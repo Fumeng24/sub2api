@@ -737,6 +737,30 @@ func (s *SettingService) IsInvitationCodeEnabled(ctx context.Context) bool {
 	return value == "true"
 }
 
+// IsReferralEnabled 检查是否启用邀请裂变推广
+func (s *SettingService) IsReferralEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyReferralEnabled)
+	if err != nil {
+		return false
+	}
+	return value == "true"
+}
+
+// GetReferralRewards 获取邀请奖励金额
+func (s *SettingService) GetReferralRewards(ctx context.Context) (inviterReward, inviteeReward float64) {
+	if v, err := s.settingRepo.GetValue(ctx, SettingKeyReferralInviterReward); err == nil {
+		if parsed, e := strconv.ParseFloat(v, 64); e == nil && parsed >= 0 {
+			inviterReward = parsed
+		}
+	}
+	if v, err := s.settingRepo.GetValue(ctx, SettingKeyReferralInviteeReward); err == nil {
+		if parsed, e := strconv.ParseFloat(v, 64); e == nil && parsed >= 0 {
+			inviteeReward = parsed
+		}
+	}
+	return
+}
+
 // IsPasswordResetEnabled 检查是否启用密码重置功能
 // 要求：必须同时开启邮件验证
 func (s *SettingService) IsPasswordResetEnabled(ctx context.Context) bool {

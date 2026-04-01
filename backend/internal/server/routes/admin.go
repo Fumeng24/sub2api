@@ -87,6 +87,17 @@ func RegisterAdminRoutes(
 
 		// 定时测试计划
 		registerScheduledTestRoutes(admin, h)
+
+		// 邀请裂变推广
+		registerReferralRoutes(admin, h)
+	}
+}
+
+func registerReferralRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	referral := admin.Group("/referral")
+	{
+		referral.GET("/stats", h.Admin.Referral.GetStats)
+		referral.GET("/list", h.Admin.Referral.List)
 	}
 }
 
