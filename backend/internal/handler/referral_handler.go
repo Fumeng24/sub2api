@@ -30,7 +30,8 @@ func (h *ReferralHandler) GetReferralInfo(c *gin.Context) {
 		return
 	}
 
-	userID, _ := middleware2.GetAuthSubjectFromContext(c)
+	subject, _ := middleware2.GetAuthSubjectFromContext(c)
+	userID := subject.UserID
 
 	siteBaseURL := c.Request.Header.Get("Origin")
 	if siteBaseURL == "" {
@@ -53,7 +54,8 @@ func (h *ReferralHandler) GetInvitees(c *gin.Context) {
 		return
 	}
 
-	userID, _ := middleware2.GetAuthSubjectFromContext(c)
+	subject, _ := middleware2.GetAuthSubjectFromContext(c)
+	userID := subject.UserID
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -83,7 +85,8 @@ func (h *ReferralHandler) GetRewardSummary(c *gin.Context) {
 		return
 	}
 
-	userID, _ := middleware2.GetAuthSubjectFromContext(c)
+	subject, _ := middleware2.GetAuthSubjectFromContext(c)
+	userID := subject.UserID
 
 	totalInvitees, err := h.referralService.CountInvitees(c.Request.Context(), userID)
 	if err != nil {
