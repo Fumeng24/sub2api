@@ -27,9 +27,28 @@ export async function getUserGroupRates(): Promise<Record<number, number>> {
   return data || {}
 }
 
+export interface GroupAvailabilityItem {
+  group_id: number
+  group_name: string
+  platform: string
+  available: boolean
+  total_accounts: number
+  active_accounts: number
+}
+
+/**
+ * Get availability status for all groups the current user can access
+ * @returns List of group availability info
+ */
+export async function getAvailability(): Promise<GroupAvailabilityItem[]> {
+  const { data } = await apiClient.get<GroupAvailabilityItem[]>('/groups/availability')
+  return data
+}
+
 export const userGroupsAPI = {
   getAvailable,
-  getUserGroupRates
+  getUserGroupRates,
+  getAvailability
 }
 
 export default userGroupsAPI
