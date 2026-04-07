@@ -323,12 +323,12 @@ func (s *SubscriptionService) createSubscription(ctx context.Context, input *Ass
 	}
 
 	sub := &UserSubscription{
-		UserID:           input.UserID,
-		GroupID:          input.GroupID,
-		StartsAt:         now,
-		ExpiresAt:        expiresAt,
-		Status:           SubscriptionStatusActive,
-		AssignedAt:       now,
+		UserID:             input.UserID,
+		GroupID:            input.GroupID,
+		StartsAt:           now,
+		ExpiresAt:          expiresAt,
+		Status:             SubscriptionStatusActive,
+		AssignedAt:         now,
 		DailyWindowStart:   &now, // 兑换时即激活窗口，前端可立刻显示倒计时
 		WeeklyWindowStart:  &now,
 		MonthlyWindowStart: &now,
