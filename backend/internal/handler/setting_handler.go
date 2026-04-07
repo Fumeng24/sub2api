@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -67,11 +68,12 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 // GET /api/v1/groups/availability
 func (h *SettingHandler) GetGroupAvailability(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := getUserIDFromContext(c)
-	if userID == 0 {
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok || subject.UserID == 0 {
 		response.Error(c, 401, "unauthorized")
 		return
 	}
+	userID := subject.UserID
 
 	groups, err := h.apiKeyService.GetAvailableGroups(ctx, userID)
 	if err != nil {
