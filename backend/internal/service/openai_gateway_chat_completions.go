@@ -46,7 +46,13 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	// 2. Resolve model mapping early so compat prompt_cache_key injection can
 	// derive a stable seed from the final upstream model family.
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
-	upstreamModel := normalizeCodexModel(billingModel)
+	// 如果账号级模型映射已生效，跳过 Codex 规范化，避免映射结果被覆盖。
+	upstreamModel := billingModel
+	if billingModel == originalModel {
+		if nm := normalizeCodexModel(billingModel); nm != "" {
+			upstreamModel = nm
+		}
+	}
 
 	promptCacheKey = strings.TrimSpace(promptCacheKey)
 	compatPromptCacheInjected := false

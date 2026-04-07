@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SettingHandler 公开设置处理器（无需认证）
+// SettingHandler 设置处理器（含公开接口和需认证的用户接口）
 type SettingHandler struct {
 	settingService *service.SettingService
 	apiKeyService  *service.APIKeyService
