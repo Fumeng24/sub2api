@@ -38,12 +38,23 @@ const (
 	OpsSkipPassthroughKey = "ops_skip_passthrough"
 )
 
+const opsUpstreamBodyMaxCapture = 8 * 1024 // 8KB; full body not needed for ops logging
+
 func setOpsUpstreamRequestBody(c *gin.Context, body []byte) {
 	if c == nil || len(body) == 0 {
 		return
 	}
-	// 热路径避免 string(body) 额外分配，按需在落库前再转换。
-	c.Set(OpsUpstreamRequestBodyKey, body)
+	// Truncate to reduce memory held by gin.Context for the request lifetime.
+	if len(body) > opsUpstreamBodyMaxCapture {
+		truncated := make([]byte, opsUpstreamBodyMaxCapture)
+		copy(truncated, body[:opsUpstreamBodyMaxCapture])
+		c.Set(OpsUpstreamRequestBodyKey, truncated)
+		return
+	}
+	// Copy to break reference to pooled buffer.
+	owned := make([]byte, len(body))
+	copy(owned, body)
+	c.Set(OpsUpstreamRequestBodyKey, owned)
 }
 
 func SetOpsLatencyMs(c *gin.Context, key string, value int64) {

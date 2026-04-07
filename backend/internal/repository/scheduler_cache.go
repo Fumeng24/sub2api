@@ -101,12 +101,12 @@ func (c *schedulerCache) SetSnapshot(ctx context.Context, bucket service.Schedul
 	snapshotKey := schedulerSnapshotKey(bucket, versionStr)
 
 	pipe := c.rdb.Pipeline()
-	for _, account := range accounts {
-		payload, err := json.Marshal(account)
+	for i := range accounts {
+		payload, err := marshalAccountForCache(&accounts[i])
 		if err != nil {
 			return err
 		}
-		pipe.Set(ctx, schedulerAccountKey(strconv.FormatInt(account.ID, 10)), payload, 0)
+		pipe.Set(ctx, schedulerAccountKey(strconv.FormatInt(accounts[i].ID, 10)), payload, 0)
 	}
 	if len(accounts) > 0 {
 		// 使用序号作为 score，保持数据库返回的排序语义。
@@ -151,7 +151,7 @@ func (c *schedulerCache) SetAccount(ctx context.Context, account *service.Accoun
 	if account == nil || account.ID <= 0 {
 		return nil
 	}
-	payload, err := json.Marshal(account)
+	payload, err := marshalAccountForCache(account)
 	if err != nil {
 		return err
 	}
@@ -258,6 +258,66 @@ func schedulerAccountKey(id string) string {
 
 func ptrTime(t time.Time) *time.Time {
 	return &t
+}
+
+// schedulerCacheCredentialDenyList lists credential keys that are excluded from
+// the scheduler cache to reduce Redis bandwidth. Only id_token is stripped
+// because it is large and consumed exclusively by background token-refresh
+// services. refresh_token is kept because it may be used as a fallback to
+// recover access_token on the gateway hot path.
+var schedulerCacheCredentialDenyList = []string{"id_token"}
+
+// marshalAccountForCache serialises an Account for the scheduler cache while
+// stripping large fields that are not needed for scheduling or request
+// forwarding. The caller's Account is never mutated.
+//
+// Stripped fields:
+//   - Credentials: id_token (large JWT, only used by background refresh services)
+//   - AccountGroups[].Group: full Group objects (only GroupID needed for routing)
+//   - AccountGroups[].Account: back-reference to parent (circular/redundant)
+//   - Groups: duplicate of AccountGroups[].Group (ops-only, not used in gateway)
+func marshalAccountForCache(account *service.Account) ([]byte, error) {
+	if account == nil {
+		return json.Marshal(account)
+	}
+	// Shallow copy so we never mutate the caller's struct.
+	cp := *account
+
+	// Strip denied credential keys.
+	if len(cp.Credentials) > 0 {
+		filtered := make(map[string]any, len(cp.Credentials))
+		for k, v := range cp.Credentials {
+			skip := false
+			for _, denied := range schedulerCacheCredentialDenyList {
+				if k == denied {
+					skip = true
+					break
+				}
+			}
+			if !skip {
+				filtered[k] = v
+			}
+		}
+		cp.Credentials = filtered
+	}
+
+	// Strip full Group objects from AccountGroups (only GroupID is used).
+	if len(cp.AccountGroups) > 0 {
+		stripped := make([]service.AccountGroup, len(cp.AccountGroups))
+		for i, ag := range cp.AccountGroups {
+			stripped[i] = service.AccountGroup{
+				AccountID: ag.AccountID,
+				GroupID:   ag.GroupID,
+				Priority:  ag.Priority,
+			}
+		}
+		cp.AccountGroups = stripped
+	}
+
+	// Strip Groups slice entirely (only used by ops monitoring).
+	cp.Groups = nil
+
+	return json.Marshal(&cp)
 }
 
 func decodeCachedAccount(val any) (*service.Account, error) {
