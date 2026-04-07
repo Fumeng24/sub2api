@@ -1929,7 +1929,8 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 
 	// 对所有请求执行模型映射（包含 Codex CLI）。
 	billingModel := account.GetMappedModel(reqModel)
-	if billingModel != reqModel {
+	accountMappingApplied := billingModel != reqModel
+	if accountMappingApplied {
 		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Model mapping applied: %s -> %s (account: %s, isCodexCLI: %v)", reqModel, billingModel, account.Name, isCodexCLI)
 		reqBody["model"] = billingModel
 		bodyModified = true
@@ -1938,14 +1939,17 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	upstreamModel := billingModel
 
 	// 针对所有 OpenAI 账号执行 Codex 模型名规范化，确保上游识别一致。
+	// 但如果账号级模型映射已生效，跳过规范化，避免映射结果被覆盖。
 	if model, ok := reqBody["model"].(string); ok {
-		upstreamModel = normalizeCodexModel(model)
-		if upstreamModel != "" && upstreamModel != model {
-			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Upstream model resolved: %s -> %s (account: %s, type: %s, isCodexCLI: %v)",
-				model, upstreamModel, account.Name, account.Type, isCodexCLI)
-			reqBody["model"] = upstreamModel
-			bodyModified = true
-			markPatchSet("model", upstreamModel)
+		if !accountMappingApplied {
+			upstreamModel = normalizeCodexModel(model)
+			if upstreamModel != "" && upstreamModel != model {
+				logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Codex model normalization: %s -> %s (account: %s, type: %s, isCodexCLI: %v)",
+					model, upstreamModel, account.Name, account.Type, isCodexCLI)
+				reqBody["model"] = upstreamModel
+				bodyModified = true
+				markPatchSet("model", upstreamModel)
+			}
 		}
 
 		// 移除 gpt-5.2-codex 以下的版本 verbosity 参数

@@ -11,13 +11,17 @@ import (
 // SettingHandler 公开设置处理器（无需认证）
 type SettingHandler struct {
 	settingService *service.SettingService
+	apiKeyService  *service.APIKeyService
+	gatewayService *service.GatewayService
 	version        string
 }
 
 // NewSettingHandler 创建公开设置处理器
-func NewSettingHandler(settingService *service.SettingService, version string) *SettingHandler {
+func NewSettingHandler(settingService *service.SettingService, apiKeyService *service.APIKeyService, gatewayService *service.GatewayService, version string) *SettingHandler {
 	return &SettingHandler{
 		settingService: settingService,
+		apiKeyService:  apiKeyService,
+		gatewayService: gatewayService,
 		version:        version,
 	}
 }
@@ -57,4 +61,24 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		BackendModeEnabled:               settings.BackendModeEnabled,
 		Version:                          h.version,
 	})
+}
+
+// GetGroupAvailability 获取用户可用分组的可用性状态（需认证）
+// GET /api/v1/groups/availability
+func (h *SettingHandler) GetGroupAvailability(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID := getUserIDFromContext(c)
+	if userID == 0 {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+
+	groups, err := h.apiKeyService.GetAvailableGroups(ctx, userID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	availability := h.gatewayService.GetGroupsAvailability(ctx, groups)
+	response.Success(c, availability)
 }

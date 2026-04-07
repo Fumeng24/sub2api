@@ -62,7 +62,13 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 
 	// 3. Model mapping
 	billingModel := resolveOpenAIForwardModel(account, normalizedModel, defaultMappedModel)
-	upstreamModel := normalizeCodexModel(billingModel)
+	// 如果账号级模型映射已生效，跳过 Codex 规范化，避免映射结果被覆盖。
+	upstreamModel := billingModel
+	if billingModel == normalizedModel {
+		if nm := normalizeCodexModel(billingModel); nm != "" {
+			upstreamModel = nm
+		}
+	}
 	responsesReq.Model = upstreamModel
 
 	logger.L().Debug("openai messages: model mapping applied",
