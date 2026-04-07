@@ -222,6 +222,13 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 			return nil, false, fmt.Errorf("extend subscription: %w", err)
 		}
 
+		// 重置日用量窗口：从当前兑换时刻开始新的 24h 窗口
+		windowStart := time.Now()
+		if err := s.userSubRepo.ResetDailyUsage(txCtx, existingSub.ID, windowStart); err != nil {
+			_ = tx.Rollback()
+			return nil, false, fmt.Errorf("reset daily window on extend: %w", err)
+		}
+
 		// 如果订阅已过期或被暂停，恢复为active状态
 		if existingSub.Status != SubscriptionStatusActive {
 			if err := s.userSubRepo.UpdateStatus(txCtx, existingSub.ID, SubscriptionStatusActive); err != nil {
@@ -301,15 +308,16 @@ func (s *SubscriptionService) createSubscription(ctx context.Context, input *Ass
 	}
 
 	sub := &UserSubscription{
-		UserID:     input.UserID,
-		GroupID:    input.GroupID,
-		StartsAt:   now,
-		ExpiresAt:  expiresAt,
-		Status:     SubscriptionStatusActive,
-		AssignedAt: now,
-		Notes:      input.Notes,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		UserID:           input.UserID,
+		GroupID:          input.GroupID,
+		StartsAt:         now,
+		ExpiresAt:        expiresAt,
+		Status:           SubscriptionStatusActive,
+		AssignedAt:       now,
+		DailyWindowStart: &now, // 兑换时即激活窗口，前端可立刻显示倒计时
+		Notes:            input.Notes,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 	// 只有当 AssignedBy > 0 时才设置（0 表示系统分配，如兑换码）
 	if input.AssignedBy > 0 {
