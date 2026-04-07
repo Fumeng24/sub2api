@@ -332,9 +332,9 @@ func (s *SubscriptionService) createSubscription(ctx context.Context, input *Ass
 		DailyWindowStart:   &now, // 兑换时即激活窗口，前端可立刻显示倒计时
 		WeeklyWindowStart:  &now,
 		MonthlyWindowStart: &now,
-		Notes:            input.Notes,
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		Notes:              input.Notes,
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 	// 只有当 AssignedBy > 0 时才设置（0 表示系统分配，如兑换码）
 	if input.AssignedBy > 0 {
