@@ -230,7 +230,7 @@
                     ${{ row.group?.daily_limit_usd?.toFixed(2) }}
                   </span>
                 </div>
-                <div class="reset-info" v-if="row.daily_window_start">
+                <div class="reset-info" v-if="row.daily_window_start && row.status === 'active'">
                   <svg
                     class="h-3 w-3"
                     fill="none"
