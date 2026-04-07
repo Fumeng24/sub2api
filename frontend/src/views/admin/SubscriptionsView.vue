@@ -267,7 +267,7 @@
                     ${{ row.group?.weekly_limit_usd?.toFixed(2) }}
                   </span>
                 </div>
-                <div class="reset-info" v-if="row.weekly_window_start">
+                <div class="reset-info" v-if="row.weekly_window_start && row.status === 'active'">
                   <svg
                     class="h-3 w-3"
                     fill="none"
@@ -304,7 +304,7 @@
                     ${{ row.group?.monthly_limit_usd?.toFixed(2) }}
                   </span>
                 </div>
-                <div class="reset-info" v-if="row.monthly_window_start">
+                <div class="reset-info" v-if="row.monthly_window_start && row.status === 'active'">
                   <svg
                     class="h-3 w-3"
                     fill="none"

@@ -222,12 +222,25 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 			return nil, false, fmt.Errorf("extend subscription: %w", err)
 		}
 
-		// 仅在日窗口已过期或未激活时重置；窗口仍有效时保留当前用量
+		// 仅在窗口已过期或未激活时重置；窗口仍有效时保留当前用量
+		// 注：并发的 CheckAndResetWindows 调用对已过期窗口是幂等安全的
+		windowStart := time.Now()
 		if existingSub.DailyWindowStart == nil || existingSub.NeedsDailyReset() {
-			windowStart := time.Now()
 			if err := s.userSubRepo.ResetDailyUsage(txCtx, existingSub.ID, windowStart); err != nil {
 				_ = tx.Rollback()
 				return nil, false, fmt.Errorf("reset daily window on extend: %w", err)
+			}
+		}
+		if existingSub.WeeklyWindowStart == nil || existingSub.NeedsWeeklyReset() {
+			if err := s.userSubRepo.ResetWeeklyUsage(txCtx, existingSub.ID, windowStart); err != nil {
+				_ = tx.Rollback()
+				return nil, false, fmt.Errorf("reset weekly window on extend: %w", err)
+			}
+		}
+		if existingSub.MonthlyWindowStart == nil || existingSub.NeedsMonthlyReset() {
+			if err := s.userSubRepo.ResetMonthlyUsage(txCtx, existingSub.ID, windowStart); err != nil {
+				_ = tx.Rollback()
+				return nil, false, fmt.Errorf("reset monthly window on extend: %w", err)
 			}
 		}
 
@@ -316,7 +329,9 @@ func (s *SubscriptionService) createSubscription(ctx context.Context, input *Ass
 		ExpiresAt:        expiresAt,
 		Status:           SubscriptionStatusActive,
 		AssignedAt:       now,
-		DailyWindowStart: &now, // 兑换时即激活窗口，前端可立刻显示倒计时
+		DailyWindowStart:   &now, // 兑换时即激活窗口，前端可立刻显示倒计时
+		WeeklyWindowStart:  &now,
+		MonthlyWindowStart: &now,
 		Notes:            input.Notes,
 		CreatedAt:        now,
 		UpdatedAt:        now,
