@@ -222,11 +222,13 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 			return nil, false, fmt.Errorf("extend subscription: %w", err)
 		}
 
-		// 重置日用量窗口：从当前兑换时刻开始新的 24h 窗口
-		windowStart := time.Now()
-		if err := s.userSubRepo.ResetDailyUsage(txCtx, existingSub.ID, windowStart); err != nil {
-			_ = tx.Rollback()
-			return nil, false, fmt.Errorf("reset daily window on extend: %w", err)
+		// 仅在日窗口已过期或未激活时重置；窗口仍有效时保留当前用量
+		if existingSub.DailyWindowStart == nil || existingSub.NeedsDailyReset() {
+			windowStart := time.Now()
+			if err := s.userSubRepo.ResetDailyUsage(txCtx, existingSub.ID, windowStart); err != nil {
+				_ = tx.Rollback()
+				return nil, false, fmt.Errorf("reset daily window on extend: %w", err)
+			}
 		}
 
 		// 如果订阅已过期或被暂停，恢复为active状态
