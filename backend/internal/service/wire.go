@@ -173,7 +173,16 @@ func ProvideConcurrencyService(cache ConcurrencyCache, accountRepo AccountReposi
 		logger.LegacyPrintf("service.concurrency", "Warning: startup cleanup stale process slots failed: %v", err)
 	}
 	if cfg != nil {
-		svc.StartSlotCleanupWorker(accountRepo, cfg.Gateway.Scheduling.SlotCleanupInterval)
+		if cfg.Gateway.Scheduling.SlotCleanupInterval > 0 {
+			svc.StartSlotCleanupWorker(accountRepo, cfg.Gateway.Scheduling.SlotCleanupInterval)
+			logger.LegacyPrintf("service.concurrency", "[ConcurrencyService] slot cleanup worker started, interval=%s", cfg.Gateway.Scheduling.SlotCleanupInterval)
+		} else {
+			// worker 被显式禁用，concurrencyCache 会在热路径做 inline 清理兜底
+			// （参见 repository/wire.go:ProvideConcurrencyCache 的 inlineCleanupOnRead 分支）。
+			// 代价：每次 Batch 读取会额外发送 N 次 ZREMRANGEBYSCORE 写命令（N=参与调度的账号数），
+			// 在大号池 + 高 QPS 场景下会显著放大 Redis 负载与 AOF 写入。
+			logger.LegacyPrintf("service.concurrency", "[ConcurrencyService] slot_cleanup_interval<=0, background worker disabled; cache falling back to inline cleanup in read path (adds N ZREMRANGEBYSCORE per batch read)")
+		}
 	}
 	return svc
 }

@@ -194,12 +194,32 @@ type concurrencyCache struct {
 	rdb                 *redis.Client
 	slotTTLSeconds      int // 槽位过期时间（秒）
 	waitQueueTTLSeconds int // 等待队列过期时间（秒）
+	// inlineCleanupOnRead 控制批量读取接口（GetAccountConcurrencyBatch /
+	// GetAccountsLoadBatch）是否在热路径里做 ZREMRANGEBYSCORE 过期清理。
+	//
+	// 设计：正常情况下（gateway.scheduling.slot_cleanup_interval > 0）后台 worker
+	// 会周期性调用 CleanupExpiredAccountSlots，因此热路径可以只发只读命令（ZCARD/
+	// GET），把 Redis 命令数从 3N 降到 2N。
+	//
+	// 但当 slot_cleanup_interval <= 0 时，service.ConcurrencyService.StartSlotCleanupWorker
+	// 会早返回不启动 worker；此时若热路径也不清理，stale 槽位会在 ZSET 中永远累积，
+	// 被 ZCARD 读出虚高计数，调度器会避开该账号 → 该账号永远不会再进入 acquire 路径
+	// → stale 永远不会被清理。这是一个自强化的 livelock。
+	//
+	// 因此当 worker 被禁用时，wire 层会把此字段置为 true，热路径退化为原始的 3N
+	// 命令行为，保证正确性。
+	inlineCleanupOnRead bool
 }
 
 // NewConcurrencyCache 创建并发控制缓存
 // slotTTLMinutes: 槽位过期时间（分钟），0 或负数使用默认值 15 分钟
 // waitQueueTTLSeconds: 等待队列过期时间（秒），0 或负数使用 slot TTL
-func NewConcurrencyCache(rdb *redis.Client, slotTTLMinutes int, waitQueueTTLSeconds int) service.ConcurrencyCache {
+// inlineCleanupOnRead: 是否在热路径批量读取里做 stale 槽位清理。
+//
+//	正常情况下后台 worker 已经负责清理，此参数应传 false；
+//	仅当 gateway.scheduling.slot_cleanup_interval <= 0（worker 被禁用）时传 true，
+//	作为正确性兜底。
+func NewConcurrencyCache(rdb *redis.Client, slotTTLMinutes int, waitQueueTTLSeconds int, inlineCleanupOnRead bool) service.ConcurrencyCache {
 	if slotTTLMinutes <= 0 {
 		slotTTLMinutes = defaultSlotTTLMinutes
 	}
@@ -210,6 +230,7 @@ func NewConcurrencyCache(rdb *redis.Client, slotTTLMinutes int, waitQueueTTLSeco
 		rdb:                 rdb,
 		slotTTLSeconds:      slotTTLMinutes * 60,
 		waitQueueTTLSeconds: waitQueueTTLSeconds,
+		inlineCleanupOnRead: inlineCleanupOnRead,
 	}
 }
 
@@ -262,11 +283,25 @@ func (c *concurrencyCache) GetAccountConcurrencyBatch(ctx context.Context, accou
 		return map[int64]int{}, nil
 	}
 
-	now, err := c.rdb.Time(ctx).Result()
-	if err != nil {
-		return nil, fmt.Errorf("redis TIME: %w", err)
+	// 热路径默认只发只读命令（ZCARD），把 N=5000 时的命令数从 2N 降到 N，
+	// 且去掉所有写命令（AOF/主从压力同步下降）。过期槽位的清理由后台 worker 统一负责：
+	// service/concurrency_service.go:StartSlotCleanupWorker，周期由
+	// gateway.scheduling.slot_cleanup_interval 控制（默认 30s）。
+	// 真正的入队路径（AcquireAccountSlot → acquireScript）在 ZADD 前仍会做原子清理，
+	// 因此槽位不会无限累积；此处读到的计数最多滞后一个 worker 周期。
+	//
+	// 边界：当 slot_cleanup_interval <= 0（worker 被显式禁用）时，wire 层会把
+	// inlineCleanupOnRead 置 true，此时退化为原始的 2N 命令行为做正确性兜底，
+	// 防止 stale 计数把账号锁死在虚高负载状态（这是一个自强化的 livelock：
+	// ZCARD 虚高 → 调度避开 → 不走 acquire → stale 永远不清 → 继续 ZCARD 虚高）。
+	var cutoffTime int64
+	if c.inlineCleanupOnRead {
+		now, err := c.rdb.Time(ctx).Result()
+		if err != nil {
+			return nil, fmt.Errorf("redis TIME: %w", err)
+		}
+		cutoffTime = now.Unix() - int64(c.slotTTLSeconds)
 	}
-	cutoffTime := now.Unix() - int64(c.slotTTLSeconds)
 
 	pipe := c.rdb.Pipeline()
 	type accountCmd struct {
@@ -276,7 +311,9 @@ func (c *concurrencyCache) GetAccountConcurrencyBatch(ctx context.Context, accou
 	cmds := make([]accountCmd, 0, len(accountIDs))
 	for _, accountID := range accountIDs {
 		slotKey := accountSlotKeyPrefix + strconv.FormatInt(accountID, 10)
-		pipe.ZRemRangeByScore(ctx, slotKey, "-inf", strconv.FormatInt(cutoffTime, 10))
+		if c.inlineCleanupOnRead {
+			pipe.ZRemRangeByScore(ctx, slotKey, "-inf", strconv.FormatInt(cutoffTime, 10))
+		}
 		cmds = append(cmds, accountCmd{
 			accountID: accountID,
 			zcardCmd:  pipe.ZCard(ctx, slotKey),
@@ -373,12 +410,26 @@ func (c *concurrencyCache) GetAccountsLoadBatch(ctx context.Context, accounts []
 	}
 
 	// 使用 Pipeline 替代 Lua 脚本，兼容 Redis Cluster（Lua 内动态拼 key 会 CROSSSLOT）。
-	// 每个账号执行 3 个命令：ZREMRANGEBYSCORE（清理过期）、ZCARD（并发数）、GET（等待数）。
-	now, err := c.rdb.Time(ctx).Result()
-	if err != nil {
-		return nil, fmt.Errorf("redis TIME: %w", err)
+	// 热路径默认只发只读命令：ZCARD（并发数）+ GET（等待数）。
+	// 过期槽位的清理（ZREMRANGEBYSCORE）已移至后台 worker 统一负责：
+	// service/concurrency_service.go:StartSlotCleanupWorker，周期由
+	// gateway.scheduling.slot_cleanup_interval 控制（默认 30s）。
+	// 真正的入队路径（AcquireAccountSlot → acquireScript）在 ZADD 前仍会做原子清理，
+	// 因此槽位不会无限累积；此处读到的计数最多滞后一个 worker 周期，对负载打分影响可忽略。
+	// 收益：N=5000 账号时，从每请求 3N=15000 条 Redis 命令降到 2N=10000 条，
+	// 且剥离了所有写命令（AOF/主从复制压力同步下降）。
+	//
+	// 边界：当 slot_cleanup_interval <= 0（worker 被显式禁用）时，wire 层会把
+	// inlineCleanupOnRead 置 true，此时退化为原始的 3N 命令行为做正确性兜底，
+	// 防止 stale 计数把账号锁死在虚高负载状态。
+	var cutoffTime int64
+	if c.inlineCleanupOnRead {
+		now, err := c.rdb.Time(ctx).Result()
+		if err != nil {
+			return nil, fmt.Errorf("redis TIME: %w", err)
+		}
+		cutoffTime = now.Unix() - int64(c.slotTTLSeconds)
 	}
-	cutoffTime := now.Unix() - int64(c.slotTTLSeconds)
 
 	pipe := c.rdb.Pipeline()
 
@@ -392,7 +443,9 @@ func (c *concurrencyCache) GetAccountsLoadBatch(ctx context.Context, accounts []
 	for _, acc := range accounts {
 		slotKey := accountSlotKeyPrefix + strconv.FormatInt(acc.ID, 10)
 		waitKey := accountWaitKeyPrefix + strconv.FormatInt(acc.ID, 10)
-		pipe.ZRemRangeByScore(ctx, slotKey, "-inf", strconv.FormatInt(cutoffTime, 10))
+		if c.inlineCleanupOnRead {
+			pipe.ZRemRangeByScore(ctx, slotKey, "-inf", strconv.FormatInt(cutoffTime, 10))
+		}
 		ac := accountCmds{
 			id:             acc.ID,
 			maxConcurrency: acc.MaxConcurrency,

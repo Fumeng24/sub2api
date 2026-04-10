@@ -1969,14 +1969,19 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 				"platform", platform,
 				"use_mixed", useMixed,
 				"count", len(accounts))
-			for _, acc := range accounts {
-				slog.Debug("account_scheduling_account_detail",
-					"account_id", acc.ID,
-					"name", acc.Name,
-					"platform", acc.Platform,
-					"type", acc.Type,
-					"status", acc.Status,
-					"tls_fingerprint", acc.IsTLSFingerprintEnabled())
+			// 仅在 debug 级别真正开启时才遍历账号并逐个打日志。
+			// 否则 O(N) 的 range + slog.Debug(...) 即便被 slog 内部丢弃，
+			// 每迭代仍有方法调用 + ...any 装箱开销（N=5000 时每请求 ~25k 次装箱）。
+			if slog.Default().Enabled(ctx, slog.LevelDebug) {
+				for _, acc := range accounts {
+					slog.Debug("account_scheduling_account_detail",
+						"account_id", acc.ID,
+						"name", acc.Name,
+						"platform", acc.Platform,
+						"type", acc.Type,
+						"status", acc.Status,
+						"tls_fingerprint", acc.IsTLSFingerprintEnabled())
+				}
 			}
 		}
 		return accounts, useMixed, err
@@ -2012,14 +2017,16 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 			"platform", platform,
 			"raw_count", len(accounts),
 			"filtered_count", len(filtered))
-		for _, acc := range filtered {
-			slog.Debug("account_scheduling_account_detail",
-				"account_id", acc.ID,
-				"name", acc.Name,
-				"platform", acc.Platform,
-				"type", acc.Type,
-				"status", acc.Status,
-				"tls_fingerprint", acc.IsTLSFingerprintEnabled())
+		if slog.Default().Enabled(ctx, slog.LevelDebug) {
+			for _, acc := range filtered {
+				slog.Debug("account_scheduling_account_detail",
+					"account_id", acc.ID,
+					"name", acc.Name,
+					"platform", acc.Platform,
+					"type", acc.Type,
+					"status", acc.Status,
+					"tls_fingerprint", acc.IsTLSFingerprintEnabled())
+			}
 		}
 		return filtered, useMixed, nil
 	}
@@ -2045,14 +2052,16 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 		"group_id", derefGroupID(groupID),
 		"platform", platform,
 		"count", len(accounts))
-	for _, acc := range accounts {
-		slog.Debug("account_scheduling_account_detail",
-			"account_id", acc.ID,
-			"name", acc.Name,
-			"platform", acc.Platform,
-			"type", acc.Type,
-			"status", acc.Status,
-			"tls_fingerprint", acc.IsTLSFingerprintEnabled())
+	if slog.Default().Enabled(ctx, slog.LevelDebug) {
+		for _, acc := range accounts {
+			slog.Debug("account_scheduling_account_detail",
+				"account_id", acc.ID,
+				"name", acc.Name,
+				"platform", acc.Platform,
+				"type", acc.Type,
+				"status", acc.Status,
+				"tls_fingerprint", acc.IsTLSFingerprintEnabled())
+		}
 	}
 	return accounts, useMixed, nil
 }

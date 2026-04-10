@@ -22,7 +22,8 @@ func BenchmarkAccountConcurrency(b *testing.B) {
 		_ = rdb.Close()
 	}()
 
-	cache, _ := NewConcurrencyCache(rdb, benchSlotTTLMinutes, int(benchSlotTTL.Seconds())).(*concurrencyCache)
+	// Benchmark 模式下关闭 inline 清理，测量生产热路径的真实开销（只读命令）。
+	cache, _ := NewConcurrencyCache(rdb, benchSlotTTLMinutes, int(benchSlotTTL.Seconds()), false).(*concurrencyCache)
 	ctx := context.Background()
 
 	for _, size := range []int{10, 100, 1000} {

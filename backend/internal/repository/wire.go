@@ -22,7 +22,11 @@ func ProvideConcurrencyCache(rdb *redis.Client, cfg *config.Config) service.Conc
 	if waitTTLSeconds <= 0 {
 		waitTTLSeconds = cfg.Gateway.ConcurrencySlotTTLMinutes * 60
 	}
-	return NewConcurrencyCache(rdb, cfg.Gateway.ConcurrencySlotTTLMinutes, waitTTLSeconds)
+	// 当 slot_cleanup_interval <= 0 时，service.ConcurrencyService.StartSlotCleanupWorker
+	// 会早返回不启动后台 worker；此时必须让 cache 在热路径做 inline 清理，否则 stale
+	// 槽位会永久累积并锁死账号。正常情况下（worker 启用）inline 清理关闭，仅发只读命令。
+	inlineCleanupOnRead := cfg.Gateway.Scheduling.SlotCleanupInterval <= 0
+	return NewConcurrencyCache(rdb, cfg.Gateway.ConcurrencySlotTTLMinutes, waitTTLSeconds, inlineCleanupOnRead)
 }
 
 // ProvideGitHubReleaseClient 创建 GitHub Release 客户端
