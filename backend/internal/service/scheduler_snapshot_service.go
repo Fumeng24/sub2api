@@ -96,7 +96,7 @@ func (s *SchedulerSnapshotService) Stop() {
 	s.wg.Wait()
 }
 
-func (s *SchedulerSnapshotService) ListSchedulableAccounts(ctx context.Context, groupID *int64, platform string, hasForcePlatform bool) ([]Account, bool, error) {
+func (s *SchedulerSnapshotService) ListSchedulableAccounts(ctx context.Context, groupID *int64, platform string, hasForcePlatform bool) ([]*Account, bool, error) {
 	useMixed := (platform == PlatformAnthropic || platform == PlatformGemini) && !hasForcePlatform
 	mode := s.resolveMode(platform, hasForcePlatform)
 	bucket := s.bucketFor(groupID, platform, mode)
@@ -106,7 +106,7 @@ func (s *SchedulerSnapshotService) ListSchedulableAccounts(ctx context.Context, 
 		if err != nil {
 			logger.LegacyPrintf("service.scheduler_snapshot", "[Scheduler] cache read failed: bucket=%s err=%v", bucket.String(), err)
 		} else if hit {
-			return derefAccounts(cached), useMixed, nil
+			return cached, useMixed, nil
 		}
 	}
 
@@ -122,13 +122,18 @@ func (s *SchedulerSnapshotService) ListSchedulableAccounts(ctx context.Context, 
 		return nil, useMixed, err
 	}
 
+	result := make([]*Account, len(accounts))
+	for i := range accounts {
+		result[i] = &accounts[i]
+	}
+
 	if s.cache != nil {
 		if err := s.cache.SetSnapshot(fallbackCtx, bucket, accounts); err != nil {
 			logger.LegacyPrintf("service.scheduler_snapshot", "[Scheduler] cache write failed: bucket=%s err=%v", bucket.String(), err)
 		}
 	}
 
-	return accounts, useMixed, nil
+	return result, useMixed, nil
 }
 
 func (s *SchedulerSnapshotService) GetAccount(ctx context.Context, accountID int64) (*Account, error) {
@@ -788,20 +793,6 @@ func dedupeBuckets(in []SchedulerBucket) []SchedulerBucket {
 		}
 		seen[key] = struct{}{}
 		out = append(out, bucket)
-	}
-	return out
-}
-
-func derefAccounts(accounts []*Account) []Account {
-	if len(accounts) == 0 {
-		return []Account{}
-	}
-	out := make([]Account, 0, len(accounts))
-	for _, account := range accounts {
-		if account == nil {
-			continue
-		}
-		out = append(out, *account)
 	}
 	return out
 }
