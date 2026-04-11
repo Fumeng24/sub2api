@@ -244,6 +244,79 @@ func (c *schedulerCache) SetOutboxWatermark(ctx context.Context, id int64) error
 	return c.rdb.Set(ctx, schedulerOutboxWatermarkKey, strconv.FormatInt(id, 10), 0).Err()
 }
 
+func (c *schedulerCache) SetBucketMembers(ctx context.Context, bucket service.SchedulerBucket, accountIDs []int64) error {
+	activeKey := schedulerBucketKey(schedulerActivePrefix, bucket)
+	oldActive, _ := c.rdb.Get(ctx, activeKey).Result()
+
+	versionKey := schedulerBucketKey(schedulerVersionPrefix, bucket)
+	version, err := c.rdb.Incr(ctx, versionKey).Result()
+	if err != nil {
+		return err
+	}
+
+	versionStr := strconv.FormatInt(version, 10)
+	snapshotKey := schedulerSnapshotKey(bucket, versionStr)
+
+	pipe := c.rdb.Pipeline()
+	if len(accountIDs) > 0 {
+		members := make([]redis.Z, 0, len(accountIDs))
+		for idx, id := range accountIDs {
+			members = append(members, redis.Z{
+				Score:  float64(idx),
+				Member: strconv.FormatInt(id, 10),
+			})
+		}
+		pipe.ZAdd(ctx, snapshotKey, members...)
+	} else {
+		pipe.Del(ctx, snapshotKey)
+	}
+	pipe.Set(ctx, activeKey, versionStr, 0)
+	pipe.Set(ctx, schedulerBucketKey(schedulerReadyPrefix, bucket), "1", 0)
+	pipe.SAdd(ctx, schedulerBucketSetKey, bucket.String())
+	if _, err := pipe.Exec(ctx); err != nil {
+		return err
+	}
+
+	if oldActive != "" && oldActive != versionStr {
+		_ = c.rdb.Del(ctx, schedulerSnapshotKey(bucket, oldActive)).Err()
+	}
+	return nil
+}
+
+func (c *schedulerCache) RemoveAccountFromBuckets(ctx context.Context, accountID int64) error {
+	if accountID <= 0 {
+		return nil
+	}
+
+	buckets, err := c.rdb.SMembers(ctx, schedulerBucketSetKey).Result()
+	if err != nil {
+		return err
+	}
+	if len(buckets) == 0 {
+		return nil
+	}
+
+	accountIDStr := strconv.FormatInt(accountID, 10)
+	pipe := c.rdb.Pipeline()
+
+	for _, bucketStr := range buckets {
+		bucket, ok := service.ParseSchedulerBucket(bucketStr)
+		if !ok {
+			continue
+		}
+		activeKey := schedulerBucketKey(schedulerActivePrefix, bucket)
+		activeVer, err := c.rdb.Get(ctx, activeKey).Result()
+		if err != nil || activeVer == "" {
+			continue
+		}
+		snapshotKey := schedulerSnapshotKey(bucket, activeVer)
+		pipe.ZRem(ctx, snapshotKey, accountIDStr)
+	}
+
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
 func schedulerBucketKey(prefix string, bucket service.SchedulerBucket) string {
 	return fmt.Sprintf("%s%d:%s:%s", prefix, bucket.GroupID, bucket.Platform, bucket.Mode)
 }
