@@ -12,7 +12,7 @@ func TestCollectSelectionFailureStats(t *testing.T) {
 	model := "gpt-5.4"
 	resetAt := time.Now().Add(2 * time.Minute).Format(time.RFC3339)
 
-	accounts := []Account{
+	accounts := []*Account{
 		// excluded
 		{
 			ID:          1,

@@ -149,6 +149,17 @@ func cloneStringSlice(src []string) []string {
 	return dst
 }
 
+// accountsToPointers converts []Account to []*Account.
+// Used at repo call sites where scheduler snapshot path returns []*Account
+// but fallback repo path returns []Account.
+func accountsToPointers(accounts []Account) []*Account {
+	result := make([]*Account, len(accounts))
+	for i := range accounts {
+		result[i] = &accounts[i]
+	}
+	return result
+}
+
 // IsForceCacheBilling 检查是否启用强制缓存计费
 func IsForceCacheBilling(ctx context.Context) bool {
 	v, _ := ctx.Value(ForceCacheBillingContextKey).(bool)
@@ -1341,8 +1352,8 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 	// 提前构建 accountByID（供 Layer 1 和 Layer 1.5 使用）
 	accountByID := make(map[int64]*Account, len(accounts))
-	for i := range accounts {
-		accountByID[accounts[i].ID] = &accounts[i]
+	for _, acc := range accounts {
+		accountByID[acc.ID] = acc
 	}
 
 	// 获取模型路由配置（仅 anthropic 平台）
@@ -1665,8 +1676,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 	// ============ Layer 2: 负载感知选择 ============
 	candidates := make([]*Account, 0, len(accounts))
-	for i := range accounts {
-		acc := &accounts[i]
+	for _, acc := range accounts {
 		if isExcluded(acc.ID) {
 			continue
 		}
@@ -1960,7 +1970,7 @@ func (s *GatewayService) resolvePlatform(ctx context.Context, groupID *int64, gr
 	return PlatformAnthropic, false, nil
 }
 
-func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *int64, platform string, hasForcePlatform bool) ([]Account, bool, error) {
+func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *int64, platform string, hasForcePlatform bool) ([]*Account, bool, error) {
 	if s.schedulerSnapshot != nil {
 		accounts, useMixed, err := s.schedulerSnapshot.ListSchedulableAccounts(ctx, groupID, platform, hasForcePlatform)
 		if err == nil {
@@ -1989,14 +1999,14 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 	useMixed := (platform == PlatformAnthropic || platform == PlatformGemini) && !hasForcePlatform
 	if useMixed {
 		platforms := []string{platform, PlatformAntigravity}
-		var accounts []Account
+		var rawAccounts []Account
 		var err error
 		if groupID != nil {
-			accounts, err = s.accountRepo.ListSchedulableByGroupIDAndPlatforms(ctx, *groupID, platforms)
+			rawAccounts, err = s.accountRepo.ListSchedulableByGroupIDAndPlatforms(ctx, *groupID, platforms)
 		} else if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-			accounts, err = s.accountRepo.ListSchedulableByPlatforms(ctx, platforms)
+			rawAccounts, err = s.accountRepo.ListSchedulableByPlatforms(ctx, platforms)
 		} else {
-			accounts, err = s.accountRepo.ListSchedulableUngroupedByPlatforms(ctx, platforms)
+			rawAccounts, err = s.accountRepo.ListSchedulableUngroupedByPlatforms(ctx, platforms)
 		}
 		if err != nil {
 			slog.Debug("account_scheduling_list_failed",
@@ -2005,7 +2015,8 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 				"error", err)
 			return nil, useMixed, err
 		}
-		filtered := make([]Account, 0, len(accounts))
+		accounts := accountsToPointers(rawAccounts)
+		filtered := make([]*Account, 0, len(accounts))
 		for _, acc := range accounts {
 			if acc.Platform == PlatformAntigravity && !acc.IsMixedSchedulingEnabled() {
 				continue
@@ -2031,15 +2042,15 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 		return filtered, useMixed, nil
 	}
 
-	var accounts []Account
+	var rawAccounts []Account
 	var err error
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-		accounts, err = s.accountRepo.ListSchedulableByPlatform(ctx, platform)
+		rawAccounts, err = s.accountRepo.ListSchedulableByPlatform(ctx, platform)
 	} else if groupID != nil {
-		accounts, err = s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, *groupID, platform)
+		rawAccounts, err = s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, *groupID, platform)
 		// 分组内无账号则返回空列表，由上层处理错误，不再回退到全平台查询
 	} else {
-		accounts, err = s.accountRepo.ListSchedulableUngroupedByPlatform(ctx, platform)
+		rawAccounts, err = s.accountRepo.ListSchedulableUngroupedByPlatform(ctx, platform)
 	}
 	if err != nil {
 		slog.Debug("account_scheduling_list_failed",
@@ -2048,6 +2059,7 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 			"error", err)
 		return nil, useMixed, err
 	}
+	accounts := accountsToPointers(rawAccounts)
 	slog.Debug("account_scheduling_list_single",
 		"group_id", derefGroupID(groupID),
 		"platform", platform,
@@ -2149,15 +2161,14 @@ func windowCostFromPrefetchContext(ctx context.Context, accountID int64) (float6
 	return v, exists
 }
 
-func (s *GatewayService) withWindowCostPrefetch(ctx context.Context, accounts []Account) context.Context {
+func (s *GatewayService) withWindowCostPrefetch(ctx context.Context, accounts []*Account) context.Context {
 	if ctx == nil || len(accounts) == 0 || s.sessionLimitCache == nil || s.usageLogRepo == nil {
 		return ctx
 	}
 
 	accountByID := make(map[int64]*Account)
 	accountIDs := make([]int64, 0, len(accounts))
-	for i := range accounts {
-		account := &accounts[i]
+	for _, account := range accounts {
 		if account == nil || !account.IsAnthropicOAuthOrSetupToken() {
 			continue
 		}
@@ -2336,15 +2347,15 @@ func rpmFromPrefetchContext(ctx context.Context, accountID int64) (int, bool) {
 }
 
 // withRPMPrefetch 批量预取所有候选账号的 RPM 计数
-func (s *GatewayService) withRPMPrefetch(ctx context.Context, accounts []Account) context.Context {
+func (s *GatewayService) withRPMPrefetch(ctx context.Context, accounts []*Account) context.Context {
 	if s.rpmCache == nil {
 		return ctx
 	}
 
 	var ids []int64
-	for i := range accounts {
-		if accounts[i].IsAnthropicOAuthOrSetupToken() && accounts[i].GetBaseRPM() > 0 {
-			ids = append(ids, accounts[i].ID)
+	for _, acc := range accounts {
+		if acc != nil && acc.IsAnthropicOAuthOrSetupToken() && acc.GetBaseRPM() > 0 {
+			ids = append(ids, acc.ID)
 		}
 	}
 	if len(ids) == 0 {
@@ -2721,7 +2732,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 		schedGroup, _ = s.groupRepo.GetByID(ctx, *groupID)
 	}
 
-	var accounts []Account
+	var accounts []*Account
 	accountsLoaded := false
 
 	// ============ Model Routing (legacy path): apply before sticky session ============
@@ -2779,8 +2790,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 		}
 
 		var selected *Account
-		for i := range accounts {
-			acc := &accounts[i]
+		for _, acc := range accounts {
 			if _, ok := routingSet[acc.ID]; !ok {
 				continue
 			}
@@ -2893,8 +2903,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	// 因为粘性会话优先保持连接一致性，且 upstream 计费基准极少使用。
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	var selected *Account
-	for i := range accounts {
-		acc := &accounts[i]
+	for _, acc := range accounts {
 		if _, excluded := excludedIDs[acc.ID]; excluded {
 			continue
 		}
@@ -2981,7 +2990,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 		schedGroup, _ = s.groupRepo.GetByID(ctx, *groupID)
 	}
 
-	var accounts []Account
+	var accounts []*Account
 	accountsLoaded := false
 
 	// ============ Model Routing (legacy path): apply before sticky session ============
@@ -3035,8 +3044,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 		}
 
 		var selected *Account
-		for i := range accounts {
-			acc := &accounts[i]
+		for _, acc := range accounts {
 			if _, ok := routingSet[acc.ID]; !ok {
 				continue
 			}
@@ -3150,8 +3158,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	// needsUpstreamCheck 仅在主选择循环中使用；粘性会话命中时跳过此检查。
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	var selected *Account
-	for i := range accounts {
-		acc := &accounts[i]
+	for _, acc := range accounts {
 		if _, excluded := excludedIDs[acc.ID]; excluded {
 			continue
 		}
@@ -3254,7 +3261,7 @@ func (s *GatewayService) logDetailedSelectionFailure(
 	sessionHash string,
 	requestedModel string,
 	platform string,
-	accounts []Account,
+	accounts []*Account,
 	excludedIDs map[int64]struct{},
 	allowMixedScheduling bool,
 ) selectionFailureStats {
@@ -3282,7 +3289,7 @@ func (s *GatewayService) logDetailedSelectionFailure(
 
 func (s *GatewayService) collectSelectionFailureStats(
 	ctx context.Context,
-	accounts []Account,
+	accounts []*Account,
 	requestedModel string,
 	platform string,
 	excludedIDs map[int64]struct{},
@@ -3292,8 +3299,7 @@ func (s *GatewayService) collectSelectionFailureStats(
 		Total: len(accounts),
 	}
 
-	for i := range accounts {
-		acc := &accounts[i]
+	for _, acc := range accounts {
 		diagnosis := s.diagnoseSelectionFailure(ctx, acc, requestedModel, platform, excludedIDs, allowMixedScheduling)
 		switch diagnosis.Category {
 		case "excluded":

@@ -304,7 +304,7 @@ func TestWithWindowCostPrefetch_BatchReadAndContextReuse(t *testing.T) {
 
 	windowStart := time.Now().Add(-30 * time.Minute).Truncate(time.Hour)
 	windowEnd := windowStart.Add(5 * time.Hour)
-	accounts := []Account{
+	accounts := []*Account{
 		{
 			ID:                 1,
 			Platform:           PlatformAnthropic,
@@ -374,7 +374,7 @@ func TestWithWindowCostPrefetch_AllHitNoSQL(t *testing.T) {
 
 	windowStart := time.Now().Add(-30 * time.Minute).Truncate(time.Hour)
 	windowEnd := windowStart.Add(5 * time.Hour)
-	accounts := []Account{
+	accounts := []*Account{
 		{
 			ID:                 1,
 			Platform:           PlatformAnthropic,
@@ -428,7 +428,7 @@ func TestWithWindowCostPrefetch_BatchErrorFallbackSingleQuery(t *testing.T) {
 
 	windowStart := time.Now().Add(-30 * time.Minute).Truncate(time.Hour)
 	windowEnd := windowStart.Add(5 * time.Hour)
-	accounts := []Account{
+	accounts := []*Account{
 		{
 			ID:                 2,
 			Platform:           PlatformAnthropic,
