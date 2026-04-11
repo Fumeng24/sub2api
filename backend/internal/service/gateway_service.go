@@ -565,6 +565,7 @@ type GatewayService struct {
 	httpUpstream          HTTPUpstream
 	deferredService       *DeferredService
 	concurrencyService    *ConcurrencyService
+	slotPoolService       SlotPoolService
 	claudeTokenProvider   *ClaudeTokenProvider
 	sessionLimitCache     SessionLimitCache // 会话数量限制缓存（仅 Anthropic OAuth/SetupToken）
 	rpmCache              RPMCache          // RPM 计数缓存（仅 Anthropic OAuth/SetupToken）
@@ -596,6 +597,7 @@ func NewGatewayService(
 	cfg *config.Config,
 	schedulerSnapshot *SchedulerSnapshotService,
 	concurrencyService *ConcurrencyService,
+	slotPoolService SlotPoolService,
 	billingService *BillingService,
 	rateLimitService *RateLimitService,
 	billingCacheService *BillingCacheService,
@@ -627,6 +629,7 @@ func NewGatewayService(
 		cfg:                  cfg,
 		schedulerSnapshot:    schedulerSnapshot,
 		concurrencyService:   concurrencyService,
+		slotPoolService:      slotPoolService,
 		billingService:       billingService,
 		rateLimitService:     rateLimitService,
 		billingCacheService:  billingCacheService,
@@ -1712,6 +1715,73 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 	if len(candidates) == 0 {
 		return nil, ErrNoAvailableAccounts
+	}
+
+	// Layer 2a: 候选池快速获取（如果启用）
+	if s.slotPoolService != nil && s.slotPoolService.IsEnabled() {
+		// 构造 bucket（与 scheduler snapshot 一致）
+		bucketMode := SchedulerModeSingle
+		if hasForcePlatform {
+			bucketMode = SchedulerModeForced
+		} else if useMixed {
+			bucketMode = SchedulerModeMixed
+		}
+		// 简单模式下 groupID 统一归 0
+		bucketGroupID := derefGroupID(groupID)
+		if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+			bucketGroupID = 0
+		}
+		bucket := SchedulerBucket{
+			GroupID:  bucketGroupID,
+			Platform: platform,
+			Mode:     bucketMode,
+		}
+
+		// 构造候选集 map
+		candidateMap := make(map[int64]*Account, len(candidates))
+		for _, acc := range candidates {
+			candidateMap[acc.ID] = acc
+		}
+
+		// 生成 requestID 供 SlotPool 使用
+		requestID := generateRequestID()
+
+		accountID, acquired, err := s.slotPoolService.AcquireFromPool(ctx, bucket, candidateMap, requestID)
+		if err != nil {
+			// 根据配置决定是否降级
+			if !s.cfg.Gateway.Scheduling.SlotPool.FallbackOnError {
+				return nil, fmt.Errorf("slot pool error: %w", err)
+			}
+			// 降级到 load-batch，继续执行
+			slog.Warn("[SlotPool] failed, falling back to load-batch", "error", err)
+		} else if acquired {
+			account := candidateMap[accountID]
+			// 会话数量限制检查
+			if !s.checkAndRegisterSession(ctx, account, sessionHash) {
+				// 释放槽位，通知 SlotPool 可能需要回填
+				bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_ = s.concurrencyService.cache.ReleaseAccountSlot(bgCtx, accountID, requestID)
+				_ = s.slotPoolService.OnSlotReleased(bgCtx, accountID)
+				// 继续到 load-batch 逻辑
+			} else {
+				if sessionHash != "" && s.cache != nil {
+					_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, accountID, stickySessionTTL)
+				}
+				return &AccountSelectionResult{
+					Account:  account,
+					Acquired: true,
+					ReleaseFunc: func() {
+						bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancel()
+						_ = s.concurrencyService.cache.ReleaseAccountSlot(bgCtx, accountID, requestID)
+						// 通知 SlotPool 可能需要回填
+						_ = s.slotPoolService.OnSlotReleased(bgCtx, accountID)
+					},
+				}, nil
+			}
+		}
+		// 池空或重试耗尽，降级到 load-batch 逻辑
 	}
 
 	accountLoads := make([]AccountWithConcurrency, 0, len(candidates))

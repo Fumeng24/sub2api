@@ -149,6 +149,11 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 		}
 	}
 
+	// 校验 priority 范围（SlotPool score 公式依赖 priority <= 100）
+	if req.Priority < 0 || req.Priority > 100 {
+		return nil, infraerrors.BadRequest("INVALID_PRIORITY", "priority must be between 0 and 100")
+	}
+
 	// 创建账号
 	account := &Account{
 		Name:        req.Name,
@@ -264,6 +269,9 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 	}
 
 	if req.Priority != nil {
+		if *req.Priority < 0 || *req.Priority > 100 {
+			return nil, infraerrors.BadRequest("INVALID_PRIORITY", "priority must be between 0 and 100")
+		}
 		account.Priority = *req.Priority
 	}
 

@@ -368,6 +368,23 @@ gateway:
     outbox_backlog_rebuild_rows: 10000
     # 全量重建周期（秒），0 表示禁用
     full_rebuild_interval_seconds: 300
+    # Candidate account slot pool (Layer 2 optimization)
+    # 候选账号索引池配置（Layer 2 调度优化）
+    # Reduces Redis command count from O(N) to O(1) per request
+    # 将每请求 Redis 命令数从 O(N) 降到 O(1)
+    slot_pool:
+      # Enable slot pool (disabled by default)
+      # 启用池（默认禁用）
+      enabled: false
+      # Pool rebuild interval (duration), 0 to disable periodic rebuild
+      # 池周期性重建间隔（时间段），0 表示禁用周期性重建
+      rebuild_interval: 5m
+      # Max retries when acquiring from pool
+      # 从池获取账号的最大重试次数
+      max_retries: 10
+      # Fallback to load-batch on pool error
+      # 池错误时是否降级到 load-batch
+      fallback_on_error: true
   # TLS fingerprint simulation / TLS 指纹伪装
   # Default profile "claude_cli_v2" simulates Node.js 20.x
   # 默认模板 "claude_cli_v2" 模拟 Node.js 20.x 指纹

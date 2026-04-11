@@ -646,6 +646,22 @@ type GatewaySchedulingConfig struct {
 	// 全量重建周期配置
 	// 全量重建周期（秒），0 表示禁用
 	FullRebuildIntervalSeconds int `mapstructure:"full_rebuild_interval_seconds"`
+
+	// 候选账号索引池配置
+	SlotPool SlotPoolConfig `mapstructure:"slot_pool"`
+}
+
+// SlotPoolConfig 候选账号索引池配置
+// 用于 Layer 2 候选账号快速选择，降低 Redis 读放大
+type SlotPoolConfig struct {
+	// Enabled 是否启用
+	Enabled bool `mapstructure:"enabled"`
+	// RebuildInterval 周期性重建间隔，0 表示禁用
+	RebuildInterval time.Duration `mapstructure:"rebuild_interval"`
+	// MaxRetries 从池获取的最大重试次数
+	MaxRetries int `mapstructure:"max_retries"`
+	// FallbackOnError 池错误时是否降级到 load-batch
+	FallbackOnError bool `mapstructure:"fallback_on_error"`
 }
 
 func (s *ServerConfig) Address() string {
@@ -1350,6 +1366,11 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.outbox_lag_rebuild_failures", 3)
 	viper.SetDefault("gateway.scheduling.outbox_backlog_rebuild_rows", 10000)
 	viper.SetDefault("gateway.scheduling.full_rebuild_interval_seconds", 300)
+	// SlotPool defaults - disabled by default for rollout safety
+	viper.SetDefault("gateway.scheduling.slot_pool.enabled", false)
+	viper.SetDefault("gateway.scheduling.slot_pool.rebuild_interval", 5*time.Minute)
+	viper.SetDefault("gateway.scheduling.slot_pool.max_retries", 10)
+	viper.SetDefault("gateway.scheduling.slot_pool.fallback_on_error", true)
 	viper.SetDefault("gateway.usage_record.worker_count", 128)
 	viper.SetDefault("gateway.usage_record.queue_size", 16384)
 	viper.SetDefault("gateway.usage_record.task_timeout_seconds", 5)
@@ -2032,6 +2053,15 @@ func (c *Config) Validate() error {
 		c.Gateway.Scheduling.OutboxLagRebuildSeconds > 0 &&
 		c.Gateway.Scheduling.OutboxLagRebuildSeconds < c.Gateway.Scheduling.OutboxLagWarnSeconds {
 		return fmt.Errorf("gateway.scheduling.outbox_lag_rebuild_seconds must be >= outbox_lag_warn_seconds")
+	}
+	// SlotPool validation
+	if c.Gateway.Scheduling.SlotPool.Enabled {
+		if c.Gateway.Scheduling.SlotPool.RebuildInterval < 0 {
+			return fmt.Errorf("gateway.scheduling.slot_pool.rebuild_interval must be non-negative")
+		}
+		if c.Gateway.Scheduling.SlotPool.MaxRetries <= 0 {
+			return fmt.Errorf("gateway.scheduling.slot_pool.max_retries must be positive when slot_pool is enabled")
+		}
 	}
 	if c.Ops.MetricsCollectorCache.TTL < 0 {
 		return fmt.Errorf("ops.metrics_collector_cache.ttl must be non-negative")

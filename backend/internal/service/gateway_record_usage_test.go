@@ -29,6 +29,7 @@ func newGatewayRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo 
 		cfg,
 		nil,
 		nil,
+		nil, // slotPoolService
 		NewBillingService(cfg, nil),
 		nil,
 		&BillingCacheService{},

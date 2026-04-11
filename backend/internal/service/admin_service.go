@@ -1510,6 +1510,11 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		}
 	}
 
+	// 校验 priority 范围（SlotPool score 公式依赖 priority <= 100）
+	if input.Priority < 0 || input.Priority > 100 {
+		return nil, errors.New("priority must be between 0 and 100")
+	}
+
 	account := &Account{
 		Name:        input.Name,
 		Notes:       normalizeAccountNotes(input.Notes),
@@ -1651,6 +1656,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	// 只在指针非 nil 时更新 Priority（支持设置为 0）
 	if input.Priority != nil {
+		if *input.Priority < 0 || *input.Priority > 100 {
+			return nil, errors.New("priority must be between 0 and 100")
+		}
 		account.Priority = *input.Priority
 	}
 	if input.RateMultiplier != nil {
@@ -1784,6 +1792,9 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 		repoUpdates.Concurrency = input.Concurrency
 	}
 	if input.Priority != nil {
+		if *input.Priority < 0 || *input.Priority > 100 {
+			return nil, errors.New("priority must be between 0 and 100")
+		}
 		repoUpdates.Priority = input.Priority
 	}
 	if input.RateMultiplier != nil {

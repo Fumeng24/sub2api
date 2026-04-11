@@ -21,17 +21,18 @@ var (
 const outboxEventTimeout = 2 * time.Minute
 
 type SchedulerSnapshotService struct {
-	cache         SchedulerCache
-	outboxRepo    SchedulerOutboxRepository
-	accountRepo   AccountRepository
-	groupRepo     GroupRepository
-	cfg           *config.Config
-	stopCh        chan struct{}
-	stopOnce      sync.Once
-	wg            sync.WaitGroup
-	fallbackLimit *fallbackLimiter
-	lagMu         sync.Mutex
-	lagFailures   int
+	cache           SchedulerCache
+	outboxRepo      SchedulerOutboxRepository
+	accountRepo     AccountRepository
+	groupRepo       GroupRepository
+	slotPoolService SlotPoolService
+	cfg             *config.Config
+	stopCh          chan struct{}
+	stopOnce        sync.Once
+	wg              sync.WaitGroup
+	fallbackLimit   *fallbackLimiter
+	lagMu           sync.Mutex
+	lagFailures     int
 }
 
 func NewSchedulerSnapshotService(
@@ -39,6 +40,7 @@ func NewSchedulerSnapshotService(
 	outboxRepo SchedulerOutboxRepository,
 	accountRepo AccountRepository,
 	groupRepo GroupRepository,
+	slotPoolService SlotPoolService,
 	cfg *config.Config,
 ) *SchedulerSnapshotService {
 	maxQPS := 0
@@ -46,13 +48,14 @@ func NewSchedulerSnapshotService(
 		maxQPS = cfg.Gateway.Scheduling.DbFallbackMaxQPS
 	}
 	return &SchedulerSnapshotService{
-		cache:         cache,
-		outboxRepo:    outboxRepo,
-		accountRepo:   accountRepo,
-		groupRepo:     groupRepo,
-		cfg:           cfg,
-		stopCh:        make(chan struct{}),
-		fallbackLimit: newFallbackLimiter(maxQPS),
+		cache:           cache,
+		outboxRepo:      outboxRepo,
+		accountRepo:     accountRepo,
+		groupRepo:       groupRepo,
+		slotPoolService: slotPoolService,
+		cfg:             cfg,
+		stopCh:          make(chan struct{}),
+		fallbackLimit:   newFallbackLimiter(maxQPS),
 	}
 }
 
@@ -529,6 +532,19 @@ func (s *SchedulerSnapshotService) rebuildBucket(ctx context.Context, bucket Sch
 	if err := s.cache.SetSnapshot(rebuildCtx, bucket, accounts); err != nil {
 		logger.LegacyPrintf("service.scheduler_snapshot", "[Scheduler] rebuild cache failed: bucket=%s reason=%s err=%v", bucket.String(), reason, err)
 		return err
+	}
+	// 在 SetSnapshot 成功后，顺手重建对应的 SlotPool
+	if s.slotPoolService != nil {
+		accountPtrs := make([]*Account, len(accounts))
+		for i := range accounts {
+			accountPtrs[i] = &accounts[i]
+		}
+		if err := s.slotPoolService.RebuildBucketPool(rebuildCtx, bucket, accountPtrs); err != nil {
+			slog.Warn("[Scheduler] failed to rebuild slot pool",
+				"bucket", bucket.String(),
+				"error", err)
+			// 不返回错误，池重建失败不影响 snapshot 重建
+		}
 	}
 	slog.Debug("[Scheduler] rebuild ok", "bucket", bucket.String(), "reason", reason, "size", len(accounts))
 	return nil

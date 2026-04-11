@@ -139,7 +139,7 @@ func newTestGatewayHandler(t *testing.T, group *service.Group, accounts []*servi
 	t.Helper()
 
 	schedulerCache := &fakeSchedulerCache{accounts: accounts}
-	schedulerSnapshot := service.NewSchedulerSnapshotService(schedulerCache, nil, nil, nil, nil)
+	schedulerSnapshot := service.NewSchedulerSnapshotService(schedulerCache, nil, nil, nil, nil, nil)
 
 	gwSvc := service.NewGatewayService(
 		nil, // accountRepo (not used: scheduler snapshot hit)
@@ -153,6 +153,7 @@ func newTestGatewayHandler(t *testing.T, group *service.Group, accounts []*servi
 		nil, // cfg
 		schedulerSnapshot,
 		nil, // concurrencyService (disable load-aware; tryAcquire always acquired)
+		nil, // slotPoolService
 		nil, // billingService
 		nil, // rateLimitService
 		nil, // billingCacheService
