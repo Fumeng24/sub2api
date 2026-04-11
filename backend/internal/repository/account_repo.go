@@ -660,6 +660,13 @@ func (r *accountRepository) syncSchedulerAccountSnapshot(ctx context.Context, ac
 	if err := r.schedulerCache.SetAccount(ctx, account); err != nil {
 		logger.LegacyPrintf("repository.account", "[Scheduler] sync account snapshot write failed: id=%d err=%v", accountID, err)
 	}
+	// Immediately remove unschedulable accounts from bucket ZSETs to prevent selection
+	// by other instances before the next full bucket rebuild.
+	if !account.IsSchedulable() {
+		if err := r.schedulerCache.RemoveAccountFromBuckets(ctx, accountID); err != nil {
+			logger.LegacyPrintf("repository.account", "[Scheduler] remove account from buckets failed: id=%d err=%v", accountID, err)
+		}
+	}
 }
 
 func (r *accountRepository) syncSchedulerAccountSnapshots(ctx context.Context, accountIDs []int64) {
