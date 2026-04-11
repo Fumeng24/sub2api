@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -151,12 +152,20 @@ func (c *schedulerCache) SetAccount(ctx context.Context, account *service.Accoun
 	if account == nil || account.ID <= 0 {
 		return nil
 	}
-	payload, err := marshalAccountForCache(account)
+
+	key := schedulerAccountKey(strconv.FormatInt(account.ID, 10))
+	newPayload, err := marshalAccountForCache(account)
 	if err != nil {
 		return err
 	}
-	key := schedulerAccountKey(strconv.FormatInt(account.ID, 10))
-	return c.rdb.Set(ctx, key, payload, 0).Err()
+
+	// Skip write if payload unchanged (reduces incremental update writes)
+	existing, err := c.rdb.Get(ctx, key).Bytes()
+	if err == nil && bytes.Equal(existing, newPayload) {
+		return nil
+	}
+
+	return c.rdb.Set(ctx, key, newPayload, 0).Err()
 }
 
 func (c *schedulerCache) DeleteAccount(ctx context.Context, accountID int64) error {
