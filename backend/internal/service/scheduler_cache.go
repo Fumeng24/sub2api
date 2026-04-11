@@ -65,4 +65,9 @@ type SchedulerCache interface {
 	GetOutboxWatermark(ctx context.Context) (int64, error)
 	// SetOutboxWatermark 保存 outbox 水位。
 	SetOutboxWatermark(ctx context.Context, id int64) error
+	// SetBucketMembers updates only the ZSET membership for a bucket without touching account payloads.
+	SetBucketMembers(ctx context.Context, bucket SchedulerBucket, accountIDs []int64) error
+	// RemoveAccountFromBuckets removes an account ID from all bucket ZSETs.
+	// Does NOT delete the account payload - caller should update payload separately via SetAccount.
+	RemoveAccountFromBuckets(ctx context.Context, accountID int64) error
 }
