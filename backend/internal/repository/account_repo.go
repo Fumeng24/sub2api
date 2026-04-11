@@ -703,6 +703,12 @@ func (r *accountRepository) syncSchedulerAccountSnapshots(ctx context.Context, a
 		if err := r.schedulerCache.SetAccount(ctx, account); err != nil {
 			logger.LegacyPrintf("repository.account", "[Scheduler] batch sync account snapshot write failed: id=%d err=%v", account.ID, err)
 		}
+		// Immediately remove unschedulable accounts from bucket ZSETs
+		if !account.IsSchedulable() {
+			if err := r.schedulerCache.RemoveAccountFromBuckets(ctx, account.ID); err != nil {
+				logger.LegacyPrintf("repository.account", "[Scheduler] batch remove account from buckets failed: id=%d err=%v", account.ID, err)
+			}
+		}
 	}
 }
 
@@ -1040,6 +1046,7 @@ func (r *accountRepository) SetOverloaded(ctx context.Context, id int64, until t
 	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
 		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue overload failed: account=%d err=%v", id, err)
 	}
+	r.syncSchedulerAccountSnapshot(ctx, id)
 	return nil
 }
 

@@ -76,6 +76,14 @@ func (s *schedulerCacheRecorder) SetOutboxWatermark(ctx context.Context, id int6
 	return nil
 }
 
+func (s *schedulerCacheRecorder) SetBucketMembers(ctx context.Context, bucket service.SchedulerBucket, accountIDs []int64) error {
+	return nil
+}
+
+func (s *schedulerCacheRecorder) RemoveAccountFromBuckets(ctx context.Context, accountID int64) error {
+	return nil
+}
+
 func (s *AccountRepoSuite) SetupTest() {
 	s.ctx = context.Background()
 	tx := testEntTx(s.T())

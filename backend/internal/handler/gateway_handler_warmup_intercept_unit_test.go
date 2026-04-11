@@ -50,6 +50,10 @@ func (f *fakeSchedulerCache) ListBuckets(_ context.Context) ([]service.Scheduler
 }
 func (f *fakeSchedulerCache) GetOutboxWatermark(_ context.Context) (int64, error) { return 0, nil }
 func (f *fakeSchedulerCache) SetOutboxWatermark(_ context.Context, _ int64) error { return nil }
+func (f *fakeSchedulerCache) SetBucketMembers(_ context.Context, _ service.SchedulerBucket, _ []int64) error {
+	return nil
+}
+func (f *fakeSchedulerCache) RemoveAccountFromBuckets(_ context.Context, _ int64) error { return nil }
 
 type fakeGroupRepo struct {
 	group *service.Group
