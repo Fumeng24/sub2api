@@ -1366,8 +1366,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.outbox_lag_rebuild_failures", 3)
 	viper.SetDefault("gateway.scheduling.outbox_backlog_rebuild_rows", 10000)
 	viper.SetDefault("gateway.scheduling.full_rebuild_interval_seconds", 300)
-	// SlotPool defaults - disabled by default for rollout safety
-	viper.SetDefault("gateway.scheduling.slot_pool.enabled", false)
+	// SlotPool defaults - enabled by default for better performance
+	viper.SetDefault("gateway.scheduling.slot_pool.enabled", true)
 	viper.SetDefault("gateway.scheduling.slot_pool.rebuild_interval", 5*time.Minute)
 	viper.SetDefault("gateway.scheduling.slot_pool.max_retries", 10)
 	viper.SetDefault("gateway.scheduling.slot_pool.fallback_on_error", true)
