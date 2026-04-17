@@ -65,6 +65,13 @@
                 {{ t(`userSubscriptions.status.${subscription.status}`) }}
               </span>
               <button
+                v-if="canReset(subscription)"
+                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600"
+                @click="openResetDialog(subscription)"
+              >
+                {{ t('userSubscriptions.reset') }}
+              </button>
+              <button
                 v-if="subscription.status === 'active'"
                 :class="['rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors', platformButtonClass(subscription.group?.platform || '')]"
                 @click="router.push({ path: '/purchase', query: { tab: 'subscription', group: String(subscription.group_id) } })"
@@ -242,6 +249,19 @@
         </div>
       </div>
     </div>
+
+    <ConfirmDialog
+      :show="showResetDialog"
+      :title="t('userSubscriptions.resetTitle')"
+      :message="t('userSubscriptions.resetConfirm', {
+        daysBefore: getDaysCeil(resettingSubscription?.expires_at),
+        daysAfter: Math.max(0, getDaysCeil(resettingSubscription?.expires_at) - 1)
+      })"
+      :confirm-text="t('userSubscriptions.reset')"
+      :cancel-text="t('common.cancel')"
+      @confirm="confirmReset"
+      @cancel="showResetDialog = false"
+    />
   </AppLayout>
 </template>
 
@@ -254,6 +274,7 @@ import subscriptionsAPI from '@/api/subscriptions'
 import type { UserSubscription } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { formatDateOnly } from '@/utils/format'
 import { platformBorderClass, platformBadgeClass, platformButtonClass, platformLabel } from '@/utils/platformColors'
 
@@ -273,6 +294,51 @@ const appStore = useAppStore()
 
 const subscriptions = ref<UserSubscription[]>([])
 const loading = ref(true)
+
+const showResetDialog = ref(false)
+const resettingSubscription = ref<UserSubscription | null>(null)
+const resetLoading = ref(false)
+
+function getRemainingSeconds(expiresAt: string | null | undefined): number {
+  if (!expiresAt) return 0
+  return Math.max(0, (new Date(expiresAt).getTime() - Date.now()) / 1000)
+}
+
+function canReset(sub: UserSubscription): boolean {
+  return sub.status === 'active' && getRemainingSeconds(sub.expires_at) > 86400
+}
+
+function getDaysCeil(expiresAt: string | null | undefined): number {
+  return Math.ceil(getRemainingSeconds(expiresAt) / 86400)
+}
+
+function openResetDialog(sub: UserSubscription) {
+  resettingSubscription.value = sub
+  showResetDialog.value = true
+}
+
+async function confirmReset() {
+  if (!resettingSubscription.value || resetLoading.value) return
+  resetLoading.value = true
+  try {
+    const updated = await subscriptionsAPI.resetSubscription(resettingSubscription.value.id)
+    const days = getDaysCeil(updated.expires_at)
+    appStore.showSuccess(t('userSubscriptions.resetSuccess', { days }))
+    showResetDialog.value = false
+    resettingSubscription.value = null
+    await loadSubscriptions()
+  } catch (error: any) {
+    const code = error.response?.data?.error?.code || error.response?.data?.code
+    let msg = t('userSubscriptions.resetFailed')
+    if (code === 'SUBSCRIPTION_TIME_INSUFFICIENT') msg = t('userSubscriptions.resetError.timeInsufficient')
+    else if (code === 'SUBSCRIPTION_NOT_OWNED') msg = t('userSubscriptions.resetError.notOwned')
+    else if (code === 'SUBSCRIPTION_INACTIVE') msg = t('userSubscriptions.resetError.inactive')
+    else if (code === 'SUBSCRIPTION_NOT_FOUND') msg = t('userSubscriptions.resetError.notFound')
+    appStore.showError(msg)
+  } finally {
+    resetLoading.value = false
+  }
+}
 
 async function loadSubscriptions() {
   try {
