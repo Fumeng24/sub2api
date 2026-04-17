@@ -1348,7 +1348,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	// 提前构建 accountByID（供 Layer 1 和 Layer 1.5 使用）
 	accountByID := make(map[int64]*Account, len(accounts))
 	for i := range accounts {
-		accountByID[accounts[i].ID] = &accounts[i]
+		accountByID[accounts[i].ID] = accounts[i]
 	}
 	isExcluded := func(accountID int64) bool {
 		if excludedIDs == nil {
