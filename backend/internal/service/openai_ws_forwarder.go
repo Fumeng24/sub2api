@@ -2515,13 +2515,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			}
 			normalized = next
 		}
-		mappedModel := account.GetMappedModel(originalModel)
-		upstreamModel := mappedModel
-		if mappedModel == originalModel {
-			if nm := normalizeCodexModel(mappedModel); nm != "" {
-				upstreamModel = nm
-			}
-		}
+		upstreamModel := normalizeOpenAIModelForUpstream(account, account.GetMappedModel(originalModel))
 		if upstreamModel != originalModel {
 			next, setErr := applyPayloadMutation(normalized, "model", upstreamModel)
 			if setErr != nil {
@@ -2779,12 +2773,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		mappedModel := ""
 		var mappedModelBytes []byte
 		if originalModel != "" {
-			mappedModel = account.GetMappedModel(originalModel)
-			if mappedModel == originalModel {
-				if nm := normalizeCodexModel(mappedModel); nm != "" {
-					mappedModel = nm
-				}
-			}
+			mappedModel = normalizeOpenAIModelForUpstream(account, account.GetMappedModel(originalModel))
 			needModelReplace = mappedModel != "" && mappedModel != originalModel
 			if needModelReplace {
 				mappedModelBytes = []byte(mappedModel)
