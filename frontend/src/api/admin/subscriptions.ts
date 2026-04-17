@@ -139,6 +139,18 @@ export async function resetQuota(
 }
 
 /**
+ * Reset subscription with 1-day cost (deducts 1 day from expires_at + clears daily usage)
+ * @param id - Subscription ID
+ * @returns Updated subscription
+ */
+export async function resetWithCost(id: number): Promise<UserSubscription> {
+  const { data } = await apiClient.post<UserSubscription>(
+    `/admin/subscriptions/${id}/reset-with-cost`
+  )
+  return data
+}
+
+/**
  * List subscriptions by group
  * @param groupId - Group ID
  * @param page - Page number
@@ -189,6 +201,7 @@ export const subscriptionsAPI = {
   extend,
   revoke,
   resetQuota,
+  resetWithCost,
   listByGroup,
   listByUser
 }
