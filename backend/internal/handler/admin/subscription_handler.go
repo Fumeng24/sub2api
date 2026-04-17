@@ -249,6 +249,25 @@ func (h *SubscriptionHandler) ResetQuota(c *gin.Context) {
 	response.Success(c, dto.UserSubscriptionFromServiceAdmin(sub))
 }
 
+// ResetWithCost 管理员触发"提前重置"订阅（扣 1 天 + 清零 daily 用量）
+// POST /api/v1/admin/subscriptions/:id/reset-with-cost
+func (h *SubscriptionHandler) ResetWithCost(c *gin.Context) {
+	subscriptionID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid subscription ID")
+		return
+	}
+
+	// ownerUserID = 0 表示管理员调用，跳过归属校验
+	sub, err := h.subscriptionService.ResetSubscriptionWithCost(c.Request.Context(), subscriptionID, 0)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, dto.UserSubscriptionFromServiceAdmin(sub))
+}
+
 // Revoke handles revoking a subscription
 // DELETE /api/v1/admin/subscriptions/:id
 func (h *SubscriptionHandler) Revoke(c *gin.Context) {
