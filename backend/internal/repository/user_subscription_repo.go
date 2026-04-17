@@ -336,6 +336,30 @@ func (r *userSubscriptionRepository) ResetMonthlyUsage(ctx context.Context, id i
 	return translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
 }
 
+func (r *userSubscriptionRepository) ShortenExpiryAndResetDaily(
+	ctx context.Context,
+	subID int64,
+	newExpiresAt time.Time,
+	windowStart time.Time,
+	minRemaining time.Duration,
+) (bool, error) {
+	client := clientFromContext(ctx, r.client)
+	n, err := client.UserSubscription.Update().
+		Where(
+			usersubscription.IDEQ(subID),
+			usersubscription.ExpiresAtGT(time.Now().Add(minRemaining)),
+			usersubscription.StatusEQ(service.SubscriptionStatusActive),
+		).
+		SetExpiresAt(newExpiresAt).
+		SetDailyWindowStart(windowStart).
+		SetDailyUsageUsd(0).
+		Save(ctx)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
 // IncrementUsage 原子性地累加订阅用量。
 // 限额检查已在请求前由 BillingCacheService.CheckBillingEligibility 完成，
 // 此处仅负责记录实际消费，确保消费数据的完整性。
