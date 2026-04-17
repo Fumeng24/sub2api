@@ -1405,6 +1405,9 @@ func (stubUserSubscriptionRepo) IncrementUsage(ctx context.Context, id int64, co
 func (stubUserSubscriptionRepo) BatchUpdateExpiredStatus(ctx context.Context) (int64, error) {
 	return 0, errors.New("not implemented")
 }
+func (stubUserSubscriptionRepo) ShortenExpiryAndResetDaily(ctx context.Context, subID int64, newExpiresAt time.Time, windowStart time.Time, minRemaining time.Duration) (bool, error) {
+	return false, nil
+}
 
 type stubApiKeyRepo struct {
 	now time.Time
