@@ -1748,14 +1748,17 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 				if sessionHash != "" && s.cache != nil {
 					_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, accountID, stickySessionTTL)
 				}
+				hydrated, err := s.hydrateSelectedAccount(ctx, account)
+				if err != nil {
+					return nil, err
+				}
 				return &AccountSelectionResult{
-					Account:  account,
+					Account:  hydrated,
 					Acquired: true,
 					ReleaseFunc: func() {
 						bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 						defer cancel()
 						_ = s.concurrencyService.cache.ReleaseAccountSlot(bgCtx, accountID, requestID)
-						// 通知 SlotPool 可能需要回填
 						_ = s.slotPoolService.OnSlotReleased(bgCtx, accountID)
 					},
 				}, nil
