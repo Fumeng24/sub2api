@@ -122,9 +122,18 @@ func (s *slotPoolService) AcquireFromPool(
 			continue
 		}
 
-		// 尝试获取槽位
-		acquired, err := s.concurrencyCache.AcquireAccountSlot(
-			ctx, accountID, account.Concurrency, requestID)
+		// 尝试获取槽位（无限并发账号直接视为已获取，匹配 ConcurrencyService 短路语义）
+		var acquired bool
+		if account.Concurrency <= 0 {
+			acquired = true
+		} else {
+			var acqErr error
+			acquired, acqErr = s.concurrencyCache.AcquireAccountSlot(
+				ctx, accountID, account.Concurrency, requestID)
+			if acqErr != nil {
+				err = acqErr
+			}
+		}
 		if err != nil {
 			logger.FromContext(ctx).Warn("slot pool acquire slot failed",
 				zap.Int64("account_id", accountID),

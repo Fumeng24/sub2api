@@ -176,15 +176,21 @@ func (c *schedulerCache) SetAccount(ctx context.Context, account *service.Accoun
 		return nil
 	}
 
-	// Skip write if full payload unchanged (reduces incremental update writes)
-	key := schedulerAccountKey(strconv.FormatInt(account.ID, 10))
-	newPayload, err := json.Marshal(account)
+	// Skip write if full payload unchanged AND meta key already exists.
+	// Meta-key existence guard prevents stale/missing meta after upgrades or
+	// out-of-band Redis maintenance.
+	idStr := strconv.FormatInt(account.ID, 10)
+	key := schedulerAccountKey(idStr)
+	newPayload, err := marshalSchedulerFullAccount(*account)
 	if err != nil {
 		return err
 	}
 	existing, err := c.rdb.Get(ctx, key).Bytes()
 	if err == nil && bytes.Equal(existing, newPayload) {
-		return nil
+		metaExists, mErr := c.rdb.Exists(ctx, schedulerAccountMetaKey(idStr)).Result()
+		if mErr == nil && metaExists == 1 {
+			return nil
+		}
 	}
 
 	return c.writeAccounts(ctx, []service.Account{*account})
@@ -225,7 +231,7 @@ func (c *schedulerCache) UpdateLastUsed(ctx context.Context, updates map[int64]t
 			return err
 		}
 		account.LastUsedAt = ptrTime(updates[ids[i]])
-		updated, err := json.Marshal(account)
+		updated, err := marshalSchedulerFullAccount(*account)
 		if err != nil {
 			return err
 		}
@@ -410,7 +416,7 @@ func (c *schedulerCache) writeAccounts(ctx context.Context, accounts []service.A
 	}
 
 	for _, account := range accounts {
-		fullPayload, err := json.Marshal(account)
+		fullPayload, err := marshalSchedulerFullAccount(account)
 		if err != nil {
 			return err
 		}
@@ -457,6 +463,46 @@ func (c *schedulerCache) mgetChunked(ctx context.Context, keys []string) ([]any,
 	return out, nil
 }
 
+// schedulerCacheCredentialDenyList lists credential keys excluded from the
+// scheduler full-payload cache. Only id_token is stripped because it is large
+// (multi-KB JWT) and consumed only by background token-refresh services that
+// read directly from PostgreSQL. access_token / refresh_token MUST remain so
+// that hydrateSelectedAccount can supply them to the gateway hot path.
+var schedulerCacheCredentialDenyList = []string{"id_token"}
+
+// marshalSchedulerFullAccount serialises the full-payload account written to
+// `sched:acc:{id}`. The result is stripped of large fields not needed for
+// scheduling or request forwarding to reduce Redis bandwidth:
+//   - Credentials.id_token (large JWT)
+//   - AccountGroups[].Group nested objects (only IDs needed for routing)
+//   - Groups slice (only used by ops monitoring, not gateway)
+//
+// The caller's Account is never mutated.
+func marshalSchedulerFullAccount(account service.Account) ([]byte, error) {
+	cp := account
+	if len(cp.Credentials) > 0 {
+		filtered := make(map[string]any, len(cp.Credentials))
+		for k, v := range cp.Credentials {
+			skip := false
+			for _, denied := range schedulerCacheCredentialDenyList {
+				if k == denied {
+					skip = true
+					break
+				}
+			}
+			if !skip {
+				filtered[k] = v
+			}
+		}
+		cp.Credentials = filtered
+	}
+	if len(cp.AccountGroups) > 0 {
+		cp.AccountGroups = buildSchedulerMetadataAccountGroups(cp.AccountGroups)
+	}
+	cp.Groups = nil
+	return json.Marshal(&cp)
+}
+
 func buildSchedulerMetadataAccount(account service.Account) service.Account {
 	return service.Account{
 		ID:                      account.ID,
@@ -480,9 +526,29 @@ func buildSchedulerMetadataAccount(account service.Account) service.Account {
 		SessionWindowStart:      account.SessionWindowStart,
 		SessionWindowEnd:        account.SessionWindowEnd,
 		SessionWindowStatus:     account.SessionWindowStatus,
+		GroupIDs:                append([]int64(nil), account.GroupIDs...),
+		AccountGroups:           buildSchedulerMetadataAccountGroups(account.AccountGroups),
 		Credentials:             filterSchedulerCredentials(account.Credentials),
 		Extra:                   filterSchedulerExtra(account.Extra),
 	}
+}
+
+// buildSchedulerMetadataAccountGroups returns lightweight AccountGroup entries
+// (AccountID/GroupID/Priority only, no nested Group object) so scheduler-side
+// group membership checks (e.g. isAccountInGroup) work on metadata-only accounts.
+func buildSchedulerMetadataAccountGroups(groups []service.AccountGroup) []service.AccountGroup {
+	if len(groups) == 0 {
+		return nil
+	}
+	stripped := make([]service.AccountGroup, len(groups))
+	for i, ag := range groups {
+		stripped[i] = service.AccountGroup{
+			AccountID: ag.AccountID,
+			GroupID:   ag.GroupID,
+			Priority:  ag.Priority,
+		}
+	}
+	return stripped
 }
 
 func filterSchedulerCredentials(credentials map[string]any) map[string]any {
