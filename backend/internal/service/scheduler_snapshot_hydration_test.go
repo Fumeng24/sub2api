@@ -56,6 +56,14 @@ func (c *snapshotHydrationCache) SetOutboxWatermark(ctx context.Context, id int6
 	return nil
 }
 
+func (c *snapshotHydrationCache) SetBucketMembers(ctx context.Context, bucket SchedulerBucket, accountIDs []int64) error {
+	return nil
+}
+
+func (c *snapshotHydrationCache) RemoveAccountFromBuckets(ctx context.Context, accountID int64) error {
+	return nil
+}
+
 func TestOpenAISelectAccountWithLoadAwareness_HydratesSelectedAccountFromSchedulerSnapshot(t *testing.T) {
 	cache := &snapshotHydrationCache{
 		snapshot: []*Account{
@@ -91,7 +99,7 @@ func TestOpenAISelectAccountWithLoadAwareness_HydratesSelectedAccountFromSchedul
 		},
 	}
 
-	schedulerSnapshot := NewSchedulerSnapshotService(cache, nil, nil, nil, nil)
+	schedulerSnapshot := NewSchedulerSnapshotService(cache, nil, nil, nil, nil, nil)
 	groupID := int64(2)
 	svc := &OpenAIGatewayService{
 		schedulerSnapshot: schedulerSnapshot,
@@ -139,7 +147,7 @@ func TestGatewaySelectAccountWithLoadAwareness_HydratesSelectedAccountFromSchedu
 		},
 	}
 
-	schedulerSnapshot := NewSchedulerSnapshotService(cache, nil, nil, nil, nil)
+	schedulerSnapshot := NewSchedulerSnapshotService(cache, nil, nil, nil, nil, nil)
 	svc := &GatewayService{
 		schedulerSnapshot: schedulerSnapshot,
 		cache:             &mockGatewayCacheForPlatform{},

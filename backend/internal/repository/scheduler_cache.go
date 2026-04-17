@@ -373,65 +373,6 @@ func ptrTime(t time.Time) *time.Time {
 	return &t
 }
 
-// schedulerCacheCredentialDenyList lists credential keys that are excluded from
-// the scheduler cache to reduce Redis bandwidth. Only id_token is stripped
-// because it is large and consumed exclusively by background token-refresh
-// services. refresh_token is kept because it may be used as a fallback to
-// recover access_token on the gateway hot path.
-var schedulerCacheCredentialDenyList = []string{"id_token"}
-
-// marshalAccountForCache serialises an Account for the scheduler cache while
-// stripping large fields that are not needed for scheduling or request
-// forwarding. The caller's Account is never mutated.
-//
-// Stripped fields:
-//   - Credentials: id_token (large JWT, only used by background refresh services)
-//   - AccountGroups[].Group: full Group objects (only GroupID needed for routing)
-//   - AccountGroups[].Account: back-reference to parent (circular/redundant)
-//   - Groups: duplicate of AccountGroups[].Group (ops-only, not used in gateway)
-func marshalAccountForCache(account *service.Account) ([]byte, error) {
-	if account == nil {
-		return json.Marshal(account)
-	}
-	// Shallow copy so we never mutate the caller's struct.
-	cp := *account
-
-	// Strip denied credential keys.
-	if len(cp.Credentials) > 0 {
-		filtered := make(map[string]any, len(cp.Credentials))
-		for k, v := range cp.Credentials {
-			skip := false
-			for _, denied := range schedulerCacheCredentialDenyList {
-				if k == denied {
-					skip = true
-					break
-				}
-			}
-			if !skip {
-				filtered[k] = v
-			}
-		}
-		cp.Credentials = filtered
-	}
-
-	// Strip full Group objects from AccountGroups (only GroupID is used).
-	if len(cp.AccountGroups) > 0 {
-		stripped := make([]service.AccountGroup, len(cp.AccountGroups))
-		for i, ag := range cp.AccountGroups {
-			stripped[i] = service.AccountGroup{
-				AccountID: ag.AccountID,
-				GroupID:   ag.GroupID,
-				Priority:  ag.Priority,
-			}
-		}
-		cp.AccountGroups = stripped
-	}
-
-	// Strip Groups slice entirely (only used by ops monitoring).
-	cp.Groups = nil
-
-	return json.Marshal(&cp)
-}
 
 func decodeCachedAccount(val any) (*service.Account, error) {
 	var payload []byte
