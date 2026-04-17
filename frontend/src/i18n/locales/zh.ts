@@ -2040,6 +2040,16 @@ export default {
       resetQuotaConfirm: "确定要重置 '{user}' 的每日、每周和每月用量配额吗？用量将归零并从今天开始重新计算。",
       quotaResetSuccess: '配额重置成功',
       failedToResetQuota: '重置配额失败',
+      resetWithCost: '重置（扣 1 天）',
+      resetWithCostTitle: '确认提前重置',
+      resetWithCostConfirm: '此操作将扣除 1 天订阅时间，并刷新当日额度。\n用户：{user}\n当前剩余：{daysBefore} 天\n重置后剩余：{daysAfter} 天\n确定继续？',
+      resetWithCostSuccess: '重置成功，已扣除 1 天，当前剩余 {days} 天',
+      resetWithCostFailed: '重置失败',
+      resetWithCostError: {
+        timeInsufficient: '剩余时间不足 1 天，无法重置',
+        inactive: '订阅已过期或暂停，无法重置',
+        notFound: '订阅不存在',
+      },
       noSubscriptionsYet: '暂无订阅',
       assignFirstSubscription: '分配一个订阅以开始使用。',
       subscriptionAssigned: '订阅分配成功',
@@ -5342,7 +5352,18 @@ export default {
     expiresOn: '{date} 到期',
     resetIn: '{time} 后重置',
     windowNotActive: '等待首次使用',
-    usageOf: '已用 {used} / {limit}'
+    usageOf: '已用 {used} / {limit}',
+    reset: '重置',
+    resetTitle: '确认提前重置',
+    resetConfirm: '此操作将扣除 1 天订阅时间，并刷新当日额度。\n当前剩余：{daysBefore} 天\n重置后剩余：{daysAfter} 天\n确定继续？',
+    resetSuccess: '重置成功，已扣除 1 天，当前剩余 {days} 天',
+    resetFailed: '重置失败',
+    resetError: {
+      timeInsufficient: '剩余时间不足 1 天，无法重置',
+      notOwned: '无权操作此订阅',
+      inactive: '订阅已过期或暂停',
+      notFound: '订阅不存在',
+    },
   },
 
   // Onboarding Tour

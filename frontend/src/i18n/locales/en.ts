@@ -1961,6 +1961,16 @@ export default {
       resetQuotaConfirm: "Reset the daily, weekly, and monthly usage quota for '{user}'? Usage will be zeroed and windows restarted from today.",
       quotaResetSuccess: 'Quota reset successfully',
       failedToResetQuota: 'Failed to reset quota',
+      resetWithCost: 'Reset (−1 day)',
+      resetWithCostTitle: 'Confirm early reset',
+      resetWithCostConfirm: 'This will deduct 1 day from the subscription and refresh the daily quota.\nUser: {user}\nCurrent remaining: {daysBefore} days\nAfter reset: {daysAfter} days\nProceed?',
+      resetWithCostSuccess: 'Reset successful. 1 day deducted, {days} days remaining.',
+      resetWithCostFailed: 'Reset failed',
+      resetWithCostError: {
+        timeInsufficient: 'Less than 1 day remaining; cannot reset.',
+        inactive: 'Subscription is expired or suspended.',
+        notFound: 'Subscription not found.',
+      },
       noSubscriptionsYet: 'No subscriptions yet',
       assignFirstSubscription: 'Assign a subscription to get started.',
       subscriptionAssigned: 'Subscription assigned successfully',
@@ -5181,7 +5191,18 @@ export default {
     expiresOn: 'Expires on {date}',
     resetIn: 'Resets in {time}',
     windowNotActive: 'Awaiting first use',
-    usageOf: '{used} of {limit}'
+    usageOf: '{used} of {limit}',
+    reset: 'Reset',
+    resetTitle: 'Confirm early reset',
+    resetConfirm: 'This will deduct 1 day from your subscription and refresh your daily quota.\nCurrent remaining: {daysBefore} days\nAfter reset: {daysAfter} days\nProceed?',
+    resetSuccess: 'Reset successful. 1 day deducted, {days} days remaining.',
+    resetFailed: 'Reset failed',
+    resetError: {
+      timeInsufficient: 'Less than 1 day remaining; cannot reset.',
+      notOwned: 'You do not own this subscription.',
+      inactive: 'Subscription is expired or suspended.',
+      notFound: 'Subscription not found.',
+    },
   },
 
   // Onboarding Tour
