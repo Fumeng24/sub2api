@@ -37,6 +37,9 @@ var (
 	ErrMonthlyLimitExceeded       = infraerrors.TooManyRequests("MONTHLY_LIMIT_EXCEEDED", "monthly usage limit exceeded")
 	ErrSubscriptionNilInput       = infraerrors.BadRequest("SUBSCRIPTION_NIL_INPUT", "subscription input cannot be nil")
 	ErrAdjustWouldExpire          = infraerrors.BadRequest("ADJUST_WOULD_EXPIRE", "adjustment would result in expired subscription (remaining days must be > 0)")
+	ErrSubscriptionNotOwned       = infraerrors.Forbidden("SUBSCRIPTION_NOT_OWNED", "subscription does not belong to user")
+	ErrSubscriptionInactive       = infraerrors.Conflict("SUBSCRIPTION_INACTIVE", "subscription is not active")
+	ErrSubscriptionTimeInsufficient = infraerrors.BadRequest("SUBSCRIPTION_TIME_INSUFFICIENT", "subscription remaining time must be greater than 1 day")
 )
 
 // SubscriptionService 订阅服务
