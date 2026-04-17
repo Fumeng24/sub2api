@@ -397,6 +397,15 @@
                 <span class="text-xs">{{ t('admin.subscriptions.resetQuota') }}</span>
               </button>
               <button
+                v-if="canResetWithCost(row)"
+                @click="openResetWithCostDialog(row)"
+                :title="t('admin.subscriptions.resetWithCost')"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/20 dark:hover:text-amber-400"
+              >
+                <Icon name="refresh" size="sm" />
+                <span class="text-xs">{{ t('admin.subscriptions.resetWithCost') }}</span>
+              </button>
+              <button
                 v-if="row.status === 'active'"
                 @click="handleRevoke(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
@@ -654,6 +663,21 @@
       :cancel-text="t('common.cancel')"
       @confirm="confirmResetQuota"
       @cancel="showResetQuotaConfirm = false"
+    />
+
+    <!-- Reset With Cost Confirmation Dialog -->
+    <ConfirmDialog
+      :show="showResetWithCostDialog"
+      :title="t('admin.subscriptions.resetWithCostTitle')"
+      :message="t('admin.subscriptions.resetWithCostConfirm', {
+        user: resetWithCostSubscription?.user?.email,
+        daysBefore: getResetDaysCeil(resetWithCostSubscription?.expires_at),
+        daysAfter: Math.max(0, getResetDaysCeil(resetWithCostSubscription?.expires_at) - 1)
+      })"
+      :confirm-text="t('admin.subscriptions.resetWithCost')"
+      :cancel-text="t('common.cancel')"
+      @confirm="confirmResetWithCost"
+      @cancel="showResetWithCostDialog = false"
     />
     <!-- Subscription Guide Modal -->
     <teleport to="body">
@@ -945,6 +969,9 @@ const resettingSubscription = ref<UserSubscription | null>(null)
 const resettingQuota = ref(false)
 const extendingSubscription = ref<UserSubscription | null>(null)
 const revokingSubscription = ref<UserSubscription | null>(null)
+const showResetWithCostDialog = ref(false)
+const resetWithCostSubscription = ref<UserSubscription | null>(null)
+const resetWithCostLoading = ref(false)
 
 const assignForm = reactive({
   user_id: null as number | null,
@@ -1280,6 +1307,46 @@ const confirmResetQuota = async () => {
     console.error('Error resetting quota:', error)
   } finally {
     resettingQuota.value = false
+  }
+}
+
+function getResetRemainingSeconds(expiresAt: string | null | undefined): number {
+  if (!expiresAt) return 0
+  return Math.max(0, (new Date(expiresAt).getTime() - Date.now()) / 1000)
+}
+
+function canResetWithCost(sub: UserSubscription): boolean {
+  return sub.status === 'active' && getResetRemainingSeconds(sub.expires_at) > 86400
+}
+
+function getResetDaysCeil(expiresAt: string | null | undefined): number {
+  return Math.ceil(getResetRemainingSeconds(expiresAt) / 86400)
+}
+
+function openResetWithCostDialog(sub: UserSubscription) {
+  resetWithCostSubscription.value = sub
+  showResetWithCostDialog.value = true
+}
+
+async function confirmResetWithCost() {
+  if (!resetWithCostSubscription.value || resetWithCostLoading.value) return
+  resetWithCostLoading.value = true
+  try {
+    const updated = await adminAPI.subscriptions.resetWithCost(resetWithCostSubscription.value.id)
+    const days = getResetDaysCeil(updated.expires_at)
+    appStore.showSuccess(t('admin.subscriptions.resetWithCostSuccess', { days }))
+    showResetWithCostDialog.value = false
+    resetWithCostSubscription.value = null
+    await loadSubscriptions()
+  } catch (error: any) {
+    const code = error.response?.data?.error?.code || error.response?.data?.code
+    let msg = t('admin.subscriptions.resetWithCostFailed')
+    if (code === 'SUBSCRIPTION_TIME_INSUFFICIENT') msg = t('admin.subscriptions.resetWithCostError.timeInsufficient')
+    else if (code === 'SUBSCRIPTION_INACTIVE') msg = t('admin.subscriptions.resetWithCostError.inactive')
+    else if (code === 'SUBSCRIPTION_NOT_FOUND') msg = t('admin.subscriptions.resetWithCostError.notFound')
+    appStore.showError(msg)
+  } finally {
+    resetWithCostLoading.value = false
   }
 }
 
