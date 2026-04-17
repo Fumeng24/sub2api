@@ -67,10 +67,25 @@ export async function getSubscriptionProgress(
   return response.data
 }
 
+/**
+ * Reset subscription (deduct 1 day + clear daily usage window)
+ * @param subscriptionId - Subscription ID
+ * @returns Updated subscription
+ */
+export async function resetSubscription(
+  subscriptionId: number
+): Promise<UserSubscription> {
+  const response = await apiClient.post<UserSubscription>(
+    `/subscriptions/${subscriptionId}/reset`
+  )
+  return response.data
+}
+
 export default {
   getMySubscriptions,
   getActiveSubscriptions,
   getSubscriptionsProgress,
   getSubscriptionSummary,
-  getSubscriptionProgress
+  getSubscriptionProgress,
+  resetSubscription
 }
