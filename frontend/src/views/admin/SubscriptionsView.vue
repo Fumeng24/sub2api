@@ -1337,7 +1337,11 @@ function canResetWithCost(sub: UserSubscription): boolean {
   if (!sub.daily_window_start) return false
   const windowEndMs = new Date(sub.daily_window_start).getTime() + 86400_000
   if (windowEndMs <= Date.now()) return false
-  return getResetRemainingSeconds(sub.expires_at) > 86400
+  if (getResetRemainingSeconds(sub.expires_at) <= 86400) return false
+  // 仅当当前额度已用完才显示（有额度没必要重置）
+  const dailyLimit = sub.group?.daily_limit_usd
+  if (!dailyLimit || dailyLimit <= 0) return false
+  return (sub.daily_usage_usd || 0) >= dailyLimit
 }
 
 function getResetDaysCeil(expiresAt: string | null | undefined): number {
