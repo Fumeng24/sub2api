@@ -83,14 +83,27 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 
 			needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
 			if err != nil {
-				status := 403
-				if errors.Is(err, service.ErrDailyLimitExceeded) ||
-					errors.Is(err, service.ErrWeeklyLimitExceeded) ||
-					errors.Is(err, service.ErrMonthlyLimitExceeded) {
-					status = 429
+				// Auto-reset 尝试：仅对 daily limit exceeded 且 sub 开启了 auto_reset_daily
+				if errors.Is(err, service.ErrDailyLimitExceeded) && subscription.AutoResetDaily {
+					resetSub, resetErr := subscriptionService.ResetSubscriptionWithCost(c.Request.Context(), subscription.ID, 0)
+					if resetErr == nil && resetSub != nil {
+						subscription = resetSub
+						err = nil
+						needsMaintenance = false
+					}
+					// 重置失败：静默继续原错误流（fall through）
 				}
-				abortWithGoogleError(c, status, err.Error())
-				return
+
+				if err != nil {
+					status := 403
+					if errors.Is(err, service.ErrDailyLimitExceeded) ||
+						errors.Is(err, service.ErrWeeklyLimitExceeded) ||
+						errors.Is(err, service.ErrMonthlyLimitExceeded) {
+						status = 429
+					}
+					abortWithGoogleError(c, status, err.Error())
+					return
+				}
 			}
 
 			c.Set(string(ContextKeySubscription), subscription)

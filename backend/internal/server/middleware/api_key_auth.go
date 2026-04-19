@@ -176,16 +176,31 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			if subscription != nil {
 				needsMaintenance, validateErr := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
 				if validateErr != nil {
-					code := "SUBSCRIPTION_INVALID"
-					status := 403
-					if errors.Is(validateErr, service.ErrDailyLimitExceeded) ||
-						errors.Is(validateErr, service.ErrWeeklyLimitExceeded) ||
-						errors.Is(validateErr, service.ErrMonthlyLimitExceeded) {
-						code = "USAGE_LIMIT_EXCEEDED"
-						status = 429
+					// Auto-reset 尝试：仅对 daily limit exceeded 且 sub 开启了 auto_reset_daily
+					if errors.Is(validateErr, service.ErrDailyLimitExceeded) && subscription.AutoResetDaily {
+						resetSub, resetErr := subscriptionService.ResetSubscriptionWithCost(c.Request.Context(), subscription.ID, 0)
+						if resetErr == nil && resetSub != nil {
+							// 重置成功：用刷新后的 sub 替换，允许请求继续
+							subscription = resetSub
+							validateErr = nil
+							// 清零 needsMaintenance（窗口已最新）
+							needsMaintenance = false
+						}
+						// 重置失败：静默继续原错误流（fall through）
 					}
-					AbortWithError(c, status, code, validateErr.Error())
-					return
+
+					if validateErr != nil {
+						code := "SUBSCRIPTION_INVALID"
+						status := 403
+						if errors.Is(validateErr, service.ErrDailyLimitExceeded) ||
+							errors.Is(validateErr, service.ErrWeeklyLimitExceeded) ||
+							errors.Is(validateErr, service.ErrMonthlyLimitExceeded) {
+							code = "USAGE_LIMIT_EXCEEDED"
+							status = 429
+						}
+						AbortWithError(c, status, code, validateErr.Error())
+						return
+					}
 				}
 
 				// 窗口维护异步化（不阻塞请求）
