@@ -669,11 +669,7 @@
     <ConfirmDialog
       :show="showResetWithCostDialog"
       :title="t('admin.subscriptions.resetWithCostTitle')"
-      :message="t('admin.subscriptions.resetWithCostConfirm', {
-        user: resetWithCostSubscription?.user?.email,
-        daysBefore: getResetDaysCeil(resetWithCostSubscription?.expires_at),
-        daysAfter: Math.max(0, getResetDaysCeil(resetWithCostSubscription?.expires_at) - 1)
-      })"
+      :message="resetWithCostDialogMessage"
       :confirm-text="t('admin.subscriptions.resetWithCost')"
       :cancel-text="t('common.cancel')"
       @confirm="confirmResetWithCost"
@@ -1316,12 +1312,58 @@ function getResetRemainingSeconds(expiresAt: string | null | undefined): number 
 }
 
 function canResetWithCost(sub: UserSubscription): boolean {
-  return sub.status === 'active' && getResetRemainingSeconds(sub.expires_at) > 86400
+  if (sub.status !== 'active') return false
+  if (!sub.daily_window_start) return false
+  const windowEndMs = new Date(sub.daily_window_start).getTime() + 86400_000
+  if (windowEndMs <= Date.now()) return false
+  return getResetRemainingSeconds(sub.expires_at) > 86400
 }
 
 function getResetDaysCeil(expiresAt: string | null | undefined): number {
   return Math.ceil(getResetRemainingSeconds(expiresAt) / 86400)
 }
+
+interface ResetWithCostInfo {
+  costSeconds: number
+  beforeSeconds: number
+  afterSeconds: number
+}
+
+function computeResetWithCostInfo(sub: UserSubscription | null | undefined): ResetWithCostInfo {
+  if (!sub || !sub.daily_window_start || !sub.expires_at) {
+    return { costSeconds: 0, beforeSeconds: 0, afterSeconds: 0 }
+  }
+  const windowEndMs = new Date(sub.daily_window_start).getTime() + 86400_000
+  const nowMs = Date.now()
+  const costSeconds = Math.max(0, (windowEndMs - nowMs) / 1000)
+  const beforeSeconds = getResetRemainingSeconds(sub.expires_at)
+  const afterSeconds = Math.max(0, beforeSeconds - costSeconds)
+  return { costSeconds, beforeSeconds, afterSeconds }
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return t('admin.subscriptions.durationLessThanMinute')
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const parts: string[] = []
+  if (days > 0) parts.push(t('admin.subscriptions.durationDays', { n: days }))
+  if (hours > 0) parts.push(t('admin.subscriptions.durationHours', { n: hours }))
+  if (minutes > 0 || parts.length === 0) parts.push(t('admin.subscriptions.durationMinutes', { n: minutes }))
+  return parts.join(' ')
+}
+
+const resetWithCostDialogMessage = computed(() => {
+  const sub = resetWithCostSubscription.value
+  if (!sub) return ''
+  const info = computeResetWithCostInfo(sub)
+  return t('admin.subscriptions.resetWithCostConfirm', {
+    user: sub.user?.email || '',
+    cost: formatDuration(info.costSeconds),
+    before: formatDuration(info.beforeSeconds),
+    after: formatDuration(info.afterSeconds)
+  })
+})
 
 function openResetWithCostDialog(sub: UserSubscription) {
   resetWithCostSubscription.value = sub
@@ -1339,12 +1381,14 @@ async function confirmResetWithCost() {
     resetWithCostSubscription.value = null
     await loadSubscriptions()
   } catch (error: any) {
-    const code = error.response?.data?.error?.code || error.response?.data?.code
+    const code = error?.code
     let msg = t('admin.subscriptions.resetWithCostFailed')
     if (code === 'SUBSCRIPTION_TIME_INSUFFICIENT') msg = t('admin.subscriptions.resetWithCostError.timeInsufficient')
     else if (code === 'SUBSCRIPTION_INACTIVE') msg = t('admin.subscriptions.resetWithCostError.inactive')
     else if (code === 'SUBSCRIPTION_NOT_FOUND') msg = t('admin.subscriptions.resetWithCostError.notFound')
     appStore.showError(msg)
+    showResetWithCostDialog.value = false
+    resetWithCostSubscription.value = null
   } finally {
     resetWithCostLoading.value = false
   }
