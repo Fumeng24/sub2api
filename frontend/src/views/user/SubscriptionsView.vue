@@ -140,6 +140,37 @@
                   })
                 }}
               </p>
+
+              <!-- Auto Reset Toggle -->
+              <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-dark-700">
+                <div class="flex-1">
+                  <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('userSubscriptions.autoResetLabel') }}
+                  </div>
+                  <div class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
+                    {{ t('userSubscriptions.autoResetHint') }}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="subscription.auto_reset_daily"
+                  :disabled="autoResetSubmitting[subscription.id]"
+                  :class="[
+                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                    subscription.auto_reset_daily ? 'bg-primary-500' : 'bg-gray-200 dark:bg-dark-600',
+                    autoResetSubmitting[subscription.id] ? 'opacity-50 cursor-not-allowed' : ''
+                  ]"
+                  @click="toggleAutoReset(subscription, !subscription.auto_reset_daily)"
+                >
+                  <span
+                    :class="[
+                      'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                      subscription.auto_reset_daily ? 'translate-x-4' : 'translate-x-0'
+                    ]"
+                  ></span>
+                </button>
+              </div>
             </div>
 
             <!-- Weekly Usage -->
@@ -294,6 +325,28 @@ const loading = ref(true)
 const showResetDialog = ref(false)
 const resettingSubscription = ref<UserSubscription | null>(null)
 const resetLoading = ref(false)
+
+const autoResetSubmitting = ref<Record<number, boolean>>({})
+
+async function toggleAutoReset(sub: UserSubscription, next: boolean) {
+  if (autoResetSubmitting.value[sub.id]) return
+  autoResetSubmitting.value[sub.id] = true
+  try {
+    const updated = await subscriptionsAPI.setAutoResetDaily(sub.id, next)
+    // Update the local sub in-place
+    const idx = subscriptions.value.findIndex(s => s.id === sub.id)
+    if (idx >= 0) subscriptions.value[idx] = updated
+    appStore.showSuccess(
+      next
+        ? t('userSubscriptions.autoResetEnabled')
+        : t('userSubscriptions.autoResetDisabled')
+    )
+  } catch {
+    appStore.showError(t('userSubscriptions.autoResetFailed'))
+  } finally {
+    autoResetSubmitting.value[sub.id] = false
+  }
+}
 
 function getRemainingSeconds(expiresAt: string | null | undefined): number {
   if (!expiresAt) return 0

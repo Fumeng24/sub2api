@@ -81,11 +81,29 @@ export async function resetSubscription(
   return response.data
 }
 
+/**
+ * Toggle auto-reset-daily setting for a subscription
+ * @param subscriptionId - Subscription ID
+ * @param enabled - Whether to enable auto-reset when daily quota is exhausted
+ * @returns Updated subscription
+ */
+export async function setAutoResetDaily(
+  subscriptionId: number,
+  enabled: boolean
+): Promise<UserSubscription> {
+  const response = await apiClient.patch<UserSubscription>(
+    `/subscriptions/${subscriptionId}/auto-reset`,
+    { enabled }
+  )
+  return response.data
+}
+
 export default {
   getMySubscriptions,
   getActiveSubscriptions,
   getSubscriptionsProgress,
   getSubscriptionSummary,
   getSubscriptionProgress,
-  resetSubscription
+  resetSubscription,
+  setAutoResetDaily
 }
