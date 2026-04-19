@@ -232,7 +232,14 @@
                     ${{ row.group?.daily_limit_usd?.toFixed(2) }}
                   </span>
                 </div>
-                <div class="reset-info" v-if="row.daily_window_start && row.status === 'active'">
+                <div
+                  class="reset-info"
+                  v-if="
+                    row.daily_window_start &&
+                    row.status === 'active' &&
+                    formatResetTime(row.daily_window_start, 'daily', row.expires_at)
+                  "
+                >
                   <svg
                     class="h-3 w-3"
                     fill="none"
@@ -246,7 +253,7 @@
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>{{ formatResetTime(row.daily_window_start, 'daily') }}</span>
+                  <span>{{ formatResetTime(row.daily_window_start, 'daily', row.expires_at) }}</span>
                 </div>
               </div>
 
@@ -269,7 +276,14 @@
                     ${{ row.group?.weekly_limit_usd?.toFixed(2) }}
                   </span>
                 </div>
-                <div class="reset-info" v-if="row.weekly_window_start && row.status === 'active'">
+                <div
+                  class="reset-info"
+                  v-if="
+                    row.weekly_window_start &&
+                    row.status === 'active' &&
+                    formatResetTime(row.weekly_window_start, 'weekly', row.expires_at)
+                  "
+                >
                   <svg
                     class="h-3 w-3"
                     fill="none"
@@ -283,7 +297,7 @@
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>{{ formatResetTime(row.weekly_window_start, 'weekly') }}</span>
+                  <span>{{ formatResetTime(row.weekly_window_start, 'weekly', row.expires_at) }}</span>
                 </div>
               </div>
 
@@ -306,7 +320,14 @@
                     ${{ row.group?.monthly_limit_usd?.toFixed(2) }}
                   </span>
                 </div>
-                <div class="reset-info" v-if="row.monthly_window_start && row.status === 'active'">
+                <div
+                  class="reset-info"
+                  v-if="
+                    row.monthly_window_start &&
+                    row.status === 'active' &&
+                    formatResetTime(row.monthly_window_start, 'monthly', row.expires_at)
+                  "
+                >
                   <svg
                     class="h-3 w-3"
                     fill="none"
@@ -320,7 +341,7 @@
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>{{ formatResetTime(row.monthly_window_start, 'monthly') }}</span>
+                  <span>{{ formatResetTime(row.monthly_window_start, 'monthly', row.expires_at) }}</span>
                 </div>
               </div>
 
@@ -1425,8 +1446,12 @@ const getProgressClass = (used: number | null | undefined, limit: number | null)
 }
 
 // Format reset time based on window start and period type
-const formatResetTime = (windowStart: string, period: 'daily' | 'weekly' | 'monthly'): string => {
-  if (!windowStart) return t('admin.subscriptions.windowNotActive')
+const formatResetTime = (
+  windowStart: string,
+  period: 'daily' | 'weekly' | 'monthly',
+  expiresAt?: string | null
+): string => {
+  if (!windowStart) return ''
 
   const start = new Date(windowStart)
   const now = new Date()
@@ -1446,7 +1471,13 @@ const formatResetTime = (windowStart: string, period: 'daily' | 'weekly' | 'mont
   }
 
   const diffMs = resetTime.getTime() - now.getTime()
-  if (diffMs <= 0) return t('admin.subscriptions.windowNotActive')
+  if (diffMs <= 0) return ''
+
+  // 订阅先到期时，这次"重置"永远不会发生 → 隐藏
+  if (expiresAt) {
+    const expires = new Date(expiresAt)
+    if (resetTime > expires) return ''
+  }
 
   const diffSeconds = Math.floor(diffMs / 1000)
   const days = Math.floor(diffSeconds / 86400)
