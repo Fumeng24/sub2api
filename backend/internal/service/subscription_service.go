@@ -759,9 +759,10 @@ func (s *SubscriptionService) AdminResetQuota(ctx context.Context, subscriptionI
 	return s.userSubRepo.GetByID(ctx, subscriptionID)
 }
 
-// ResetSubscriptionWithCost 提前重置订阅：清零 daily 用量窗口 + 扣除 1 天 expires_at。
+// ResetSubscriptionWithCost 提前重置订阅：清零 daily 用量窗口 + 扣除"提前的时间"。
+// 扣费 = (daily_window_start + 24h) - now，即提前触发下次自然重置省下的等待时间。
 // ownerUserID != 0 时校验归属（用户端调用），== 0 时跳过归属校验（管理员端调用）。
-// 使用单条原子 UPDATE 防止 TOCTOU 竞争。
+// 使用单条原子 UPDATE（以 daily_window_start 等值条件）防止 TOCTOU 竞争。
 func (s *SubscriptionService) ResetSubscriptionWithCost(
 	ctx context.Context,
 	subscriptionID int64,
@@ -780,22 +781,35 @@ func (s *SubscriptionService) ResetSubscriptionWithCost(
 	}
 
 	now := time.Now()
-	// 预检：剩余时间必须严格大于 1 天
+
+	// 必须有活跃的 daily 窗口才能重置
+	if sub.DailyWindowStart == nil {
+		return nil, ErrSubscriptionTimeInsufficient
+	}
+	windowEnd := sub.DailyWindowStart.Add(24 * time.Hour)
+	if !windowEnd.After(now) {
+		// 窗口已过期，下次 API 调用会自然滚动；不需要手动重置
+		return nil, ErrSubscriptionTimeInsufficient
+	}
+
+	// 剩余时长必须 > 24h
 	if !sub.ExpiresAt.After(now.Add(24 * time.Hour)) {
 		return nil, ErrSubscriptionTimeInsufficient
 	}
 
-	newExpiresAt := sub.ExpiresAt.AddDate(0, 0, -1)
-	updated, err := s.userSubRepo.ShortenExpiryAndResetDaily(ctx, subscriptionID, newExpiresAt, now, 24*time.Hour)
+	cost := windowEnd.Sub(now)
+	newExpiresAt := sub.ExpiresAt.Add(-cost)
+
+	originalWindowStart := *sub.DailyWindowStart
+	updated, err := s.userSubRepo.ShortenExpiryAndResetDaily(ctx, subscriptionID, originalWindowStart, newExpiresAt, now)
 	if err != nil {
 		return nil, err
 	}
 	if !updated {
-		// 并发兜底：预检和 UPDATE 之间时间戳逼近边界，或另一个请求先更新了
+		// 并发兜底：窗口被别的请求滚动了或 expires_at 不够
 		return nil, ErrSubscriptionTimeInsufficient
 	}
 
-	// 失效缓存（与 AdminResetQuota 相同的模式）
 	s.InvalidateSubCache(sub.UserID, sub.GroupID)
 	if s.subCacheL1 != nil {
 		s.subCacheL1.Wait()

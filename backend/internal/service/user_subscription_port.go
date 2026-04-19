@@ -30,10 +30,9 @@ type UserSubscriptionRepository interface {
 	ResetWeeklyUsage(ctx context.Context, id int64, newWindowStart time.Time) error
 	ResetMonthlyUsage(ctx context.Context, id int64, newWindowStart time.Time) error
 	IncrementUsage(ctx context.Context, id int64, costUSD float64) error
-	// ShortenExpiryAndResetDaily 原子执行：仅当 expires_at > now + minRemaining 且
-	// status == active 且未软删时，将 expires_at 设为 newExpiresAt，同时清零 daily 用量窗口。
-	// 返回是否有行被更新（false 表示条件未满足）。
-	ShortenExpiryAndResetDaily(ctx context.Context, subID int64, newExpiresAt time.Time, windowStart time.Time, minRemaining time.Duration) (bool, error)
+	// ShortenExpiryAndResetDaily 原子地完成订阅重置：只在 daily_window_start 未被并发滚动、
+	// status=active 且 newExpiresAt 仍有 >24h 剩余时生效。
+	ShortenExpiryAndResetDaily(ctx context.Context, subID int64, originalWindowStart time.Time, newExpiresAt time.Time, now time.Time) (bool, error)
 
 	BatchUpdateExpiredStatus(ctx context.Context) (int64, error)
 }

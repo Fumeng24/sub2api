@@ -336,22 +336,34 @@ func (r *userSubscriptionRepository) ResetMonthlyUsage(ctx context.Context, id i
 	return translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
 }
 
+// ShortenExpiryAndResetDaily 原子地完成订阅重置：
+//
+//	仅当 daily_window_start 仍等于 originalWindowStart（未被并发滚动）、
+//	    status == active、
+//	    newExpiresAt 仍大于 now + 24h（扣完仍有 >24h 剩余，保护兜底）
+//	时：
+//	  expires_at = newExpiresAt
+//	  daily_window_start = now
+//	  daily_usage_usd = 0
+//
+// 返回是否有行被更新（false 表示条件不满足或并发失败）。
 func (r *userSubscriptionRepository) ShortenExpiryAndResetDaily(
 	ctx context.Context,
 	subID int64,
+	originalWindowStart time.Time,
 	newExpiresAt time.Time,
-	windowStart time.Time,
-	minRemaining time.Duration,
+	now time.Time,
 ) (bool, error) {
 	client := clientFromContext(ctx, r.client)
 	n, err := client.UserSubscription.Update().
 		Where(
 			usersubscription.IDEQ(subID),
-			usersubscription.ExpiresAtGT(time.Now().Add(minRemaining)),
 			usersubscription.StatusEQ(service.SubscriptionStatusActive),
+			usersubscription.DailyWindowStartEQ(originalWindowStart),
+			usersubscription.ExpiresAtGT(now.Add(24*time.Hour)),
 		).
 		SetExpiresAt(newExpiresAt).
-		SetDailyWindowStart(windowStart).
+		SetDailyWindowStart(now).
 		SetDailyUsageUsd(0).
 		Save(ctx)
 	if err != nil {

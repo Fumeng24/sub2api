@@ -709,6 +709,6 @@ func (r *stubUserSubscriptionRepo) BatchUpdateExpiredStatus(ctx context.Context)
 	return 0, errors.New("not implemented")
 }
 
-func (r *stubUserSubscriptionRepo) ShortenExpiryAndResetDaily(_ context.Context, _ int64, _ time.Time, _ time.Time, _ time.Duration) (bool, error) {
+func (r *stubUserSubscriptionRepo) ShortenExpiryAndResetDaily(_ context.Context, _ int64, _ time.Time, _ time.Time, _ time.Time) (bool, error) {
 	return false, nil
 }

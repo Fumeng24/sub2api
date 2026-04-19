@@ -186,7 +186,7 @@ func (f fakeGoogleSubscriptionRepo) IncrementUsage(ctx context.Context, id int64
 func (f fakeGoogleSubscriptionRepo) BatchUpdateExpiredStatus(ctx context.Context) (int64, error) {
 	return 0, errors.New("not implemented")
 }
-func (f fakeGoogleSubscriptionRepo) ShortenExpiryAndResetDaily(_ context.Context, _ int64, _ time.Time, _ time.Time, _ time.Duration) (bool, error) {
+func (f fakeGoogleSubscriptionRepo) ShortenExpiryAndResetDaily(_ context.Context, _ int64, _ time.Time, _ time.Time, _ time.Time) (bool, error) {
 	return false, nil
 }
 
