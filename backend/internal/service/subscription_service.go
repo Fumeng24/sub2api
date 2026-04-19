@@ -821,6 +821,33 @@ func (s *SubscriptionService) ResetSubscriptionWithCost(
 	return s.userSubRepo.GetByID(ctx, subscriptionID)
 }
 
+// SetAutoResetDaily 切换订阅的"日额度耗尽时自动重置"功能。
+// ownerUserID != 0 时校验归属（用户端调用），== 0 时跳过（管理员端调用）。
+func (s *SubscriptionService) SetAutoResetDaily(ctx context.Context, subscriptionID int64, ownerUserID int64, enabled bool) (*UserSubscription, error) {
+	sub, err := s.userSubRepo.GetByID(ctx, subscriptionID)
+	if err != nil {
+		return nil, err
+	}
+	if ownerUserID != 0 && sub.UserID != ownerUserID {
+		return nil, ErrSubscriptionNotOwned
+	}
+
+	if err := s.userSubRepo.UpdateAutoResetDaily(ctx, subscriptionID, enabled); err != nil {
+		return nil, err
+	}
+
+	// 失效缓存（行为配置变化了，不一定影响计费但保险起见失效）
+	s.InvalidateSubCache(sub.UserID, sub.GroupID)
+	if s.subCacheL1 != nil {
+		s.subCacheL1.Wait()
+	}
+	if s.billingCacheService != nil {
+		_ = s.billingCacheService.InvalidateSubscription(ctx, sub.UserID, sub.GroupID)
+	}
+
+	return s.userSubRepo.GetByID(ctx, subscriptionID)
+}
+
 // CheckAndResetWindows 检查并重置过期的窗口
 func (s *SubscriptionService) CheckAndResetWindows(ctx context.Context, sub *UserSubscription) error {
 	// 使用当前时刻作为新窗口起始时间（24 小时滚动窗口，非 0 点对齐）
