@@ -253,10 +253,7 @@
     <ConfirmDialog
       :show="showResetDialog"
       :title="t('userSubscriptions.resetTitle')"
-      :message="t('userSubscriptions.resetConfirm', {
-        daysBefore: getDaysCeil(resettingSubscription?.expires_at),
-        daysAfter: Math.max(0, getDaysCeil(resettingSubscription?.expires_at) - 1)
-      })"
+      :message="resetDialogMessage"
       :confirm-text="t('userSubscriptions.reset')"
       :cancel-text="t('common.cancel')"
       @confirm="confirmReset"
@@ -266,7 +263,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
@@ -275,7 +272,6 @@ import type { UserSubscription } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { formatDateOnly } from '@/utils/format'
 import { platformBorderClass, platformBadgeClass, platformButtonClass, platformLabel } from '@/utils/platformColors'
 
 function platformAccentDotClass(p: string): string {
@@ -305,12 +301,44 @@ function getRemainingSeconds(expiresAt: string | null | undefined): number {
 }
 
 function canReset(sub: UserSubscription): boolean {
-  return sub.status === 'active' && getRemainingSeconds(sub.expires_at) > 86400
+  if (sub.status !== 'active') return false
+  if (!sub.daily_window_start) return false
+  const windowEndMs = new Date(sub.daily_window_start).getTime() + 86400_000
+  if (windowEndMs <= Date.now()) return false // 窗口已过期，会自然滚
+  return getRemainingSeconds(sub.expires_at) > 86400
 }
 
 function getDaysCeil(expiresAt: string | null | undefined): number {
   return Math.ceil(getRemainingSeconds(expiresAt) / 86400)
 }
+
+interface ResetInfo {
+  costSeconds: number
+  beforeSeconds: number
+  afterSeconds: number
+}
+
+function computeResetInfo(sub: UserSubscription | null | undefined): ResetInfo {
+  if (!sub || !sub.daily_window_start || !sub.expires_at) {
+    return { costSeconds: 0, beforeSeconds: 0, afterSeconds: 0 }
+  }
+  const windowEndMs = new Date(sub.daily_window_start).getTime() + 86400_000
+  const nowMs = Date.now()
+  const costSeconds = Math.max(0, (windowEndMs - nowMs) / 1000)
+  const beforeSeconds = getRemainingSeconds(sub.expires_at)
+  const afterSeconds = Math.max(0, beforeSeconds - costSeconds)
+  return { costSeconds, beforeSeconds, afterSeconds }
+}
+
+const resetDialogMessage = computed(() => {
+  if (!resettingSubscription.value) return ''
+  const info = computeResetInfo(resettingSubscription.value)
+  return t('userSubscriptions.resetConfirm', {
+    cost: formatDuration(info.costSeconds),
+    before: formatDuration(info.beforeSeconds),
+    after: formatDuration(info.afterSeconds)
+  })
+})
 
 function openResetDialog(sub: UserSubscription) {
   resettingSubscription.value = sub
@@ -328,13 +356,16 @@ async function confirmReset() {
     resettingSubscription.value = null
     await loadSubscriptions()
   } catch (error: any) {
-    const code = error.response?.data?.error?.code || error.response?.data?.code
+    const code = error?.code
     let msg = t('userSubscriptions.resetFailed')
     if (code === 'SUBSCRIPTION_TIME_INSUFFICIENT') msg = t('userSubscriptions.resetError.timeInsufficient')
     else if (code === 'SUBSCRIPTION_NOT_OWNED') msg = t('userSubscriptions.resetError.notOwned')
     else if (code === 'SUBSCRIPTION_INACTIVE') msg = t('userSubscriptions.resetError.inactive')
     else if (code === 'SUBSCRIPTION_NOT_FOUND') msg = t('userSubscriptions.resetError.notFound')
     appStore.showError(msg)
+    // Close dialog on error too
+    showResetDialog.value = false
+    resettingSubscription.value = null
   } finally {
     resetLoading.value = false
   }
@@ -366,26 +397,39 @@ function getProgressBarClass(used: number | undefined, limit: number | null | un
   return 'bg-green-500'
 }
 
+/**
+ * Format seconds as "X 天 Y 小时 Z 分" (omit zero-leading parts for readability)
+ * Falls back to "少于 1 分钟" for < 60s.
+ */
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return t('userSubscriptions.durationLessThanMinute')
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const parts: string[] = []
+  if (days > 0) parts.push(t('userSubscriptions.durationDays', { n: days }))
+  if (hours > 0) parts.push(t('userSubscriptions.durationHours', { n: hours }))
+  if (minutes > 0 || parts.length === 0) parts.push(t('userSubscriptions.durationMinutes', { n: minutes }))
+  return parts.join(' ')
+}
+
+function formatLocalDateTime(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 function formatExpirationDate(expiresAt: string): string {
   const now = new Date()
   const expires = new Date(expiresAt)
-  const diff = expires.getTime() - now.getTime()
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+  const diffMs = expires.getTime() - now.getTime()
 
-  if (days < 0) {
+  if (diffMs < 0) {
     return t('userSubscriptions.status.expired')
   }
 
-  const dateStr = formatDateOnly(expires)
-
-  if (days === 0) {
-    return `${dateStr} (${t('common.today')})`
-  }
-  if (days === 1) {
-    return `${dateStr} (${t('common.tomorrow')})`
-  }
-
-  return t('userSubscriptions.daysRemaining', { days }) + ` (${dateStr})`
+  const dateTimeStr = formatLocalDateTime(expires)
+  const remaining = formatDuration(diffMs / 1000)
+  return `${dateTimeStr} (${t('userSubscriptions.remainingPrefix')} ${remaining})`
 }
 
 function getExpirationClass(expiresAt: string): string {
