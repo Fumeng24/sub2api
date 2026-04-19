@@ -100,6 +100,7 @@ func RegisterUserRoutes(
 			subscriptions.GET("/progress", h.Subscription.GetProgress)
 			subscriptions.GET("/summary", h.Subscription.GetSummary)
 			subscriptions.POST("/:id/reset", h.Subscription.ResetSubscription)
+			subscriptions.PATCH("/:id/auto-reset", h.Subscription.SetAutoReset)
 		}
 	}
 }

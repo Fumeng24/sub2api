@@ -212,3 +212,38 @@ func (h *SubscriptionHandler) ResetSubscription(c *gin.Context) {
 
 	response.Success(c, dto.UserSubscriptionFromService(sub))
 }
+
+// SetAutoResetRequest represents the auto-reset toggle request
+type SetAutoResetRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+// SetAutoReset 切换订阅的"日额度耗尽时自动重置"开关
+// PATCH /api/v1/subscriptions/:id/auto-reset
+func (h *SubscriptionHandler) SetAutoReset(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+
+	subscriptionID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid subscription ID")
+		return
+	}
+
+	var req SetAutoResetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	sub, err := h.subscriptionService.SetAutoResetDaily(c.Request.Context(), subscriptionID, subject.UserID, req.Enabled)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, dto.UserSubscriptionFromService(sub))
+}

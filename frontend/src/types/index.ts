@@ -1319,6 +1319,7 @@ export interface UserSubscription {
   daily_window_start: string | null
   weekly_window_start: string | null
   monthly_window_start: string | null
+  auto_reset_daily: boolean
   created_at: string
   updated_at: string
   expires_at: string | null
