@@ -131,12 +131,12 @@
                 ></div>
               </div>
               <p
-                v-if="subscription.daily_window_start"
+                v-if="subscription.daily_window_start && formatResetTime(subscription.daily_window_start, 24, subscription.expires_at)"
                 class="text-xs text-gray-500 dark:text-dark-400"
               >
                 {{
                   t('userSubscriptions.resetIn', {
-                    time: formatResetTime(subscription.daily_window_start, 24)
+                    time: formatResetTime(subscription.daily_window_start, 24, subscription.expires_at)
                   })
                 }}
               </p>
@@ -172,12 +172,12 @@
                 ></div>
               </div>
               <p
-                v-if="subscription.weekly_window_start"
+                v-if="subscription.weekly_window_start && formatResetTime(subscription.weekly_window_start, 168, subscription.expires_at)"
                 class="text-xs text-gray-500 dark:text-dark-400"
               >
                 {{
                   t('userSubscriptions.resetIn', {
-                    time: formatResetTime(subscription.weekly_window_start, 168)
+                    time: formatResetTime(subscription.weekly_window_start, 168, subscription.expires_at)
                   })
                 }}
               </p>
@@ -213,12 +213,12 @@
                 ></div>
               </div>
               <p
-                v-if="subscription.monthly_window_start"
+                v-if="subscription.monthly_window_start && formatResetTime(subscription.monthly_window_start, 720, subscription.expires_at)"
                 class="text-xs text-gray-500 dark:text-dark-400"
               >
                 {{
                   t('userSubscriptions.resetIn', {
-                    time: formatResetTime(subscription.monthly_window_start, 720)
+                    time: formatResetTime(subscription.monthly_window_start, 720, subscription.expires_at)
                   })
                 }}
               </p>
@@ -444,15 +444,25 @@ function getExpirationClass(expiresAt: string): string {
   return 'text-gray-700 dark:text-gray-300'
 }
 
-function formatResetTime(windowStart: string | null, windowHours: number): string {
-  if (!windowStart) return t('userSubscriptions.windowNotActive')
+function formatResetTime(
+  windowStart: string | null,
+  windowHours: number,
+  expiresAt?: string | null
+): string {
+  if (!windowStart) return ''
 
   const start = new Date(windowStart)
   const end = new Date(start.getTime() + windowHours * 60 * 60 * 1000)
   const now = new Date()
   const diff = end.getTime() - now.getTime()
 
-  if (diff <= 0) return t('userSubscriptions.windowNotActive')
+  if (diff <= 0) return ''
+
+  // 订阅先到期时，这次"重置"永远不会发生 → 隐藏
+  if (expiresAt) {
+    const expires = new Date(expiresAt)
+    if (end > expires) return ''
+  }
 
   const hours = Math.floor(diff / (1000 * 60 * 60))
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
