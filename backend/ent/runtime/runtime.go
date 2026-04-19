@@ -1478,8 +1478,12 @@ func init() {
 	usersubscriptionDescMonthlyUsageUsd := usersubscriptionFields[10].Descriptor()
 	// usersubscription.DefaultMonthlyUsageUsd holds the default value on creation for the monthly_usage_usd field.
 	usersubscription.DefaultMonthlyUsageUsd = usersubscriptionDescMonthlyUsageUsd.Default.(float64)
+	// usersubscriptionDescAutoResetDaily is the schema descriptor for auto_reset_daily field.
+	usersubscriptionDescAutoResetDaily := usersubscriptionFields[11].Descriptor()
+	// usersubscription.DefaultAutoResetDaily holds the default value on creation for the auto_reset_daily field.
+	usersubscription.DefaultAutoResetDaily = usersubscriptionDescAutoResetDaily.Default.(bool)
 	// usersubscriptionDescAssignedAt is the schema descriptor for assigned_at field.
-	usersubscriptionDescAssignedAt := usersubscriptionFields[12].Descriptor()
+	usersubscriptionDescAssignedAt := usersubscriptionFields[13].Descriptor()
 	// usersubscription.DefaultAssignedAt holds the default value on creation for the assigned_at field.
 	usersubscription.DefaultAssignedAt = usersubscriptionDescAssignedAt.Default.(func() time.Time)
 }

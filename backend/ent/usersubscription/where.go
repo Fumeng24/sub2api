@@ -125,6 +125,11 @@ func MonthlyUsageUsd(v float64) predicate.UserSubscription {
 	return predicate.UserSubscription(sql.FieldEQ(FieldMonthlyUsageUsd, v))
 }
 
+// AutoResetDaily applies equality check predicate on the "auto_reset_daily" field. It's identical to AutoResetDailyEQ.
+func AutoResetDaily(v bool) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldAutoResetDaily, v))
+}
+
 // AssignedBy applies equality check predicate on the "assigned_by" field. It's identical to AssignedByEQ.
 func AssignedBy(v int64) predicate.UserSubscription {
 	return predicate.UserSubscription(sql.FieldEQ(FieldAssignedBy, v))
@@ -723,6 +728,16 @@ func MonthlyUsageUsdLT(v float64) predicate.UserSubscription {
 // MonthlyUsageUsdLTE applies the LTE predicate on the "monthly_usage_usd" field.
 func MonthlyUsageUsdLTE(v float64) predicate.UserSubscription {
 	return predicate.UserSubscription(sql.FieldLTE(FieldMonthlyUsageUsd, v))
+}
+
+// AutoResetDailyEQ applies the EQ predicate on the "auto_reset_daily" field.
+func AutoResetDailyEQ(v bool) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldEQ(FieldAutoResetDaily, v))
+}
+
+// AutoResetDailyNEQ applies the NEQ predicate on the "auto_reset_daily" field.
+func AutoResetDailyNEQ(v bool) predicate.UserSubscription {
+	return predicate.UserSubscription(sql.FieldNEQ(FieldAutoResetDaily, v))
 }
 
 // AssignedByEQ applies the EQ predicate on the "assigned_by" field.

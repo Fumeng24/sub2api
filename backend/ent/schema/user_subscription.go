@@ -69,6 +69,10 @@ func (UserSubscription) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}).
 			Default(0),
 
+		field.Bool("auto_reset_daily").
+			Default(false).
+			Comment("Enable auto-reset-with-cost when daily quota is exhausted"),
+
 		field.Int64("assigned_by").
 			Optional().
 			Nillable(),

@@ -1387,6 +1387,9 @@ func (stubUserSubscriptionRepo) UpdateStatus(ctx context.Context, subscriptionID
 func (stubUserSubscriptionRepo) UpdateNotes(ctx context.Context, subscriptionID int64, notes string) error {
 	return errors.New("not implemented")
 }
+func (stubUserSubscriptionRepo) UpdateAutoResetDaily(ctx context.Context, subscriptionID int64, enabled bool) error {
+	return errors.New("not implemented")
+}
 func (stubUserSubscriptionRepo) ActivateWindows(ctx context.Context, id int64, start time.Time) error {
 	return errors.New("not implemented")
 }

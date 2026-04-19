@@ -107,6 +107,9 @@ func (userSubRepoNoop) UpdateStatus(context.Context, int64, string) error {
 func (userSubRepoNoop) UpdateNotes(context.Context, int64, string) error {
 	panic("unexpected UpdateNotes call")
 }
+func (userSubRepoNoop) UpdateAutoResetDaily(context.Context, int64, bool) error {
+	panic("unexpected UpdateAutoResetDaily call")
+}
 func (userSubRepoNoop) ActivateWindows(context.Context, int64, time.Time) error {
 	panic("unexpected ActivateWindows call")
 }

@@ -250,6 +250,20 @@ func (_u *UserSubscriptionUpdate) AddMonthlyUsageUsd(v float64) *UserSubscriptio
 	return _u
 }
 
+// SetAutoResetDaily sets the "auto_reset_daily" field.
+func (_u *UserSubscriptionUpdate) SetAutoResetDaily(v bool) *UserSubscriptionUpdate {
+	_u.mutation.SetAutoResetDaily(v)
+	return _u
+}
+
+// SetNillableAutoResetDaily sets the "auto_reset_daily" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableAutoResetDaily(v *bool) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetAutoResetDaily(*v)
+	}
+	return _u
+}
+
 // SetAssignedBy sets the "assigned_by" field.
 func (_u *UserSubscriptionUpdate) SetAssignedBy(v int64) *UserSubscriptionUpdate {
 	_u.mutation.SetAssignedBy(v)
@@ -515,6 +529,9 @@ func (_u *UserSubscriptionUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if value, ok := _u.mutation.AddedMonthlyUsageUsd(); ok {
 		_spec.AddField(usersubscription.FieldMonthlyUsageUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AutoResetDaily(); ok {
+		_spec.SetField(usersubscription.FieldAutoResetDaily, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.AssignedAt(); ok {
 		_spec.SetField(usersubscription.FieldAssignedAt, field.TypeTime, value)
@@ -896,6 +913,20 @@ func (_u *UserSubscriptionUpdateOne) AddMonthlyUsageUsd(v float64) *UserSubscrip
 	return _u
 }
 
+// SetAutoResetDaily sets the "auto_reset_daily" field.
+func (_u *UserSubscriptionUpdateOne) SetAutoResetDaily(v bool) *UserSubscriptionUpdateOne {
+	_u.mutation.SetAutoResetDaily(v)
+	return _u
+}
+
+// SetNillableAutoResetDaily sets the "auto_reset_daily" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableAutoResetDaily(v *bool) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetAutoResetDaily(*v)
+	}
+	return _u
+}
+
 // SetAssignedBy sets the "assigned_by" field.
 func (_u *UserSubscriptionUpdateOne) SetAssignedBy(v int64) *UserSubscriptionUpdateOne {
 	_u.mutation.SetAssignedBy(v)
@@ -1191,6 +1222,9 @@ func (_u *UserSubscriptionUpdateOne) sqlSave(ctx context.Context) (_node *UserSu
 	}
 	if value, ok := _u.mutation.AddedMonthlyUsageUsd(); ok {
 		_spec.AddField(usersubscription.FieldMonthlyUsageUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AutoResetDaily(); ok {
+		_spec.SetField(usersubscription.FieldAutoResetDaily, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.AssignedAt(); ok {
 		_spec.SetField(usersubscription.FieldAssignedAt, field.TypeTime, value)
