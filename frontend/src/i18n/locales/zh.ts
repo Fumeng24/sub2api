@@ -2042,7 +2042,7 @@ export default {
       failedToResetQuota: '重置配额失败',
       resetWithCost: '重置（扣 1 天）',
       resetWithCostTitle: '确认提前重置',
-      resetWithCostConfirm: '此操作将扣除 1 天订阅时间，并刷新当日额度。\n用户：{user}\n当前剩余：{daysBefore} 天\n重置后剩余：{daysAfter} 天\n确定继续？',
+      resetWithCostConfirm: '此操作将立即刷新当日额度，代价是扣除 {cost} 订阅时间。\n用户：{user}\n当前剩余：{before}\n重置后剩余：{after}\n确定继续？',
       resetWithCostSuccess: '重置成功，已扣除 1 天，当前剩余 {days} 天',
       resetWithCostFailed: '重置失败',
       resetWithCostError: {
@@ -2050,6 +2050,11 @@ export default {
         inactive: '订阅已过期或暂停，无法重置',
         notFound: '订阅不存在',
       },
+      durationLessThanMinute: '少于 1 分钟',
+      durationDays: '{n} 天',
+      durationHours: '{n} 小时',
+      durationMinutes: '{n} 分',
+      remainingPrefix: '剩余',
       noSubscriptionsYet: '暂无订阅',
       assignFirstSubscription: '分配一个订阅以开始使用。',
       subscriptionAssigned: '订阅分配成功',
@@ -5355,7 +5360,7 @@ export default {
     usageOf: '已用 {used} / {limit}',
     reset: '重置',
     resetTitle: '确认提前重置',
-    resetConfirm: '此操作将扣除 1 天订阅时间，并刷新当日额度。\n当前剩余：{daysBefore} 天\n重置后剩余：{daysAfter} 天\n确定继续？',
+    resetConfirm: '此操作将立即刷新当日额度，代价是扣除 {cost} 订阅时间。\n当前剩余：{before}\n重置后剩余：{after}\n确定继续？',
     resetSuccess: '重置成功，已扣除 1 天，当前剩余 {days} 天',
     resetFailed: '重置失败',
     resetError: {
@@ -5364,6 +5369,11 @@ export default {
       inactive: '订阅已过期或暂停',
       notFound: '订阅不存在',
     },
+    durationLessThanMinute: '少于 1 分钟',
+    durationDays: '{n} 天',
+    durationHours: '{n} 小时',
+    durationMinutes: '{n} 分',
+    remainingPrefix: '剩余',
   },
 
   // Onboarding Tour

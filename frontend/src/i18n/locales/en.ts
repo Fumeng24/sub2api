@@ -1963,7 +1963,7 @@ export default {
       failedToResetQuota: 'Failed to reset quota',
       resetWithCost: 'Reset (−1 day)',
       resetWithCostTitle: 'Confirm early reset',
-      resetWithCostConfirm: 'This will deduct 1 day from the subscription and refresh the daily quota.\nUser: {user}\nCurrent remaining: {daysBefore} days\nAfter reset: {daysAfter} days\nProceed?',
+      resetWithCostConfirm: 'This will refresh the daily quota immediately at the cost of {cost} subscription time.\nUser: {user}\nCurrent remaining: {before}\nAfter reset: {after}\nProceed?',
       resetWithCostSuccess: 'Reset successful. 1 day deducted, {days} days remaining.',
       resetWithCostFailed: 'Reset failed',
       resetWithCostError: {
@@ -1971,6 +1971,11 @@ export default {
         inactive: 'Subscription is expired or suspended.',
         notFound: 'Subscription not found.',
       },
+      durationLessThanMinute: 'less than 1 minute',
+      durationDays: '{n}d',
+      durationHours: '{n}h',
+      durationMinutes: '{n}m',
+      remainingPrefix: 'remaining',
       noSubscriptionsYet: 'No subscriptions yet',
       assignFirstSubscription: 'Assign a subscription to get started.',
       subscriptionAssigned: 'Subscription assigned successfully',
@@ -5194,7 +5199,7 @@ export default {
     usageOf: '{used} of {limit}',
     reset: 'Reset',
     resetTitle: 'Confirm early reset',
-    resetConfirm: 'This will deduct 1 day from your subscription and refresh your daily quota.\nCurrent remaining: {daysBefore} days\nAfter reset: {daysAfter} days\nProceed?',
+    resetConfirm: 'This will refresh the daily quota immediately at the cost of {cost} subscription time.\nCurrent remaining: {before}\nAfter reset: {after}\nProceed?',
     resetSuccess: 'Reset successful. 1 day deducted, {days} days remaining.',
     resetFailed: 'Reset failed',
     resetError: {
@@ -5203,6 +5208,11 @@ export default {
       inactive: 'Subscription is expired or suspended.',
       notFound: 'Subscription not found.',
     },
+    durationLessThanMinute: 'less than 1 minute',
+    durationDays: '{n}d',
+    durationHours: '{n}h',
+    durationMinutes: '{n}m',
+    remainingPrefix: 'remaining',
   },
 
   // Onboarding Tour
