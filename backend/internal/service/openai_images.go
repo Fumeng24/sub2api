@@ -1157,9 +1157,9 @@ func uploadOpenAIImageFiles(ctx context.Context, client *req.Client, headers htt
 		if err != nil {
 			return nil, err
 		}
-		if putResp.Response != nil && putResp.Response.Body != nil {
-			_, _ = io.Copy(io.Discard, putResp.Response.Body)
-			_ = putResp.Response.Body.Close()
+		if putResp.Response != nil && putResp.Body != nil {
+			_, _ = io.Copy(io.Discard, putResp.Body)
+			_ = putResp.Body.Close()
 		}
 		if putResp.StatusCode < 200 || putResp.StatusCode >= 300 {
 			return nil, newOpenAIImageStatusError(putResp, "upload image bytes failed")
