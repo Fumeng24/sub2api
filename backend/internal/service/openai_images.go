@@ -307,11 +307,29 @@ func normalizeOpenAIImagesEndpointPath(path string) string {
 	}
 }
 
+// classifyOpenAIImagesCapability decides whether a request must go through the
+// native /v1/images/generations path (APIKey accounts only) or can be served
+// by ChatGPT's internal backend (OAuth accounts). Native is required only when
+// the request uses features the ChatGPT subscription UI doesn't support:
+//
+//   - Non-gpt-image-* model (custom model routing)
+//   - n > 1 (OAuth path returns a single image per conversation)
+//   - stream (OAuth uses its own SSE transport, not the OpenAI-style chunks)
+//   - mask upload (only the native edits API accepts separate mask input)
+//   - Other advanced native-only fields (see hasOpenAINativeImageOptions)
+//   - JSON-shaped /v1/images/edits (only multipart is supported via OAuth)
+//   - response_format other than b64_json (OAuth only produces b64 / URL we
+//     must base64-encode ourselves; callers asking for hosted urls need the
+//     native CDN path)
+//
+// ExplicitModel and ExplicitSize do NOT force Native — those fields are
+// present on every real client request (e.g. CherryStudio always sends both)
+// and most values (the common gpt-image-* models at standard sizes) are
+// perfectly supported by the OAuth backend. Classifying them as Native made
+// every real request require APIKey accounts, and when none existed the
+// scheduler burned time walking the entire OAuth pool before fallback.
 func classifyOpenAIImagesCapability(req *OpenAIImagesRequest) OpenAIImagesCapability {
 	if req == nil {
-		return OpenAIImagesCapabilityNative
-	}
-	if req.ExplicitModel || req.ExplicitSize {
 		return OpenAIImagesCapabilityNative
 	}
 	model := strings.ToLower(strings.TrimSpace(req.Model))

@@ -35,7 +35,10 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_JSON(t *testing.T) {
 	require.False(t, parsed.Multipart)
 }
 
-func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultipartEdit(t *testing.T) {
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultipartEditAllowsBasic(t *testing.T) {
+	// gpt-image-* with a multipart edit (model + size + image upload) is
+	// supported by the ChatGPT OAuth backend via the conversation upload API,
+	// so classification should return Basic, not Native.
 	gin.SetMode(gin.TestMode)
 
 	var body bytes.Buffer
@@ -66,7 +69,7 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultipartEdit(t *testing.T
 	require.Equal(t, "1536x1024", parsed.Size)
 	require.Equal(t, "2K", parsed.SizeTier)
 	require.Len(t, parsed.Uploads, 1)
-	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
+	require.Equal(t, OpenAIImagesCapabilityBasic, parsed.RequiredCapability)
 }
 
 func TestOpenAIGatewayServiceParseOpenAIImagesRequest_PromptOnlyDefaultsRemainBasic(t *testing.T) {
@@ -87,7 +90,11 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_PromptOnlyDefaultsRemainBa
 	require.Equal(t, OpenAIImagesCapabilityBasic, parsed.RequiredCapability)
 }
 
-func TestOpenAIGatewayServiceParseOpenAIImagesRequest_ExplicitSizeRequiresNativeCapability(t *testing.T) {
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_ExplicitSizeStaysBasic(t *testing.T) {
+	// Regression: before this fix, any explicit size forced Native capability,
+	// which caused schedulers to walk the entire OAuth pool looking for an
+	// APIKey account that didn't exist. gpt-image-* at standard sizes is
+	// supported by the OAuth backend and must remain Basic.
 	gin.SetMode(gin.TestMode)
 	body := []byte(`{"prompt":"draw a cat","size":"1024x1024"}`)
 
@@ -101,5 +108,74 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_ExplicitSizeRequiresNative
 	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
 	require.NoError(t, err)
 	require.NotNil(t, parsed)
+	require.True(t, parsed.ExplicitSize)
+	require.Equal(t, OpenAIImagesCapabilityBasic, parsed.RequiredCapability)
+}
+
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_CherryStudioShapeStaysBasic(t *testing.T) {
+	// The actual payload shape CherryStudio sends for gpt-image generation.
+	// Under the pre-fix classifier this was Native (forcing APIKey accounts)
+	// — it should be Basic so OAuth accounts can serve it.
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"gpt-image-2","prompt":"a small cat","size":"1024x1024","n":1,"response_format":"b64_json"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	svc := &OpenAIGatewayService{}
+	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
+	require.Equal(t, OpenAIImagesCapabilityBasic, parsed.RequiredCapability)
+}
+
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_ResponseFormatURLRequiresNative(t *testing.T) {
+	// Real Native trigger: response_format=url. OAuth path only produces b64.
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"gpt-image-2","prompt":"a cat","size":"1024x1024","response_format":"url"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	svc := &OpenAIGatewayService{}
+	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
+	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
+}
+
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_NonGptImageModelRequiresNative(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"dall-e-3","prompt":"a cat"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	svc := &OpenAIGatewayService{}
+	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
+	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
+}
+
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultiImageRequiresNative(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"gpt-image-2","prompt":"a cat","n":2}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	svc := &OpenAIGatewayService{}
+	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
 	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
 }
