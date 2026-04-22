@@ -128,7 +128,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
-import Icon from '@/components/common/Icon.vue'
+import Icon from '@/components/icons/Icon.vue'
 import bulkVerifyAPI, {
   BULK_VERIFY_JOB_ALREADY_RUNNING,
   type BulkVerifyJob
