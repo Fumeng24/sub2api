@@ -83,6 +83,16 @@
                 <span class="hidden md:inline">{{ t('admin.tlsFingerprintProfiles.title') }}</span>
               </button>
 
+              <!-- Bulk Verify (wham/usage) -->
+              <button
+                @click="showBulkVerify = true"
+                class="btn btn-secondary"
+                :title="t('admin.accounts.bulkVerify.button')"
+              >
+                <Icon name="sync" size="md" class="mr-1.5" />
+                <span class="hidden md:inline">{{ t('admin.accounts.bulkVerify.button') }}</span>
+              </button>
+
               <!-- Column Settings Dropdown -->
               <div class="relative" ref="columnDropdownRef">
                 <button
@@ -307,6 +317,7 @@
     </ConfirmDialog>
     <ErrorPassthroughRulesModal :show="showErrorPassthrough" @close="showErrorPassthrough = false" />
     <TLSFingerprintProfilesModal :show="showTLSFingerprintProfiles" @close="showTLSFingerprintProfiles = false" />
+    <AccountBulkVerifyModal :show="showBulkVerify" @close="showBulkVerify = false" @finished="handleBulkVerifyFinished" />
   </AppLayout>
 </template>
 
@@ -345,6 +356,7 @@ import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ErrorPassthroughRulesModal from '@/components/admin/ErrorPassthroughRulesModal.vue'
 import TLSFingerprintProfilesModal from '@/components/admin/TLSFingerprintProfilesModal.vue'
+import AccountBulkVerifyModal from '@/components/admin/AccountBulkVerifyModal.vue'
 import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import type { Account, AccountPlatform, AccountType, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel } from '@/types'
@@ -387,6 +399,11 @@ const showTest = ref(false)
 const showStats = ref(false)
 const showErrorPassthrough = ref(false)
 const showTLSFingerprintProfiles = ref(false)
+const showBulkVerify = ref(false)
+
+const handleBulkVerifyFinished = () => {
+  void reload()
+}
 const edAcc = ref<Account | null>(null)
 const tempUnschedAcc = ref<Account | null>(null)
 const deletingAcc = ref<Account | null>(null)

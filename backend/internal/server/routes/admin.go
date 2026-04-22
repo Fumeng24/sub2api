@@ -282,6 +282,9 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.POST("/batch-refresh-tier", h.Admin.Account.BatchRefreshTier)
 		accounts.POST("/bulk-update", h.Admin.Account.BulkUpdate)
 		accounts.POST("/batch-clear-error", h.Admin.Account.BatchClearError)
+		accounts.POST("/bulk-verify", h.Admin.BulkVerify.Start)
+		accounts.GET("/bulk-verify/:id", h.Admin.BulkVerify.Get)
+		accounts.DELETE("/bulk-verify/:id", h.Admin.BulkVerify.Cancel)
 		accounts.POST("/batch-refresh", h.Admin.Account.BatchRefresh)
 
 		// Antigravity 默认模型映射
