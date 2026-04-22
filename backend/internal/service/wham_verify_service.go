@@ -65,7 +65,7 @@ type WhamVerifyRequest struct {
 
 // whamVerifyJob is the internal state holder. Concurrent fields are touched
 // via atomics; struct fields (Running, Cancelled, FinishedAt) are read/written
-// under WhamVerifyService.mu.
+// under WhamVerifyService.mu. Apply targets are guarded by targetsMu.
 type whamVerifyJob struct {
 	ID        string
 	Total     int32
@@ -86,31 +86,41 @@ type whamVerifyJob struct {
 	cancelled  bool
 	finishedAt *time.Time
 	cancel     context.CancelFunc
+
+	// Populated during verify, read during Apply. Guarded by targetsMu so
+	// workers don't race on slice/map growth.
+	targetsMu        sync.Mutex
+	expiredIDs       []int64
+	exhaustedTargets map[int64]time.Time // id -> 7d reset_at (empty if no reset data)
+	applying         bool                // guards re-entrant Apply
 }
 
 // WhamVerifyJobSnapshot is the external, immutable view of job state. Returned
 // by Start/Get; safe to serialize concurrently with worker goroutines.
 type WhamVerifyJobSnapshot struct {
-	ID         string     `json:"id"`
-	Total      int32      `json:"total"`
-	Done       int32      `json:"done"`
-	High       int32      `json:"high"`
-	Medium     int32      `json:"medium"`
-	Low        int32      `json:"low"`
-	Exhausted  int32      `json:"exhausted"`
-	Expired    int32      `json:"expired"`
-	Missing    int32      `json:"missing"`
-	Unknown    int32      `json:"unknown"`
-	Error      int32      `json:"error"`
-	Running    bool       `json:"running"`
-	Cancelled  bool       `json:"cancelled"`
-	StartedAt  time.Time  `json:"started_at"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	ID                 string     `json:"id"`
+	Total              int32      `json:"total"`
+	Done               int32      `json:"done"`
+	High               int32      `json:"high"`
+	Medium             int32      `json:"medium"`
+	Low                int32      `json:"low"`
+	Exhausted          int32      `json:"exhausted"`
+	Expired            int32      `json:"expired"`
+	Missing            int32      `json:"missing"`
+	Unknown            int32      `json:"unknown"`
+	Error              int32      `json:"error"`
+	Running            bool       `json:"running"`
+	Cancelled          bool       `json:"cancelled"`
+	StartedAt          time.Time  `json:"started_at"`
+	FinishedAt         *time.Time `json:"finished_at,omitempty"`
+	RefreshableExpired int        `json:"refreshable_expired"` // accounts pending refresh via Apply
+	MarkableExhausted  int        `json:"markable_exhausted"`  // exhausted accounts with known reset_at
 }
 
 // WhamVerifyService owns the worker pool and job registry for bulk verify.
 type WhamVerifyService struct {
 	accountRepo AccountRepository
+	openaiOAuth *OpenAIOAuthService // for token refresh during Apply
 	httpClient  *http.Client
 
 	mu           sync.Mutex
@@ -121,9 +131,10 @@ type WhamVerifyService struct {
 }
 
 // NewWhamVerifyService constructs the service and starts a janitor goroutine.
-func NewWhamVerifyService(accountRepo AccountRepository) *WhamVerifyService {
+func NewWhamVerifyService(accountRepo AccountRepository, openaiOAuth *OpenAIOAuthService) *WhamVerifyService {
 	s := &WhamVerifyService{
 		accountRepo: accountRepo,
+		openaiOAuth: openaiOAuth,
 		httpClient:  &http.Client{Timeout: whamVerifyHTTPTimeout},
 		jobs:        make(map[string]*whamVerifyJob),
 		stopCleanup: make(chan struct{}),
@@ -187,10 +198,11 @@ func (s *WhamVerifyService) Start(ctx context.Context, req *WhamVerifyRequest) (
 	}
 
 	job := &whamVerifyJob{
-		ID:        uuid.NewString(),
-		Total:     int32(len(targets)),
-		startedAt: time.Now(),
-		running:   true,
+		ID:               uuid.NewString(),
+		Total:            int32(len(targets)),
+		startedAt:        time.Now(),
+		running:          true,
+		exhaustedTargets: make(map[int64]time.Time),
 	}
 	jobCtx, cancel := context.WithCancel(context.Background())
 	job.cancel = cancel
@@ -224,22 +236,34 @@ func (s *WhamVerifyService) Snapshot(jobID string) *WhamVerifyJobSnapshot {
 
 // snapshotLocked captures job state while s.mu is held.
 func (s *WhamVerifyService) snapshotLocked(job *whamVerifyJob) *WhamVerifyJobSnapshot {
+	job.targetsMu.Lock()
+	refreshable := len(job.expiredIDs)
+	markable := 0
+	for _, resetAt := range job.exhaustedTargets {
+		if !resetAt.IsZero() {
+			markable++
+		}
+	}
+	job.targetsMu.Unlock()
+
 	return &WhamVerifyJobSnapshot{
-		ID:         job.ID,
-		Total:      job.Total,
-		Done:       atomic.LoadInt32(&job.Done),
-		High:       atomic.LoadInt32(&job.High),
-		Medium:     atomic.LoadInt32(&job.Medium),
-		Low:        atomic.LoadInt32(&job.Low),
-		Exhausted:  atomic.LoadInt32(&job.Exhausted),
-		Expired:    atomic.LoadInt32(&job.Expired),
-		Missing:    atomic.LoadInt32(&job.Missing),
-		Unknown:    atomic.LoadInt32(&job.Unknown),
-		Error:      atomic.LoadInt32(&job.Errors),
-		Running:    job.running,
-		Cancelled:  job.cancelled,
-		StartedAt:  job.startedAt,
-		FinishedAt: job.finishedAt,
+		ID:                 job.ID,
+		Total:              job.Total,
+		Done:               atomic.LoadInt32(&job.Done),
+		High:               atomic.LoadInt32(&job.High),
+		Medium:             atomic.LoadInt32(&job.Medium),
+		Low:                atomic.LoadInt32(&job.Low),
+		Exhausted:          atomic.LoadInt32(&job.Exhausted),
+		Expired:            atomic.LoadInt32(&job.Expired),
+		Missing:            atomic.LoadInt32(&job.Missing),
+		Unknown:            atomic.LoadInt32(&job.Unknown),
+		Error:              atomic.LoadInt32(&job.Errors),
+		Running:            job.running,
+		Cancelled:          job.cancelled,
+		StartedAt:          job.startedAt,
+		FinishedAt:         job.finishedAt,
+		RefreshableExpired: refreshable,
+		MarkableExhausted:  markable,
 	}
 }
 
@@ -328,6 +352,7 @@ func (s *WhamVerifyService) verifyAccount(ctx context.Context, job *whamVerifyJo
 
 	if exp, ok := whamJWTExpiry(accessToken); ok && exp.Before(time.Now()) {
 		atomic.AddInt32(&job.Expired, 1)
+		job.addExpiredTarget(account.ID)
 		s.writeResult(account.ID, whamStatusExpired, fmt.Sprintf("access_token expired at %s", exp.Format(time.RFC3339)), nil)
 		return
 	}
@@ -345,6 +370,7 @@ func (s *WhamVerifyService) verifyAccount(ctx context.Context, job *whamVerifyJo
 	}
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		atomic.AddInt32(&job.Expired, 1)
+		job.addExpiredTarget(account.ID)
 		s.writeResult(account.ID, whamStatusExpired, fmt.Sprintf("http %d: %s", status, whamTruncate(string(body), 200)), nil)
 		return
 	}
@@ -364,11 +390,45 @@ func (s *WhamVerifyService) verifyAccount(ctx context.Context, job *whamVerifyJo
 		atomic.AddInt32(&job.Low, 1)
 	case whamStatusExhausted:
 		atomic.AddInt32(&job.Exhausted, 1)
+		job.addExhaustedTarget(account.ID, snapshot)
 	default:
 		classified = whamStatusUnknown
 		atomic.AddInt32(&job.Unknown, 1)
 	}
 	s.writeResult(account.ID, classified, "", snapshot)
+}
+
+func (j *whamVerifyJob) addExpiredTarget(accountID int64) {
+	j.targetsMu.Lock()
+	j.expiredIDs = append(j.expiredIDs, accountID)
+	j.targetsMu.Unlock()
+}
+
+// addExhaustedTarget records the account along with its 7d reset time (if
+// known) so Apply can call SetRateLimited with an accurate expiry. If the 7d
+// reset is unknown, fall back to the 5h reset — better to unblock at the
+// wrong time than never unblock.
+func (j *whamVerifyJob) addExhaustedTarget(accountID int64, snapshot *OpenAICodexUsageSnapshot) {
+	resetAt := extractCodexExhaustedResetAt(snapshot, time.Now())
+	j.targetsMu.Lock()
+	j.exhaustedTargets[accountID] = resetAt
+	j.targetsMu.Unlock()
+}
+
+// extractCodexExhaustedResetAt prefers the secondary (7d) window reset time
+// since that's the window that defines when a fully exhausted account can be
+// used again. Returns the zero time if nothing usable is present.
+func extractCodexExhaustedResetAt(snapshot *OpenAICodexUsageSnapshot, now time.Time) time.Time {
+	if snapshot == nil {
+		return time.Time{}
+	}
+	if snapshot.SecondaryResetAfterSeconds != nil && *snapshot.SecondaryResetAfterSeconds > 0 {
+		return now.Add(time.Duration(*snapshot.SecondaryResetAfterSeconds) * time.Second)
+	}
+	if snapshot.PrimaryResetAfterSeconds != nil && *snapshot.PrimaryResetAfterSeconds > 0 {
+		return now.Add(time.Duration(*snapshot.PrimaryResetAfterSeconds) * time.Second)
+	}
+	return time.Time{}
 }
 
 func (s *WhamVerifyService) callWham(ctx context.Context, accessToken, chatgptAccID string) (int, []byte, error) {
@@ -567,6 +627,179 @@ func whamTruncate(s string, n int) string {
 		n--
 	}
 	return s[:n]
+}
+
+// WhamApplyRequest captures which post-verify actions to execute.
+type WhamApplyRequest struct {
+	RefreshExpired bool `json:"refresh_expired"`
+	MarkExhausted  bool `json:"mark_exhausted"`
+	DryRun         bool `json:"dry_run"`
+}
+
+// WhamApplyFailure records a single account-level failure for UI visibility.
+type WhamApplyFailure struct {
+	AccountID int64  `json:"account_id"`
+	Action    string `json:"action"`
+	Error     string `json:"error"`
+}
+
+// WhamApplyResult summarises what Apply did.
+type WhamApplyResult struct {
+	RefreshSucceeded    int                `json:"refresh_succeeded"`
+	RefreshFailed       int                `json:"refresh_failed"`
+	MarkedRateLimited   int                `json:"marked_rate_limited"`
+	MarkRateLimitFailed int                `json:"mark_rate_limit_failed"`
+	SkippedNoResetAt    int                `json:"skipped_no_reset_at"`
+	DryRun              bool               `json:"dry_run"`
+	Failures            []WhamApplyFailure `json:"failures,omitempty"`
+}
+
+// Apply executes the post-verify actions against the targets collected during
+// verify. Mirrors the gateway's own side-effect paths:
+//   - Expired tokens: try OpenAIOAuthService.RefreshAccountToken; on failure
+//     fall back to accountRepo.SetError (same as gateway's 401 token-revoked).
+//   - Exhausted accounts: accountRepo.SetRateLimited with the 7d reset time
+//     (same as gateway's 429 handler via calculateOpenAI429ResetTime).
+//
+// Concurrent execution is capped at whamVerifyDefaultConc. Apply is not
+// re-entrant on the same job.
+func (s *WhamVerifyService) Apply(ctx context.Context, jobID string, req *WhamApplyRequest) (*WhamApplyResult, error) {
+	if req == nil {
+		req = &WhamApplyRequest{}
+	}
+
+	s.mu.Lock()
+	job, ok := s.jobs[jobID]
+	if !ok {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("job not found")
+	}
+	if job.running {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("job still running; cancel or wait before applying")
+	}
+	if job.applying {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("apply already in progress for this job")
+	}
+	job.applying = true
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		job.applying = false
+		s.mu.Unlock()
+	}()
+
+	job.targetsMu.Lock()
+	expiredIDs := append([]int64(nil), job.expiredIDs...)
+	exhaustedCopy := make(map[int64]time.Time, len(job.exhaustedTargets))
+	for id, r := range job.exhaustedTargets {
+		exhaustedCopy[id] = r
+	}
+	job.targetsMu.Unlock()
+
+	result := &WhamApplyResult{DryRun: req.DryRun}
+	var mu sync.Mutex
+	recordFailure := func(accountID int64, action string, err error) {
+		mu.Lock()
+		defer mu.Unlock()
+		result.Failures = append(result.Failures, WhamApplyFailure{
+			AccountID: accountID,
+			Action:    action,
+			Error:     whamTruncate(err.Error(), whamErrorMsgMax),
+		})
+	}
+
+	if req.RefreshExpired && len(expiredIDs) > 0 {
+		if s.openaiOAuth == nil {
+			return nil, fmt.Errorf("openai oauth service not configured; refresh_expired unavailable")
+		}
+		sem := make(chan struct{}, whamVerifyDefaultConc)
+		var wg sync.WaitGroup
+		for _, id := range expiredIDs {
+			accountID := id
+			sem <- struct{}{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer func() { <-sem }()
+				if ctx.Err() != nil {
+					return
+				}
+				if req.DryRun {
+					mu.Lock()
+					result.RefreshSucceeded++
+					mu.Unlock()
+					return
+				}
+				if err := s.refreshOneExpired(ctx, accountID); err != nil {
+					mu.Lock()
+					result.RefreshFailed++
+					mu.Unlock()
+					recordFailure(accountID, "refresh", err)
+					return
+				}
+				mu.Lock()
+				result.RefreshSucceeded++
+				mu.Unlock()
+			}()
+		}
+		wg.Wait()
+	}
+
+	if req.MarkExhausted && len(exhaustedCopy) > 0 {
+		for id, resetAt := range exhaustedCopy {
+			if resetAt.IsZero() {
+				result.SkippedNoResetAt++
+				continue
+			}
+			if req.DryRun {
+				result.MarkedRateLimited++
+				continue
+			}
+			if err := s.accountRepo.SetRateLimited(ctx, id, resetAt); err != nil {
+				result.MarkRateLimitFailed++
+				recordFailure(id, "mark_rate_limited", err)
+				continue
+			}
+			result.MarkedRateLimited++
+		}
+	}
+
+	logger.L().Info("wham_verify: apply finished",
+		zap.String("job_id", jobID),
+		zap.Bool("dry_run", req.DryRun),
+		zap.Int("refresh_succeeded", result.RefreshSucceeded),
+		zap.Int("refresh_failed", result.RefreshFailed),
+		zap.Int("marked_rate_limited", result.MarkedRateLimited),
+		zap.Int("mark_rate_limit_failed", result.MarkRateLimitFailed),
+		zap.Int("skipped_no_reset_at", result.SkippedNoResetAt),
+	)
+	return result, nil
+}
+
+// refreshOneExpired loads the account, attempts a fresh OAuth refresh, and on
+// failure marks the account as errored (same path gateway uses for
+// token_invalidated).
+func (s *WhamVerifyService) refreshOneExpired(ctx context.Context, accountID int64) error {
+	account, err := s.accountRepo.GetByID(ctx, accountID)
+	if err != nil {
+		return fmt.Errorf("load account: %w", err)
+	}
+	if account == nil {
+		return fmt.Errorf("account not found")
+	}
+	if _, err := s.openaiOAuth.RefreshAccountToken(ctx, account); err != nil {
+		// Token refresh failed — the account is effectively dead. Mark it error
+		// so the scheduler stops picking it (gateway does the same in its 401
+		// token_invalidated branch via handleAuthError).
+		reason := fmt.Sprintf("wham-verify: token refresh failed: %s", whamTruncate(err.Error(), 200))
+		if setErr := s.accountRepo.SetError(ctx, accountID, reason); setErr != nil {
+			return fmt.Errorf("refresh failed (%v) and set_error failed (%w)", err, setErr)
+		}
+		return fmt.Errorf("refresh failed (marked error): %w", err)
+	}
+	return nil
 }
 
 // cleanupLoop drops finished jobs after whamVerifyJobTTL so we don't leak memory.

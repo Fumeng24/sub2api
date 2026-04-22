@@ -99,6 +99,105 @@
             <div v-if="job.finished_at">{{ t('admin.accounts.bulkVerify.finishedAt') }}: {{ formatTs(job.finished_at) }}</div>
           </div>
         </div>
+
+        <!-- Apply panel: only shown after the job finishes -->
+        <div
+          v-if="!job.running && (job.refreshable_expired > 0 || job.markable_exhausted > 0)"
+          class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-600 dark:bg-dark-700"
+        >
+          <div class="text-sm font-medium text-gray-900 dark:text-white">
+            {{ t('admin.accounts.bulkVerify.applyTitle') }}
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.bulkVerify.applyDescription') }}
+          </p>
+
+          <label
+            v-if="job.refreshable_expired > 0"
+            class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200"
+          >
+            <input
+              v-model="applyRefreshExpired"
+              type="checkbox"
+              class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span>
+              {{ t('admin.accounts.bulkVerify.applyRefresh', { n: job.refreshable_expired }) }}
+            </span>
+          </label>
+
+          <label
+            v-if="job.markable_exhausted > 0"
+            class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200"
+          >
+            <input
+              v-model="applyMarkExhausted"
+              type="checkbox"
+              class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span>
+              {{ t('admin.accounts.bulkVerify.applyMarkExhausted', { n: job.markable_exhausted }) }}
+            </span>
+          </label>
+
+          <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <input
+              v-model="applyDryRun"
+              type="checkbox"
+              class="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span>{{ t('admin.accounts.bulkVerify.applyDryRun') }}</span>
+          </label>
+
+          <button
+            @click="handleApply"
+            :disabled="applying || (!applyRefreshExpired && !applyMarkExhausted)"
+            class="btn btn-primary btn-sm"
+          >
+            <Icon v-if="applying" name="refresh" size="sm" class="mr-1 animate-spin" />
+            {{ applyDryRun ? t('admin.accounts.bulkVerify.applyDryRunBtn') : t('admin.accounts.bulkVerify.applyBtn') }}
+          </button>
+        </div>
+
+        <!-- Apply result -->
+        <div
+          v-if="applyResult"
+          class="space-y-2 rounded-lg border border-gray-200 p-4 text-sm dark:border-dark-600"
+        >
+          <div class="font-medium text-gray-900 dark:text-white">
+            {{ applyResult.dry_run ? t('admin.accounts.bulkVerify.applyResultDryRun') : t('admin.accounts.bulkVerify.applyResult') }}
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+            <div class="flex justify-between rounded bg-emerald-50 px-2 py-1 dark:bg-emerald-900/20">
+              <span class="text-emerald-700 dark:text-emerald-300">{{ t('admin.accounts.bulkVerify.applyRefreshed') }}</span>
+              <span class="font-medium text-emerald-800 dark:text-emerald-200">{{ applyResult.refresh_succeeded }}</span>
+            </div>
+            <div class="flex justify-between rounded bg-red-50 px-2 py-1 dark:bg-red-900/20">
+              <span class="text-red-700 dark:text-red-300">{{ t('admin.accounts.bulkVerify.applyRefreshFailed') }}</span>
+              <span class="font-medium text-red-800 dark:text-red-200">{{ applyResult.refresh_failed }}</span>
+            </div>
+            <div class="flex justify-between rounded bg-emerald-50 px-2 py-1 dark:bg-emerald-900/20">
+              <span class="text-emerald-700 dark:text-emerald-300">{{ t('admin.accounts.bulkVerify.applyMarked') }}</span>
+              <span class="font-medium text-emerald-800 dark:text-emerald-200">{{ applyResult.marked_rate_limited }}</span>
+            </div>
+            <div class="flex justify-between rounded bg-red-50 px-2 py-1 dark:bg-red-900/20">
+              <span class="text-red-700 dark:text-red-300">{{ t('admin.accounts.bulkVerify.applyMarkFailed') }}</span>
+              <span class="font-medium text-red-800 dark:text-red-200">{{ applyResult.mark_rate_limit_failed }}</span>
+            </div>
+            <div v-if="applyResult.skipped_no_reset_at > 0" class="flex justify-between rounded bg-gray-100 px-2 py-1 dark:bg-dark-600">
+              <span class="text-gray-600 dark:text-gray-400">{{ t('admin.accounts.bulkVerify.applySkippedNoReset') }}</span>
+              <span class="font-medium text-gray-800 dark:text-gray-200">{{ applyResult.skipped_no_reset_at }}</span>
+            </div>
+          </div>
+          <details v-if="applyResult.failures && applyResult.failures.length" class="text-xs text-gray-600 dark:text-gray-400">
+            <summary class="cursor-pointer">{{ t('admin.accounts.bulkVerify.applyFailuresTitle', { n: applyResult.failures.length }) }}</summary>
+            <ul class="mt-2 max-h-48 space-y-1 overflow-auto pl-4">
+              <li v-for="f in applyResult.failures" :key="`${f.account_id}-${f.action}`" class="list-disc">
+                #{{ f.account_id }} · {{ f.action }} · {{ f.error }}
+              </li>
+            </ul>
+          </details>
+        </div>
       </div>
 
       <div v-if="errorMsg" class="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">
@@ -131,7 +230,8 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import bulkVerifyAPI, {
   BULK_VERIFY_JOB_ALREADY_RUNNING,
-  type BulkVerifyJob
+  type BulkVerifyJob,
+  type BulkVerifyApplyResult
 } from '@/api/admin/bulkVerify'
 
 const props = defineProps<{ show: boolean }>()
@@ -145,6 +245,12 @@ const starting = ref(false)
 const cancelling = ref(false)
 const errorMsg = ref('')
 let pollTimer: ReturnType<typeof setInterval> | null = null
+
+const applyRefreshExpired = ref(true)
+const applyMarkExhausted = ref(true)
+const applyDryRun = ref(false)
+const applying = ref(false)
+const applyResult = ref<BulkVerifyApplyResult | null>(null)
 
 const progressPct = computed(() => {
   if (!job.value || job.value.total === 0) return 0
@@ -224,6 +330,31 @@ function handleReset() {
   stopPolling()
   job.value = null
   errorMsg.value = ''
+  applyResult.value = null
+}
+
+async function handleApply() {
+  if (!job.value) return
+  applying.value = true
+  errorMsg.value = ''
+  applyResult.value = null
+  try {
+    const result = await bulkVerifyAPI.apply(job.value.id, {
+      refresh_expired: applyRefreshExpired.value,
+      mark_exhausted: applyMarkExhausted.value,
+      dry_run: applyDryRun.value
+    })
+    applyResult.value = result
+    if (!result.dry_run) {
+      // Actions committed — tell the parent to refresh the accounts list.
+      emit('finished', job.value)
+    }
+  } catch (err) {
+    const e = err as { message?: string }
+    errorMsg.value = e.message || 'failed to apply actions'
+  } finally {
+    applying.value = false
+  }
 }
 
 function handleClose() {

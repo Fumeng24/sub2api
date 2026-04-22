@@ -223,7 +223,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	settingHandler := admin.NewSettingHandler(settingService, emailService, turnstileService, opsService, paymentConfigService, paymentService)
 	paymentOrderExpiryService := service.ProvidePaymentOrderExpiryService(paymentService)
 	paymentHandler := admin.NewPaymentHandler(paymentService, paymentConfigService)
-	whamVerifyService := service.NewWhamVerifyService(accountRepository)
+	whamVerifyService := service.NewWhamVerifyService(accountRepository, openAIOAuthService)
 	bulkVerifyHandler := admin.NewBulkVerifyHandler(whamVerifyService)
 	adminHandlers := handler.ProvideAdminHandlers(dashboardHandler, adminUserHandler, groupHandler, accountHandler, adminAnnouncementHandler, dataManagementHandler, backupHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, antigravityOAuthHandler, proxyHandler, adminRedeemHandler, promoHandler, settingHandler, opsHandler, systemHandler, adminSubscriptionHandler, adminUsageHandler, userAttributeHandler, errorPassthroughHandler, tlsFingerprintProfileHandler, adminAPIKeyHandler, scheduledTestHandler, channelHandler, paymentHandler, bulkVerifyHandler)
 	usageRecordWorkerPool := service.NewUsageRecordWorkerPool(configConfig)

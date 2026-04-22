@@ -284,6 +284,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.POST("/batch-clear-error", h.Admin.Account.BatchClearError)
 		accounts.POST("/bulk-verify", h.Admin.BulkVerify.Start)
 		accounts.GET("/bulk-verify/:id", h.Admin.BulkVerify.Get)
+		accounts.POST("/bulk-verify/:id/apply", h.Admin.BulkVerify.Apply)
 		accounts.DELETE("/bulk-verify/:id", h.Admin.BulkVerify.Cancel)
 		accounts.POST("/batch-refresh", h.Admin.Account.BatchRefresh)
 

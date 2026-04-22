@@ -68,6 +68,32 @@ func (h *BulkVerifyHandler) Get(c *gin.Context) {
 	response.Success(c, job)
 }
 
+// Apply POST /admin/accounts/bulk-verify/:id/apply
+// Executes post-verify actions (refresh expired tokens, mark exhausted as
+// rate-limited) based on the targets collected during the verify run.
+func (h *BulkVerifyHandler) Apply(c *gin.Context) {
+	if h.svc == nil {
+		response.InternalError(c, "bulk-verify service not configured")
+		return
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		response.BadRequest(c, "missing job id")
+		return
+	}
+	var req service.WhamApplyRequest
+	if err := c.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.svc.Apply(c.Request.Context(), id, &req)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 // Cancel DELETE /admin/accounts/bulk-verify/:id
 func (h *BulkVerifyHandler) Cancel(c *gin.Context) {
 	if h.svc == nil {
