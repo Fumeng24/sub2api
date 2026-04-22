@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -771,11 +772,31 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	account *Account,
 	parsed *OpenAIImagesRequest,
 	channelMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (result *OpenAIForwardResult, retErr error) {
 	startTime := time.Now()
 	requestModel := strings.TrimSpace(parsed.Model)
 	if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
 		requestModel = mapped
+	}
+
+	// For streaming requests we have to commit SSE headers up front so upstream
+	// proxies (Cloudflare, nginx) don't tear down the idle connection while the
+	// OAuth backend takes 30-60s to assemble the image. A lightweight keepalive
+	// goroutine emits ": keepalive" comments during the wait. Writes to the
+	// response body are serialized via streamWriter.mu so main-goroutine final
+	// payload doesn't race with the keepalive emits. On error the defer emits
+	// an SSE error event + [DONE] so clients see a structured failure.
+	var streamWriter *openaiImagesStreamWriter
+	if parsed.Stream {
+		streamWriter = newOpenAIImagesStreamWriter(c)
+		streamWriter.commitHeaders()
+		streamWriter.startKeepalive()
+		defer func() {
+			streamWriter.stop()
+			if retErr != nil {
+				streamWriter.writeError(retErr)
+			}
+		}()
 	}
 
 	token, _, err := s.GetAccessToken(ctx, account)
@@ -879,18 +900,128 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 		return nil, s.wrapOpenAIImageBackendError(ctx, c, account, err)
 	}
 
-	c.Data(http.StatusOK, "application/json; charset=utf-8", responseBody)
+	if parsed.Stream {
+		streamWriter.writeFinal(responseBody)
+	} else {
+		c.Data(http.StatusOK, "application/json; charset=utf-8", responseBody)
+	}
 	return &OpenAIForwardResult{
 		RequestID:     resp.Header.Get("x-request-id"),
 		Usage:         usage,
 		Model:         requestModel,
 		UpstreamModel: requestModel,
-		Stream:        false,
+		Stream:        parsed.Stream,
 		Duration:      time.Since(startTime),
 		FirstTokenMs:  firstTokenMs,
 		ImageCount:    imageCount,
 		ImageSize:     parsed.SizeTier,
 	}, nil
+}
+
+// openaiImagesStreamWriter serialises SSE writes between the main goroutine
+// (final data event) and the keepalive ticker goroutine.
+type openaiImagesStreamWriter struct {
+	c       *gin.Context
+	flusher http.Flusher
+	mu      sync.Mutex
+	stopCh  chan struct{}
+	stopped bool
+}
+
+func newOpenAIImagesStreamWriter(c *gin.Context) *openaiImagesStreamWriter {
+	flusher, _ := c.Writer.(http.Flusher)
+	return &openaiImagesStreamWriter{
+		c:       c,
+		flusher: flusher,
+		stopCh:  make(chan struct{}),
+	}
+}
+
+// commitHeaders writes SSE response headers and an initial comment so upstream
+// proxies see a valid streaming response immediately.
+func (w *openaiImagesStreamWriter) commitHeaders() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.c.Writer.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	w.c.Writer.Header().Set("Cache-Control", "no-cache")
+	w.c.Writer.Header().Set("Connection", "keep-alive")
+	w.c.Writer.Header().Set("X-Accel-Buffering", "no")
+	w.c.Writer.WriteHeader(http.StatusOK)
+	_, _ = w.c.Writer.Write([]byte(": generating\n\n"))
+	if w.flusher != nil {
+		w.flusher.Flush()
+	}
+}
+
+// startKeepalive emits a ": keepalive" SSE comment every 15s until stop() is
+// called or the request context is done.
+func (w *openaiImagesStreamWriter) startKeepalive() {
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-w.stopCh:
+				return
+			case <-w.c.Request.Context().Done():
+				return
+			case <-ticker.C:
+				w.mu.Lock()
+				_, err := w.c.Writer.Write([]byte(": keepalive\n\n"))
+				if err == nil && w.flusher != nil {
+					w.flusher.Flush()
+				}
+				w.mu.Unlock()
+				if err != nil {
+					return
+				}
+			}
+		}
+	}()
+}
+
+// writeFinal emits the assembled images response as SSE: one data event with
+// the JSON payload followed by [DONE]. Safe to call while keepalive is still
+// running because the mutex serialises writes.
+func (w *openaiImagesStreamWriter) writeFinal(jsonBody []byte) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_, _ = w.c.Writer.Write([]byte("data: "))
+	_, _ = w.c.Writer.Write(jsonBody)
+	_, _ = w.c.Writer.Write([]byte("\n\ndata: [DONE]\n\n"))
+	if w.flusher != nil {
+		w.flusher.Flush()
+	}
+}
+
+func (w *openaiImagesStreamWriter) stop() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.stopped {
+		w.stopped = true
+		close(w.stopCh)
+	}
+}
+
+// writeError emits an SSE error data event + [DONE] so the client sees a
+// structured failure instead of a dangling connection. Called from the error
+// defer in forwardOpenAIImagesOAuth after stop().
+func (w *openaiImagesStreamWriter) writeError(err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	msg := whamTruncate(err.Error(), 500)
+	payload, _ := json.Marshal(map[string]any{
+		"error": map[string]any{
+			"type":    "upstream_error",
+			"message": msg,
+		},
+	})
+	_, _ = w.c.Writer.Write([]byte("data: "))
+	_, _ = w.c.Writer.Write(payload)
+	_, _ = w.c.Writer.Write([]byte("\n\ndata: [DONE]\n\n"))
+	if w.flusher != nil {
+		w.flusher.Flush()
+	}
 }
 
 func resolveOpenAIProxyURL(account *Account) string {
