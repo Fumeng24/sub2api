@@ -1069,6 +1069,16 @@ func (w *openaiImagesStreamWriter) commitHeaders() {
 
 // startKeepalive emits a ": keepalive" SSE comment every 15s until stop() is
 // called or the request context is done.
+//
+// NOTE on the stopped re-check after Lock(): select is atomic, so once the
+// ticker.C branch is chosen the goroutine is committed to writing unless we
+// re-check. Without this, there's a race where writeFinal/writeError could
+// acquire the lock first (closing stopCh and emitting the terminator), then
+// release, and this goroutine would acquire the lock and write ": keepalive"
+// AFTER the terminator event. SSE comments are technically harmless, but
+// strict clients (observed: CherryStudio) and some proxies interpret any
+// post-terminator bytes as "stream still open, wait for more" and keep the
+// loading indicator on forever.
 func (w *openaiImagesStreamWriter) startKeepalive() {
 	go func() {
 		ticker := time.NewTicker(15 * time.Second)
@@ -1081,6 +1091,10 @@ func (w *openaiImagesStreamWriter) startKeepalive() {
 				return
 			case <-ticker.C:
 				w.mu.Lock()
+				if w.stopped {
+					w.mu.Unlock()
+					return
+				}
 				_, err := w.c.Writer.Write([]byte(": keepalive\n\n"))
 				if err == nil && w.flusher != nil {
 					w.flusher.Flush()
