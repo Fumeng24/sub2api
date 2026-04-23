@@ -1035,15 +1035,17 @@ func (w *openaiImagesStreamWriter) startKeepalive() {
 	}()
 }
 
-// writeFinal emits the assembled images response as two SSE data events:
-// (1) OpenAI native image_generation.completed event — what SDK-based clients
+// writeFinal emits the assembled images response as a single OpenAI-native
+// image_generation.completed SSE event. Per OpenAI's images streaming
+// protocol this event IS the stream terminator — there is no "data: [DONE]"
+// for the images endpoint, and extra follow-up events confuse clients that
+// expect strict single-terminator semantics (observed: CherryStudio renders
+// the image from the completed event but keeps its loading indicator on when
+// additional events follow, waiting for what it believes is a still-incoming
+// second image).
 //
-//	(CherryStudio, openai-python/js) watch for to know the stream terminated
-//
-// (2) Legacy non-stream-wrapped-in-SSE data event — fallback for naive clients
-//
-// Followed by "data: [DONE]" for Chat Completions-style clients. Safe to call
-// while keepalive is still running because the mutex serialises writes.
+// Safe to call while keepalive is still running because the mutex serialises
+// writes.
 func (w *openaiImagesStreamWriter) writeFinal(jsonBody []byte, parsed *OpenAIImagesRequest, model string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -1064,19 +1066,28 @@ func (w *openaiImagesStreamWriter) writeFinal(jsonBody []byte, parsed *OpenAIIma
 		"created_at":    createdAt,
 		"model":         model,
 		"size":          size,
+		"quality":       "auto",
+		"background":    "auto",
 		"output_format": "png",
+		"usage": map[string]any{
+			"total_tokens":  0,
+			"input_tokens":  0,
+			"output_tokens": 0,
+		},
 	}
 	completedJSON, err := json.Marshal(completed)
-	if err == nil {
+	if err != nil {
+		// Fall back to the raw assembled body so the client at least gets the
+		// image bytes; this branch shouldn't fire because the map above only
+		// contains JSON-safe values.
+		_, _ = w.c.Writer.Write([]byte("data: "))
+		_, _ = w.c.Writer.Write(jsonBody)
+		_, _ = w.c.Writer.Write([]byte("\n\n"))
+	} else {
 		_, _ = w.c.Writer.Write([]byte("data: "))
 		_, _ = w.c.Writer.Write(completedJSON)
 		_, _ = w.c.Writer.Write([]byte("\n\n"))
 	}
-
-	// Legacy + Chat-style terminator for compatibility.
-	_, _ = w.c.Writer.Write([]byte("data: "))
-	_, _ = w.c.Writer.Write(jsonBody)
-	_, _ = w.c.Writer.Write([]byte("\n\ndata: [DONE]\n\n"))
 
 	if w.flusher != nil {
 		w.flusher.Flush()
