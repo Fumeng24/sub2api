@@ -1641,31 +1641,32 @@ func buildOpenAIImageConversationRequest(parsed *OpenAIImagesRequest, parentMess
 		metadata["attachments"] = attachments
 	}
 
+	// Mirror the admin test-button body shape (buildOpenAIImageTestConversationRequest):
+	// admin tests succeed on accounts where the gateway path fails with
+	// total_assets=0. The difference that matters is the body — ChatGPT's backend
+	// takes a different generation path when the request carries the "browser
+	// impersonation" fields (enable_message_followups, paragen_cot_summary_display_override,
+	// force_parallel_switch, the full client_contextual_info block). The simpler
+	// CLI-shaped body with explicit force_paragen=false + websocket_request_id
+	// is what reliably triggers image generation on free/Plus ChatGPT accounts.
 	return map[string]any{
-		"action":                               "next",
-		"client_prepare_state":                 "sent",
-		"parent_message_id":                    parentMessageID,
-		"model":                                "auto",
-		"timezone_offset_min":                  openAITimezoneOffsetMinutes(),
-		"timezone":                             openAITimezoneName(),
-		"conversation_mode":                    map[string]any{"kind": "primary_assistant"},
-		"enable_message_followups":             true,
-		"system_hints":                         []string{"picture_v2"},
-		"supports_buffering":                   true,
-		"supported_encodings":                  []string{"v1"},
-		"paragen_cot_summary_display_override": "allow",
-		"force_parallel_switch":                "auto",
-		"client_contextual_info": map[string]any{
-			"is_dark_mode":      false,
-			"time_since_loaded": 200,
-			"page_height":       900,
-			"page_width":        1440,
-			"pixel_ratio":       1,
-			"screen_height":     1080,
-			"screen_width":      1920,
-			"app_name":          "chatgpt.com",
-		},
-		"messages": []any{message},
+		"action":                   "next",
+		"client_prepare_state":     "sent",
+		"parent_message_id":        parentMessageID,
+		"messages":                 []any{message},
+		"model":                    "auto",
+		"timezone_offset_min":      openAITimezoneOffsetMinutes(),
+		"timezone":                 openAITimezoneName(),
+		"conversation_mode":        map[string]any{"kind": "primary_assistant"},
+		"system_hints":             []string{"picture_v2"},
+		"supports_buffering":       true,
+		"supported_encodings":      []string{"v1"},
+		"client_contextual_info":   map[string]any{"app_name": "chatgpt.com"},
+		"force_nulligen":           false,
+		"force_paragen":            false,
+		"force_paragen_model_slug": "",
+		"force_rate_limit":         false,
+		"websocket_request_id":     uuid.NewString(),
 	}
 }
 
