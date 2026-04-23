@@ -179,3 +179,23 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultiImageRequiresNative(t
 	require.NoError(t, err)
 	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
 }
+
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_StreamStaysBasic(t *testing.T) {
+	// stream=true alone should not force Native. The OAuth path now wraps the
+	// final payload in an SSE envelope, so clients (e.g. CherryStudio) that
+	// always set stream=true can still be served by OAuth accounts.
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"gpt-image-2","prompt":"a cat","size":"1024x1024","n":1,"stream":true}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	svc := &OpenAIGatewayService{}
+	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
+	require.True(t, parsed.Stream)
+	require.Equal(t, OpenAIImagesCapabilityBasic, parsed.RequiredCapability)
+}
