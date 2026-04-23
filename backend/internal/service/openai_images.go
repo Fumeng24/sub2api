@@ -1187,6 +1187,15 @@ func (w *openaiImagesStreamWriter) writeFinal(jsonBody []byte, parsed *OpenAIIma
 	}
 
 	completedJSON, err := json.Marshal(completed)
+	// Emit BOTH "event:" dispatch line AND "data:" payload. OpenAI's real
+	// images streaming protocol sends both; strict SSE parsers (Vercel AI SDK
+	// used by CherryStudio) dispatch on the "event:" name — without it, the
+	// terminator is treated as an anonymous "message" event and never matches
+	// the client's "wait for image_generation.completed" handler, so the
+	// image renders (from a partial handler) but the loading indicator spins
+	// forever. Python OpenAI SDK works regardless because it parses by the
+	// JSON "type" field, but not every client is as forgiving.
+	_, _ = w.c.Writer.Write([]byte("event: image_generation.completed\n"))
 	if err != nil {
 		// Defensive: the map above only contains JSON-safe values so this
 		// should never fire. Fall back to the raw assembled body so the client
@@ -1242,6 +1251,9 @@ func (w *openaiImagesStreamWriter) writeError(err error) {
 		// Should never happen with the map above.
 		return
 	}
+	// See writeFinal for why the "event:" dispatch line matters for strict
+	// SSE parsers like Vercel AI SDK / CherryStudio.
+	_, _ = w.c.Writer.Write([]byte("event: image_generation.failed\n"))
 	_, _ = w.c.Writer.Write([]byte("data: "))
 	_, _ = w.c.Writer.Write(payload)
 	_, _ = w.c.Writer.Write([]byte("\n\n"))

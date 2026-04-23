@@ -367,6 +367,34 @@ func TestSSEWriter_WriteErrorEmitsFailedTypeNoDoneMarker(t *testing.T) {
 	require.Contains(t, body, "upstream boom")
 }
 
+// TestSSEWriter_EmitsEventPrefixForDispatch guards the "event:" dispatch line
+// on both success and error terminators. OpenAI's real images stream emits
+// both "event: <type>\n" AND "data: <json>\n\n"; strict SSE parsers (Vercel
+// AI SDK used by CherryStudio) dispatch by the event name. Without the
+// event: line, the client treats the terminator as an anonymous "message"
+// event and never matches its completed/failed handler — image renders but
+// spinner spins forever.
+func TestSSEWriter_EmitsEventPrefixForDispatch(t *testing.T) {
+	t.Run("writeFinal emits event: image_generation.completed", func(t *testing.T) {
+		w, rec, _ := newSSETestWriter(t)
+		w.commitHeaders()
+		parsed := &OpenAIImagesRequest{Size: "1024x1024", Body: []byte(`{"model":"gpt-image-2"}`)}
+		w.writeFinal([]byte(`{"created":1,"data":[{"b64_json":"QQ=="}]}`), parsed, "gpt-image-2", OpenAIUsage{})
+		body := rec.Body.String()
+		require.Contains(t, body, "event: image_generation.completed\ndata:",
+			"terminator must be prefixed with 'event: image_generation.completed' so strict SSE clients dispatch correctly; body was:\n%s", body)
+	})
+
+	t.Run("writeError emits event: image_generation.failed", func(t *testing.T) {
+		w, rec, _ := newSSETestWriter(t)
+		w.commitHeaders()
+		w.writeError(errors.New("boom"))
+		body := rec.Body.String()
+		require.Contains(t, body, "event: image_generation.failed\ndata:",
+			"error terminator must be prefixed with 'event: image_generation.failed'; body was:\n%s", body)
+	})
+}
+
 func TestSSEWriter_WriteFinalStopsKeepaliveAtomically(t *testing.T) {
 	// After writeFinal returns, the keepalive goroutine must be stopped so
 	// no `: keepalive\n\n` can land after the completed event.
