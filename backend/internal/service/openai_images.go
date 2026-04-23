@@ -899,7 +899,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	}
 
 	if parsed.Stream {
-		streamWriter.writeFinal(responseBody)
+		streamWriter.writeFinal(responseBody, parsed, requestModel)
 	} else {
 		c.Data(http.StatusOK, "application/json; charset=utf-8", responseBody)
 	}
@@ -978,15 +978,49 @@ func (w *openaiImagesStreamWriter) startKeepalive() {
 	}()
 }
 
-// writeFinal emits the assembled images response as SSE: one data event with
-// the JSON payload followed by [DONE]. Safe to call while keepalive is still
-// running because the mutex serialises writes.
-func (w *openaiImagesStreamWriter) writeFinal(jsonBody []byte) {
+// writeFinal emits the assembled images response as two SSE data events:
+// (1) OpenAI native image_generation.completed event — what SDK-based clients
+//
+//	(CherryStudio, openai-python/js) watch for to know the stream terminated
+//
+// (2) Legacy non-stream-wrapped-in-SSE data event — fallback for naive clients
+//
+// Followed by "data: [DONE]" for Chat Completions-style clients. Safe to call
+// while keepalive is still running because the mutex serialises writes.
+func (w *openaiImagesStreamWriter) writeFinal(jsonBody []byte, parsed *OpenAIImagesRequest, model string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	// Extract b64_json + created from the assembled response body.
+	b64 := gjson.GetBytes(jsonBody, "data.0.b64_json").String()
+	createdAt := gjson.GetBytes(jsonBody, "created").Int()
+	if createdAt == 0 {
+		createdAt = time.Now().Unix()
+	}
+	size := ""
+	if parsed != nil {
+		size = parsed.Size
+	}
+	completed := map[string]any{
+		"type":          "image_generation.completed",
+		"b64_json":      b64,
+		"created_at":    createdAt,
+		"model":         model,
+		"size":          size,
+		"output_format": "png",
+	}
+	completedJSON, err := json.Marshal(completed)
+	if err == nil {
+		_, _ = w.c.Writer.Write([]byte("data: "))
+		_, _ = w.c.Writer.Write(completedJSON)
+		_, _ = w.c.Writer.Write([]byte("\n\n"))
+	}
+
+	// Legacy + Chat-style terminator for compatibility.
 	_, _ = w.c.Writer.Write([]byte("data: "))
 	_, _ = w.c.Writer.Write(jsonBody)
 	_, _ = w.c.Writer.Write([]byte("\n\ndata: [DONE]\n\n"))
+
 	if w.flusher != nil {
 		w.flusher.Flush()
 	}
