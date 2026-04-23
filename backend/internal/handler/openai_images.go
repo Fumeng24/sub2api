@@ -117,15 +117,20 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		return
 	}
 
-	// Images endpoints don't carry chat-style session signals (session_id
-	// header, prompt_cache_key, messages[]/input[] that deriveOpenAIContent
-	// SessionSeed inspects) — only `prompt`. If we fall through to the
-	// default GenerateSessionHash(body), every gpt-image-* request hashes
-	// to the same seed (model-only) and the scheduler pins EVERY image
-	// request cluster-wide to a single sticky account. Use the image
-	// request's own sticky seed (endpoint|model|size|prompt) as the
-	// fallback so different prompts produce different sessions.
-	sessionHash := h.gatewayService.GenerateSessionHashWithFallback(c, body, parsed.StickySessionSeed())
+	// Images endpoints don't carry chat-style session signals and
+	// deriveOpenAIContentSessionSeed only inspects model/tools/functions/
+	// instructions/messages[]/input[] — NONE of which an images body has.
+	// For an images body it returns `compat_cs_model=<model>`, giving
+	// every gpt-image-* request the same sessionHash and the scheduler
+	// pins all image traffic onto a single sticky account (observed in
+	// prod: 3 requests with different prompts all routed to account 72343).
+	//
+	// GenerateSessionHashWithFallback is NO HELP — the fallback only fires
+	// when the primary derivation returns empty, and here it returns the
+	// bogus model-only seed as non-empty. So compute the hash directly
+	// from the image-specific StickySessionSeed (endpoint|model|size|prompt),
+	// bypassing the chat-completions-shaped helper entirely.
+	sessionHash := service.DeriveSessionHashFromSeed(parsed.StickySessionSeed())
 
 	maxAccountSwitches := h.maxAccountSwitches
 	switchCount := 0
