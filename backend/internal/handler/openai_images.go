@@ -117,12 +117,15 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		return
 	}
 
-	sessionHash := ""
-	if parsed.Multipart {
-		sessionHash = h.gatewayService.GenerateSessionHashWithFallback(c, nil, parsed.StickySessionSeed())
-	} else {
-		sessionHash = h.gatewayService.GenerateSessionHash(c, body)
-	}
+	// Images endpoints don't carry chat-style session signals (session_id
+	// header, prompt_cache_key, messages[]/input[] that deriveOpenAIContent
+	// SessionSeed inspects) — only `prompt`. If we fall through to the
+	// default GenerateSessionHash(body), every gpt-image-* request hashes
+	// to the same seed (model-only) and the scheduler pins EVERY image
+	// request cluster-wide to a single sticky account. Use the image
+	// request's own sticky seed (endpoint|model|size|prompt) as the
+	// fallback so different prompts produce different sessions.
+	sessionHash := h.gatewayService.GenerateSessionHashWithFallback(c, body, parsed.StickySessionSeed())
 
 	maxAccountSwitches := h.maxAccountSwitches
 	switchCount := 0
