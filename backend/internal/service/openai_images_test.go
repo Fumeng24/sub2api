@@ -36,7 +36,9 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_JSON(t *testing.T) {
 	require.True(t, parsed.Stream)
 	require.Equal(t, "1024x1024", parsed.Size)
 	require.Equal(t, "1K", parsed.SizeTier)
-	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
+	// stream=true and quality=high are both soft-ignorable for classification;
+	// OAuth path (Basic) can serve this. Before v99.7.14 this expected Native.
+	require.Equal(t, OpenAIImagesCapabilityBasic, parsed.RequiredCapability)
 	require.False(t, parsed.Multipart)
 }
 
@@ -183,6 +185,30 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultiImageRequiresNative(t
 	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
 	require.NoError(t, err)
 	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
+}
+
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_CherryStudioPaintingStaysBasic(t *testing.T) {
+	// Regression: CherryStudio's AihubmixPage always sends quality and
+	// moderation fields for gpt-image-* models. Before this fix, presence of
+	// any HasNativeOptions field forced Native capability, scheduler walked
+	// the OAuth-only pool for 60s looking for APIKey accounts that didn't
+	// exist, client timed out, UI stuck in loading. These fields are soft
+	// presentation hints the OAuth path silently ignores — must stay Basic.
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"prompt":"cat","model":"gpt-image-2","size":"1024x1024","n":1,"quality":"auto","moderation":"auto"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	svc := &OpenAIGatewayService{}
+	parsed, err := svc.ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
+	require.True(t, parsed.HasNativeOptions, "quality/moderation should still register as native options for tracking")
+	require.Equal(t, OpenAIImagesCapabilityBasic, parsed.RequiredCapability,
+		"soft native options (quality, moderation, etc.) must not force Native capability")
 }
 
 func TestOpenAIGatewayServiceParseOpenAIImagesRequest_StreamStaysBasic(t *testing.T) {

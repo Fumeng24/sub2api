@@ -332,22 +332,25 @@ func normalizeOpenAIImagesEndpointPath(path string) string {
 // classifyOpenAIImagesCapability decides whether a request must go through the
 // native /v1/images/generations path (APIKey accounts only) or can be served
 // by ChatGPT's internal backend (OAuth accounts). Native is required only when
-// the request uses features the ChatGPT subscription UI doesn't support:
+// the request uses features the OAuth backend genuinely cannot produce:
 //
-//   - Non-gpt-image-* model (custom model routing)
+//   - Non-gpt-image-* model (custom model routing — OAuth only has gpt-image-*)
 //   - n > 1 (OAuth path returns a single image per conversation)
 //   - mask upload (only the native edits API accepts separate mask input)
-//   - Other advanced native-only fields (see hasOpenAINativeImageOptions)
-//   - JSON-shaped /v1/images/edits (only multipart is supported via OAuth)
-//   - response_format other than b64_json (OAuth only produces b64 / URL we
-//     must base64-encode ourselves; callers asking for hosted urls need the
-//     native CDN path)
+//   - JSON-shaped /v1/images/edits (OAuth only supports multipart for edits)
+//   - response_format other than b64_json (OAuth only produces b64; hosted
+//     URLs need the native CDN path)
 //
-// stream=true does NOT force Native — OAuth path wraps the final payload in
-// an SSE envelope (keepalive + data event + terminator) so clients like
-// CherryStudio that always set stream=true can still be served by OAuth
-// accounts. ExplicitModel and ExplicitSize also do NOT force Native since
-// most values (gpt-image-* at standard sizes) are supported by OAuth.
+// Soft presentation fields (quality, moderation, background, style,
+// output_format, output_compression — `HasNativeOptions`) do NOT force
+// Native. These are echoed in the upstream request when the APIKey path is
+// taken; on the OAuth path ChatGPT's backend picks its own defaults and we
+// silently ignore them. Routing a gpt-image request to fail-fast Native just
+// because the client sent quality="auto" was making CherryStudio's painting
+// flow time out after 60s walking the empty APIKey pool.
+//
+// Similarly stream=true, ExplicitModel and ExplicitSize do NOT force Native
+// — all three are common client defaults that OAuth can service just fine.
 func classifyOpenAIImagesCapability(req *OpenAIImagesRequest) OpenAIImagesCapability {
 	if req == nil {
 		return OpenAIImagesCapabilityNative
@@ -356,7 +359,7 @@ func classifyOpenAIImagesCapability(req *OpenAIImagesRequest) OpenAIImagesCapabi
 	if !strings.HasPrefix(model, "gpt-image-") {
 		return OpenAIImagesCapabilityNative
 	}
-	if req.N != 1 || req.HasMask || req.HasNativeOptions {
+	if req.N != 1 || req.HasMask {
 		return OpenAIImagesCapabilityNative
 	}
 	if req.IsEdits() && !req.Multipart {
