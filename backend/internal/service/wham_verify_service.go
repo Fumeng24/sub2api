@@ -793,7 +793,7 @@ func (s *WhamVerifyService) refreshOneExpired(ctx context.Context, accountID int
 		// Token refresh failed — the account is effectively dead. Mark it error
 		// so the scheduler stops picking it (gateway does the same in its 401
 		// token_invalidated branch via handleAuthError).
-		reason := fmt.Sprintf("wham-verify: token refresh failed: %s", whamTruncate(err.Error(), 200))
+		reason := fmt.Sprintf("wham-verify: refresh rejected by provider: %s", whamTruncate(err.Error(), 200))
 		if setErr := s.accountRepo.SetError(ctx, accountID, reason); setErr != nil {
 			return fmt.Errorf("refresh failed (%v) and set_error failed (%w)", err, setErr)
 		}

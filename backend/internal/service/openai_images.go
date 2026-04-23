@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -942,6 +943,38 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	)
 	lifecycleCtx, releaseLifecycleCtx := detachOpenAIImageLifecycleContext(ctx, openAIImageLifecycleTimeout)
 	defer releaseLifecycleCtx()
+
+	// Fast-fail: a ChatGPT conversation that emitted ZERO asset pointers in
+	// the stream almost certainly will not materialise any via polling either
+	// (the upstream refused the generation, the account lacks image-gen
+	// privilege, or quota is exhausted). Polling for 90s in this state burns
+	// the whole request budget on a doomed account. Skip the poll and signal
+	// the handler to try the next account (non-stream path) or emit a
+	// structured SSE error (stream path, headers already committed).
+	//
+	// Also mark the account as error: ChatGPT accounts that can complete a
+	// conversation but never emit image assets are almost always lacking
+	// image-gen permission. Leaving them schedulable means the scheduler
+	// picks them again on the next request and burns another budget. Admin
+	// can clear the error manually if it was a transient upstream glitch.
+	if len(pointerInfos) == 0 {
+		logger.LegacyPrintf(
+			"service.openai_gateway",
+			"[OpenAI] Image extraction fast-fail on empty stream conversation_id=%s account=%d",
+			conversationID, account.ID,
+		)
+		s.markOpenAIImageIncapableAccount(ctx, account, "empty stream (no image assets emitted)")
+		emptyStreamErr := fmt.Errorf("openai image conversation returned empty stream for account %d", account.ID)
+		if streamWriter != nil {
+			return nil, emptyStreamErr
+		}
+		return nil, &UpstreamFailoverError{
+			StatusCode:             http.StatusBadGateway,
+			ResponseBody:           []byte(`{"error":{"message":"upstream produced no images"}}`),
+			RetryableOnSameAccount: false,
+		}
+	}
+
 	if conversationID != "" && !hasOpenAIFileServicePointerInfos(pointerInfos) {
 		polledPointers, pollErr := pollOpenAIImageConversation(lifecycleCtx, client, headers, conversationID)
 		if pollErr != nil {
@@ -956,8 +989,20 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	}
 	pointerInfos = preferOpenAIFileServicePointerInfos(pointerInfos)
 	if len(pointerInfos) == 0 {
+		// We had pointers in the stream (preview-only) but the post-stream
+		// poll never produced a final file-service asset. Treat similarly to
+		// the empty-stream case above.
 		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Image extraction yielded no assets conversation_id=%s", conversationID)
-		return nil, fmt.Errorf("openai image conversation returned no downloadable images")
+		s.markOpenAIImageIncapableAccount(ctx, account, "no downloadable assets after polling")
+		missingErr := fmt.Errorf("openai image conversation returned no downloadable images")
+		if streamWriter != nil {
+			return nil, missingErr
+		}
+		return nil, &UpstreamFailoverError{
+			StatusCode:             http.StatusBadGateway,
+			ResponseBody:           []byte(`{"error":{"message":"upstream produced no downloadable images"}}`),
+			RetryableOnSameAccount: false,
+		}
 	}
 
 	responseBody, imageCount, err := buildOpenAIImageResponse(lifecycleCtx, client, headers, conversationID, pointerInfos)
@@ -2320,6 +2365,41 @@ func isOpenAIImageTransientConversationNotFoundError(err error) bool {
 		return true
 	}
 	return strings.Contains(bodyMsg, "conversation") && strings.Contains(bodyMsg, "not found")
+}
+
+// markOpenAIImageIncapableAccount flags an OAuth ChatGPT account that was able
+// to start a conversation but never emitted any image assets as errored. These
+// accounts almost always lack image-gen permission (or their plan was downgraded)
+// and leaving them schedulable causes the scheduler to pick them repeatedly and
+// burn ~90s per request on doomed polls. The error message is intentionally
+// generic so tryClearRecoverableAccountError can't auto-clear it; admins can
+// clear via UI if they believe the block was incorrect.
+func (s *OpenAIGatewayService) markOpenAIImageIncapableAccount(
+	ctx context.Context,
+	account *Account,
+	detail string,
+) {
+	if account == nil || s.accountRepo == nil {
+		return
+	}
+	// Only ChatGPT OAuth accounts hit this path; guard anyway to avoid
+	// accidentally disabling APIKey accounts (which never use this flow).
+	if account.Type != AccountTypeOAuth || account.Platform != PlatformOpenAI {
+		return
+	}
+	reason := "Image generation unavailable: " + detail
+	if err := s.accountRepo.SetError(context.WithoutCancel(ctx), account.ID, reason); err != nil {
+		slog.Warn("openai_images_mark_incapable_failed",
+			"account_id", account.ID,
+			"error", err,
+			"detail", detail,
+		)
+		return
+	}
+	slog.Info("openai_images_account_marked_incapable",
+		"account_id", account.ID,
+		"detail", detail,
+	)
 }
 
 func (s *OpenAIGatewayService) wrapOpenAIImageBackendError(

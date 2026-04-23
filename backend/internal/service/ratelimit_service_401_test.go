@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,8 +50,12 @@ func (r *tokenCacheInvalidatorRecorder) InvalidateToken(ctx context.Context, acc
 	return r.err
 }
 
-func TestRateLimitService_HandleUpstreamError_OAuth401SetsTempUnschedulable(t *testing.T) {
-	t.Run("gemini", func(t *testing.T) {
+// TestRateLimitService_HandleUpstreamError_OAuth401SetsError verifies that any
+// 401 from an upstream provider marks the account as errored (permanent), so
+// the scheduler stops picking it. OAuth accounts also have their token cache
+// invalidated so subsequent requests don't reuse the dead access_token.
+func TestRateLimitService_HandleUpstreamError_OAuth401SetsError(t *testing.T) {
+	t.Run("gemini_oauth", func(t *testing.T) {
 		repo := &rateLimitAccountRepoStub{}
 		invalidator := &tokenCacheInvalidatorRecorder{}
 		service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
@@ -59,30 +64,18 @@ func TestRateLimitService_HandleUpstreamError_OAuth401SetsTempUnschedulable(t *t
 			ID:       100,
 			Platform: PlatformGemini,
 			Type:     AccountTypeOAuth,
-			Credentials: map[string]any{
-				"temp_unschedulable_enabled": true,
-				"temp_unschedulable_rules": []any{
-					map[string]any{
-						"error_code":       401,
-						"keywords":         []any{"unauthorized"},
-						"duration_minutes": 30,
-						"description":      "custom rule",
-					},
-				},
-			},
 		}
 
 		shouldDisable := service.HandleUpstreamError(context.Background(), account, 401, http.Header{}, []byte("unauthorized"))
 
 		require.True(t, shouldDisable)
-		require.Equal(t, 0, repo.setErrorCalls)
-		require.Equal(t, 1, repo.tempCalls)
+		require.Equal(t, 1, repo.setErrorCalls)
+		require.Equal(t, 0, repo.tempCalls)
 		require.Len(t, invalidator.accounts, 1)
+		require.True(t, strings.HasPrefix(repo.lastErrorMsg, "Upstream 401:"))
 	})
 
-	t.Run("antigravity_401_uses_SetError", func(t *testing.T) {
-		// Antigravity 401 由 applyErrorPolicy 的 temp_unschedulable_rules 控制，
-		// HandleUpstreamError 中走 SetError 路径。
+	t.Run("antigravity_oauth", func(t *testing.T) {
 		repo := &rateLimitAccountRepoStub{}
 		invalidator := &tokenCacheInvalidatorRecorder{}
 		service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
@@ -98,12 +91,13 @@ func TestRateLimitService_HandleUpstreamError_OAuth401SetsTempUnschedulable(t *t
 		require.True(t, shouldDisable)
 		require.Equal(t, 1, repo.setErrorCalls)
 		require.Equal(t, 0, repo.tempCalls)
-		require.Empty(t, invalidator.accounts)
+		require.Len(t, invalidator.accounts, 1)
 	})
 }
 
-// TestRateLimitService_HandleUpstreamError_OAuth401InvalidatorError
-// OpenAI OAuth 401 缓存失效出错时仍走 temp_unschedulable
+// TestRateLimitService_HandleUpstreamError_OAuth401InvalidatorError verifies
+// that when the cache invalidator fails we still mark the account errored —
+// cache failure must not swallow the 401 signal.
 func TestRateLimitService_HandleUpstreamError_OAuth401InvalidatorError(t *testing.T) {
 	repo := &rateLimitAccountRepoStub{}
 	invalidator := &tokenCacheInvalidatorRecorder{err: errors.New("boom")}
@@ -118,12 +112,14 @@ func TestRateLimitService_HandleUpstreamError_OAuth401InvalidatorError(t *testin
 	shouldDisable := service.HandleUpstreamError(context.Background(), account, 401, http.Header{}, []byte("unauthorized"))
 
 	require.True(t, shouldDisable)
-	require.Equal(t, 0, repo.setErrorCalls)
-	require.Equal(t, 1, repo.tempCalls)
-	require.Equal(t, 1, repo.updateCredentialsCalls)
+	require.Equal(t, 1, repo.setErrorCalls)
+	require.Equal(t, 0, repo.tempCalls)
 	require.Len(t, invalidator.accounts, 1)
 }
 
+// TestRateLimitService_HandleUpstreamError_NonOAuth401 confirms APIKey accounts
+// go through SetError without invoking the token cache invalidator (they have
+// no OAuth token cache to invalidate).
 func TestRateLimitService_HandleUpstreamError_NonOAuth401(t *testing.T) {
 	repo := &rateLimitAccountRepoStub{}
 	invalidator := &tokenCacheInvalidatorRecorder{}
@@ -142,21 +138,23 @@ func TestRateLimitService_HandleUpstreamError_NonOAuth401(t *testing.T) {
 	require.Empty(t, invalidator.accounts)
 }
 
-func TestRateLimitService_HandleUpstreamError_OAuth401UsesCredentialsUpdater(t *testing.T) {
+// TestRateLimitService_HandleUpstreamError_OAuth401MessageNoAutoClearKeywords
+// guards the error-message choice: it must not contain any substring that
+// tryClearRecoverableAccountError auto-clears (invalid_client / missing_project_id),
+// otherwise a subsequent successful usage query would silently revert the
+// account back to active.
+func TestRateLimitService_HandleUpstreamError_OAuth401MessageNoAutoClearKeywords(t *testing.T) {
 	repo := &rateLimitAccountRepoStub{}
 	service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
 	account := &Account{
 		ID:       103,
 		Platform: PlatformOpenAI,
 		Type:     AccountTypeOAuth,
-		Credentials: map[string]any{
-			"access_token": "token",
-		},
 	}
 
-	shouldDisable := service.HandleUpstreamError(context.Background(), account, 401, http.Header{}, []byte("unauthorized"))
+	_ = service.HandleUpstreamError(context.Background(), account, 401, http.Header{}, []byte("generic 401 body"))
 
-	require.True(t, shouldDisable)
-	require.Equal(t, 1, repo.updateCredentialsCalls)
-	require.NotEmpty(t, repo.lastCredentials["expires_at"])
+	msg := strings.ToLower(repo.lastErrorMsg)
+	require.NotContains(t, msg, "invalid_client")
+	require.NotContains(t, msg, "missing_project_id")
 }

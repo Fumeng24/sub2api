@@ -1181,10 +1181,13 @@ func (s *AccountUsageService) tryClearRecoverableAccountError(ctx context.Contex
 		return
 	}
 
-	if !strings.Contains(msg, "token refresh failed") &&
-		!strings.Contains(msg, "invalid_client") &&
-		!strings.Contains(msg, "missing_project_id") &&
-		!strings.Contains(msg, "unauthenticated") {
+	// 仅自动恢复特定的 OAuth 配置错误（invalid_client / missing_project_id）。
+	// 不再自动清除 "token refresh failed" / "unauthenticated" 类错误——这些对应
+	// 账号级别的拒绝（如 401 token_expired、refresh_token 被作废），一旦成功查到
+	// usage 就自动清除会让批量验活或 401 的标记莫名其妙被还原，从而继续把坏号
+	// 派给客户端。保留这类标记，需人工或专门恢复路径介入。
+	if !strings.Contains(msg, "invalid_client") &&
+		!strings.Contains(msg, "missing_project_id") {
 		return
 	}
 
