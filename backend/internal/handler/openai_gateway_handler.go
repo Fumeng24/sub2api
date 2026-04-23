@@ -1549,6 +1549,14 @@ func shouldLogOpenAIForwardFailureAsWarn(c *gin.Context, wroteFallback bool) boo
 
 // errorResponse returns OpenAI API format error response
 func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
+	// Guard: if response body was already committed (e.g. SSE stream
+	// started by a downstream service), don't inject a JSON error — that
+	// would splice application/json content into a text/event-stream body
+	// and confuse clients. The service layer's own SSE error event should
+	// have been emitted instead.
+	if c != nil && c.Writer != nil && c.Writer.Written() {
+		return
+	}
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"type":    errType,

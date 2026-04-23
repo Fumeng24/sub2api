@@ -823,25 +823,11 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 		len(parsed.Uploads),
 	)
 
-	// For streaming requests we have to commit SSE headers up front so upstream
-	// proxies (Cloudflare, nginx) don't tear down the idle connection while the
-	// OAuth backend takes 30-60s to assemble the image. A lightweight keepalive
-	// goroutine emits ": keepalive" comments during the wait. Writes to the
-	// response body are serialized via streamWriter.mu so main-goroutine final
-	// payload doesn't race with the keepalive emits. On error the defer emits
-	// an SSE error event + [DONE] so clients see a structured failure.
+	// streamWriter is created lazily AFTER the upstream conversation POST
+	// succeeds, so a pre-POST failure (chat-requirements, proof-of-work,
+	// prepare-conversation, upload) can still return UpstreamFailoverError to
+	// the handler loop without corrupting a half-written SSE response.
 	var streamWriter *openaiImagesStreamWriter
-	if parsed.Stream {
-		streamWriter = newOpenAIImagesStreamWriter(c)
-		streamWriter.commitHeaders()
-		streamWriter.startKeepalive()
-		defer func() {
-			streamWriter.stop()
-			if retErr != nil {
-				streamWriter.writeError(retErr)
-			}
-		}()
-	}
 
 	token, _, err := s.GetAccessToken(ctx, account)
 	if err != nil {
@@ -922,6 +908,22 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 		return nil, s.wrapOpenAIImageBackendError(ctx, c, account, handleOpenAIImageBackendError(resp))
 	}
 
+	// POST succeeded — we're past the "failover is safe" boundary. From here on
+	// errors must NOT be wrapped as UpstreamFailoverError (handler would retry
+	// a new account and write duplicate SSE events). Commit SSE headers + start
+	// keepalive so Cloudflare/nginx see traffic while we drain the stream.
+	if parsed.Stream {
+		streamWriter = newOpenAIImagesStreamWriter(c)
+		streamWriter.commitHeaders()
+		streamWriter.startKeepalive()
+		defer func() {
+			if retErr != nil {
+				streamWriter.writeError(retErr)
+			}
+			streamWriter.stop()
+		}()
+	}
+
 	conversationID, pointerInfos, usage, firstTokenMs, err := readOpenAIImageConversationStream(resp, startTime)
 	if err != nil {
 		return nil, err
@@ -940,6 +942,11 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	if conversationID != "" && !hasOpenAIFileServicePointerInfos(pointerInfos) {
 		polledPointers, pollErr := pollOpenAIImageConversation(lifecycleCtx, client, headers, conversationID)
 		if pollErr != nil {
+			// Post-commit: return plain error (no failover wrap) so handler
+			// does not retry a new account and double-commit SSE headers.
+			if streamWriter != nil {
+				return nil, pollErr
+			}
 			return nil, s.wrapOpenAIImageBackendError(ctx, c, account, pollErr)
 		}
 		pointerInfos = mergeOpenAIImagePointerInfos(pointerInfos, polledPointers)
@@ -952,11 +959,14 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 
 	responseBody, imageCount, err := buildOpenAIImageResponse(lifecycleCtx, client, headers, conversationID, pointerInfos)
 	if err != nil {
+		if streamWriter != nil {
+			return nil, err
+		}
 		return nil, s.wrapOpenAIImageBackendError(ctx, c, account, err)
 	}
 
 	if parsed.Stream {
-		streamWriter.writeFinal(responseBody, parsed, requestModel)
+		streamWriter.writeFinal(responseBody, parsed, requestModel, usage)
 	} else {
 		c.Data(http.StatusOK, "application/json; charset=utf-8", responseBody)
 	}
@@ -1044,42 +1054,80 @@ func (w *openaiImagesStreamWriter) startKeepalive() {
 // additional events follow, waiting for what it believes is a still-incoming
 // second image).
 //
-// Safe to call while keepalive is still running because the mutex serialises
-// writes.
-func (w *openaiImagesStreamWriter) writeFinal(jsonBody []byte, parsed *OpenAIImagesRequest, model string) {
+// writeFinal stops the keepalive goroutine *before* emitting the terminator
+// so no ": keepalive" bytes can appear after the completed event.
+//
+// Fields included in the event:
+//   - type, b64_json, created_at, model, size, output_format: always present
+//   - quality, background: only if the request sent these fields (echoed back)
+//   - usage: only if we got real token counts from the upstream stream
+//
+// This is intentionally conservative — OpenAI's strict SDK parsers may
+// reject events with plausibly-valued but fabricated fields, so we omit
+// what we can't honestly provide.
+func (w *openaiImagesStreamWriter) writeFinal(jsonBody []byte, parsed *OpenAIImagesRequest, model string, usage OpenAIUsage) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// Extract b64_json + created from the assembled response body.
+	// Close stopCh under the lock so keepalive can't race past the terminator.
+	w.stopLocked()
+
 	b64 := gjson.GetBytes(jsonBody, "data.0.b64_json").String()
 	createdAt := gjson.GetBytes(jsonBody, "created").Int()
 	if createdAt == 0 {
 		createdAt = time.Now().Unix()
 	}
+
 	size := ""
 	if parsed != nil {
 		size = parsed.Size
 	}
+	outputFormat := ""
+	quality := ""
+	background := ""
+	if parsed != nil && len(parsed.Body) > 0 {
+		if v := strings.TrimSpace(gjson.GetBytes(parsed.Body, "output_format").String()); v != "" {
+			outputFormat = v
+		}
+		if v := strings.TrimSpace(gjson.GetBytes(parsed.Body, "quality").String()); v != "" {
+			quality = v
+		}
+		if v := strings.TrimSpace(gjson.GetBytes(parsed.Body, "background").String()); v != "" {
+			background = v
+		}
+	}
+	if outputFormat == "" {
+		outputFormat = "png" // ChatGPT OAuth backend always returns PNG
+	}
+
 	completed := map[string]any{
 		"type":          "image_generation.completed",
 		"b64_json":      b64,
 		"created_at":    createdAt,
 		"model":         model,
 		"size":          size,
-		"quality":       "auto",
-		"background":    "auto",
-		"output_format": "png",
-		"usage": map[string]any{
-			"total_tokens":  0,
-			"input_tokens":  0,
-			"output_tokens": 0,
-		},
+		"output_format": outputFormat,
 	}
+	if quality != "" {
+		completed["quality"] = quality
+	}
+	if background != "" {
+		completed["background"] = background
+	}
+	if usage.InputTokens > 0 || usage.OutputTokens > 0 || usage.ImageOutputTokens > 0 {
+		completed["usage"] = map[string]any{
+			"input_tokens":        usage.InputTokens,
+			"output_tokens":       usage.OutputTokens,
+			"image_output_tokens": usage.ImageOutputTokens,
+			"total_tokens":        usage.InputTokens + usage.OutputTokens,
+		}
+	}
+
 	completedJSON, err := json.Marshal(completed)
 	if err != nil {
-		// Fall back to the raw assembled body so the client at least gets the
-		// image bytes; this branch shouldn't fire because the map above only
-		// contains JSON-safe values.
+		// Defensive: the map above only contains JSON-safe values so this
+		// should never fire. Fall back to the raw assembled body so the client
+		// at least receives the image bytes.
 		_, _ = w.c.Writer.Write([]byte("data: "))
 		_, _ = w.c.Writer.Write(jsonBody)
 		_, _ = w.c.Writer.Write([]byte("\n\n"))
@@ -1094,31 +1142,46 @@ func (w *openaiImagesStreamWriter) writeFinal(jsonBody []byte, parsed *OpenAIIma
 	}
 }
 
-func (w *openaiImagesStreamWriter) stop() {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+// stopLocked closes stopCh to terminate the keepalive goroutine. Caller must
+// hold w.mu.
+func (w *openaiImagesStreamWriter) stopLocked() {
 	if !w.stopped {
 		w.stopped = true
 		close(w.stopCh)
 	}
 }
 
-// writeError emits an SSE error data event + [DONE] so the client sees a
-// structured failure instead of a dangling connection. Called from the error
-// defer in forwardOpenAIImagesOAuth after stop().
+func (w *openaiImagesStreamWriter) stop() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.stopLocked()
+}
+
+// writeError emits a single image_generation.failed SSE event, matching the
+// success-path terminator discipline (no legacy [DONE], no extra events).
+// Called from the error defer in forwardOpenAIImagesOAuth. Like writeFinal,
+// stops the keepalive before writing the terminator.
 func (w *openaiImagesStreamWriter) writeError(err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.stopLocked()
+
 	msg := whamTruncate(err.Error(), 500)
-	payload, _ := json.Marshal(map[string]any{
+	payload, marshalErr := json.Marshal(map[string]any{
+		"type":       "image_generation.failed",
+		"created_at": time.Now().Unix(),
 		"error": map[string]any{
 			"type":    "upstream_error",
 			"message": msg,
 		},
 	})
+	if marshalErr != nil {
+		// Should never happen with the map above.
+		return
+	}
 	_, _ = w.c.Writer.Write([]byte("data: "))
 	_, _ = w.c.Writer.Write(payload)
-	_, _ = w.c.Writer.Write([]byte("\n\ndata: [DONE]\n\n"))
+	_, _ = w.c.Writer.Write([]byte("\n\n"))
 	if w.flusher != nil {
 		w.flusher.Flush()
 	}
