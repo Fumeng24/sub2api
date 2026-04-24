@@ -1,4 +1,4 @@
--- Migration: 127_drop_channel_monitor_deleted_at
+-- Migration: 132_drop_channel_monitor_deleted_at
 -- 纠正 110 引入的 SoftDeleteMixin：日志/聚合表无恢复需求，软删会让行和索引只增不减，
 -- 徒增磁盘和查询开销。改回分批物理删（由 OpsCleanupService 每天凌晨统一调度，
 -- deleteOldRowsByID 模板，batch=5000）。

@@ -1,4 +1,4 @@
--- Migration: 128_add_channel_monitor_request_templates
+-- Migration: 133_add_channel_monitor_request_templates
 -- 加请求模板表 + 给 channel_monitors 加 4 个快照字段（template_id 关联引用 + extra_headers /
 -- body_override_mode / body_override 三个真正运行时使用的快照）。
 --

@@ -1,4 +1,4 @@
--- Migration: 129_seed_claude_code_template
+-- Migration: 134_seed_claude_code_template
 -- 内置「Claude Code 伪装」请求模板，覆盖 Anthropic 上游对官方 CLI 客户端的所有验证项：
 --   1) User-Agent / X-App / anthropic-beta / anthropic-version 等头
 --   2) system 数组首项与官方 system prompt 字面一致（Dice >= 0.5）

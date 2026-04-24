@@ -1,4 +1,4 @@
--- Migration: 126_add_channel_monitor_aggregation
+-- Migration: 131_add_channel_monitor_aggregation
 -- 渠道监控日聚合：把 channel_monitor_histories 的明细按天聚合，明细只保留 1 天，
 -- 聚合保留 30 天。明细和聚合表都用软删除（deleted_at），由 ops cleanup 任务每天
 -- 凌晨随运维监控清理一起跑（共享 cron）。

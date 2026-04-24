@@ -1,4 +1,4 @@
--- Migration: 125_add_channel_monitors
+-- Migration: 130_add_channel_monitors
 -- 渠道监控 MVP：周期性对外部 provider/endpoint/api_key 做模型心跳测试。
 --
 -- 表结构说明：
