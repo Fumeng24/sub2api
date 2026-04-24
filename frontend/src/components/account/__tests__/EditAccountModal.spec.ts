@@ -26,6 +26,13 @@ vi.mock('@/api/admin', () => ({
     accounts: {
       update: updateAccountMock,
       checkMixedChannelRisk: checkMixedChannelRiskMock
+    },
+    settings: {
+      getWebSearchEmulationConfig: vi.fn().mockResolvedValue({
+        enabled: false,
+        providers: []
+      }),
+      getSettings: vi.fn().mockResolvedValue({})
     }
   }
 }))
