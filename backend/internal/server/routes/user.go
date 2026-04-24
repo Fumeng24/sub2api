@@ -69,6 +69,12 @@ func RegisterUserRoutes(
 			groups.GET("/rates", h.APIKey.GetUserGroupRates)
 		}
 
+		// 用户可用渠道（非管理员接口）
+		channels := authenticated.Group("/channels")
+		{
+			channels.GET("/available", h.AvailableChannel.List)
+		}
+
 		// 使用记录
 		usage := authenticated.Group("/usage")
 		{
@@ -105,6 +111,13 @@ func RegisterUserRoutes(
 			subscriptions.GET("/summary", h.Subscription.GetSummary)
 			subscriptions.POST("/:id/reset", h.Subscription.ResetSubscription)
 			subscriptions.PATCH("/:id/auto-reset", h.Subscription.SetAutoReset)
+		}
+
+		// 渠道监控（用户只读）
+		monitors := authenticated.Group("/channel-monitors")
+		{
+			monitors.GET("", h.ChannelMonitor.List)
+			monitors.GET("/:id/status", h.ChannelMonitor.GetStatus)
 		}
 	}
 }
