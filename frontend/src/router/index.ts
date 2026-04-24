@@ -174,18 +174,6 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/availability',
-    name: 'ModelAvailability',
-    component: () => import('@/views/ModelAvailabilityView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: false,
-      title: 'Model Availability',
-      titleKey: 'availability.title',
-      descriptionKey: 'availability.subtitle'
-    }
-  },
-  {
     path: '/usage',
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),

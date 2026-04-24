@@ -345,7 +345,6 @@ export default {
     announcements: 'Announcements',
     apiKeys: 'API Keys',
     usage: 'Usage',
-    availability: 'Availability',
     redeem: 'Redeem',
     profile: 'Profile',
     users: 'Users',
@@ -5960,28 +5959,6 @@ export default {
         description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Click to confirm and create your API key.</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ Important:</b><ul style="margin: 8px 0 0 16px;"><li>Copy the key (sk-xxx) immediately after creation</li><li>Key is only shown once, need to regenerate if lost</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>🚀 How to Use:</b><br/>Configure the key in any OpenAI-compatible client (like ChatBox, OpenCat, etc.) and start using!</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Create" button</p></div>'
       }
     }
-  },
-
-  // Availability
-  availability: {
-    title: 'Availability',
-    subtitle: 'Real-time service availability status for each group',
-    refresh: 'Refresh',
-    totalGroups: 'Total Groups',
-    available: 'Available',
-    unavailable: 'Unavailable',
-    all: 'All',
-    online: 'Online',
-    offline: 'Offline',
-    activeAccounts: 'Active Accounts',
-    lastUpdated: 'Last Updated',
-    noGroups: 'No groups available',
-    retry: 'Retry',
-    platforms: 'Platforms',
-    allServicesOk: 'All Services Operational',
-    status: 'Status',
-    recent: 'History',
-    now: 'Now'
   },
 
   // Payment System

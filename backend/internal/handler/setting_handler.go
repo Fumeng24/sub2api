@@ -3,26 +3,21 @@ package handler
 import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
-	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-// SettingHandler 设置处理器（含公开接口和需认证的用户接口）
+// SettingHandler 公开设置处理器（无需认证）
 type SettingHandler struct {
 	settingService *service.SettingService
-	apiKeyService  *service.APIKeyService
-	gatewayService *service.GatewayService
 	version        string
 }
 
 // NewSettingHandler 创建公开设置处理器
-func NewSettingHandler(settingService *service.SettingService, apiKeyService *service.APIKeyService, gatewayService *service.GatewayService, version string) *SettingHandler {
+func NewSettingHandler(settingService *service.SettingService, version string) *SettingHandler {
 	return &SettingHandler{
 		settingService: settingService,
-		apiKeyService:  apiKeyService,
-		gatewayService: gatewayService,
 		version:        version,
 	}
 }
@@ -83,23 +78,3 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 	})
 }
 
-// GetGroupAvailability 获取用户可用分组的可用性状态（需认证）
-// GET /api/v1/groups/availability
-func (h *SettingHandler) GetGroupAvailability(c *gin.Context) {
-	ctx := c.Request.Context()
-	subject, ok := middleware.GetAuthSubjectFromContext(c)
-	if !ok || subject.UserID == 0 {
-		response.Error(c, 401, "unauthorized")
-		return
-	}
-	userID := subject.UserID
-
-	groups, err := h.apiKeyService.GetAvailableGroups(ctx, userID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	availability := h.gatewayService.GetGroupsAvailability(ctx, groups)
-	response.Success(c, availability)
-}

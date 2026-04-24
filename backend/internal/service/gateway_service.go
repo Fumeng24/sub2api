@@ -8873,44 +8873,6 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	return cloneStringSlice(models)
 }
 
-// GroupAvailabilityInfo holds availability status for a single group.
-type GroupAvailabilityInfo struct {
-	GroupID       int64  `json:"group_id"`
-	GroupName     string `json:"group_name"`
-	Platform      string `json:"platform"`
-	Available     bool   `json:"available"`
-	TotalAccounts int    `json:"total_accounts"`
-	ActiveCount   int    `json:"active_accounts"`
-}
-
-// GetGroupsAvailability returns availability status for each provided group.
-// A group is "available" if it has at least one schedulable account.
-func (s *GatewayService) GetGroupsAvailability(ctx context.Context, groups []Group) []GroupAvailabilityInfo {
-	result := make([]GroupAvailabilityInfo, 0, len(groups))
-	for _, g := range groups {
-		info := GroupAvailabilityInfo{
-			GroupID:   g.ID,
-			GroupName: g.Name,
-			Platform:  g.Platform,
-		}
-		accounts, err := s.accountRepo.ListByGroup(ctx, g.ID)
-		if err != nil {
-			result = append(result, info)
-			continue
-		}
-		info.TotalAccounts = len(accounts)
-		for _, acc := range accounts {
-			// 可用性展示只看账号基础状态，忽略临时限流/过载（这些是瞬态，不代表服务下线）
-			if acc.Status == StatusActive && acc.Schedulable {
-				info.ActiveCount++
-			}
-		}
-		info.Available = info.ActiveCount > 0
-		result = append(result, info)
-	}
-	return result
-}
-
 func (s *GatewayService) InvalidateAvailableModelsCache(groupID *int64, platform string) {
 	if s == nil || s.modelsListCache == nil {
 		return
