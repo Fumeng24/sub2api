@@ -78,6 +78,19 @@ func TestMigration119DefersPaymentIndexRolloutToOnlineFollowup(t *testing.T) {
 	require.Contains(t, alignmentSQL, "RENAME TO paymentorder_out_trade_no")
 }
 
+func TestMigration136NormalizesFractionalAffiliateRebateRates(t *testing.T) {
+	content, err := FS.ReadFile("136_affiliate_rebate_hardening.sql")
+	require.NoError(t, err)
+
+	sql := string(content)
+	require.Contains(t, sql, "0.2 => 20%")
+	require.Contains(t, sql, "value ~ '^-?[0-9]+([.][0-9]+)?$'")
+	require.NotContains(t, sql, `value ~ '^-?[0-9]+(\\.[0-9]+)?$'`)
+	require.Contains(t, sql, "value::numeric * 100")
+	require.Contains(t, sql, "value::numeric > 0")
+	require.Contains(t, sql, "value::numeric <= 1")
+}
+
 func TestMigration110SeedsAuthSourceSignupGrantsDisabledByDefault(t *testing.T) {
 	content, err := FS.ReadFile("110_pending_auth_and_provider_default_grants.sql")
 	require.NoError(t, err)

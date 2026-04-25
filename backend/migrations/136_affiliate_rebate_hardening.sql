@@ -5,7 +5,7 @@ UPDATE settings
 SET value = to_char((value::numeric * 100), 'FM999999990.########'),
     updated_at = NOW()
 WHERE key = 'affiliate_rebate_rate'
-  AND value ~ '^-?[0-9]+(\\.[0-9]+)?$'
+  AND value ~ '^-?[0-9]+([.][0-9]+)?$'
   AND value::numeric > 0
   AND value::numeric <= 1;
 
