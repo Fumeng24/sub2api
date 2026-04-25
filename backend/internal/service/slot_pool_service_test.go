@@ -432,12 +432,12 @@ func TestSlotPoolService_OnSlotReleased_AccountNotSchedulable(t *testing.T) {
 			account: func() *Account {
 				past := time.Now().Add(-time.Hour)
 				return &Account{
-					ID:                1,
-					Status:            StatusActive,
-					Schedulable:       true,
-					Concurrency:       1,
+					ID:                 1,
+					Status:             StatusActive,
+					Schedulable:        true,
+					Concurrency:        1,
 					AutoPauseOnExpired: true,
-					ExpiresAt:         &past,
+					ExpiresAt:          &past,
 				}
 			}(),
 		},
@@ -472,10 +472,10 @@ func TestSlotPoolService_OnSlotReleased_AccountNotSchedulable(t *testing.T) {
 			account: func() *Account {
 				future := time.Now().Add(time.Hour)
 				return &Account{
-					ID:                    1,
-					Status:                StatusActive,
-					Schedulable:           true,
-					Concurrency:           1,
+					ID:                     1,
+					Status:                 StatusActive,
+					Schedulable:            true,
+					Concurrency:            1,
 					TempUnschedulableUntil: &future,
 				}
 			}(),
@@ -545,11 +545,11 @@ func TestSlotPoolService_RebuildBucketPool_FiltersNonSchedulable(t *testing.T) {
 
 	future := time.Now().Add(time.Hour)
 	accounts := []*Account{
-		activeSchedulableAccount(1, PlatformAnthropic, 1, nil), // schedulable
-		{ID: 2, Status: StatusDisabled, Schedulable: true, Concurrency: 1},                           // inactive
-		{ID: 3, Status: StatusActive, Schedulable: false, Concurrency: 1},                            // not schedulable
-		{ID: 4, Status: StatusActive, Schedulable: true, Concurrency: 1, OverloadUntil: &future},     // overloaded
-		activeSchedulableAccount(5, PlatformAnthropic, 1, nil), // schedulable
+		activeSchedulableAccount(1, PlatformAnthropic, 1, nil),                                   // schedulable
+		{ID: 2, Status: StatusDisabled, Schedulable: true, Concurrency: 1},                       // inactive
+		{ID: 3, Status: StatusActive, Schedulable: false, Concurrency: 1},                        // not schedulable
+		{ID: 4, Status: StatusActive, Schedulable: true, Concurrency: 1, OverloadUntil: &future}, // overloaded
+		activeSchedulableAccount(5, PlatformAnthropic, 1, nil),                                   // schedulable
 	}
 
 	bucket := SchedulerBucket{GroupID: 0, Platform: PlatformAnthropic, Mode: SchedulerModeSingle}

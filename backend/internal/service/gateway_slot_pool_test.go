@@ -15,14 +15,14 @@ import (
 // --- Stub implementations for Gateway SlotPool integration tests ---
 
 type stubSlotPoolServiceForGateway struct {
-	enabled        bool
-	acquireID      int64
-	acquireOK      bool
-	acquireErr     error
-	releasedIDs    []int64
-	releaseErr     error
-	acquireCalls   int
-	releaseCalls   int
+	enabled      bool
+	acquireID    int64
+	acquireOK    bool
+	acquireErr   error
+	releasedIDs  []int64
+	releaseErr   error
+	acquireCalls int
+	releaseCalls int
 }
 
 var _ SlotPoolService = (*stubSlotPoolServiceForGateway)(nil)
@@ -50,7 +50,10 @@ func (s *stubSlotPoolServiceForGateway) Stop()  {}
 type stubConcurrencyCacheForGateway struct {
 	acquireResult bool
 	acquireErr    error
-	releaseCalls  []struct{ AccountID int64; RequestID string }
+	releaseCalls  []struct {
+		AccountID int64
+		RequestID string
+	}
 }
 
 var _ ConcurrencyCache = (*stubConcurrencyCacheForGateway)(nil)
@@ -59,7 +62,10 @@ func (c *stubConcurrencyCacheForGateway) AcquireAccountSlot(_ context.Context, _
 	return c.acquireResult, c.acquireErr
 }
 func (c *stubConcurrencyCacheForGateway) ReleaseAccountSlot(_ context.Context, accountID int64, requestID string) error {
-	c.releaseCalls = append(c.releaseCalls, struct{ AccountID int64; RequestID string }{accountID, requestID})
+	c.releaseCalls = append(c.releaseCalls, struct {
+		AccountID int64
+		RequestID string
+	}{accountID, requestID})
 	return nil
 }
 func (c *stubConcurrencyCacheForGateway) GetAccountConcurrency(_ context.Context, _ int64) (int, error) {
