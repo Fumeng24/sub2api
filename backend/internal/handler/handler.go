@@ -35,6 +35,7 @@ type AdminHandlers struct {
 	ChannelMonitorTemplate *admin.ChannelMonitorRequestTemplateHandler
 	Payment                *admin.PaymentHandler
 	BulkVerify             *admin.BulkVerifyHandler
+	Affiliate              *admin.AffiliateHandler
 }
 
 // Handlers contains all HTTP handlers
