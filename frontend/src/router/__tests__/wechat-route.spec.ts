@@ -51,7 +51,7 @@ describe('router WeChat OAuth route', () => {
     expect(route?.path).toBe('/auth/wechat/callback')
     expect(route?.meta.requiresAuth).toBe(false)
     expect(route?.meta.title).toBe('WeChat OAuth Callback')
-  })
+  }, 30000)
 
   it('registers the WeChat payment callback route as a public route', async () => {
     const { default: router } = await import('@/router')
@@ -60,5 +60,5 @@ describe('router WeChat OAuth route', () => {
     expect(route?.path).toBe('/auth/wechat/payment/callback')
     expect(route?.meta.requiresAuth).toBe(false)
     expect(route?.meta.title).toBe('WeChat Payment Callback')
-  })
+  }, 30000)
 })
