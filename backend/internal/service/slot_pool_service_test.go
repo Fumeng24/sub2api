@@ -99,6 +99,9 @@ func (c *stubSchedulerCacheForSlotPool) UpdateLastUsed(_ context.Context, _ map[
 func (c *stubSchedulerCacheForSlotPool) TryLockBucket(_ context.Context, _ SchedulerBucket, _ time.Duration) (bool, error) {
 	return true, nil
 }
+func (c *stubSchedulerCacheForSlotPool) UnlockBucket(_ context.Context, _ SchedulerBucket) error {
+	return nil
+}
 func (c *stubSchedulerCacheForSlotPool) ListBuckets(_ context.Context) ([]SchedulerBucket, error) {
 	return c.buckets, c.bucketsErr
 }
