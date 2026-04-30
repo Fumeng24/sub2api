@@ -4,6 +4,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -114,4 +115,36 @@ func TestBuildSchedulerMetadataAccount_KeepsSlimGroupMembership(t *testing.T) {
 	require.Nil(t, got.AccountGroups[0].Group)
 	require.Equal(t, int64(11), got.AccountGroups[1].GroupID)
 	require.Nil(t, got.Groups)
+}
+
+func TestMarshalSchedulerFullAccount_KeepsFullGroupPayload(t *testing.T) {
+	account := service.Account{
+		ID:       42,
+		Platform: service.PlatformAnthropic,
+		Credentials: map[string]any{
+			"access_token": "keep-access-token",
+			"id_token":     "drop-id-token",
+		},
+		AccountGroups: []service.AccountGroup{
+			{
+				AccountID: 42,
+				GroupID:   7,
+				Group:     &service.Group{ID: 7, Name: "keep-nested-group"},
+			},
+		},
+		Groups: []*service.Group{{ID: 7, Name: "keep-group-list"}},
+	}
+
+	payload, err := marshalSchedulerFullAccount(account)
+	require.NoError(t, err)
+
+	var got service.Account
+	require.NoError(t, json.Unmarshal(payload, &got))
+	require.Equal(t, "keep-access-token", got.GetCredential("access_token"))
+	require.Empty(t, got.GetCredential("id_token"))
+	require.Len(t, got.AccountGroups, 1)
+	require.NotNil(t, got.AccountGroups[0].Group)
+	require.Equal(t, "keep-nested-group", got.AccountGroups[0].Group.Name)
+	require.Len(t, got.Groups, 1)
+	require.Equal(t, "keep-group-list", got.Groups[0].Name)
 }

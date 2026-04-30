@@ -526,13 +526,10 @@ func (c *schedulerCache) mgetChunked(ctx context.Context, keys []string) ([]any,
 var schedulerCacheCredentialDenyList = []string{"id_token"}
 
 // marshalSchedulerFullAccount serialises the full-payload account written to
-// `sched:acc:{id}`. The result is stripped of large fields not needed for
-// scheduling or request forwarding to reduce Redis bandwidth:
-//   - Credentials.id_token (large JWT)
-//   - AccountGroups[].Group nested objects (only IDs needed for routing)
-//   - Groups slice (only used by ops monitoring, not gateway)
-//
-// The caller's Account is never mutated.
+// `sched:acc:{id}`. It keeps the complete account shape for GetAccount
+// hydration while dropping id_token, a large JWT consumed by background refresh
+// services that read directly from PostgreSQL. The caller's Account is never
+// mutated.
 func marshalSchedulerFullAccount(account service.Account) ([]byte, error) {
 	cp := account
 	if len(cp.Credentials) > 0 {
@@ -551,10 +548,6 @@ func marshalSchedulerFullAccount(account service.Account) ([]byte, error) {
 		}
 		cp.Credentials = filtered
 	}
-	if len(cp.AccountGroups) > 0 {
-		cp.AccountGroups = filterSchedulerAccountGroups(cp.AccountGroups)
-	}
-	cp.Groups = nil
 	return json.Marshal(&cp)
 }
 
