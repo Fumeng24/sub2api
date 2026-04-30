@@ -36,10 +36,33 @@ func TestFilterUserVisibleGroups_IntersectionOnly(t *testing.T) {
 	}
 	allowed := map[int64]struct{}{1: {}, 3: {}}
 
-	visible := filterUserVisibleGroups(groups, allowed)
+	visible := filterUserVisibleGroups(groups, allowed, nil)
 	require.Len(t, visible, 2)
 	ids := []int64{visible[0].ID, visible[1].ID}
 	require.ElementsMatch(t, []int64{1, 3}, ids)
+}
+
+func TestFilterUserVisibleGroups_EmbedsActiveDiscount(t *testing.T) {
+	groups := []service.AvailableGroupRef{
+		{ID: 1, Name: "g1", Platform: "anthropic", RateMultiplier: 2},
+		{ID: 2, Name: "g2", Platform: "openai", RateMultiplier: 3},
+	}
+	allowed := map[int64]struct{}{1: {}, 2: {}}
+	discount := &service.ActiveGroupRateDiscount{
+		Name:               "Promo",
+		DiscountMultiplier: 0.5,
+		StartAt:            "2026-01-01T00:00:00Z",
+		EndAt:              "2026-01-02T00:00:00Z",
+		GroupIDs:           []int64{2},
+	}
+
+	visible := filterUserVisibleGroups(groups, allowed, discount)
+	require.Len(t, visible, 2)
+	require.Nil(t, visible[0].GroupRateDiscountMultiplier)
+	require.NotNil(t, visible[1].GroupRateDiscountMultiplier)
+	require.Equal(t, 0.5, *visible[1].GroupRateDiscountMultiplier)
+	require.Equal(t, 1.5, *visible[1].DiscountedRateMultiplier)
+	require.Equal(t, "Promo", *visible[1].GroupRateDiscountName)
 }
 
 func TestToUserSupportedModels_FiltersByAllowedPlatforms(t *testing.T) {

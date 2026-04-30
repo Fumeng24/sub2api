@@ -10,11 +10,19 @@
     <!-- Group name -->
     <span class="truncate">{{ name }}</span>
     <!-- Right side label -->
-    <span v-if="showLabel" :class="labelClass">
-      <template v-if="hasCustomRate">
-        <!-- 原倍率删除线 + 专属倍率高亮 -->
-        <span class="line-through opacity-50 mr-0.5">{{ rateMultiplier }}x</span>
-        <span class="font-bold">{{ userRateMultiplier }}x</span>
+    <span v-if="showLabel" :class="labelClass" :title="discountTitle || undefined">
+      <template v-if="discountDisplay">
+        <span class="mr-0.5 line-through opacity-50">{{ formatRateMultiplier(originalDisplayRate) }}x</span>
+        <span class="font-bold">{{ formatRateMultiplier(discountDisplay.discountedRate) }}x</span>
+        <span class="ml-0.5 font-semibold">{{ formatDiscountLabel(discountDisplay.multiplier) }}</span>
+      </template>
+      <template v-else-if="hasCustomRate">
+        <span class="line-through opacity-50 mr-0.5">{{ formatRateMultiplier(rateMultiplier) }}x</span>
+        <span class="font-bold">{{ formatRateMultiplier(userRateMultiplier) }}x</span>
+      </template>
+      <template v-else-if="isSubscription && !alwaysShowRate && rateMultiplier !== undefined">
+        <span class="mr-0.5 text-[10px] opacity-75">{{ labelText }}</span>
+        <span class="font-bold">{{ formatRateMultiplier(rateMultiplier) }}x</span>
       </template>
       <template v-else>
         {{ labelText }}
@@ -26,7 +34,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores/app'
 import type { SubscriptionType, GroupPlatform } from '@/types'
+import { formatDiscountLabel, formatRateMultiplier, resolveGroupRateDiscount } from '@/utils/groupRateDiscount'
 import PlatformIcon from './PlatformIcon.vue'
 
 interface Props {
@@ -35,6 +45,12 @@ interface Props {
   subscriptionType?: SubscriptionType
   rateMultiplier?: number
   userRateMultiplier?: number | null // 用户专属倍率
+  groupId?: number | null
+  discountMultiplier?: number | null
+  discountedRateMultiplier?: number | null
+  discountName?: string | null
+  discountStartAt?: string | null
+  discountEndAt?: string | null
   showRate?: boolean
   daysRemaining?: number | null // 剩余天数（订阅类型时使用）
   /**
@@ -54,8 +70,27 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const { t } = useI18n()
+const appStore = useAppStore()
 
 const isSubscription = computed(() => props.subscriptionType === 'subscription')
+const originalDisplayRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
+const discountDisplay = computed(() => resolveGroupRateDiscount(
+  props.groupId,
+  originalDisplayRate.value,
+  appStore.cachedPublicSettings?.group_rate_discount ?? null,
+  {
+    multiplier: props.discountMultiplier,
+    discountedRate: props.discountedRateMultiplier,
+    name: props.discountName,
+    startAt: props.discountStartAt,
+    endAt: props.discountEndAt
+  }
+))
+const discountTitle = computed(() => {
+  if (!discountDisplay.value) return ''
+  const end = discountDisplay.value.endAt ? new Date(discountDisplay.value.endAt).toLocaleString() : ''
+  return end ? `${discountDisplay.value.name} · ${end}` : discountDisplay.value.name
+})
 
 // 是否有专属倍率（且与默认倍率不同）
 const hasCustomRate = computed(() => {
@@ -78,7 +113,7 @@ const showLabel = computed(() => {
 
 // Label text
 const labelText = computed(() => {
-  const rateLabel = props.rateMultiplier !== undefined ? `${props.rateMultiplier}x` : ''
+  const rateLabel = props.rateMultiplier !== undefined ? `${formatRateMultiplier(props.rateMultiplier)}x` : ''
   if (isSubscription.value && !props.alwaysShowRate) {
     // 如果有剩余天数，显示天数
     if (props.daysRemaining !== null && props.daysRemaining !== undefined) {

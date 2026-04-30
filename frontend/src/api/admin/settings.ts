@@ -11,6 +11,15 @@ export interface DefaultSubscriptionSetting {
   validity_days: number;
 }
 
+export interface GroupRateDiscountSettings {
+  enabled: boolean;
+  name: string;
+  discount_multiplier: number;
+  start_at: string;
+  end_at: string;
+  group_ids: number[];
+}
+
 export type AuthSourceType = "email" | "linuxdo" | "oidc" | "wechat";
 
 export interface AuthSourceDefaultsValue {
@@ -486,6 +495,9 @@ export interface SystemSettings {
   // Affiliate (邀请返利) feature switch
   affiliate_enabled: boolean;
 
+  // Group rate discount campaign
+  group_rate_discount_settings: GroupRateDiscountSettings;
+
   // OpenAI fast/flex policy
   openai_fast_policy_settings?: OpenAIFastPolicySettings;
 }
@@ -653,6 +665,9 @@ export interface UpdateSettingsRequest {
 
   // Affiliate (邀请返利) feature switch
   affiliate_enabled?: boolean;
+
+  // Group rate discount campaign
+  group_rate_discount_settings?: GroupRateDiscountSettings;
 
   // OpenAI fast/flex policy
   openai_fast_policy_settings?: OpenAIFastPolicySettings;

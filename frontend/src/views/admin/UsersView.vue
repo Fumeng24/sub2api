@@ -374,6 +374,7 @@
                 :name="sub.group?.name || ''"
                 :platform="sub.group?.platform"
                 :subscription-type="sub.group?.subscription_type"
+                :group-id="sub.group?.id"
                 :rate-multiplier="sub.group?.rate_multiplier"
                 :days-remaining="sub.expires_at ? getDaysRemaining(sub.expires_at) : null"
                 :title="sub.expires_at ? formatDateTime(sub.expires_at) : ''"

@@ -2541,6 +2541,11 @@
                                 option as unknown as DefaultSubscriptionGroupOption
                               ).rate
                             "
+                            :group-id="
+                              (
+                                option as unknown as DefaultSubscriptionGroupOption
+                              ).value
+                            "
                           />
                           <span v-else class="text-gray-400">
                             {{ t("admin.settings.defaults.subscriptionGroup") }}
@@ -2567,6 +2572,11 @@
                               (
                                 option as unknown as DefaultSubscriptionGroupOption
                               ).rate
+                            "
+                            :group-id="
+                              (
+                                option as unknown as DefaultSubscriptionGroupOption
+                              ).value
                             "
                             :description="
                               (
@@ -2806,6 +2816,11 @@
                                     option as unknown as DefaultSubscriptionGroupOption
                                   ).rate
                                 "
+                                :group-id="
+                                  (
+                                    option as unknown as DefaultSubscriptionGroupOption
+                                  ).value
+                                "
                               />
                               <span v-else class="text-gray-400">
                                 {{
@@ -2834,6 +2849,11 @@
                                   (
                                     option as unknown as DefaultSubscriptionGroupOption
                                   ).rate
+                                "
+                                :group-id="
+                                  (
+                                    option as unknown as DefaultSubscriptionGroupOption
+                                  ).value
                                 "
                                 :description="
                                   (
@@ -4153,6 +4173,155 @@
                 </p>
               </div>
               <Toggle v-model="form.available_channels_enabled" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ localText('分组限时折扣', 'Limited-Time Group Discount') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ localText('给指定分组在活动时间内应用统一倍率折扣，用户侧会在分组标签和渠道页看到折后倍率。', 'Apply one discount multiplier to selected groups during a time window. Users will see discounted rates on group badges and the channels page.') }}
+            </p>
+          </div>
+          <div class="space-y-6 p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ localText('启用折扣活动', 'Enable discount campaign') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ localText('关闭时会保留配置，但不会参与计费或前端展示。', 'When off, settings are kept but not applied to billing or shown to users.') }}
+                </p>
+              </div>
+              <Toggle v-model="form.group_rate_discount_settings.enabled" />
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label class="input-label">
+                  {{ localText('活动名称', 'Campaign name') }}
+                </label>
+                <input
+                  v-model="form.group_rate_discount_settings.name"
+                  type="text"
+                  class="input"
+                  :placeholder="localText('限时折扣', 'Limited-time discount')"
+                />
+              </div>
+              <div>
+                <label class="input-label">
+                  {{ localText('折扣倍率', 'Discount multiplier') }}
+                </label>
+                <input
+                  v-model.number="form.group_rate_discount_settings.discount_multiplier"
+                  type="number"
+                  min="0.01"
+                  max="1"
+                  step="0.01"
+                  class="input"
+                  placeholder="0.8"
+                />
+                <p class="input-hint">
+                  {{ localText('例如 0.8 表示按原倍率的 80% 计费。', 'For example, 0.8 bills at 80% of the original rate.') }}
+                </p>
+              </div>
+              <div>
+                <label class="input-label">
+                  {{ localText('开始时间', 'Start time') }}
+                </label>
+                <input
+                  v-model="form.group_rate_discount_settings.start_at"
+                  type="datetime-local"
+                  class="input"
+                />
+              </div>
+              <div>
+                <label class="input-label">
+                  {{ localText('结束时间', 'End time') }}
+                </label>
+                <input
+                  v-model="form.group_rate_discount_settings.end_at"
+                  type="datetime-local"
+                  class="input"
+                />
+              </div>
+            </div>
+
+            <div>
+              <div class="mb-2 flex items-center justify-between">
+                <label class="input-label mb-0">
+                  {{ localText('参与分组', 'Discount groups') }}
+                </label>
+                <span class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ localText('已选', 'Selected') }} {{ form.group_rate_discount_settings.group_ids.length }}
+                </span>
+              </div>
+              <div
+                v-if="discountGroups.length === 0"
+                class="rounded border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 dark:border-dark-600 dark:text-gray-400"
+              >
+                {{ localText('暂无可选分组。', 'No groups available.') }}
+              </div>
+              <div
+                v-else
+                class="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-600 dark:bg-dark-800 md:grid-cols-2"
+              >
+                <label
+                  v-for="group in discountGroups"
+                  :key="group.id"
+                  class="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 transition hover:bg-gray-50 dark:bg-dark-700 dark:hover:bg-dark-600"
+                >
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-500"
+                    :checked="isDiscountGroupSelected(group.id)"
+                    @change="toggleDiscountGroup(group.id, ($event.target as HTMLInputElement).checked)"
+                  />
+                  <GroupBadge
+                    :name="group.name"
+                    :platform="group.platform"
+                    :subscription-type="group.subscription_type"
+                    :group-id="group.id"
+                    :rate-multiplier="group.rate_multiplier"
+                    class="min-w-0"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div
+              v-if="groupRateDiscountPreview.length > 0"
+              class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+            >
+              <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                  {{ form.group_rate_discount_settings.name || localText('限时折扣', 'Limited-time discount') }}
+                  <span class="ml-1 rounded bg-white/70 px-1.5 py-0.5 text-xs dark:bg-black/20">
+                    {{ groupRateDiscountPercentLabel }}
+                  </span>
+                </div>
+                <div v-if="groupRateDiscountWindowLabel" class="text-xs text-emerald-700 dark:text-emerald-300">
+                  {{ groupRateDiscountWindowLabel }}
+                </div>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <span
+                  v-for="item in groupRateDiscountPreview"
+                  :key="item.group.id"
+                  class="inline-flex items-center gap-1.5 rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-800 shadow-sm dark:bg-dark-800 dark:text-emerald-200"
+                >
+                  {{ item.group.name }}
+                  <span class="text-gray-400 line-through dark:text-gray-500">
+                    {{ formatRateMultiplier(item.group.rate_multiplier) }}x
+                  </span>
+                  <span class="font-bold">
+                    {{ formatRateMultiplier(item.discountedRate) }}x
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -5500,6 +5669,7 @@ import {
 import type {
   AuthSourceDefaultsState,
   AuthSourceType,
+  GroupRateDiscountSettings,
   SystemSettings,
   UpdateSettingsRequest,
   DefaultSubscriptionSetting,
@@ -5535,6 +5705,11 @@ import {
   normalizeRegistrationEmailSuffixDomains,
   parseRegistrationEmailSuffixWhitelistInput,
 } from "@/utils/registrationEmailPolicy";
+import {
+  formatDiscountLabel,
+  formatRateMultiplier,
+  roundRateMultiplier,
+} from "@/utils/groupRateDiscount";
 
 const { t, locale } = useI18n();
 const appStore = useAppStore();
@@ -5596,6 +5771,7 @@ const adminApiKeyMasked = ref("");
 const adminApiKeyOperating = ref(false);
 const newAdminApiKey = ref("");
 const subscriptionGroups = ref<AdminGroup[]>([]);
+const discountGroups = ref<AdminGroup[]>([]);
 
 // Overload Cooldown (529) 状态
 const overloadCooldownLoading = ref(true);
@@ -5663,6 +5839,15 @@ interface DefaultSubscriptionGroupOption {
   rate: number;
   [key: string]: unknown;
 }
+
+const defaultGroupRateDiscountSettings = (): GroupRateDiscountSettings => ({
+  enabled: false,
+  name: "限时折扣",
+  discount_multiplier: 1,
+  start_at: "",
+  end_at: "",
+  group_ids: [],
+});
 
 type SettingsForm = Omit<
   SystemSettings,
@@ -5847,6 +6032,7 @@ const form = reactive<SettingsForm>({
   channel_monitor_default_interval_seconds: 60,
   // Available Channels feature switch
   available_channels_enabled: false,
+  group_rate_discount_settings: defaultGroupRateDiscountSettings(),
   // Affiliate (邀请返利) feature switch
   affiliate_enabled: false,
 });
@@ -6067,6 +6253,75 @@ const defaultSubscriptionGroupOptions = computed<
     rate: group.rate_multiplier,
   })),
 );
+
+const selectedDiscountGroups = computed(() => {
+  const selected = new Set(form.group_rate_discount_settings.group_ids || []);
+  return discountGroups.value.filter((group) => selected.has(group.id));
+});
+
+const groupRateDiscountPreview = computed(() => {
+  const multiplier = Number(form.group_rate_discount_settings.discount_multiplier);
+  if (!Number.isFinite(multiplier) || multiplier <= 0) {
+    return [];
+  }
+  return selectedDiscountGroups.value.map((group) => ({
+    group,
+    discountedRate: roundRateMultiplier(group.rate_multiplier * multiplier),
+  }));
+});
+
+const groupRateDiscountPercentLabel = computed(() =>
+  formatDiscountLabel(Number(form.group_rate_discount_settings.discount_multiplier)),
+);
+
+const groupRateDiscountWindowLabel = computed(() => {
+  const { start_at: startAt, end_at: endAt } = form.group_rate_discount_settings;
+  const start = formatLocalDateTimeForDisplay(startAt);
+  const end = formatLocalDateTimeForDisplay(endAt);
+  if (!start || !end) return "";
+  return `${start} - ${end}`;
+});
+
+function isDiscountGroupSelected(groupID: number): boolean {
+  return form.group_rate_discount_settings.group_ids.includes(groupID);
+}
+
+function toggleDiscountGroup(groupID: number, checked: boolean) {
+  const current = new Set(form.group_rate_discount_settings.group_ids || []);
+  if (checked) {
+    current.add(groupID);
+  } else {
+    current.delete(groupID);
+  }
+  form.group_rate_discount_settings.group_ids = Array.from(current).sort((a, b) => a - b);
+}
+
+function formatDateTimeLocalInput(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function parseDateTimeLocalInput(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString();
+}
+
+function formatLocalDateTimeForDisplay(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(locale.value.startsWith("zh") ? "zh-CN" : "en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
 
 const registrationEmailSuffixWhitelistSeparatorKeys = new Set([
   " ",
@@ -6359,6 +6614,16 @@ async function loadSettings() {
     form.default_subscriptions = normalizeDefaultSubscriptionSettings(
       settings.default_subscriptions,
     );
+    form.group_rate_discount_settings = {
+      ...defaultGroupRateDiscountSettings(),
+      ...(settings.group_rate_discount_settings || {}),
+    };
+    form.group_rate_discount_settings.start_at = formatDateTimeLocalInput(
+      form.group_rate_discount_settings.start_at,
+    );
+    form.group_rate_discount_settings.end_at = formatDateTimeLocalInput(
+      form.group_rate_discount_settings.end_at,
+    );
     registrationEmailSuffixWhitelistTags.value =
       normalizeRegistrationEmailSuffixDomains(
         settings.registration_email_suffix_whitelist,
@@ -6462,11 +6727,13 @@ async function loadSettings() {
 async function loadSubscriptionGroups() {
   try {
     const groups = await adminAPI.groups.getAll();
+    discountGroups.value = groups.filter((group) => group.status === "active");
     subscriptionGroups.value = groups.filter(
       (group) =>
         group.subscription_type === "subscription" && group.status === "active",
     );
   } catch (_error: unknown) {
+    discountGroups.value = [];
     subscriptionGroups.value = [];
   }
 }
@@ -6622,6 +6889,64 @@ async function saveSettings() {
     if (!isValidHttpUrl(form.frontend_url)) form.frontend_url = "";
     if (!isValidHttpUrl(form.doc_url)) form.doc_url = "";
     syncWeChatConnectMode();
+    const discountSettings: GroupRateDiscountSettings = {
+      enabled: Boolean(form.group_rate_discount_settings.enabled),
+      name:
+        String(form.group_rate_discount_settings.name || "").trim() ||
+        defaultGroupRateDiscountSettings().name,
+      discount_multiplier:
+        Number(form.group_rate_discount_settings.discount_multiplier) || 1,
+      start_at: parseDateTimeLocalInput(form.group_rate_discount_settings.start_at),
+      end_at: parseDateTimeLocalInput(form.group_rate_discount_settings.end_at),
+      group_ids: Array.from(
+        new Set(
+          (form.group_rate_discount_settings.group_ids || [])
+            .map((id) => Math.floor(Number(id)))
+            .filter((id) => id > 0),
+        ),
+      ).sort((a, b) => a - b),
+    };
+    if (discountSettings.enabled) {
+      if (
+        discountSettings.discount_multiplier <= 0 ||
+        discountSettings.discount_multiplier >= 1
+      ) {
+        appStore.showError(
+          localText(
+            "分组折扣倍率必须大于 0 且小于 1。",
+            "Group discount multiplier must be greater than 0 and less than 1.",
+          ),
+        );
+        return;
+      }
+      if (!discountSettings.start_at || !discountSettings.end_at) {
+        appStore.showError(
+          localText(
+            "请填写分组折扣的开始和结束时间。",
+            "Please enter the group discount start and end time.",
+          ),
+        );
+        return;
+      }
+      if (new Date(discountSettings.end_at) <= new Date(discountSettings.start_at)) {
+        appStore.showError(
+          localText(
+            "分组折扣结束时间必须晚于开始时间。",
+            "Group discount end time must be after the start time.",
+          ),
+        );
+        return;
+      }
+      if (discountSettings.group_ids.length === 0) {
+        appStore.showError(
+          localText(
+            "请至少选择一个参与折扣的分组。",
+            "Select at least one group for the discount.",
+          ),
+        );
+        return;
+      }
+    }
     const wechatStoredMode = deriveWeChatConnectStoredMode(
       form.wechat_connect_open_enabled,
       form.wechat_connect_mp_enabled,
@@ -6789,6 +7114,7 @@ async function saveSettings() {
         Number(form.channel_monitor_default_interval_seconds) || 60,
       // Available Channels feature switch
       available_channels_enabled: form.available_channels_enabled,
+      group_rate_discount_settings: discountSettings,
       // Affiliate (邀请返利) feature switch
       affiliate_enabled: form.affiliate_enabled,
     };
@@ -6830,6 +7156,16 @@ async function saveSettings() {
         (form as Record<string, unknown>)[key] = value;
       }
     }
+    form.group_rate_discount_settings = {
+      ...defaultGroupRateDiscountSettings(),
+      ...(updated.group_rate_discount_settings || {}),
+    };
+    form.group_rate_discount_settings.start_at = formatDateTimeLocalInput(
+      form.group_rate_discount_settings.start_at,
+    );
+    form.group_rate_discount_settings.end_at = formatDateTimeLocalInput(
+      form.group_rate_discount_settings.end_at,
+    );
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(updated));
     registrationEmailSuffixWhitelistTags.value =
       normalizeRegistrationEmailSuffixDomains(

@@ -14,6 +14,11 @@ export interface UserAvailableGroup {
   subscription_type: string
   /** 分组默认倍率。用户专属倍率（若有）通过 /groups/rates 获取后在前端 join。 */
   rate_multiplier: number
+  group_rate_discount_multiplier?: number | null
+  discounted_rate_multiplier?: number | null
+  group_rate_discount_name?: string | null
+  group_rate_discount_start_at?: string | null
+  group_rate_discount_end_at?: string | null
   /** true = 专属分组（小范围授权）；false = 公开分组。 */
   is_exclusive: boolean
 }

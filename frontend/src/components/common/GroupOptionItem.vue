@@ -10,6 +10,7 @@
         :name="name"
         :platform="platform"
         :subscription-type="subscriptionType"
+        :group-id="groupId"
         :show-rate="false"
         class="groupOptionItemBadge"
       />
@@ -26,12 +27,19 @@
     <div class="flex shrink-0 items-center gap-2 pt-0.5">
       <!-- Rate pill (platform color) -->
       <span v-if="rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
-        <template v-if="hasCustomRate">
-          <span class="mr-1 line-through opacity-50">{{ rateMultiplier }}x</span>
-          <span class="font-bold">{{ userRateMultiplier }}x</span>
+        <template v-if="discountDisplay">
+          <span class="mr-1 line-through opacity-50">{{ formatRateMultiplier(originalDisplayRate) }}x</span>
+          <span class="font-bold">{{ formatRateMultiplier(discountDisplay.discountedRate) }}x</span>
+          <span class="ml-1 rounded bg-white/60 px-1 text-[10px] dark:bg-black/20">
+            {{ formatDiscountLabel(discountDisplay.multiplier) }}
+          </span>
+        </template>
+        <template v-else-if="hasCustomRate">
+          <span class="mr-1 line-through opacity-50">{{ formatRateMultiplier(rateMultiplier) }}x</span>
+          <span class="font-bold">{{ formatRateMultiplier(userRateMultiplier) }}x</span>
         </template>
         <template v-else>
-          {{ rateMultiplier }}x 倍率
+          {{ formatRateMultiplier(rateMultiplier) }}x 倍率
         </template>
       </span>
       <!-- Checkmark -->
@@ -52,7 +60,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import GroupBadge from './GroupBadge.vue'
+import { useAppStore } from '@/stores/app'
 import type { SubscriptionType, GroupPlatform } from '@/types'
+import { formatDiscountLabel, formatRateMultiplier, resolveGroupRateDiscount } from '@/utils/groupRateDiscount'
 
 interface Props {
   name: string
@@ -60,6 +70,12 @@ interface Props {
   subscriptionType?: SubscriptionType
   rateMultiplier?: number
   userRateMultiplier?: number | null
+  groupId?: number | null
+  discountMultiplier?: number | null
+  discountedRateMultiplier?: number | null
+  discountName?: string | null
+  discountStartAt?: string | null
+  discountEndAt?: string | null
   description?: string | null
   selected?: boolean
   showCheckmark?: boolean
@@ -71,6 +87,21 @@ const props = withDefaults(defineProps<Props>(), {
   showCheckmark: true,
   userRateMultiplier: null
 })
+
+const appStore = useAppStore()
+const originalDisplayRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
+const discountDisplay = computed(() => resolveGroupRateDiscount(
+  props.groupId,
+  originalDisplayRate.value,
+  appStore.cachedPublicSettings?.group_rate_discount ?? null,
+  {
+    multiplier: props.discountMultiplier,
+    discountedRate: props.discountedRateMultiplier,
+    name: props.discountName,
+    startAt: props.discountStartAt,
+    endAt: props.discountEndAt
+  }
+))
 
 // Whether user has a custom rate different from default
 const hasCustomRate = computed(() => {

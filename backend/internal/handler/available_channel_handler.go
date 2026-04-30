@@ -2,6 +2,7 @@ package handler
 
 import (
 	"sort"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -53,12 +54,17 @@ func (h *AvailableChannelHandler) featureEnabled(c *gin.Context) bool {
 // 订阅视觉加深），并用 RateMultiplier 作为默认倍率；用户专属倍率前端走
 // /groups/rates，和 API 密钥页面保持一致。
 type userAvailableGroup struct {
-	ID               int64   `json:"id"`
-	Name             string  `json:"name"`
-	Platform         string  `json:"platform"`
-	SubscriptionType string  `json:"subscription_type"`
-	RateMultiplier   float64 `json:"rate_multiplier"`
-	IsExclusive      bool    `json:"is_exclusive"`
+	ID                          int64    `json:"id"`
+	Name                        string   `json:"name"`
+	Platform                    string   `json:"platform"`
+	SubscriptionType            string   `json:"subscription_type"`
+	RateMultiplier              float64  `json:"rate_multiplier"`
+	GroupRateDiscountMultiplier *float64 `json:"group_rate_discount_multiplier,omitempty"`
+	DiscountedRateMultiplier    *float64 `json:"discounted_rate_multiplier,omitempty"`
+	GroupRateDiscountName       *string  `json:"group_rate_discount_name,omitempty"`
+	GroupRateDiscountStartAt    *string  `json:"group_rate_discount_start_at,omitempty"`
+	GroupRateDiscountEndAt      *string  `json:"group_rate_discount_end_at,omitempty"`
+	IsExclusive                 bool     `json:"is_exclusive"`
 }
 
 // userSupportedModelPricing 用户可见的定价字段白名单。
@@ -148,7 +154,11 @@ func (h *AvailableChannelHandler) List(c *gin.Context) {
 		if ch.Status != service.StatusActive {
 			continue
 		}
-		visibleGroups := filterUserVisibleGroups(ch.Groups, allowedGroupIDs)
+		var discount *service.ActiveGroupRateDiscount
+		if h.settingService != nil {
+			discount = h.settingService.ActiveGroupRateDiscount(c.Request.Context(), time.Now())
+		}
+		visibleGroups := filterUserVisibleGroups(ch.Groups, allowedGroupIDs, discount)
 		if len(visibleGroups) == 0 {
 			continue
 		}
@@ -206,20 +216,31 @@ func buildPlatformSections(
 func filterUserVisibleGroups(
 	groups []service.AvailableGroupRef,
 	allowed map[int64]struct{},
+	discount *service.ActiveGroupRateDiscount,
 ) []userAvailableGroup {
 	visible := make([]userAvailableGroup, 0, len(groups))
 	for _, g := range groups {
 		if _, ok := allowed[g.ID]; !ok {
 			continue
 		}
-		visible = append(visible, userAvailableGroup{
+		group := userAvailableGroup{
 			ID:               g.ID,
 			Name:             g.Name,
 			Platform:         g.Platform,
 			SubscriptionType: g.SubscriptionType,
 			RateMultiplier:   g.RateMultiplier,
 			IsExclusive:      g.IsExclusive,
-		})
+		}
+		if discount != nil && discount.AppliesToGroup(g.ID) {
+			multiplier := discount.DiscountMultiplier
+			discounted := g.RateMultiplier * multiplier
+			group.GroupRateDiscountMultiplier = &multiplier
+			group.DiscountedRateMultiplier = &discounted
+			group.GroupRateDiscountName = &discount.Name
+			group.GroupRateDiscountStartAt = &discount.StartAt
+			group.GroupRateDiscountEndAt = &discount.EndAt
+		}
+		visible = append(visible, group)
 	}
 	return visible
 }

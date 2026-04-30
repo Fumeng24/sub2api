@@ -91,8 +91,14 @@
                   :name="g.name"
                   :platform="g.platform as GroupPlatform"
                   :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
+                  :group-id="g.id"
                   :rate-multiplier="g.rate_multiplier"
                   :user-rate-multiplier="userGroupRates[g.id] ?? null"
+                  :discount-multiplier="g.group_rate_discount_multiplier"
+                  :discounted-rate-multiplier="g.discounted_rate_multiplier"
+                  :discount-name="g.group_rate_discount_name"
+                  :discount-start-at="g.group_rate_discount_start_at"
+                  :discount-end-at="g.group_rate_discount_end_at"
                   always-show-rate
                 />
               </div>
@@ -113,8 +119,14 @@
                   :name="g.name"
                   :platform="g.platform as GroupPlatform"
                   :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
+                  :group-id="g.id"
                   :rate-multiplier="g.rate_multiplier"
                   :user-rate-multiplier="userGroupRates[g.id] ?? null"
+                  :discount-multiplier="g.group_rate_discount_multiplier"
+                  :discounted-rate-multiplier="g.discounted_rate_multiplier"
+                  :discount-name="g.group_rate_discount_name"
+                  :discount-start-at="g.group_rate_discount_start_at"
+                  :discount-end-at="g.group_rate_discount_end_at"
                   always-show-rate
                 />
               </div>

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -91,6 +92,60 @@ func TestSettingService_UpdateSettings_DefaultSubscriptions_ValidGroup(t *testin
 	require.Equal(t, []DefaultSubscriptionSetting{
 		{GroupID: 11, ValidityDays: 30},
 	}, got)
+}
+
+func TestSettingService_UpdateSettings_GroupRateDiscount_ValidatesAndStores(t *testing.T) {
+	repo := &settingUpdateRepoStub{}
+	groupReader := &defaultSubGroupReaderStub{
+		byID: map[int64]*Group{
+			11: {ID: 11, SubscriptionType: SubscriptionTypeStandard},
+			12: {ID: 12, SubscriptionType: SubscriptionTypeSubscription},
+		},
+	}
+	svc := NewSettingService(repo, &config.Config{})
+	svc.SetDefaultSubscriptionGroupReader(groupReader)
+	start := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	end := time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339)
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		GroupRateDiscountSettings: GroupRateDiscountSettings{
+			Enabled:            true,
+			Name:               "Promo",
+			DiscountMultiplier: 0.75,
+			StartAt:            start,
+			EndAt:              end,
+			GroupIDs:           []int64{12, 11, 11},
+		},
+	})
+	require.NoError(t, err)
+
+	raw := repo.updates[SettingKeyGroupRateDiscountSettings]
+	var got GroupRateDiscountSettings
+	require.NoError(t, json.Unmarshal([]byte(raw), &got))
+	require.True(t, got.Enabled)
+	require.Equal(t, "Promo", got.Name)
+	require.Equal(t, 0.75, got.DiscountMultiplier)
+	require.Equal(t, []int64{11, 12}, got.GroupIDs)
+}
+
+func TestSettingService_UpdateSettings_GroupRateDiscount_RejectsInvalidWindow(t *testing.T) {
+	repo := &settingUpdateRepoStub{}
+	svc := NewSettingService(repo, &config.Config{})
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		GroupRateDiscountSettings: GroupRateDiscountSettings{
+			Enabled:            true,
+			Name:               "Promo",
+			DiscountMultiplier: 0.8,
+			StartAt:            now,
+			EndAt:              now,
+			GroupIDs:           []int64{11},
+		},
+	})
+	require.Error(t, err)
+	require.Equal(t, "INVALID_GROUP_RATE_DISCOUNT_WINDOW", infraerrors.Reason(err))
+	require.Nil(t, repo.updates)
 }
 
 func TestSettingService_UpdateSettings_DefaultSubscriptions_RejectsNonSubscriptionGroup(t *testing.T) {

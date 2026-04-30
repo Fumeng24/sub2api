@@ -393,6 +393,18 @@ const baseSettingsResponse = {
   balance_low_notify_recharge_url: "",
   account_quota_notify_enabled: false,
   account_quota_notify_emails: [],
+  channel_monitor_enabled: true,
+  channel_monitor_default_interval_seconds: 60,
+  available_channels_enabled: false,
+  affiliate_enabled: false,
+  group_rate_discount_settings: {
+    enabled: false,
+    name: "限时折扣",
+    discount_multiplier: 1,
+    start_at: "",
+    end_at: "",
+    group_ids: [],
+  },
 };
 
 function mountView() {

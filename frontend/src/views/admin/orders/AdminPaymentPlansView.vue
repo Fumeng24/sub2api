@@ -23,6 +23,7 @@
             v-else-if="getGroup(value)"
             :name="getGroup(value)!.name"
             :platform="getGroup(value)!.platform"
+            :group-id="getGroup(value)!.id"
             :rate-multiplier="getGroup(value)!.rate_multiplier"
           />
           <span v-else class="text-sm text-gray-400">-</span>

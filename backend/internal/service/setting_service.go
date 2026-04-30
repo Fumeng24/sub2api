@@ -96,6 +96,13 @@ const gatewayForwardingCacheTTL = 60 * time.Second
 const gatewayForwardingErrorTTL = 5 * time.Second
 const gatewayForwardingDBTimeout = 5 * time.Second
 
+type cachedGroupRateDiscountSettings struct {
+	settings  GroupRateDiscountSettings
+	expiresAt int64 // unix nano
+}
+
+const groupRateDiscountSettingsCacheTTL = 10 * time.Second
+
 // DefaultSubscriptionGroupReader validates group references used by default subscriptions.
 type DefaultSubscriptionGroupReader interface {
 	GetByID(ctx context.Context, id int64) (*Group, error)
@@ -114,6 +121,7 @@ type SettingService struct {
 	onUpdate                func() // Callback when settings are updated (for cache invalidation)
 	version                 string // Application version
 	webSearchManagerBuilder WebSearchManagerBuilder
+	groupRateDiscountCache  atomic.Value // *cachedGroupRateDiscountSettings
 }
 
 type ProviderDefaultGrantSettings struct {
@@ -391,6 +399,142 @@ func (s *SettingService) GetAllSettings(ctx context.Context) (*SystemSettings, e
 	return s.parseSettings(settings), nil
 }
 
+const defaultGroupRateDiscountName = "限时折扣"
+
+func defaultGroupRateDiscountSettings() GroupRateDiscountSettings {
+	return GroupRateDiscountSettings{
+		Enabled:            false,
+		Name:               defaultGroupRateDiscountName,
+		DiscountMultiplier: 1,
+		StartAt:            "",
+		EndAt:              "",
+		GroupIDs:           []int64{},
+	}
+}
+
+func parseGroupRateDiscountSettings(raw string) GroupRateDiscountSettings {
+	if strings.TrimSpace(raw) == "" {
+		return defaultGroupRateDiscountSettings()
+	}
+	var settings GroupRateDiscountSettings
+	if err := json.Unmarshal([]byte(raw), &settings); err != nil {
+		return defaultGroupRateDiscountSettings()
+	}
+	return normalizeGroupRateDiscountSettings(settings)
+}
+
+func normalizeGroupRateDiscountSettings(settings GroupRateDiscountSettings) GroupRateDiscountSettings {
+	settings.Name = strings.TrimSpace(settings.Name)
+	if settings.Name == "" {
+		settings.Name = defaultGroupRateDiscountName
+	}
+	if math.IsNaN(settings.DiscountMultiplier) || math.IsInf(settings.DiscountMultiplier, 0) || settings.DiscountMultiplier <= 0 {
+		settings.DiscountMultiplier = 1
+	}
+	settings.StartAt = normalizeRFC3339TimeString(settings.StartAt)
+	settings.EndAt = normalizeRFC3339TimeString(settings.EndAt)
+
+	seen := make(map[int64]struct{}, len(settings.GroupIDs))
+	groupIDs := make([]int64, 0, len(settings.GroupIDs))
+	for _, id := range settings.GroupIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		groupIDs = append(groupIDs, id)
+	}
+	sort.Slice(groupIDs, func(i, j int) bool { return groupIDs[i] < groupIDs[j] })
+	settings.GroupIDs = groupIDs
+	return settings
+}
+
+func normalizeRFC3339TimeString(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return raw
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
+func (s *SettingService) validateGroupRateDiscountSettings(ctx context.Context, settings *GroupRateDiscountSettings) error {
+	if settings == nil {
+		return nil
+	}
+	normalized := normalizeGroupRateDiscountSettings(*settings)
+	*settings = normalized
+	if !settings.Enabled {
+		return nil
+	}
+	if settings.DiscountMultiplier <= 0 || settings.DiscountMultiplier >= 1 {
+		return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_MULTIPLIER", "discount multiplier must be greater than 0 and less than 1")
+	}
+	if len(settings.GroupIDs) == 0 {
+		return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_GROUPS", "at least one group must be selected when group rate discount is enabled")
+	}
+	start, err := time.Parse(time.RFC3339, settings.StartAt)
+	if err != nil {
+		return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_START", "start_at must be a valid RFC3339 timestamp")
+	}
+	end, err := time.Parse(time.RFC3339, settings.EndAt)
+	if err != nil {
+		return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_END", "end_at must be a valid RFC3339 timestamp")
+	}
+	if !end.After(start) {
+		return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_WINDOW", "end_at must be after start_at")
+	}
+	if s.defaultSubGroupReader == nil {
+		return nil
+	}
+	for _, groupID := range settings.GroupIDs {
+		if _, err := s.defaultSubGroupReader.GetByID(ctx, groupID); err != nil {
+			if errors.Is(err, ErrGroupNotFound) {
+				return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_GROUP", "discount group must exist").WithMetadata(map[string]string{
+					"group_id": strconv.FormatInt(groupID, 10),
+				})
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *SettingService) GetGroupRateDiscountSettings(ctx context.Context) GroupRateDiscountSettings {
+	if s == nil || s.settingRepo == nil {
+		return defaultGroupRateDiscountSettings()
+	}
+	now := time.Now()
+	if cached, ok := s.groupRateDiscountCache.Load().(*cachedGroupRateDiscountSettings); ok && now.UnixNano() < cached.expiresAt {
+		return cached.settings
+	}
+	raw, err := s.settingRepo.GetValue(ctx, SettingKeyGroupRateDiscountSettings)
+	if err != nil {
+		settings := defaultGroupRateDiscountSettings()
+		s.groupRateDiscountCache.Store(&cachedGroupRateDiscountSettings{
+			settings:  settings,
+			expiresAt: now.Add(groupRateDiscountSettingsCacheTTL).UnixNano(),
+		})
+		return settings
+	}
+	settings := parseGroupRateDiscountSettings(raw)
+	s.groupRateDiscountCache.Store(&cachedGroupRateDiscountSettings{
+		settings:  settings,
+		expiresAt: now.Add(groupRateDiscountSettingsCacheTTL).UnixNano(),
+	})
+	return settings
+}
+
+func (s *SettingService) ActiveGroupRateDiscount(ctx context.Context, now time.Time) *ActiveGroupRateDiscount {
+	settings := s.GetGroupRateDiscountSettings(ctx)
+	return settings.ActiveAt(now)
+}
+
 // GetFrontendURL 获取前端基础URL（数据库优先，fallback 到配置文件）
 func (s *SettingService) GetFrontendURL(ctx context.Context) string {
 	val, err := s.settingRepo.GetValue(ctx, SettingKeyFrontendURL)
@@ -455,6 +599,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyChannelMonitorEnabled,
 		SettingKeyChannelMonitorDefaultIntervalSeconds,
 		SettingKeyAvailableChannelsEnabled,
+		SettingKeyGroupRateDiscountSettings,
 		SettingKeyAffiliateEnabled,
 	}
 
@@ -499,6 +644,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 	if v, err := strconv.ParseFloat(settings[SettingKeyBalanceLowNotifyThreshold], 64); err == nil && v >= 0 {
 		balanceLowNotifyThreshold = v
 	}
+	groupRateDiscount := parseGroupRateDiscountSettings(settings[SettingKeyGroupRateDiscountSettings]).ActiveAt(time.Now())
 
 	return &PublicSettings{
 		RegistrationEnabled:              settings[SettingKeyRegistrationEnabled] == "true",
@@ -545,6 +691,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		AvailableChannelsEnabled: settings[SettingKeyAvailableChannelsEnabled] == "true",
 
 		AffiliateEnabled: settings[SettingKeyAffiliateEnabled] == "true",
+
+		GroupRateDiscount: groupRateDiscount,
 	}, nil
 }
 
@@ -688,10 +836,11 @@ type PublicSettingsInjectionPayload struct {
 	// Feature flags — MUST match the opt-in/opt-out registry in
 	// frontend/src/utils/featureFlags.ts. Missing a field here is the bug
 	// that hid the "可用渠道" menu on page refresh.
-	ChannelMonitorEnabled                bool `json:"channel_monitor_enabled"`
-	ChannelMonitorDefaultIntervalSeconds int  `json:"channel_monitor_default_interval_seconds"`
-	AvailableChannelsEnabled             bool `json:"available_channels_enabled"`
-	AffiliateEnabled                     bool `json:"affiliate_enabled"`
+	ChannelMonitorEnabled                bool                     `json:"channel_monitor_enabled"`
+	ChannelMonitorDefaultIntervalSeconds int                      `json:"channel_monitor_default_interval_seconds"`
+	AvailableChannelsEnabled             bool                     `json:"available_channels_enabled"`
+	AffiliateEnabled                     bool                     `json:"affiliate_enabled"`
+	GroupRateDiscount                    *ActiveGroupRateDiscount `json:"group_rate_discount,omitempty"`
 }
 
 // GetPublicSettingsForInjection returns public settings in a format suitable for HTML injection.
@@ -745,6 +894,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		ChannelMonitorDefaultIntervalSeconds: settings.ChannelMonitorDefaultIntervalSeconds,
 		AvailableChannelsEnabled:             settings.AvailableChannelsEnabled,
 		AffiliateEnabled:                     settings.AffiliateEnabled,
+		GroupRateDiscount:                    settings.GroupRateDiscount,
 	}, nil
 }
 
@@ -1014,6 +1164,9 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	if err := s.validateDefaultSubscriptionGroups(ctx, settings.DefaultSubscriptions); err != nil {
 		return nil, err
 	}
+	if err := s.validateGroupRateDiscountSettings(ctx, &settings.GroupRateDiscountSettings); err != nil {
+		return nil, err
+	}
 	normalizedWhitelist, err := NormalizeRegistrationEmailSuffixWhitelist(settings.RegistrationEmailSuffixWhitelist)
 	if err != nil {
 		return nil, infraerrors.BadRequest("INVALID_REGISTRATION_EMAIL_SUFFIX_WHITELIST", err.Error())
@@ -1228,6 +1381,11 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 
 	// Available channels feature switch
 	updates[SettingKeyAvailableChannelsEnabled] = strconv.FormatBool(settings.AvailableChannelsEnabled)
+	groupRateDiscountJSON, err := json.Marshal(settings.GroupRateDiscountSettings)
+	if err != nil {
+		return nil, fmt.Errorf("marshal group rate discount settings: %w", err)
+	}
+	updates[SettingKeyGroupRateDiscountSettings] = string(groupRateDiscountJSON)
 
 	// Affiliate (邀请返利) feature switch
 	updates[SettingKeyAffiliateEnabled] = strconv.FormatBool(settings.AffiliateEnabled)
@@ -1317,6 +1475,10 @@ func (s *SettingService) refreshCachedSettings(settings *SystemSettings) {
 	openAIAdvancedSchedulerSettingCache.Store(&cachedOpenAIAdvancedSchedulerSetting{
 		enabled:   settings.OpenAIAdvancedSchedulerEnabled,
 		expiresAt: time.Now().Add(openAIAdvancedSchedulerSettingCacheTTL).UnixNano(),
+	})
+	s.groupRateDiscountCache.Store(&cachedGroupRateDiscountSettings{
+		settings:  settings.GroupRateDiscountSettings,
+		expiresAt: time.Now().Add(groupRateDiscountSettingsCacheTTL).UnixNano(),
 	})
 	if s.onUpdate != nil {
 		s.onUpdate() // Invalidate cache after settings update
@@ -1898,7 +2060,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyChannelMonitorDefaultIntervalSeconds: "60",
 
 		// Available channels feature (default disabled; opt-in)
-		SettingKeyAvailableChannelsEnabled: "false",
+		SettingKeyAvailableChannelsEnabled:  "false",
+		SettingKeyGroupRateDiscountSettings: `{"enabled":false,"name":"限时折扣","discount_multiplier":1,"start_at":"","end_at":"","group_ids":[]}`,
 
 		// Affiliate (邀请返利) feature (default disabled; opt-in)
 		SettingKeyAffiliateEnabled: "false",
@@ -2238,6 +2401,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 
 	// Available channels feature (default: disabled; strict true)
 	result.AvailableChannelsEnabled = settings[SettingKeyAvailableChannelsEnabled] == "true"
+	result.GroupRateDiscountSettings = parseGroupRateDiscountSettings(settings[SettingKeyGroupRateDiscountSettings])
 
 	// Affiliate (邀请返利) feature (default: disabled; strict true)
 	result.AffiliateEnabled = settings[SettingKeyAffiliateEnabled] == "true"

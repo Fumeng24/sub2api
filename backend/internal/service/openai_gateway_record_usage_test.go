@@ -121,6 +121,22 @@ func (s *openAIUserGroupRateRepoStub) GetByUserAndGroup(ctx context.Context, use
 	return s.rate, nil
 }
 
+type openAIRecordUsageSettingRepoStub struct {
+	SettingRepository
+	values map[string]string
+}
+
+func (s *openAIRecordUsageSettingRepoStub) GetValue(_ context.Context, key string) (string, error) {
+	if s == nil || s.values == nil {
+		return "", ErrSettingNotFound
+	}
+	value, ok := s.values[key]
+	if !ok {
+		return "", ErrSettingNotFound
+	}
+	return value, nil
+}
+
 func i64p(v int64) *int64 {
 	return &v
 }
@@ -228,6 +244,53 @@ func TestOpenAIGatewayServiceRecordUsage_UsesUserSpecificGroupRate(t *testing.T)
 	require.InDelta(t, expected.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
 	require.InDelta(t, expected.ActualCost, userRepo.lastAmount, 1e-12)
 	require.Equal(t, 1, userRepo.deductCalls)
+}
+
+func TestOpenAIGatewayServiceRecordUsage_AppliesSelectedGroupDiscount(t *testing.T) {
+	groupID := int64(11)
+	groupRate := 1.4
+	userRate := 1.8
+	discount := 0.5
+	usage := OpenAIUsage{InputTokens: 15, OutputTokens: 4}
+
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	userRepo := &openAIRecordUsageUserRepoStub{}
+	subRepo := &openAIRecordUsageSubRepoStub{}
+	rateRepo := &openAIUserGroupRateRepoStub{rate: &userRate}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, rateRepo)
+	start := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	end := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	svc.settingService = NewSettingService(&openAIRecordUsageSettingRepoStub{
+		values: map[string]string{
+			SettingKeyGroupRateDiscountSettings: `{"enabled":true,"name":"Promo","discount_multiplier":0.5,"start_at":"` + start + `","end_at":"` + end + `","group_ids":[11]}`,
+		},
+	}, &config.Config{})
+
+	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID: "resp_group_rate_discount",
+			Usage:     usage,
+			Model:     "gpt-5.1",
+			Duration:  time.Second,
+		},
+		APIKey: &APIKey{
+			ID:      1001,
+			GroupID: i64p(groupID),
+			Group: &Group{
+				ID:             groupID,
+				RateMultiplier: groupRate,
+			},
+		},
+		User:    &User{ID: 2001},
+		Account: &Account{ID: 3001},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.InDelta(t, userRate*discount, usageRepo.lastLog.RateMultiplier, 1e-12)
+	expected := expectedOpenAICost(t, svc, "gpt-5.1", usage, userRate*discount)
+	require.InDelta(t, expected.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
+	require.InDelta(t, expected.ActualCost, userRepo.lastAmount, 1e-12)
 }
 
 func TestOpenAIGatewayServiceRecordUsage_IncludesEndpointMetadata(t *testing.T) {

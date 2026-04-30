@@ -217,6 +217,24 @@ export interface PublicSettings {
   channel_monitor_default_interval_seconds: number
   available_channels_enabled: boolean
   affiliate_enabled: boolean
+  group_rate_discount?: ActiveGroupRateDiscount | null
+}
+
+export interface GroupRateDiscountSettings {
+  enabled: boolean
+  name: string
+  discount_multiplier: number
+  start_at: string
+  end_at: string
+  group_ids: number[]
+}
+
+export interface ActiveGroupRateDiscount {
+  name: string
+  discount_multiplier: number
+  start_at: string
+  end_at: string
+  group_ids: number[]
 }
 
 export interface AuthResponse {
@@ -485,6 +503,11 @@ export interface Group {
   description: string | null
   platform: GroupPlatform
   rate_multiplier: number
+  group_rate_discount_multiplier?: number | null
+  discounted_rate_multiplier?: number | null
+  group_rate_discount_name?: string | null
+  group_rate_discount_start_at?: string | null
+  group_rate_discount_end_at?: string | null
   rpm_limit?: number // Group-level RPM cap (0 = unlimited); overrides user-level rpm_limit when set
   is_exclusive: boolean
   status: 'active' | 'inactive'

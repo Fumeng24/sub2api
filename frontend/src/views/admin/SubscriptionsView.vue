@@ -205,6 +205,7 @@
               :name="row.group.name"
               :platform="row.group.platform"
               :subscription-type="row.group.subscription_type"
+              :group-id="row.group.id"
               :rate-multiplier="row.group.rate_multiplier"
               :show-rate="false"
             />
@@ -535,6 +536,7 @@
                 :name="(option as unknown as GroupOption).label"
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                :group-id="(option as unknown as GroupOption).value"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
               />
               <span v-else class="text-gray-400">{{ t('admin.subscriptions.selectGroup') }}</span>
@@ -544,6 +546,7 @@
                 :name="(option as unknown as GroupOption).label"
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                :group-id="(option as unknown as GroupOption).value"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
                 :description="(option as unknown as GroupOption).description"
                 :selected="selected"

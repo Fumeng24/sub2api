@@ -31,6 +31,7 @@
                   :name="key.group.name"
                   :platform="key.group.platform"
                   :subscription-type="key.group.subscription_type"
+                  :group-id="key.group.id"
                   :rate-multiplier="key.group.rate_multiplier"
                 />
                 <span v-else class="text-gray-400 italic">{{ t('admin.users.none') }}</span>
@@ -87,6 +88,7 @@
             :name="group.name"
             :platform="group.platform"
             :subscription-type="group.subscription_type"
+            :group-id="group.id"
             :rate-multiplier="group.rate_multiplier"
             :description="group.description"
             :selected="selectedKeyForGroup?.group_id === group.id"

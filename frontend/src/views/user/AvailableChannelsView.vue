@@ -3,7 +3,26 @@
     <TablePageLayout>
       <template #filters>
         <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-          <div class="flex flex-1 flex-wrap items-center gap-3">
+          <div class="flex flex-1 flex-col gap-3">
+            <div
+              v-if="activeGroupRateDiscount"
+              class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200"
+            >
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-2">
+                  <Icon name="badge" size="sm" class="shrink-0" />
+                  <span class="font-semibold">
+                    {{ activeGroupRateDiscount.name || localText('限时分组折扣', 'Limited-time group discount') }}
+                  </span>
+                  <span class="rounded bg-white/70 px-1.5 py-0.5 text-xs font-bold dark:bg-black/20">
+                    {{ formatDiscountLabel(activeGroupRateDiscount.discount_multiplier) }}
+                  </span>
+                </div>
+                <span class="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                  {{ localText('活动至', 'Ends') }} {{ formatDiscountDateTime(activeGroupRateDiscount.end_at, locale) }}
+                </span>
+              </div>
+            </div>
             <div class="relative w-full sm:w-80">
               <Icon
                 name="search"
@@ -59,14 +78,20 @@ import userChannelsAPI, { type UserAvailableChannel } from '@/api/channels'
 import userGroupsAPI from '@/api/groups'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { formatDiscountDateTime, formatDiscountLabel } from '@/utils/groupRateDiscount'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const appStore = useAppStore()
 
 const channels = ref<UserAvailableChannel[]>([])
 const userGroupRates = ref<Record<number, number>>({})
 const loading = ref(false)
 const searchQuery = ref('')
+const activeGroupRateDiscount = computed(() => appStore.cachedPublicSettings?.group_rate_discount ?? null)
+
+function localText(zh: string, en: string): string {
+  return locale.value.startsWith('zh') ? zh : en
+}
 
 const columnLabels = computed(() => ({
   name: t('availableChannels.columns.name'),
@@ -124,4 +149,7 @@ async function loadChannels() {
 }
 
 onMounted(loadChannels)
+onMounted(() => {
+  appStore.fetchPublicSettings()
+})
 </script>

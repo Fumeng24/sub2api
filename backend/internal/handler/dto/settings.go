@@ -3,6 +3,8 @@ package dto
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
 // CustomMenuItem represents a user-configured custom menu entry.
@@ -200,6 +202,9 @@ type SystemSettings struct {
 	// Affiliate (邀请返利) feature switch
 	AffiliateEnabled bool `json:"affiliate_enabled"`
 
+	// Group rate discount campaign
+	GroupRateDiscountSettings GroupRateDiscountSettings `json:"group_rate_discount_settings"`
+
 	// OpenAI fast/flex policy
 	OpenAIFastPolicySettings *OpenAIFastPolicySettings `json:"openai_fast_policy_settings,omitempty"`
 }
@@ -256,6 +261,60 @@ type PublicSettings struct {
 	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
 
 	AffiliateEnabled bool `json:"affiliate_enabled"`
+
+	GroupRateDiscount *ActiveGroupRateDiscount `json:"group_rate_discount,omitempty"`
+}
+
+type GroupRateDiscountSettings struct {
+	Enabled            bool    `json:"enabled"`
+	Name               string  `json:"name"`
+	DiscountMultiplier float64 `json:"discount_multiplier"`
+	StartAt            string  `json:"start_at"`
+	EndAt              string  `json:"end_at"`
+	GroupIDs           []int64 `json:"group_ids"`
+}
+
+type ActiveGroupRateDiscount struct {
+	Name               string  `json:"name"`
+	DiscountMultiplier float64 `json:"discount_multiplier"`
+	StartAt            string  `json:"start_at"`
+	EndAt              string  `json:"end_at"`
+	GroupIDs           []int64 `json:"group_ids"`
+}
+
+func GroupRateDiscountSettingsFromService(s service.GroupRateDiscountSettings) GroupRateDiscountSettings {
+	return GroupRateDiscountSettings{
+		Enabled:            s.Enabled,
+		Name:               s.Name,
+		DiscountMultiplier: s.DiscountMultiplier,
+		StartAt:            s.StartAt,
+		EndAt:              s.EndAt,
+		GroupIDs:           append([]int64(nil), s.GroupIDs...),
+	}
+}
+
+func GroupRateDiscountSettingsToService(s GroupRateDiscountSettings) service.GroupRateDiscountSettings {
+	return service.GroupRateDiscountSettings{
+		Enabled:            s.Enabled,
+		Name:               s.Name,
+		DiscountMultiplier: s.DiscountMultiplier,
+		StartAt:            s.StartAt,
+		EndAt:              s.EndAt,
+		GroupIDs:           append([]int64(nil), s.GroupIDs...),
+	}
+}
+
+func ActiveGroupRateDiscountFromService(s *service.ActiveGroupRateDiscount) *ActiveGroupRateDiscount {
+	if s == nil {
+		return nil
+	}
+	return &ActiveGroupRateDiscount{
+		Name:               s.Name,
+		DiscountMultiplier: s.DiscountMultiplier,
+		StartAt:            s.StartAt,
+		EndAt:              s.EndAt,
+		GroupIDs:           append([]int64(nil), s.GroupIDs...),
+	}
 }
 
 // OverloadCooldownSettings 529过载冷却配置 DTO

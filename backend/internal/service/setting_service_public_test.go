@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,24 @@ import (
 
 type settingPublicRepoStub struct {
 	values map[string]string
+}
+
+func TestSettingService_GetPublicSettings_ExposesActiveGroupRateDiscount(t *testing.T) {
+	start := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	end := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	repo := &settingPublicRepoStub{
+		values: map[string]string{
+			SettingKeyGroupRateDiscountSettings: `{"enabled":true,"name":"Night Sale","discount_multiplier":0.8,"start_at":"` + start + `","end_at":"` + end + `","group_ids":[2,1,1]}`,
+		},
+	}
+	svc := NewSettingService(repo, &config.Config{})
+
+	settings, err := svc.GetPublicSettings(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, settings.GroupRateDiscount)
+	require.Equal(t, "Night Sale", settings.GroupRateDiscount.Name)
+	require.Equal(t, 0.8, settings.GroupRateDiscount.DiscountMultiplier)
+	require.Equal(t, []int64{1, 2}, settings.GroupRateDiscount.GroupIDs)
 }
 
 func (s *settingPublicRepoStub) Get(ctx context.Context, key string) (*Setting, error) {

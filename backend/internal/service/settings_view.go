@@ -1,6 +1,9 @@
 package service
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
@@ -138,6 +141,9 @@ type SystemSettings struct {
 	// Available Channels feature (user-facing aggregate view)
 	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
 
+	// Group rate discount campaign
+	GroupRateDiscountSettings GroupRateDiscountSettings `json:"group_rate_discount_settings"`
+
 	// Claude Code version check
 	MinClaudeCodeVersion string
 	MaxClaudeCodeVersion string
@@ -233,6 +239,63 @@ type PublicSettings struct {
 
 	// Affiliate (邀请返利) feature toggle
 	AffiliateEnabled bool `json:"affiliate_enabled"`
+
+	// Active group rate discount campaign, if any.
+	GroupRateDiscount *ActiveGroupRateDiscount `json:"group_rate_discount,omitempty"`
+}
+
+type GroupRateDiscountSettings struct {
+	Enabled            bool    `json:"enabled"`
+	Name               string  `json:"name"`
+	DiscountMultiplier float64 `json:"discount_multiplier"`
+	StartAt            string  `json:"start_at"`
+	EndAt              string  `json:"end_at"`
+	GroupIDs           []int64 `json:"group_ids"`
+}
+
+type ActiveGroupRateDiscount struct {
+	Name               string  `json:"name"`
+	DiscountMultiplier float64 `json:"discount_multiplier"`
+	StartAt            string  `json:"start_at"`
+	EndAt              string  `json:"end_at"`
+	GroupIDs           []int64 `json:"group_ids"`
+}
+
+func (d *ActiveGroupRateDiscount) AppliesToGroup(groupID int64) bool {
+	if d == nil || groupID <= 0 {
+		return false
+	}
+	for _, id := range d.GroupIDs {
+		if id == groupID {
+			return true
+		}
+	}
+	return false
+}
+
+func (s GroupRateDiscountSettings) ActiveAt(now time.Time) *ActiveGroupRateDiscount {
+	normalized := normalizeGroupRateDiscountSettings(s)
+	if !normalized.Enabled || normalized.DiscountMultiplier <= 0 || normalized.DiscountMultiplier >= 1 || len(normalized.GroupIDs) == 0 {
+		return nil
+	}
+	start, err := time.Parse(time.RFC3339, normalized.StartAt)
+	if err != nil {
+		return nil
+	}
+	end, err := time.Parse(time.RFC3339, normalized.EndAt)
+	if err != nil {
+		return nil
+	}
+	if now.Before(start) || !now.Before(end) {
+		return nil
+	}
+	return &ActiveGroupRateDiscount{
+		Name:               normalized.Name,
+		DiscountMultiplier: normalized.DiscountMultiplier,
+		StartAt:            normalized.StartAt,
+		EndAt:              normalized.EndAt,
+		GroupIDs:           append([]int64(nil), normalized.GroupIDs...),
+	}
 }
 
 type WeChatConnectOAuthConfig struct {

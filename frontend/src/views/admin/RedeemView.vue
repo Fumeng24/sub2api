@@ -257,6 +257,7 @@
                       :name="(option as unknown as GroupOption).label"
                       :platform="(option as unknown as GroupOption).platform"
                       :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                      :group-id="(option as unknown as GroupOption).value"
                       :rate-multiplier="(option as unknown as GroupOption).rate"
                     />
                     <span v-else class="text-gray-400">{{
@@ -268,6 +269,7 @@
                       :name="(option as unknown as GroupOption).label"
                       :platform="(option as unknown as GroupOption).platform"
                       :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                      :group-id="(option as unknown as GroupOption).value"
                       :rate-multiplier="(option as unknown as GroupOption).rate"
                       :description="(option as unknown as GroupOption).description"
                       :selected="selected"

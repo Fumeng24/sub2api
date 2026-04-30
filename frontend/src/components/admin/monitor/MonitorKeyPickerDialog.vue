@@ -52,6 +52,7 @@
                   :name="k.group.name"
                   :platform="k.group.platform"
                   :subscription-type="k.group.subscription_type"
+                  :group-id="k.group.id"
                   :rate-multiplier="k.group.rate_multiplier"
                   :user-rate-multiplier="userGroupRates[k.group.id]"
                 />

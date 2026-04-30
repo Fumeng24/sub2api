@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"regexp"
 	"strings"
@@ -248,6 +249,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		AvailableChannelsEnabled: settings.AvailableChannelsEnabled,
 
 		AffiliateEnabled: settings.AffiliateEnabled,
+
+		GroupRateDiscountSettings: dto.GroupRateDiscountSettingsFromService(settings.GroupRateDiscountSettings),
 	}
 
 	// OpenAI fast policy (stored under a dedicated setting key)
@@ -496,6 +499,9 @@ type UpdateSettingsRequest struct {
 
 	// Affiliate (邀请返利) feature switch
 	AffiliateEnabled *bool `json:"affiliate_enabled"`
+
+	// Group rate discount campaign
+	GroupRateDiscountSettings *dto.GroupRateDiscountSettings `json:"group_rate_discount_settings"`
 
 	// OpenAI fast/flex policy (optional, only updated when provided)
 	OpenAIFastPolicySettings *dto.OpenAIFastPolicySettings `json:"openai_fast_policy_settings,omitempty"`
@@ -1365,6 +1371,12 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.AffiliateEnabled
 		}(),
+		GroupRateDiscountSettings: func() service.GroupRateDiscountSettings {
+			if req.GroupRateDiscountSettings != nil {
+				return dto.GroupRateDiscountSettingsToService(*req.GroupRateDiscountSettings)
+			}
+			return previousSettings.GroupRateDiscountSettings
+		}(),
 	}
 
 	authSourceDefaults := &service.AuthSourceDefaultSettings{
@@ -1616,6 +1628,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AvailableChannelsEnabled: updatedSettings.AvailableChannelsEnabled,
 
 		AffiliateEnabled: updatedSettings.AffiliateEnabled,
+
+		GroupRateDiscountSettings: dto.GroupRateDiscountSettingsFromService(updatedSettings.GroupRateDiscountSettings),
 	}
 	if fastPolicy, err := h.settingService.GetOpenAIFastPolicySettings(c.Request.Context()); err != nil {
 		slog.Error("openai_fast_policy_settings_get_failed", "error", err)
@@ -2004,8 +2018,20 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.AffiliateEnabled != after.AffiliateEnabled {
 		changed = append(changed, "affiliate_enabled")
 	}
+	if !equalGroupRateDiscountSettings(before.GroupRateDiscountSettings, after.GroupRateDiscountSettings) {
+		changed = append(changed, "group_rate_discount_settings")
+	}
 	changed = appendAuthSourceDefaultChanges(changed, beforeAuthSourceDefaults, afterAuthSourceDefaults)
 	return changed
+}
+
+func equalGroupRateDiscountSettings(a, b service.GroupRateDiscountSettings) bool {
+	return a.Enabled == b.Enabled &&
+		a.Name == b.Name &&
+		math.Abs(a.DiscountMultiplier-b.DiscountMultiplier) < 1e-12 &&
+		a.StartAt == b.StartAt &&
+		a.EndAt == b.EndAt &&
+		equalInt64Slice(a.GroupIDs, b.GroupIDs)
 }
 
 func appendAuthSourceDefaultChanges(changed []string, before *service.AuthSourceDefaultSettings, after *service.AuthSourceDefaultSettings) []string {
@@ -2171,6 +2197,18 @@ func equalDefaultSubscriptions(a, b []service.DefaultSubscriptionSetting) bool {
 }
 
 func equalIntSlice(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func equalInt64Slice(a, b []int64) bool {
 	if len(a) != len(b) {
 		return false
 	}

@@ -279,6 +279,10 @@ const (
 	// sidebar entry is hidden. Defaults to false (opt-in feature).
 	SettingKeyAvailableChannelsEnabled = "available_channels_enabled"
 
+	// SettingKeyGroupRateDiscountSettings stores JSON config for limited-time
+	// discounts applied to selected group rate multipliers.
+	SettingKeyGroupRateDiscountSettings = "group_rate_discount_settings"
+
 	// =========================
 	// Overload Cooldown (529)
 	// =========================

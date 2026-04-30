@@ -70,7 +70,12 @@
                     </span>
                     <span class="text-gray-300 dark:text-dark-500">•</span>
                     <span class="text-gray-500 dark:text-gray-400">
-                      {{ t('admin.users.defaultRate') }}: <span class="font-medium text-gray-700 dark:text-gray-300">{{ config.defaultRate }}x</span>
+                      {{ t('admin.users.defaultRate') }}:
+                      <span v-if="config.discountMultiplier" class="font-medium text-gray-700 dark:text-gray-300">
+                        <span class="line-through opacity-50">{{ formatRateMultiplier(config.defaultRate) }}x</span>
+                        <span class="ml-1 text-emerald-600 dark:text-emerald-300">{{ formatRateMultiplier(config.defaultRate * config.discountMultiplier) }}x</span>
+                      </span>
+                      <span v-else class="font-medium text-gray-700 dark:text-gray-300">{{ formatRateMultiplier(config.defaultRate) }}x</span>
                     </span>
                   </div>
                 </div>
@@ -128,7 +133,12 @@
                     </span>
                     <span class="text-gray-300 dark:text-dark-500">•</span>
                     <span class="text-gray-500 dark:text-gray-400">
-                      {{ t('admin.users.defaultRate') }}: <span class="font-medium text-gray-700 dark:text-gray-300">{{ config.defaultRate }}x</span>
+                      {{ t('admin.users.defaultRate') }}:
+                      <span v-if="config.discountMultiplier" class="font-medium text-gray-700 dark:text-gray-300">
+                        <span class="line-through opacity-50">{{ formatRateMultiplier(config.defaultRate) }}x</span>
+                        <span class="ml-1 text-emerald-600 dark:text-emerald-300">{{ formatRateMultiplier(config.defaultRate * config.discountMultiplier) }}x</span>
+                      </span>
+                      <span v-else class="font-medium text-gray-700 dark:text-gray-300">{{ formatRateMultiplier(config.defaultRate) }}x</span>
                     </span>
                   </div>
                 </div>
@@ -186,6 +196,7 @@ import { adminAPI } from '@/api/admin'
 import type { AdminUser, Group, GroupPlatform } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import { resolveGroupRateDiscount, formatRateMultiplier } from '@/utils/groupRateDiscount'
 
 interface GroupRateConfig {
   groupId: number
@@ -193,6 +204,7 @@ interface GroupRateConfig {
   platform: GroupPlatform
   isExclusive: boolean
   defaultRate: number
+  discountMultiplier: number | null
   customRate: number | null
   isSelected: boolean
 }
@@ -244,6 +256,7 @@ const load = async () => {
       platform: g.platform,
       isExclusive: g.is_exclusive,
       defaultRate: g.rate_multiplier,
+      discountMultiplier: resolveGroupRateDiscount(g.id, g.rate_multiplier, appStore.cachedPublicSettings?.group_rate_discount ?? null)?.multiplier ?? null,
       customRate: userGroupRates[g.id] ?? null,
       // 专属分组：检查是否在 allowed_groups 中
       // 公开分组：始终选中
