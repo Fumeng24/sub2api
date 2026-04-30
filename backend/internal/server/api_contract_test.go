@@ -790,6 +790,14 @@ func TestAPIContracts(t *testing.T) {
 					"channel_monitor_enabled": true,
 					"channel_monitor_default_interval_seconds": 60,
 					"available_channels_enabled": false,
+					"group_rate_discount_settings": {
+						"enabled": false,
+						"name": "限时折扣",
+						"discount_multiplier": 1,
+						"start_at": "",
+						"end_at": "",
+						"group_ids": []
+					},
 					"affiliate_enabled": false,
 					"wechat_connect_enabled": false,
 					"wechat_connect_app_id": "",
@@ -981,6 +989,14 @@ func TestAPIContracts(t *testing.T) {
 					"channel_monitor_enabled": true,
 					"channel_monitor_default_interval_seconds": 60,
 					"available_channels_enabled": false,
+					"group_rate_discount_settings": {
+						"enabled": false,
+						"name": "限时折扣",
+						"discount_multiplier": 1,
+						"start_at": "",
+						"end_at": "",
+						"group_ids": []
+					},
 					"affiliate_enabled": false,
 					"wechat_connect_enabled": true,
 					"wechat_connect_app_id": "wx-open-config",

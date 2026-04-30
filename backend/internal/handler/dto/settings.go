@@ -283,24 +283,26 @@ type ActiveGroupRateDiscount struct {
 }
 
 func GroupRateDiscountSettingsFromService(s service.GroupRateDiscountSettings) GroupRateDiscountSettings {
+	groupIDs := append([]int64{}, s.GroupIDs...)
 	return GroupRateDiscountSettings{
 		Enabled:            s.Enabled,
 		Name:               s.Name,
 		DiscountMultiplier: s.DiscountMultiplier,
 		StartAt:            s.StartAt,
 		EndAt:              s.EndAt,
-		GroupIDs:           append([]int64(nil), s.GroupIDs...),
+		GroupIDs:           groupIDs,
 	}
 }
 
 func GroupRateDiscountSettingsToService(s GroupRateDiscountSettings) service.GroupRateDiscountSettings {
+	groupIDs := append([]int64{}, s.GroupIDs...)
 	return service.GroupRateDiscountSettings{
 		Enabled:            s.Enabled,
 		Name:               s.Name,
 		DiscountMultiplier: s.DiscountMultiplier,
 		StartAt:            s.StartAt,
 		EndAt:              s.EndAt,
-		GroupIDs:           append([]int64(nil), s.GroupIDs...),
+		GroupIDs:           groupIDs,
 	}
 }
 
@@ -308,12 +310,13 @@ func ActiveGroupRateDiscountFromService(s *service.ActiveGroupRateDiscount) *Act
 	if s == nil {
 		return nil
 	}
+	groupIDs := append([]int64{}, s.GroupIDs...)
 	return &ActiveGroupRateDiscount{
 		Name:               s.Name,
 		DiscountMultiplier: s.DiscountMultiplier,
 		StartAt:            s.StartAt,
 		EndAt:              s.EndAt,
-		GroupIDs:           append([]int64(nil), s.GroupIDs...),
+		GroupIDs:           groupIDs,
 	}
 }
 
