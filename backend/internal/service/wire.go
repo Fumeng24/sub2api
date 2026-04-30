@@ -413,23 +413,6 @@ func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupReposit
 	return svc
 }
 
-// ProvideAPIKeyService creates APIKeyService with rate limit cache invalidator injection.
-// Injection done here to break circular dependency (APIKeyService → BillingCacheService → APIKeyService).
-func ProvideAPIKeyService(
-	apiKeyRepo APIKeyRepository,
-	userRepo UserRepository,
-	groupRepo GroupRepository,
-	userSubRepo UserSubscriptionRepository,
-	userGroupRateRepo UserGroupRateRepository,
-	cache APIKeyCache,
-	cfg *config.Config,
-	billingCache BillingCache,
-) *APIKeyService {
-	svc := NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userSubRepo, userGroupRateRepo, cache, cfg)
-	svc.SetRateLimitCacheInvalidator(billingCache)
-	return svc
-}
-
 // ProvideOpenAIOAuthService creates OpenAIOAuthService with privacy client factory injection.
 // Injection done here to break circular dependency via PrivacyClientFactory.
 func ProvideOpenAIOAuthService(
@@ -453,6 +436,22 @@ func ProvideBillingCacheService(
 	cfg *config.Config,
 ) *BillingCacheService {
 	return NewBillingCacheService(cache, userRepo, subRepo, apiKeyRepo, rpmCache, rateRepo, cfg)
+}
+
+// ProvideAPIKeyService wires APIKeyService and connects rate-limit cache invalidation.
+func ProvideAPIKeyService(
+	apiKeyRepo APIKeyRepository,
+	userRepo UserRepository,
+	groupRepo GroupRepository,
+	userSubRepo UserSubscriptionRepository,
+	userGroupRateRepo UserGroupRateRepository,
+	cache APIKeyCache,
+	cfg *config.Config,
+	billingCacheService *BillingCacheService,
+) *APIKeyService {
+	svc := NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userSubRepo, userGroupRateRepo, cache, cfg)
+	svc.SetRateLimitCacheInvalidator(billingCacheService)
+	return svc
 }
 
 // ProviderSet is the Wire provider set for all services
