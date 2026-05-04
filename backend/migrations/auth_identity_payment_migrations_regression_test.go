@@ -141,8 +141,8 @@ func TestMigration124BackfillsLegacyOIDCSecurityFlagsSafely(t *testing.T) {
 	require.Contains(t, sql, "'false'")
 }
 
-func TestMigration134AddsAffiliateLedgerAuditFieldsWithoutJSONCast(t *testing.T) {
-	content, err := FS.ReadFile("134_affiliate_ledger_audit_snapshots.sql")
+func TestMigration139AddsAffiliateLedgerAuditFieldsWithoutJSONCast(t *testing.T) {
+	content, err := FS.ReadFile("139_affiliate_ledger_audit_snapshots.sql")
 	require.NoError(t, err)
 
 	sql := string(content)
@@ -154,4 +154,26 @@ func TestMigration134AddsAffiliateLedgerAuditFieldsWithoutJSONCast(t *testing.T)
 	require.Contains(t, sql, "COUNT(*) OVER (PARTITION BY ra.order_id) AS order_match_count")
 	require.Contains(t, sql, "COUNT(*) OVER (PARTITION BY ual.id) AS ledger_match_count")
 	require.NotContains(t, sql, "detail::jsonb")
+}
+
+func TestAffiliateLedgerAuditMigrationRunsAfterLedgerCreation(t *testing.T) {
+	entries, err := FS.ReadDir(".")
+	require.NoError(t, err)
+
+	var ledgerCreationIndex, auditSnapshotsIndex int
+	var foundLedgerCreation, foundAuditSnapshots bool
+	for index, entry := range entries {
+		switch entry.Name() {
+		case "136_affiliate_rebate_hardening.sql":
+			ledgerCreationIndex = index
+			foundLedgerCreation = true
+		case "139_affiliate_ledger_audit_snapshots.sql":
+			auditSnapshotsIndex = index
+			foundAuditSnapshots = true
+		}
+	}
+
+	require.True(t, foundLedgerCreation)
+	require.True(t, foundAuditSnapshots)
+	require.Greater(t, auditSnapshotsIndex, ledgerCreationIndex)
 }
