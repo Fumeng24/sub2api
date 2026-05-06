@@ -17,8 +17,8 @@
                   {{ formatDiscountLabel(activeGroupRateDiscount.discount_multiplier) }}
                 </span>
               </div>
-              <span class="text-xs font-medium text-emerald-700 dark:text-emerald-200">
-                {{ localText('活动至', 'Ends') }} {{ formatDiscountDateTime(activeGroupRateDiscount.end_at, locale) }}
+              <span v-if="activeGroupRateDiscountSchedule" class="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                {{ activeGroupRateDiscountSchedule }}
               </span>
             </div>
           </div>
@@ -1094,7 +1094,7 @@ import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
-import { formatDiscountDateTime, formatDiscountLabel } from '@/utils/groupRateDiscount'
+import { formatDiscountLabel, formatDiscountSchedule } from '@/utils/groupRateDiscount'
 
 const { t, locale } = useI18n()
 
@@ -1174,6 +1174,9 @@ const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
 const activeGroupRateDiscount = computed(() => publicSettings.value?.group_rate_discount ?? null)
+const activeGroupRateDiscountSchedule = computed(() =>
+  formatDiscountSchedule(activeGroupRateDiscount.value, locale.value)
+)
 const dropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())

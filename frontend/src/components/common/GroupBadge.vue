@@ -36,7 +36,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import type { SubscriptionType, GroupPlatform } from '@/types'
-import { formatDiscountLabel, formatRateMultiplier, resolveGroupRateDiscount } from '@/utils/groupRateDiscount'
+import { formatDiscountLabel, formatDiscountSchedule, formatRateMultiplier, resolveGroupRateDiscount } from '@/utils/groupRateDiscount'
 import PlatformIcon from './PlatformIcon.vue'
 
 interface Props {
@@ -49,8 +49,13 @@ interface Props {
   discountMultiplier?: number | null
   discountedRateMultiplier?: number | null
   discountName?: string | null
+  discountScheduleMode?: string | null
   discountStartAt?: string | null
   discountEndAt?: string | null
+  discountWeekdays?: number[] | null
+  discountDailyStartTime?: string | null
+  discountDailyEndTime?: string | null
+  discountTimezone?: string | null
   showRate?: boolean
   daysRemaining?: number | null // 剩余天数（订阅类型时使用）
   /**
@@ -69,7 +74,7 @@ const props = withDefaults(defineProps<Props>(), {
   alwaysShowRate: false
 })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const appStore = useAppStore()
 
 const isSubscription = computed(() => props.subscriptionType === 'subscription')
@@ -82,14 +87,19 @@ const discountDisplay = computed(() => resolveGroupRateDiscount(
     multiplier: props.discountMultiplier,
     discountedRate: props.discountedRateMultiplier,
     name: props.discountName,
+    scheduleMode: props.discountScheduleMode,
     startAt: props.discountStartAt,
-    endAt: props.discountEndAt
+    endAt: props.discountEndAt,
+    weekdays: props.discountWeekdays,
+    dailyStartTime: props.discountDailyStartTime,
+    dailyEndTime: props.discountDailyEndTime,
+    timezone: props.discountTimezone
   }
 ))
 const discountTitle = computed(() => {
   if (!discountDisplay.value) return ''
-  const end = discountDisplay.value.endAt ? new Date(discountDisplay.value.endAt).toLocaleString() : ''
-  return end ? `${discountDisplay.value.name} · ${end}` : discountDisplay.value.name
+  const schedule = formatDiscountSchedule(discountDisplay.value, locale.value)
+  return schedule ? `${discountDisplay.value.name} · ${schedule}` : discountDisplay.value.name
 })
 
 // 是否有专属倍率（且与默认倍率不同）

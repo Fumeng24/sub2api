@@ -18,8 +18,8 @@
                     {{ formatDiscountLabel(activeGroupRateDiscount.discount_multiplier) }}
                   </span>
                 </div>
-                <span class="text-xs font-medium text-emerald-700 dark:text-emerald-200">
-                  {{ localText('活动至', 'Ends') }} {{ formatDiscountDateTime(activeGroupRateDiscount.end_at, locale) }}
+                <span v-if="activeGroupRateDiscountSchedule" class="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                  {{ activeGroupRateDiscountSchedule }}
                 </span>
               </div>
             </div>
@@ -78,7 +78,7 @@ import userChannelsAPI, { type UserAvailableChannel } from '@/api/channels'
 import userGroupsAPI from '@/api/groups'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { formatDiscountDateTime, formatDiscountLabel } from '@/utils/groupRateDiscount'
+import { formatDiscountLabel, formatDiscountSchedule } from '@/utils/groupRateDiscount'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
@@ -88,6 +88,9 @@ const userGroupRates = ref<Record<number, number>>({})
 const loading = ref(false)
 const searchQuery = ref('')
 const activeGroupRateDiscount = computed(() => appStore.cachedPublicSettings?.group_rate_discount ?? null)
+const activeGroupRateDiscountSchedule = computed(() =>
+  formatDiscountSchedule(activeGroupRateDiscount.value, locale.value)
+)
 
 function localText(zh: string, en: string): string {
   return locale.value.startsWith('zh') ? zh : en

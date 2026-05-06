@@ -17,8 +17,13 @@ export interface UserAvailableGroup {
   group_rate_discount_multiplier?: number | null
   discounted_rate_multiplier?: number | null
   group_rate_discount_name?: string | null
+  group_rate_discount_schedule_mode?: string | null
   group_rate_discount_start_at?: string | null
   group_rate_discount_end_at?: string | null
+  group_rate_discount_weekdays?: number[] | null
+  group_rate_discount_daily_start_time?: string | null
+  group_rate_discount_daily_end_time?: string | null
+  group_rate_discount_timezone?: string | null
   /** true = 专属分组（小范围授权）；false = 公开分组。 */
   is_exclusive: boolean
 }

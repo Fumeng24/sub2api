@@ -401,13 +401,22 @@ func (s *SettingService) GetAllSettings(ctx context.Context) (*SystemSettings, e
 
 const defaultGroupRateDiscountName = "限时折扣"
 
+const (
+	groupRateDiscountScheduleOnce   = "once"
+	groupRateDiscountScheduleWeekly = "weekly"
+)
+
 func defaultGroupRateDiscountSettings() GroupRateDiscountSettings {
 	return GroupRateDiscountSettings{
 		Enabled:            false,
 		Name:               defaultGroupRateDiscountName,
 		DiscountMultiplier: 1,
+		ScheduleMode:       groupRateDiscountScheduleWeekly,
 		StartAt:            "",
 		EndAt:              "",
+		Weekdays:           []int{1, 2, 3, 4, 5, 6, 7},
+		DailyStartTime:     "00:00",
+		DailyEndTime:       "23:59",
 		GroupIDs:           []int64{},
 	}
 }
@@ -431,8 +440,18 @@ func normalizeGroupRateDiscountSettings(settings GroupRateDiscountSettings) Grou
 	if math.IsNaN(settings.DiscountMultiplier) || math.IsInf(settings.DiscountMultiplier, 0) || settings.DiscountMultiplier <= 0 {
 		settings.DiscountMultiplier = 1
 	}
+	settings.ScheduleMode = normalizeGroupRateDiscountScheduleMode(settings.ScheduleMode, settings.StartAt, settings.EndAt)
 	settings.StartAt = normalizeRFC3339TimeString(settings.StartAt)
 	settings.EndAt = normalizeRFC3339TimeString(settings.EndAt)
+	settings.Weekdays = normalizeGroupRateDiscountWeekdays(settings.Weekdays)
+	settings.DailyStartTime = normalizeDailyTimeString(settings.DailyStartTime)
+	settings.DailyEndTime = normalizeDailyTimeString(settings.DailyEndTime)
+	if settings.DailyStartTime == "" {
+		settings.DailyStartTime = "00:00"
+	}
+	if settings.DailyEndTime == "" {
+		settings.DailyEndTime = "23:59"
+	}
 
 	seen := make(map[int64]struct{}, len(settings.GroupIDs))
 	groupIDs := make([]int64, 0, len(settings.GroupIDs))
@@ -449,6 +468,106 @@ func normalizeGroupRateDiscountSettings(settings GroupRateDiscountSettings) Grou
 	sort.Slice(groupIDs, func(i, j int) bool { return groupIDs[i] < groupIDs[j] })
 	settings.GroupIDs = groupIDs
 	return settings
+}
+
+func normalizeGroupRateDiscountScheduleMode(raw string, startAt string, endAt string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case groupRateDiscountScheduleOnce:
+		return groupRateDiscountScheduleOnce
+	case groupRateDiscountScheduleWeekly:
+		return groupRateDiscountScheduleWeekly
+	default:
+		if strings.TrimSpace(startAt) != "" || strings.TrimSpace(endAt) != "" {
+			return groupRateDiscountScheduleOnce
+		}
+		return groupRateDiscountScheduleWeekly
+	}
+}
+
+func normalizeGroupRateDiscountWeekdays(raw []int) []int {
+	seen := make(map[int]struct{}, len(raw))
+	out := make([]int, 0, len(raw))
+	for _, day := range raw {
+		if day < 1 || day > 7 {
+			continue
+		}
+		if _, ok := seen[day]; ok {
+			continue
+		}
+		seen[day] = struct{}{}
+		out = append(out, day)
+	}
+	sort.Ints(out)
+	return out
+}
+
+func normalizeDailyTimeString(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	parsed, err := time.Parse("15:04", raw)
+	if err != nil {
+		return raw
+	}
+	return parsed.Format("15:04")
+}
+
+func groupRateDiscountWeeklyActiveAt(settings GroupRateDiscountSettings, now time.Time) bool {
+	if len(settings.Weekdays) == 0 {
+		return false
+	}
+	startMinutes, ok := dailyTimeMinutes(settings.DailyStartTime)
+	if !ok {
+		return false
+	}
+	endMinutes, ok := dailyTimeMinutes(settings.DailyEndTime)
+	if !ok {
+		return false
+	}
+	if startMinutes == endMinutes {
+		return false
+	}
+	localNow := now.In(time.Local)
+	currentMinutes := localNow.Hour()*60 + localNow.Minute()
+	currentDay := isoWeekday(localNow.Weekday())
+	if startMinutes < endMinutes {
+		return intSliceContains(settings.Weekdays, currentDay) &&
+			currentMinutes >= startMinutes &&
+			currentMinutes < endMinutes
+	}
+	if intSliceContains(settings.Weekdays, currentDay) && currentMinutes >= startMinutes {
+		return true
+	}
+	previousDay := currentDay - 1
+	if previousDay == 0 {
+		previousDay = 7
+	}
+	return intSliceContains(settings.Weekdays, previousDay) && currentMinutes < endMinutes
+}
+
+func dailyTimeMinutes(value string) (int, bool) {
+	parsed, err := time.Parse("15:04", value)
+	if err != nil {
+		return 0, false
+	}
+	return parsed.Hour()*60 + parsed.Minute(), true
+}
+
+func isoWeekday(day time.Weekday) int {
+	if day == time.Sunday {
+		return 7
+	}
+	return int(day)
+}
+
+func intSliceContains(values []int, needle int) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeRFC3339TimeString(raw string) string {
@@ -478,16 +597,31 @@ func (s *SettingService) validateGroupRateDiscountSettings(ctx context.Context, 
 	if len(settings.GroupIDs) == 0 {
 		return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_GROUPS", "at least one group must be selected when group rate discount is enabled")
 	}
-	start, err := time.Parse(time.RFC3339, settings.StartAt)
-	if err != nil {
-		return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_START", "start_at must be a valid RFC3339 timestamp")
-	}
-	end, err := time.Parse(time.RFC3339, settings.EndAt)
-	if err != nil {
-		return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_END", "end_at must be a valid RFC3339 timestamp")
-	}
-	if !end.After(start) {
-		return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_WINDOW", "end_at must be after start_at")
+	if settings.ScheduleMode == groupRateDiscountScheduleWeekly {
+		if len(settings.Weekdays) == 0 {
+			return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_WEEKDAYS", "at least one weekday must be selected when weekly group rate discount is enabled")
+		}
+		if _, ok := dailyTimeMinutes(settings.DailyStartTime); !ok {
+			return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_DAILY_START", "daily_start_time must use HH:mm format")
+		}
+		if _, ok := dailyTimeMinutes(settings.DailyEndTime); !ok {
+			return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_DAILY_END", "daily_end_time must use HH:mm format")
+		}
+		if settings.DailyStartTime == settings.DailyEndTime {
+			return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_DAILY_WINDOW", "daily_end_time must differ from daily_start_time")
+		}
+	} else {
+		start, err := time.Parse(time.RFC3339, settings.StartAt)
+		if err != nil {
+			return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_START", "start_at must be a valid RFC3339 timestamp")
+		}
+		end, err := time.Parse(time.RFC3339, settings.EndAt)
+		if err != nil {
+			return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_END", "end_at must be a valid RFC3339 timestamp")
+		}
+		if !end.After(start) {
+			return infraerrors.BadRequest("INVALID_GROUP_RATE_DISCOUNT_WINDOW", "end_at must be after start_at")
+		}
 	}
 	if s.defaultSubGroupReader == nil {
 		return nil
@@ -2061,7 +2195,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 		// Available channels feature (default disabled; opt-in)
 		SettingKeyAvailableChannelsEnabled:  "false",
-		SettingKeyGroupRateDiscountSettings: `{"enabled":false,"name":"限时折扣","discount_multiplier":1,"start_at":"","end_at":"","group_ids":[]}`,
+		SettingKeyGroupRateDiscountSettings: `{"enabled":false,"name":"限时折扣","discount_multiplier":1,"schedule_mode":"weekly","start_at":"","end_at":"","weekdays":[1,2,3,4,5,6,7],"daily_start_time":"00:00","daily_end_time":"23:59","group_ids":[]}`,
 
 		// Affiliate (邀请返利) feature (default disabled; opt-in)
 		SettingKeyAffiliateEnabled: "false",

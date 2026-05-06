@@ -224,16 +224,25 @@ export interface GroupRateDiscountSettings {
   enabled: boolean
   name: string
   discount_multiplier: number
+  schedule_mode: 'once' | 'weekly' | string
   start_at: string
   end_at: string
+  weekdays: number[]
+  daily_start_time: string
+  daily_end_time: string
   group_ids: number[]
 }
 
 export interface ActiveGroupRateDiscount {
   name: string
   discount_multiplier: number
+  schedule_mode: 'once' | 'weekly' | string
   start_at: string
   end_at: string
+  weekdays: number[]
+  daily_start_time: string
+  daily_end_time: string
+  timezone?: string
   group_ids: number[]
 }
 
@@ -506,8 +515,13 @@ export interface Group {
   group_rate_discount_multiplier?: number | null
   discounted_rate_multiplier?: number | null
   group_rate_discount_name?: string | null
+  group_rate_discount_schedule_mode?: string | null
   group_rate_discount_start_at?: string | null
   group_rate_discount_end_at?: string | null
+  group_rate_discount_weekdays?: number[] | null
+  group_rate_discount_daily_start_time?: string | null
+  group_rate_discount_daily_end_time?: string | null
+  group_rate_discount_timezone?: string | null
   rpm_limit?: number // Group-level RPM cap (0 = unlimited); overrides user-level rpm_limit when set
   is_exclusive: boolean
   status: 'active' | 'inactive'

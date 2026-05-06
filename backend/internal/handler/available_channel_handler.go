@@ -54,17 +54,22 @@ func (h *AvailableChannelHandler) featureEnabled(c *gin.Context) bool {
 // 订阅视觉加深），并用 RateMultiplier 作为默认倍率；用户专属倍率前端走
 // /groups/rates，和 API 密钥页面保持一致。
 type userAvailableGroup struct {
-	ID                          int64    `json:"id"`
-	Name                        string   `json:"name"`
-	Platform                    string   `json:"platform"`
-	SubscriptionType            string   `json:"subscription_type"`
-	RateMultiplier              float64  `json:"rate_multiplier"`
-	GroupRateDiscountMultiplier *float64 `json:"group_rate_discount_multiplier,omitempty"`
-	DiscountedRateMultiplier    *float64 `json:"discounted_rate_multiplier,omitempty"`
-	GroupRateDiscountName       *string  `json:"group_rate_discount_name,omitempty"`
-	GroupRateDiscountStartAt    *string  `json:"group_rate_discount_start_at,omitempty"`
-	GroupRateDiscountEndAt      *string  `json:"group_rate_discount_end_at,omitempty"`
-	IsExclusive                 bool     `json:"is_exclusive"`
+	ID                              int64    `json:"id"`
+	Name                            string   `json:"name"`
+	Platform                        string   `json:"platform"`
+	SubscriptionType                string   `json:"subscription_type"`
+	RateMultiplier                  float64  `json:"rate_multiplier"`
+	GroupRateDiscountMultiplier     *float64 `json:"group_rate_discount_multiplier,omitempty"`
+	DiscountedRateMultiplier        *float64 `json:"discounted_rate_multiplier,omitempty"`
+	GroupRateDiscountName           *string  `json:"group_rate_discount_name,omitempty"`
+	GroupRateDiscountScheduleMode   *string  `json:"group_rate_discount_schedule_mode,omitempty"`
+	GroupRateDiscountStartAt        *string  `json:"group_rate_discount_start_at,omitempty"`
+	GroupRateDiscountEndAt          *string  `json:"group_rate_discount_end_at,omitempty"`
+	GroupRateDiscountWeekdays       []int    `json:"group_rate_discount_weekdays,omitempty"`
+	GroupRateDiscountDailyStartTime *string  `json:"group_rate_discount_daily_start_time,omitempty"`
+	GroupRateDiscountDailyEndTime   *string  `json:"group_rate_discount_daily_end_time,omitempty"`
+	GroupRateDiscountTimezone       *string  `json:"group_rate_discount_timezone,omitempty"`
+	IsExclusive                     bool     `json:"is_exclusive"`
 }
 
 // userSupportedModelPricing 用户可见的定价字段白名单。
@@ -237,8 +242,13 @@ func filterUserVisibleGroups(
 			group.GroupRateDiscountMultiplier = &multiplier
 			group.DiscountedRateMultiplier = &discounted
 			group.GroupRateDiscountName = &discount.Name
+			group.GroupRateDiscountScheduleMode = &discount.ScheduleMode
 			group.GroupRateDiscountStartAt = &discount.StartAt
 			group.GroupRateDiscountEndAt = &discount.EndAt
+			group.GroupRateDiscountWeekdays = append([]int(nil), discount.Weekdays...)
+			group.GroupRateDiscountDailyStartTime = &discount.DailyStartTime
+			group.GroupRateDiscountDailyEndTime = &discount.DailyEndTime
+			group.GroupRateDiscountTimezone = &discount.Timezone
 		}
 		visible = append(visible, group)
 	}

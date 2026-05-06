@@ -51,8 +51,13 @@ func TestFilterUserVisibleGroups_EmbedsActiveDiscount(t *testing.T) {
 	discount := &service.ActiveGroupRateDiscount{
 		Name:               "Promo",
 		DiscountMultiplier: 0.5,
+		ScheduleMode:       "weekly",
 		StartAt:            "2026-01-01T00:00:00Z",
 		EndAt:              "2026-01-02T00:00:00Z",
+		Weekdays:           []int{1, 2, 3},
+		DailyStartTime:     "09:00",
+		DailyEndTime:       "18:00",
+		Timezone:           "Asia/Shanghai",
 		GroupIDs:           []int64{2},
 	}
 
@@ -63,6 +68,11 @@ func TestFilterUserVisibleGroups_EmbedsActiveDiscount(t *testing.T) {
 	require.Equal(t, 0.5, *visible[1].GroupRateDiscountMultiplier)
 	require.Equal(t, 1.5, *visible[1].DiscountedRateMultiplier)
 	require.Equal(t, "Promo", *visible[1].GroupRateDiscountName)
+	require.Equal(t, "weekly", *visible[1].GroupRateDiscountScheduleMode)
+	require.Equal(t, []int{1, 2, 3}, visible[1].GroupRateDiscountWeekdays)
+	require.Equal(t, "09:00", *visible[1].GroupRateDiscountDailyStartTime)
+	require.Equal(t, "18:00", *visible[1].GroupRateDiscountDailyEndTime)
+	require.Equal(t, "Asia/Shanghai", *visible[1].GroupRateDiscountTimezone)
 }
 
 func TestToUserSupportedModels_FiltersByAllowedPlatforms(t *testing.T) {

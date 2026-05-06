@@ -3,6 +3,8 @@ package service
 import (
 	"strings"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 )
 
 func firstNonEmpty(values ...string) string {
@@ -248,16 +250,25 @@ type GroupRateDiscountSettings struct {
 	Enabled            bool    `json:"enabled"`
 	Name               string  `json:"name"`
 	DiscountMultiplier float64 `json:"discount_multiplier"`
+	ScheduleMode       string  `json:"schedule_mode"`
 	StartAt            string  `json:"start_at"`
 	EndAt              string  `json:"end_at"`
+	Weekdays           []int   `json:"weekdays"`
+	DailyStartTime     string  `json:"daily_start_time"`
+	DailyEndTime       string  `json:"daily_end_time"`
 	GroupIDs           []int64 `json:"group_ids"`
 }
 
 type ActiveGroupRateDiscount struct {
 	Name               string  `json:"name"`
 	DiscountMultiplier float64 `json:"discount_multiplier"`
+	ScheduleMode       string  `json:"schedule_mode"`
 	StartAt            string  `json:"start_at"`
 	EndAt              string  `json:"end_at"`
+	Weekdays           []int   `json:"weekdays"`
+	DailyStartTime     string  `json:"daily_start_time"`
+	DailyEndTime       string  `json:"daily_end_time"`
+	Timezone           string  `json:"timezone"`
 	GroupIDs           []int64 `json:"group_ids"`
 }
 
@@ -278,22 +289,33 @@ func (s GroupRateDiscountSettings) ActiveAt(now time.Time) *ActiveGroupRateDisco
 	if !normalized.Enabled || normalized.DiscountMultiplier <= 0 || normalized.DiscountMultiplier >= 1 || len(normalized.GroupIDs) == 0 {
 		return nil
 	}
-	start, err := time.Parse(time.RFC3339, normalized.StartAt)
-	if err != nil {
-		return nil
-	}
-	end, err := time.Parse(time.RFC3339, normalized.EndAt)
-	if err != nil {
-		return nil
-	}
-	if now.Before(start) || !now.Before(end) {
-		return nil
+	if normalized.ScheduleMode == groupRateDiscountScheduleWeekly {
+		if !groupRateDiscountWeeklyActiveAt(normalized, now) {
+			return nil
+		}
+	} else {
+		start, err := time.Parse(time.RFC3339, normalized.StartAt)
+		if err != nil {
+			return nil
+		}
+		end, err := time.Parse(time.RFC3339, normalized.EndAt)
+		if err != nil {
+			return nil
+		}
+		if now.Before(start) || !now.Before(end) {
+			return nil
+		}
 	}
 	return &ActiveGroupRateDiscount{
 		Name:               normalized.Name,
 		DiscountMultiplier: normalized.DiscountMultiplier,
+		ScheduleMode:       normalized.ScheduleMode,
 		StartAt:            normalized.StartAt,
 		EndAt:              normalized.EndAt,
+		Weekdays:           append([]int(nil), normalized.Weekdays...),
+		DailyStartTime:     normalized.DailyStartTime,
+		DailyEndTime:       normalized.DailyEndTime,
+		Timezone:           timezone.Name(),
 		GroupIDs:           append([]int64(nil), normalized.GroupIDs...),
 	}
 }

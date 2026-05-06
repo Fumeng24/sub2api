@@ -4180,10 +4180,10 @@
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-              {{ localText('分组限时折扣', 'Limited-Time Group Discount') }}
+              {{ localText('分组周期折扣', 'Recurring Group Discount') }}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ localText('给指定分组在活动时间内应用统一倍率折扣，用户侧会在分组标签和渠道页看到折后倍率。', 'Apply one discount multiplier to selected groups during a time window. Users will see discounted rates on group badges and the channels page.') }}
+              {{ localText('给指定分组在每周指定日期和时间段内应用统一倍率折扣，用户侧会在分组标签和渠道页看到折后倍率。', 'Apply one discount multiplier to selected groups on selected weekdays and daily time windows. Users will see discounted rates on group badges and the channels page.') }}
             </p>
           </div>
           <div class="space-y-6 p-6">
@@ -4230,23 +4230,59 @@
               </div>
               <div>
                 <label class="input-label">
-                  {{ localText('开始时间', 'Start time') }}
+                  {{ localText('每日开始时间', 'Daily start time') }}
                 </label>
                 <input
-                  v-model="form.group_rate_discount_settings.start_at"
-                  type="datetime-local"
+                  v-model="form.group_rate_discount_settings.daily_start_time"
+                  type="time"
                   class="input"
                 />
               </div>
               <div>
                 <label class="input-label">
-                  {{ localText('结束时间', 'End time') }}
+                  {{ localText('每日结束时间', 'Daily end time') }}
                 </label>
                 <input
-                  v-model="form.group_rate_discount_settings.end_at"
-                  type="datetime-local"
+                  v-model="form.group_rate_discount_settings.daily_end_time"
+                  type="time"
                   class="input"
                 />
+                <p class="input-hint">
+                  {{ localText('结束时间早于开始时间时，会跨到次日。', 'If the end time is earlier than the start time, the window continues into the next day.') }}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div class="mb-2 flex items-center justify-between">
+                <label class="input-label mb-0">
+                  {{ localText('生效日期', 'Active weekdays') }}
+                </label>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
+                  @click="selectAllDiscountWeekdays"
+                >
+                  {{ localText('每天', 'Every day') }}
+                </button>
+              </div>
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                <label
+                  v-for="day in groupRateDiscountWeekdayOptions"
+                  :key="day.value"
+                  class="flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition"
+                  :class="isDiscountWeekdaySelected(day.value)
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:border-emerald-400 dark:bg-emerald-500/10 dark:text-emerald-200'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-300 dark:hover:bg-dark-600'"
+                >
+                  <input
+                    type="checkbox"
+                    class="sr-only"
+                    :checked="isDiscountWeekdaySelected(day.value)"
+                    @change="toggleDiscountWeekday(day.value, ($event.target as HTMLInputElement).checked)"
+                  />
+                  {{ day.label }}
+                </label>
               </div>
             </div>
 
@@ -5844,10 +5880,17 @@ const defaultGroupRateDiscountSettings = (): GroupRateDiscountSettings => ({
   enabled: false,
   name: "限时折扣",
   discount_multiplier: 1,
+  schedule_mode: "weekly",
   start_at: "",
   end_at: "",
+  weekdays: [1, 2, 3, 4, 5, 6, 7],
+  daily_start_time: "00:00",
+  daily_end_time: "23:59",
   group_ids: [],
 });
+
+const groupRateDiscountScheduleOnce = "once";
+const groupRateDiscountScheduleWeekly = "weekly";
 
 type SettingsForm = Omit<
   SystemSettings,
@@ -6274,12 +6317,18 @@ const groupRateDiscountPercentLabel = computed(() =>
   formatDiscountLabel(Number(form.group_rate_discount_settings.discount_multiplier)),
 );
 
+const groupRateDiscountWeekdayOptions = computed(() => {
+  const zhLabels = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+  const enLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const labels = locale.value.startsWith("zh") ? zhLabels : enLabels;
+  return labels.map((label, index) => ({ label, value: index + 1 }));
+});
+
 const groupRateDiscountWindowLabel = computed(() => {
-  const { start_at: startAt, end_at: endAt } = form.group_rate_discount_settings;
-  const start = formatLocalDateTimeForDisplay(startAt);
-  const end = formatLocalDateTimeForDisplay(endAt);
-  if (!start || !end) return "";
-  return `${start} - ${end}`;
+  const { weekdays, daily_start_time: startTime, daily_end_time: endTime } = form.group_rate_discount_settings;
+  const weekdayLabel = formatWeekdaySelection(weekdays || []);
+  if (!weekdayLabel || !startTime || !endTime) return "";
+  return `${weekdayLabel} ${startTime}-${endTime}`;
 });
 
 function isDiscountGroupSelected(groupID: number): boolean {
@@ -6296,31 +6345,96 @@ function toggleDiscountGroup(groupID: number, checked: boolean) {
   form.group_rate_discount_settings.group_ids = Array.from(current).sort((a, b) => a - b);
 }
 
-function formatDateTimeLocalInput(value: string | null | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+function isDiscountWeekdaySelected(day: number): boolean {
+  return (form.group_rate_discount_settings.weekdays || []).includes(day);
 }
 
-function parseDateTimeLocalInput(value: string | null | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString();
+function toggleDiscountWeekday(day: number, checked: boolean) {
+  const current = new Set(form.group_rate_discount_settings.weekdays || []);
+  if (checked) {
+    current.add(day);
+  } else {
+    current.delete(day);
+  }
+  form.group_rate_discount_settings.weekdays = Array.from(current).sort((a, b) => a - b);
 }
 
-function formatLocalDateTimeForDisplay(value: string | null | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat(locale.value.startsWith("zh") ? "zh-CN" : "en-US", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+function selectAllDiscountWeekdays() {
+  form.group_rate_discount_settings.weekdays = [1, 2, 3, 4, 5, 6, 7];
+}
+
+function formatWeekdaySelection(weekdays: number[]): string {
+  const normalized = Array.from(new Set(weekdays.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b);
+  if (normalized.length === 0) return "";
+  if (normalized.length === 7) return localText("每天", "Every day");
+  const labels = groupRateDiscountWeekdayOptions.value.reduce<Record<number, string>>((acc, item) => {
+    acc[item.value] = item.label;
+    return acc;
+  }, {});
+  return normalized.map((day) => labels[day]).join(locale.value.startsWith("zh") ? "、" : ", ");
+}
+
+function normalizeDiscountWeekdays(value: unknown, fallback: number[] = []): number[] {
+  const source = Array.isArray(value) ? value : fallback;
+  const normalized = Array.from(
+    new Set(
+      source
+        .map((day) => Math.floor(Number(day)))
+        .filter((day) => day >= 1 && day <= 7),
+    ),
+  ).sort((a, b) => a - b);
+  return normalized;
+}
+
+function normalizeDailyTimeInput(value: string | null | undefined, fallback: string): string {
+  const raw = String(value || "").trim();
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(raw) ? raw : fallback;
+}
+
+function normalizeDiscountScheduleMode(
+  value: string | null | undefined,
+  startAt: string | null | undefined,
+  endAt: string | null | undefined,
+): string {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === groupRateDiscountScheduleOnce || raw === groupRateDiscountScheduleWeekly) {
+    return raw;
+  }
+  return startAt || endAt ? groupRateDiscountScheduleOnce : groupRateDiscountScheduleWeekly;
+}
+
+function normalizeGroupRateDiscountFormSettings(
+  source: Partial<GroupRateDiscountSettings> | null | undefined,
+): GroupRateDiscountSettings {
+  const scheduleMode = normalizeDiscountScheduleMode(
+    source?.schedule_mode,
+    source?.start_at,
+    source?.end_at,
+  );
+  const settings: GroupRateDiscountSettings = {
+    ...defaultGroupRateDiscountSettings(),
+    ...(source || {}),
+  };
+  settings.schedule_mode = scheduleMode;
+  settings.weekdays = normalizeDiscountWeekdays(
+    settings.weekdays,
+    settings.schedule_mode === groupRateDiscountScheduleWeekly
+      ? defaultGroupRateDiscountSettings().weekdays
+      : [],
+  );
+  settings.daily_start_time = normalizeDailyTimeInput(
+    settings.daily_start_time,
+    defaultGroupRateDiscountSettings().daily_start_time,
+  );
+  settings.daily_end_time = normalizeDailyTimeInput(
+    settings.daily_end_time,
+    defaultGroupRateDiscountSettings().daily_end_time,
+  );
+  if (settings.schedule_mode === groupRateDiscountScheduleWeekly) {
+    settings.start_at = "";
+    settings.end_at = "";
+  }
+  return settings;
 }
 
 const registrationEmailSuffixWhitelistSeparatorKeys = new Set([
@@ -6614,15 +6728,8 @@ async function loadSettings() {
     form.default_subscriptions = normalizeDefaultSubscriptionSettings(
       settings.default_subscriptions,
     );
-    form.group_rate_discount_settings = {
-      ...defaultGroupRateDiscountSettings(),
-      ...(settings.group_rate_discount_settings || {}),
-    };
-    form.group_rate_discount_settings.start_at = formatDateTimeLocalInput(
-      form.group_rate_discount_settings.start_at,
-    );
-    form.group_rate_discount_settings.end_at = formatDateTimeLocalInput(
-      form.group_rate_discount_settings.end_at,
+    form.group_rate_discount_settings = normalizeGroupRateDiscountFormSettings(
+      settings.group_rate_discount_settings,
     );
     registrationEmailSuffixWhitelistTags.value =
       normalizeRegistrationEmailSuffixDomains(
@@ -6896,8 +7003,22 @@ async function saveSettings() {
         defaultGroupRateDiscountSettings().name,
       discount_multiplier:
         Number(form.group_rate_discount_settings.discount_multiplier) || 1,
-      start_at: parseDateTimeLocalInput(form.group_rate_discount_settings.start_at),
-      end_at: parseDateTimeLocalInput(form.group_rate_discount_settings.end_at),
+      schedule_mode: normalizeDiscountScheduleMode(
+        form.group_rate_discount_settings.schedule_mode,
+        form.group_rate_discount_settings.start_at,
+        form.group_rate_discount_settings.end_at,
+      ),
+      start_at: form.group_rate_discount_settings.start_at || "",
+      end_at: form.group_rate_discount_settings.end_at || "",
+      weekdays: normalizeDiscountWeekdays(form.group_rate_discount_settings.weekdays),
+      daily_start_time: normalizeDailyTimeInput(
+        form.group_rate_discount_settings.daily_start_time,
+        "00:00",
+      ),
+      daily_end_time: normalizeDailyTimeInput(
+        form.group_rate_discount_settings.daily_end_time,
+        "23:59",
+      ),
       group_ids: Array.from(
         new Set(
           (form.group_rate_discount_settings.group_ids || [])
@@ -6906,6 +7027,10 @@ async function saveSettings() {
         ),
       ).sort((a, b) => a - b),
     };
+    if (discountSettings.schedule_mode === groupRateDiscountScheduleWeekly) {
+      discountSettings.start_at = "";
+      discountSettings.end_at = "";
+    }
     if (discountSettings.enabled) {
       if (
         discountSettings.discount_multiplier <= 0 ||
@@ -6919,20 +7044,38 @@ async function saveSettings() {
         );
         return;
       }
-      if (!discountSettings.start_at || !discountSettings.end_at) {
+      if (
+        discountSettings.schedule_mode === groupRateDiscountScheduleWeekly &&
+        discountSettings.weekdays.length === 0
+      ) {
         appStore.showError(
           localText(
-            "请填写分组折扣的开始和结束时间。",
-            "Please enter the group discount start and end time.",
+            "请至少选择一个生效日期。",
+            "Select at least one active weekday.",
           ),
         );
         return;
       }
-      if (new Date(discountSettings.end_at) <= new Date(discountSettings.start_at)) {
+      if (
+        discountSettings.schedule_mode === groupRateDiscountScheduleWeekly &&
+        (!discountSettings.daily_start_time || !discountSettings.daily_end_time)
+      ) {
         appStore.showError(
           localText(
-            "分组折扣结束时间必须晚于开始时间。",
-            "Group discount end time must be after the start time.",
+            "请填写每日开始和结束时间。",
+            "Please enter the daily start and end time.",
+          ),
+        );
+        return;
+      }
+      if (
+        discountSettings.schedule_mode === groupRateDiscountScheduleWeekly &&
+        discountSettings.daily_start_time === discountSettings.daily_end_time
+      ) {
+        appStore.showError(
+          localText(
+            "每日结束时间不能等于开始时间。",
+            "Daily end time must differ from the start time.",
           ),
         );
         return;
@@ -7156,15 +7299,8 @@ async function saveSettings() {
         (form as Record<string, unknown>)[key] = value;
       }
     }
-    form.group_rate_discount_settings = {
-      ...defaultGroupRateDiscountSettings(),
-      ...(updated.group_rate_discount_settings || {}),
-    };
-    form.group_rate_discount_settings.start_at = formatDateTimeLocalInput(
-      form.group_rate_discount_settings.start_at,
-    );
-    form.group_rate_discount_settings.end_at = formatDateTimeLocalInput(
-      form.group_rate_discount_settings.end_at,
+    form.group_rate_discount_settings = normalizeGroupRateDiscountFormSettings(
+      updated.group_rate_discount_settings,
     );
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(updated));
     registrationEmailSuffixWhitelistTags.value =

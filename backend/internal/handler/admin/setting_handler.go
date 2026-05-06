@@ -2029,8 +2029,12 @@ func equalGroupRateDiscountSettings(a, b service.GroupRateDiscountSettings) bool
 	return a.Enabled == b.Enabled &&
 		a.Name == b.Name &&
 		math.Abs(a.DiscountMultiplier-b.DiscountMultiplier) < 1e-12 &&
+		a.ScheduleMode == b.ScheduleMode &&
 		a.StartAt == b.StartAt &&
 		a.EndAt == b.EndAt &&
+		equalIntSlice(a.Weekdays, b.Weekdays) &&
+		a.DailyStartTime == b.DailyStartTime &&
+		a.DailyEndTime == b.DailyEndTime &&
 		equalInt64Slice(a.GroupIDs, b.GroupIDs)
 }
 

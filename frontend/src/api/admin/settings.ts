@@ -15,8 +15,12 @@ export interface GroupRateDiscountSettings {
   enabled: boolean;
   name: string;
   discount_multiplier: number;
+  schedule_mode: "once" | "weekly" | string;
   start_at: string;
   end_at: string;
+  weekdays: number[];
+  daily_start_time: string;
+  daily_end_time: string;
   group_ids: number[];
 }
 

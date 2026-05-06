@@ -401,8 +401,12 @@ const baseSettingsResponse = {
     enabled: false,
     name: "限时折扣",
     discount_multiplier: 1,
+    schedule_mode: "weekly",
     start_at: "",
     end_at: "",
+    weekdays: [1, 2, 3, 4, 5, 6, 7],
+    daily_start_time: "00:00",
+    daily_end_time: "23:59",
     group_ids: [],
   },
 };
@@ -598,6 +602,42 @@ describe("admin SettingsView payment visible method controls", () => {
         enable_anthropic_cache_ttl_1h_injection: true,
       }),
     );
+  });
+
+  it("preserves legacy one-off group rate discounts on unrelated saves", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      group_rate_discount_settings: {
+        enabled: true,
+        name: "Legacy Promo",
+        discount_multiplier: 0.8,
+        start_at: "2026-05-01T00:00:00Z",
+        end_at: "2026-05-02T00:00:00Z",
+        group_ids: [11],
+      },
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        group_rate_discount_settings: expect.objectContaining({
+          enabled: true,
+          name: "Legacy Promo",
+          discount_multiplier: 0.8,
+          schedule_mode: "once",
+          start_at: "2026-05-01T00:00:00Z",
+          end_at: "2026-05-02T00:00:00Z",
+          group_ids: [11],
+        }),
+      }),
+    );
+    expect(showError).not.toHaveBeenCalledWith("请至少选择一个生效日期。");
   });
 
   it("updates provider enablement immediately and reloads providers", async () => {

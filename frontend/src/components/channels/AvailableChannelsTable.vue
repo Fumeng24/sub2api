@@ -97,8 +97,13 @@
                   :discount-multiplier="g.group_rate_discount_multiplier"
                   :discounted-rate-multiplier="g.discounted_rate_multiplier"
                   :discount-name="g.group_rate_discount_name"
+                  :discount-schedule-mode="g.group_rate_discount_schedule_mode"
                   :discount-start-at="g.group_rate_discount_start_at"
                   :discount-end-at="g.group_rate_discount_end_at"
+                  :discount-weekdays="g.group_rate_discount_weekdays"
+                  :discount-daily-start-time="g.group_rate_discount_daily_start_time"
+                  :discount-daily-end-time="g.group_rate_discount_daily_end_time"
+                  :discount-timezone="g.group_rate_discount_timezone"
                   always-show-rate
                 />
               </div>
@@ -125,8 +130,13 @@
                   :discount-multiplier="g.group_rate_discount_multiplier"
                   :discounted-rate-multiplier="g.discounted_rate_multiplier"
                   :discount-name="g.group_rate_discount_name"
+                  :discount-schedule-mode="g.group_rate_discount_schedule_mode"
                   :discount-start-at="g.group_rate_discount_start_at"
                   :discount-end-at="g.group_rate_discount_end_at"
+                  :discount-weekdays="g.group_rate_discount_weekdays"
+                  :discount-daily-start-time="g.group_rate_discount_daily_start_time"
+                  :discount-daily-end-time="g.group_rate_discount_daily_end_time"
+                  :discount-timezone="g.group_rate_discount_timezone"
                   always-show-rate
                 />
               </div>
