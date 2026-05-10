@@ -5218,7 +5218,11 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 
 	// Get rate multiplier and apply any active selected-group discount.
 	multiplier := s.resolveBillingRateMultiplier(ctx, user, apiKey)
-	imageMultiplier := resolveImageRateMultiplier(apiKey, multiplier)
+	activeDiscountMultiplier := 1.0
+	if groupID, ok := resolveAPIKeyBillingGroupID(apiKey); ok {
+		activeDiscountMultiplier = activeGroupRateDiscountMultiplierAt(ctx, s.settingService, groupID, time.Now())
+	}
+	imageMultiplier := resolveImageRateMultiplier(apiKey, multiplier, activeDiscountMultiplier)
 
 	var cost *CostBreakdown
 	var err error
@@ -5441,20 +5445,19 @@ func (s *OpenAIGatewayService) resolveBillingRateMultiplier(ctx context.Context,
 	if s != nil && s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if s == nil || apiKey == nil || user == nil || apiKey.GroupID == nil || apiKey.Group == nil {
+	if s == nil || apiKey == nil || user == nil || apiKey.Group == nil {
 		return multiplier
 	}
-	groupID := *apiKey.GroupID
+	groupID, ok := resolveAPIKeyBillingGroupID(apiKey)
+	if !ok {
+		return multiplier
+	}
 	resolver := s.userGroupRateResolver
 	if resolver == nil {
 		resolver = newUserGroupRateResolver(nil, nil, resolveUserGroupRateCacheTTL(s.cfg), nil, "service.openai_gateway")
 	}
 	multiplier = resolver.Resolve(ctx, user.ID, groupID, apiKey.Group.RateMultiplier)
-	if s.settingService != nil {
-		if discount := s.settingService.ActiveGroupRateDiscount(ctx, time.Now()); discount != nil && discount.AppliesToGroup(groupID) {
-			multiplier *= discount.DiscountMultiplier
-		}
-	}
+	multiplier *= activeGroupRateDiscountMultiplierAt(ctx, s.settingService, groupID, time.Now())
 	return multiplier
 }
 

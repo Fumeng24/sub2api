@@ -218,6 +218,7 @@ export interface PublicSettings {
   available_channels_enabled: boolean
   affiliate_enabled: boolean
   group_rate_discount?: ActiveGroupRateDiscount | null
+  upcoming_group_rate_discount?: ActiveGroupRateDiscount | null
 }
 
 export interface GroupRateDiscountSettings {

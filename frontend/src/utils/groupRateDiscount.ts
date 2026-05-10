@@ -5,6 +5,7 @@ export interface GroupRateDiscountDisplay {
   multiplier: number
   originalRate: number
   discountedRate: number
+  status: 'active' | 'upcoming'
   scheduleMode?: string | null
   startAt?: string | null
   endAt?: string | null
@@ -12,6 +13,11 @@ export interface GroupRateDiscountDisplay {
   dailyStartTime?: string | null
   dailyEndTime?: string | null
   timezone?: string | null
+}
+
+export interface GroupRateDiscountSummary {
+  discount: ActiveGroupRateDiscount
+  status: 'active' | 'upcoming'
 }
 
 export function roundRateMultiplier(value: number): number {
@@ -63,6 +69,7 @@ export function formatDiscountSchedule(
     | 'timezone'
   > | GroupRateDiscountDisplay | null | undefined,
   locale = 'zh-CN',
+  status?: 'active' | 'upcoming' | null,
 ): string {
   if (!discount) return ''
   const scheduleMode = 'schedule_mode' in discount ? discount.schedule_mode : discount.scheduleMode
@@ -73,16 +80,43 @@ export function formatDiscountSchedule(
     const timezone = formatDisplayTimezone(('timezone' in discount ? discount.timezone : null) || '')
     const weekdayLabel = formatWeekdays(weekdays, locale)
     if (!weekdayLabel || !startTime || !endTime) return ''
-    return timezone ? `${weekdayLabel} ${startTime}-${endTime} ${timezone}` : `${weekdayLabel} ${startTime}-${endTime}`
+    const timeLabel = formatDailyTimeRange(startTime, endTime, locale)
+    return timezone ? `${weekdayLabel} ${timeLabel} ${timezone}` : `${weekdayLabel} ${timeLabel}`
   }
   const startAt = 'start_at' in discount ? discount.start_at : discount.startAt
   const endAt = 'end_at' in discount ? discount.end_at : discount.endAt
+  const start = formatDiscountDateTime(startAt, locale)
+  if (status === 'upcoming' && start) {
+    return locale.startsWith('zh') ? `开始于 ${start}` : `Starts ${start}`
+  }
   const end = formatDiscountDateTime(endAt, locale)
   if (end) {
     return locale.startsWith('zh') ? `活动至 ${end}` : `Ends ${end}`
   }
-  const start = formatDiscountDateTime(startAt, locale)
   return start ? (locale.startsWith('zh') ? `开始于 ${start}` : `Starts ${start}`) : ''
+}
+
+export function resolvePublicGroupRateDiscount(
+  active?: ActiveGroupRateDiscount | null,
+  upcoming?: ActiveGroupRateDiscount | null,
+  now = Date.now(),
+): GroupRateDiscountSummary | null {
+  const activeStatus = resolveDiscountStatus(active, now)
+  if (active && activeStatus) {
+    return { discount: active, status: activeStatus }
+  }
+  const upcomingStatus = resolveDiscountStatus(upcoming, now)
+  if (upcoming && upcomingStatus) {
+    return { discount: upcoming, status: upcomingStatus }
+  }
+  return null
+}
+
+export function formatDiscountStatusLabel(status: 'active' | 'upcoming', locale = 'zh-CN'): string {
+  if (status === 'active') {
+    return locale.startsWith('zh') ? '进行中' : 'Active'
+  }
+  return locale.startsWith('zh') ? '即将开始' : 'Upcoming'
 }
 
 function formatWeekdays(weekdays: number[], locale: string): string {
@@ -99,6 +133,76 @@ function formatWeekdays(weekdays: number[], locale: string): string {
 
 function formatDisplayTimezone(timezone: string): string {
   return timezone === 'Local' ? '' : timezone
+}
+
+function resolveDiscountStatus(
+  discount: ActiveGroupRateDiscount | null | undefined,
+  now = Date.now(),
+): 'active' | 'upcoming' | null {
+  if (!discount || discount.discount_multiplier <= 0 || discount.discount_multiplier >= 1 || discount.group_ids.length === 0) {
+    return null
+  }
+  if (discount.schedule_mode === 'weekly') {
+    if (
+      !discount.weekdays?.length ||
+      !discount.daily_start_time ||
+      !discount.daily_end_time ||
+      discount.daily_start_time === discount.daily_end_time
+    ) {
+      return null
+    }
+    return isWeeklyDiscountActive(
+      discount.weekdays,
+      discount.daily_start_time,
+      discount.daily_end_time,
+      discount.timezone,
+      now,
+    )
+      ? 'active'
+      : 'upcoming'
+  }
+  const start = parseDiscountTime(discount.start_at)
+  const end = parseDiscountTime(discount.end_at)
+  if (start === null || end === null || start >= end || now >= end) {
+    return null
+  }
+  return now >= start ? 'active' : 'upcoming'
+}
+
+function formatDailyTimeRange(startTime: string, endTime: string, locale: string): string {
+  if (!locale.startsWith('zh')) {
+    return `${formatTimeOfDay(startTime, locale)}-${formatTimeOfDay(endTime, locale)}`
+  }
+  const startPeriod = zhTimePeriodLabel(startTime)
+  const endPeriod = zhTimePeriodLabel(endTime)
+  if (startPeriod && endPeriod) {
+    return `${startPeriod} ${startTime} - ${endPeriod} ${endTime}`
+  }
+  return `${startTime}-${endTime}`
+}
+
+function formatTimeOfDay(value: string, locale: string): string {
+  if (locale.startsWith('zh')) {
+    return value
+  }
+  const minutes = parseDailyTimeMinutes(value)
+  if (minutes === null) return value
+  const hour = Math.floor(minutes / 60)
+  const minute = minutes % 60
+  const suffix = hour < 12 ? 'AM' : 'PM'
+  const hour12 = hour % 12 || 12
+  return `${hour12}:${String(minute).padStart(2, '0')} ${suffix}`
+}
+
+function zhTimePeriodLabel(value: string): string {
+  const minutes = parseDailyTimeMinutes(value)
+  if (minutes === null) return ''
+  if (minutes < 5 * 60) return '凌晨'
+  if (minutes < 9 * 60) return '早上'
+  if (minutes < 12 * 60) return '上午'
+  if (minutes < 14 * 60) return '中午'
+  if (minutes < 18 * 60) return '下午'
+  return '晚上'
 }
 
 function parseDiscountTime(value: string | null | undefined): number | null {
@@ -222,12 +326,13 @@ export function resolveGroupRateDiscount(
     dailyEndTime?: string | null
     timezone?: string | null
   },
+  includeUpcoming = false,
+  now = Date.now(),
 ): GroupRateDiscountDisplay | null {
   const originalRate = Number(baseRate)
   if (!Number.isFinite(originalRate)) {
     return null
   }
-  const now = Date.now()
   if (embedded?.multiplier && embedded.multiplier > 0 && embedded.multiplier < 1) {
     const startAt = embedded.startAt ?? globalDiscount?.start_at
     const endAt = embedded.endAt ?? globalDiscount?.end_at
@@ -240,13 +345,16 @@ export function resolveGroupRateDiscount(
       ? isWeeklyDiscountActive(weekdays, dailyStartTime, dailyEndTime, timezone, now)
       : isDiscountWindowActive(startAt, endAt, now)
     if (!active) {
-      return null
+      if (!includeUpcoming) {
+        return null
+      }
     }
     return {
       name: embedded.name || globalDiscount?.name || '限时折扣',
       multiplier: embedded.multiplier,
       originalRate,
       discountedRate: originalRate * embedded.multiplier,
+      status: active ? 'active' : 'upcoming',
       scheduleMode,
       startAt,
       endAt,
@@ -266,13 +374,16 @@ export function resolveGroupRateDiscount(
     ? isWeeklyDiscountActive(globalDiscount.weekdays, globalDiscount.daily_start_time, globalDiscount.daily_end_time, globalDiscount.timezone, now)
     : isDiscountWindowActive(globalDiscount.start_at, globalDiscount.end_at, now)
   if (!active) {
-    return null
+    if (!includeUpcoming) {
+      return null
+    }
   }
   return {
     name: globalDiscount.name || '限时折扣',
     multiplier: globalDiscount.discount_multiplier,
     originalRate,
     discountedRate: originalRate * globalDiscount.discount_multiplier,
+    status: active ? 'active' : 'upcoming',
     scheduleMode: globalDiscount.schedule_mode,
     startAt: globalDiscount.start_at,
     endAt: globalDiscount.end_at,
@@ -301,6 +412,8 @@ export function resolveGroupDiscountFromGroup(
   >,
   baseRate?: number | null,
   globalDiscount?: ActiveGroupRateDiscount | null,
+  includeUpcoming = false,
+  now = Date.now(),
 ): GroupRateDiscountDisplay | null {
   return resolveGroupRateDiscount(
     group.id,
@@ -318,5 +431,7 @@ export function resolveGroupDiscountFromGroup(
       dailyEndTime: group.group_rate_discount_daily_end_time,
       timezone: group.group_rate_discount_timezone,
     },
+    includeUpcoming,
+    now,
   )
 }

@@ -778,7 +778,13 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 	if v, err := strconv.ParseFloat(settings[SettingKeyBalanceLowNotifyThreshold], 64); err == nil && v >= 0 {
 		balanceLowNotifyThreshold = v
 	}
-	groupRateDiscount := parseGroupRateDiscountSettings(settings[SettingKeyGroupRateDiscountSettings]).ActiveAt(time.Now())
+	now := time.Now()
+	groupRateDiscountSettings := parseGroupRateDiscountSettings(settings[SettingKeyGroupRateDiscountSettings])
+	groupRateDiscount := groupRateDiscountSettings.ActiveAt(now)
+	var upcomingGroupRateDiscount *ActiveGroupRateDiscount
+	if groupRateDiscount == nil {
+		upcomingGroupRateDiscount = groupRateDiscountSettings.PreviewAt(now)
+	}
 
 	return &PublicSettings{
 		RegistrationEnabled:              settings[SettingKeyRegistrationEnabled] == "true",
@@ -826,7 +832,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 
 		AffiliateEnabled: settings[SettingKeyAffiliateEnabled] == "true",
 
-		GroupRateDiscount: groupRateDiscount,
+		GroupRateDiscount:         groupRateDiscount,
+		UpcomingGroupRateDiscount: upcomingGroupRateDiscount,
 	}, nil
 }
 
@@ -975,6 +982,7 @@ type PublicSettingsInjectionPayload struct {
 	AvailableChannelsEnabled             bool                     `json:"available_channels_enabled"`
 	AffiliateEnabled                     bool                     `json:"affiliate_enabled"`
 	GroupRateDiscount                    *ActiveGroupRateDiscount `json:"group_rate_discount,omitempty"`
+	UpcomingGroupRateDiscount            *ActiveGroupRateDiscount `json:"upcoming_group_rate_discount,omitempty"`
 }
 
 // GetPublicSettingsForInjection returns public settings in a format suitable for HTML injection.
@@ -1029,6 +1037,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		AvailableChannelsEnabled:             settings.AvailableChannelsEnabled,
 		AffiliateEnabled:                     settings.AffiliateEnabled,
 		GroupRateDiscount:                    settings.GroupRateDiscount,
+		UpcomingGroupRateDiscount:            settings.UpcomingGroupRateDiscount,
 	}, nil
 }
 

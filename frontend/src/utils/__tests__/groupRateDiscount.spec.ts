@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { resolveGroupRateDiscount } from '../groupRateDiscount'
+import { formatDiscountSchedule, resolveGroupRateDiscount } from '../groupRateDiscount'
 
 describe('groupRateDiscount utils', () => {
   afterEach(() => {
@@ -161,5 +161,59 @@ describe('groupRateDiscount utils', () => {
     )
 
     expect(discount?.discountedRate).toBe(1)
+  })
+
+  it('can return upcoming weekly discounts for previews', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-04T01:00:00'))
+
+    const discount = resolveGroupRateDiscount(
+      11,
+      0.2,
+      {
+        name: '深夜限时折扣',
+        discount_multiplier: 0.7,
+        schedule_mode: 'weekly',
+        start_at: '',
+        end_at: '',
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        daily_start_time: '02:00',
+        daily_end_time: '08:00',
+        group_ids: [11],
+      },
+      undefined,
+      true,
+    )
+
+    expect(discount?.status).toBe('upcoming')
+    expect(discount?.discountedRate).toBeCloseTo(0.14)
+  })
+
+  it('labels early daily schedules as late night and morning in Chinese', () => {
+    expect(formatDiscountSchedule({
+      name: '深夜限时折扣',
+      discount_multiplier: 0.7,
+      schedule_mode: 'weekly',
+      start_at: '',
+      end_at: '',
+      weekdays: [1, 2, 3, 4, 5, 6, 7],
+      daily_start_time: '02:00',
+      daily_end_time: '08:00',
+      group_ids: [11],
+    }, 'zh-CN')).toBe('每天 凌晨 02:00 - 早上 08:00')
+  })
+
+  it('shows the start time for upcoming one-off discounts', () => {
+    expect(formatDiscountSchedule({
+      name: 'Future Sale',
+      discount_multiplier: 0.8,
+      schedule_mode: 'once',
+      start_at: '2026-05-10T02:00:00+08:00',
+      end_at: '2026-05-10T08:00:00+08:00',
+      weekdays: [],
+      daily_start_time: '',
+      daily_end_time: '',
+      group_ids: [11],
+    }, 'zh-CN', 'upcoming')).toContain('开始于')
   })
 })

@@ -12,9 +12,15 @@
     <!-- Right side label -->
     <span v-if="showLabel" :class="labelClass" :title="discountTitle || undefined">
       <template v-if="discountDisplay">
-        <span class="mr-0.5 line-through opacity-50">{{ formatRateMultiplier(originalDisplayRate) }}x</span>
-        <span class="font-bold">{{ formatRateMultiplier(discountDisplay.discountedRate) }}x</span>
-        <span class="ml-0.5 font-semibold">{{ formatDiscountLabel(discountDisplay.multiplier) }}</span>
+        <template v-if="discountDisplay.status === 'active'">
+          <span class="mr-0.5 line-through opacity-50">{{ formatRateMultiplier(originalDisplayRate) }}x</span>
+          <span class="font-bold">{{ formatRateMultiplier(discountDisplay.discountedRate) }}x</span>
+          <span class="ml-0.5 font-semibold">{{ formatDiscountLabel(discountDisplay.multiplier) }}</span>
+        </template>
+        <template v-else>
+          <span class="font-bold">{{ formatRateMultiplier(originalDisplayRate) }}x</span>
+          <span class="ml-0.5 opacity-80">{{ upcomingDiscountPrefix }} {{ formatRateMultiplier(discountDisplay.discountedRate) }}x</span>
+        </template>
       </template>
       <template v-else-if="hasCustomRate">
         <span class="line-through opacity-50 mr-0.5">{{ formatRateMultiplier(rateMultiplier) }}x</span>
@@ -35,8 +41,15 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useMinuteNow } from '@/composables/useMinuteNow'
 import type { SubscriptionType, GroupPlatform } from '@/types'
-import { formatDiscountLabel, formatDiscountSchedule, formatRateMultiplier, resolveGroupRateDiscount } from '@/utils/groupRateDiscount'
+import {
+  formatDiscountLabel,
+  formatDiscountSchedule,
+  formatRateMultiplier,
+  resolveGroupRateDiscount,
+  resolvePublicGroupRateDiscount,
+} from '@/utils/groupRateDiscount'
 import PlatformIcon from './PlatformIcon.vue'
 
 interface Props {
@@ -76,13 +89,19 @@ const props = withDefaults(defineProps<Props>(), {
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
+const now = useMinuteNow()
 
 const isSubscription = computed(() => props.subscriptionType === 'subscription')
 const originalDisplayRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
+const publicDiscountSummary = computed(() => resolvePublicGroupRateDiscount(
+  appStore.cachedPublicSettings?.group_rate_discount ?? null,
+  appStore.cachedPublicSettings?.upcoming_group_rate_discount ?? null,
+  now.value,
+))
 const discountDisplay = computed(() => resolveGroupRateDiscount(
   props.groupId,
   originalDisplayRate.value,
-  appStore.cachedPublicSettings?.group_rate_discount ?? null,
+  publicDiscountSummary.value?.discount ?? null,
   {
     multiplier: props.discountMultiplier,
     discountedRate: props.discountedRateMultiplier,
@@ -94,13 +113,19 @@ const discountDisplay = computed(() => resolveGroupRateDiscount(
     dailyStartTime: props.discountDailyStartTime,
     dailyEndTime: props.discountDailyEndTime,
     timezone: props.discountTimezone
-  }
+  },
+  publicDiscountSummary.value?.status === 'upcoming',
+  now.value,
 ))
 const discountTitle = computed(() => {
   if (!discountDisplay.value) return ''
-  const schedule = formatDiscountSchedule(discountDisplay.value, locale.value)
-  return schedule ? `${discountDisplay.value.name} · ${schedule}` : discountDisplay.value.name
+  const schedule = formatDiscountSchedule(discountDisplay.value, locale.value, discountDisplay.value.status)
+  const status = discountDisplay.value.status === 'active'
+    ? (locale.value.startsWith('zh') ? '进行中' : 'Active')
+    : (locale.value.startsWith('zh') ? '即将开始' : 'Upcoming')
+  return schedule ? `${status} · ${discountDisplay.value.name} · ${schedule}` : `${status} · ${discountDisplay.value.name}`
 })
+const upcomingDiscountPrefix = computed(() => locale.value.startsWith('zh') ? '即将' : 'soon')
 
 // 是否有专属倍率（且与默认倍率不同）
 const hasCustomRate = computed(() => {

@@ -4,21 +4,29 @@
       <template #filters>
         <div class="flex flex-col gap-3">
           <div
-            v-if="activeGroupRateDiscount"
-            class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200"
+            v-if="groupRateDiscountSummary"
+            :class="[
+              'rounded-lg border px-4 py-3 text-sm shadow-sm',
+              groupRateDiscountSummary.status === 'active'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
+                : 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200'
+            ]"
           >
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="flex items-center gap-2">
                 <Icon name="badge" size="sm" class="shrink-0" />
                 <span class="font-semibold">
-                  {{ activeGroupRateDiscount.name || localText('限时分组折扣', 'Limited-time group discount') }}
+                  {{ groupRateDiscountSummary.discount.name || localText('限时分组折扣', 'Limited-time group discount') }}
+                </span>
+                <span class="rounded bg-white/70 px-1.5 py-0.5 text-xs font-semibold dark:bg-black/20">
+                  {{ groupRateDiscountStatusLabel }}
                 </span>
                 <span class="rounded bg-white/70 px-1.5 py-0.5 text-xs font-bold dark:bg-black/20">
-                  {{ formatDiscountLabel(activeGroupRateDiscount.discount_multiplier) }}
+                  {{ formatDiscountLabel(groupRateDiscountSummary.discount.discount_multiplier) }}
                 </span>
               </div>
-              <span v-if="activeGroupRateDiscountSchedule" class="text-xs font-medium text-emerald-700 dark:text-emerald-200">
-                {{ activeGroupRateDiscountSchedule }}
+              <span v-if="groupRateDiscountSchedule" class="text-xs font-medium">
+                {{ groupRateDiscountSchedule }}
               </span>
             </div>
           </div>
@@ -1074,6 +1082,7 @@ import { useAppStore } from '@/stores/app'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { useMinuteNow } from '@/composables/useMinuteNow'
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -1094,9 +1103,15 @@ import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
-import { formatDiscountLabel, formatDiscountSchedule } from '@/utils/groupRateDiscount'
+import {
+  formatDiscountLabel,
+  formatDiscountSchedule,
+  formatDiscountStatusLabel,
+  resolvePublicGroupRateDiscount,
+} from '@/utils/groupRateDiscount'
 
 const { t, locale } = useI18n()
+const discountNow = useMinuteNow()
 
 function localText(zh: string, en: string): string {
   return locale.value.startsWith('zh') ? zh : en
@@ -1173,9 +1188,22 @@ const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
-const activeGroupRateDiscount = computed(() => publicSettings.value?.group_rate_discount ?? null)
-const activeGroupRateDiscountSchedule = computed(() =>
-  formatDiscountSchedule(activeGroupRateDiscount.value, locale.value)
+const groupRateDiscountSummary = computed(() => resolvePublicGroupRateDiscount(
+  publicSettings.value?.group_rate_discount ?? null,
+  publicSettings.value?.upcoming_group_rate_discount ?? null,
+  discountNow.value,
+))
+const groupRateDiscountSchedule = computed(() =>
+  formatDiscountSchedule(
+    groupRateDiscountSummary.value?.discount,
+    locale.value,
+    groupRateDiscountSummary.value?.status,
+  )
+)
+const groupRateDiscountStatusLabel = computed(() =>
+  groupRateDiscountSummary.value
+    ? formatDiscountStatusLabel(groupRateDiscountSummary.value.status, locale.value)
+    : ''
 )
 const dropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)

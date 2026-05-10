@@ -262,7 +262,8 @@ type PublicSettings struct {
 
 	AffiliateEnabled bool `json:"affiliate_enabled"`
 
-	GroupRateDiscount *ActiveGroupRateDiscount `json:"group_rate_discount,omitempty"`
+	GroupRateDiscount         *ActiveGroupRateDiscount `json:"group_rate_discount,omitempty"`
+	UpcomingGroupRateDiscount *ActiveGroupRateDiscount `json:"upcoming_group_rate_discount,omitempty"`
 }
 
 type GroupRateDiscountSettings struct {

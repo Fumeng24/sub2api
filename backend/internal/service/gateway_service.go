@@ -7929,16 +7929,15 @@ func (s *GatewayService) resolveBillingRateMultiplier(ctx context.Context, user 
 	if s != nil && s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if s == nil || apiKey == nil || user == nil || apiKey.GroupID == nil || apiKey.Group == nil {
+	if s == nil || apiKey == nil || user == nil || apiKey.Group == nil {
 		return multiplier
 	}
-	groupID := *apiKey.GroupID
-	multiplier = s.getUserGroupRateMultiplier(ctx, user.ID, groupID, apiKey.Group.RateMultiplier)
-	if s.settingService != nil {
-		if discount := s.settingService.ActiveGroupRateDiscount(ctx, time.Now()); discount != nil && discount.AppliesToGroup(groupID) {
-			multiplier *= discount.DiscountMultiplier
-		}
+	groupID, ok := resolveAPIKeyBillingGroupID(apiKey)
+	if !ok {
+		return multiplier
 	}
+	multiplier = s.getUserGroupRateMultiplier(ctx, user.ID, groupID, apiKey.Group.RateMultiplier)
+	multiplier *= activeGroupRateDiscountMultiplierAt(ctx, s.settingService, groupID, time.Now())
 	return multiplier
 }
 
@@ -8463,7 +8462,11 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 
 	// 获取费率倍数（优先级：用户专属 > 分组默认 > 系统默认），并叠加分组周期折扣。
 	multiplier := s.resolveBillingRateMultiplier(ctx, user, apiKey)
-	imageMultiplier := resolveImageRateMultiplier(apiKey, multiplier)
+	activeDiscountMultiplier := 1.0
+	if groupID, ok := resolveAPIKeyBillingGroupID(apiKey); ok {
+		activeDiscountMultiplier = activeGroupRateDiscountMultiplierAt(ctx, s.settingService, groupID, time.Now())
+	}
+	imageMultiplier := resolveImageRateMultiplier(apiKey, multiplier, activeDiscountMultiplier)
 
 	// 确定计费模型
 	billingModel := forwardResultBillingModel(result.Model, result.UpstreamModel)

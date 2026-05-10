@@ -244,6 +244,8 @@ type PublicSettings struct {
 
 	// Active group rate discount campaign, if any.
 	GroupRateDiscount *ActiveGroupRateDiscount `json:"group_rate_discount,omitempty"`
+	// Upcoming group rate discount campaign for user-facing benefit previews.
+	UpcomingGroupRateDiscount *ActiveGroupRateDiscount `json:"upcoming_group_rate_discount,omitempty"`
 }
 
 type GroupRateDiscountSettings struct {
@@ -306,17 +308,43 @@ func (s GroupRateDiscountSettings) ActiveAt(now time.Time) *ActiveGroupRateDisco
 			return nil
 		}
 	}
+	return normalized.toPublicGroupRateDiscount()
+}
+
+func (s GroupRateDiscountSettings) PreviewAt(now time.Time) *ActiveGroupRateDiscount {
+	normalized := normalizeGroupRateDiscountSettings(s)
+	if !normalized.Enabled || normalized.DiscountMultiplier <= 0 || normalized.DiscountMultiplier >= 1 || len(normalized.GroupIDs) == 0 {
+		return nil
+	}
+	if normalized.ScheduleMode == groupRateDiscountScheduleWeekly {
+		if len(normalized.Weekdays) == 0 || normalized.DailyStartTime == "" || normalized.DailyEndTime == "" || normalized.DailyStartTime == normalized.DailyEndTime {
+			return nil
+		}
+		return normalized.toPublicGroupRateDiscount()
+	}
+	start, err := time.Parse(time.RFC3339, normalized.StartAt)
+	if err != nil {
+		return nil
+	}
+	end, err := time.Parse(time.RFC3339, normalized.EndAt)
+	if err != nil || !start.Before(end) || !now.Before(end) {
+		return nil
+	}
+	return normalized.toPublicGroupRateDiscount()
+}
+
+func (s GroupRateDiscountSettings) toPublicGroupRateDiscount() *ActiveGroupRateDiscount {
 	return &ActiveGroupRateDiscount{
-		Name:               normalized.Name,
-		DiscountMultiplier: normalized.DiscountMultiplier,
-		ScheduleMode:       normalized.ScheduleMode,
-		StartAt:            normalized.StartAt,
-		EndAt:              normalized.EndAt,
-		Weekdays:           append([]int(nil), normalized.Weekdays...),
-		DailyStartTime:     normalized.DailyStartTime,
-		DailyEndTime:       normalized.DailyEndTime,
+		Name:               s.Name,
+		DiscountMultiplier: s.DiscountMultiplier,
+		ScheduleMode:       s.ScheduleMode,
+		StartAt:            s.StartAt,
+		EndAt:              s.EndAt,
+		Weekdays:           append([]int(nil), s.Weekdays...),
+		DailyStartTime:     s.DailyStartTime,
+		DailyEndTime:       s.DailyEndTime,
 		Timezone:           timezone.Name(),
-		GroupIDs:           append([]int64(nil), normalized.GroupIDs...),
+		GroupIDs:           append([]int64(nil), s.GroupIDs...),
 	}
 }
 

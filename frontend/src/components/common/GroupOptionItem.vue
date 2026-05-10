@@ -61,8 +61,14 @@
 import { computed } from 'vue'
 import GroupBadge from './GroupBadge.vue'
 import { useAppStore } from '@/stores/app'
+import { useMinuteNow } from '@/composables/useMinuteNow'
 import type { SubscriptionType, GroupPlatform } from '@/types'
-import { formatDiscountLabel, formatRateMultiplier, resolveGroupRateDiscount } from '@/utils/groupRateDiscount'
+import {
+  formatDiscountLabel,
+  formatRateMultiplier,
+  resolveGroupRateDiscount,
+  resolvePublicGroupRateDiscount,
+} from '@/utils/groupRateDiscount'
 
 interface Props {
   name: string
@@ -89,18 +95,26 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const appStore = useAppStore()
+const now = useMinuteNow()
 const originalDisplayRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
+const publicDiscountSummary = computed(() => resolvePublicGroupRateDiscount(
+  appStore.cachedPublicSettings?.group_rate_discount ?? null,
+  appStore.cachedPublicSettings?.upcoming_group_rate_discount ?? null,
+  now.value,
+))
 const discountDisplay = computed(() => resolveGroupRateDiscount(
   props.groupId,
   originalDisplayRate.value,
-  appStore.cachedPublicSettings?.group_rate_discount ?? null,
+  publicDiscountSummary.value?.discount ?? null,
   {
     multiplier: props.discountMultiplier,
     discountedRate: props.discountedRateMultiplier,
     name: props.discountName,
     startAt: props.discountStartAt,
     endAt: props.discountEndAt
-  }
+  },
+  publicDiscountSummary.value?.status === 'upcoming',
+  now.value,
 ))
 
 // Whether user has a custom rate different from default
