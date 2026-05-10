@@ -7929,14 +7929,16 @@ func (s *GatewayService) resolveBillingRateMultiplier(ctx context.Context, user 
 	if s != nil && s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if s == nil || apiKey == nil || user == nil || apiKey.Group == nil {
+	if s == nil || apiKey == nil || user == nil {
 		return multiplier
 	}
 	groupID, ok := resolveAPIKeyBillingGroupID(apiKey)
 	if !ok {
 		return multiplier
 	}
-	multiplier = s.getUserGroupRateMultiplier(ctx, user.ID, groupID, apiKey.Group.RateMultiplier)
+	if apiKey.Group != nil {
+		multiplier = s.getUserGroupRateMultiplier(ctx, user.ID, groupID, apiKey.Group.RateMultiplier)
+	}
 	multiplier *= activeGroupRateDiscountMultiplierAt(ctx, s.settingService, groupID, time.Now())
 	return multiplier
 }

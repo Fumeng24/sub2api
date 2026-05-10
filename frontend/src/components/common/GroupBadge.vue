@@ -125,7 +125,7 @@ const discountTitle = computed(() => {
     : (locale.value.startsWith('zh') ? '即将开始' : 'Upcoming')
   return schedule ? `${status} · ${discountDisplay.value.name} · ${schedule}` : `${status} · ${discountDisplay.value.name}`
 })
-const upcomingDiscountPrefix = computed(() => locale.value.startsWith('zh') ? '即将' : 'soon')
+const upcomingDiscountPrefix = computed(() => locale.value.startsWith('zh') ? '到点后' : 'scheduled')
 
 // 是否有专属倍率（且与默认倍率不同）
 const hasCustomRate = computed(() => {

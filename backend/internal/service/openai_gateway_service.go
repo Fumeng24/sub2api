@@ -5445,18 +5445,20 @@ func (s *OpenAIGatewayService) resolveBillingRateMultiplier(ctx context.Context,
 	if s != nil && s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
 	}
-	if s == nil || apiKey == nil || user == nil || apiKey.Group == nil {
+	if s == nil || apiKey == nil || user == nil {
 		return multiplier
 	}
 	groupID, ok := resolveAPIKeyBillingGroupID(apiKey)
 	if !ok {
 		return multiplier
 	}
-	resolver := s.userGroupRateResolver
-	if resolver == nil {
-		resolver = newUserGroupRateResolver(nil, nil, resolveUserGroupRateCacheTTL(s.cfg), nil, "service.openai_gateway")
+	if apiKey.Group != nil {
+		resolver := s.userGroupRateResolver
+		if resolver == nil {
+			resolver = newUserGroupRateResolver(nil, nil, resolveUserGroupRateCacheTTL(s.cfg), nil, "service.openai_gateway")
+		}
+		multiplier = resolver.Resolve(ctx, user.ID, groupID, apiKey.Group.RateMultiplier)
 	}
-	multiplier = resolver.Resolve(ctx, user.ID, groupID, apiKey.Group.RateMultiplier)
 	multiplier *= activeGroupRateDiscountMultiplierAt(ctx, s.settingService, groupID, time.Now())
 	return multiplier
 }

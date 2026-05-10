@@ -3,33 +3,6 @@
     <TablePageLayout>
       <template #filters>
         <div class="flex flex-col gap-3">
-          <div
-            v-if="groupRateDiscountSummary"
-            :class="[
-              'rounded-lg border px-4 py-3 text-sm shadow-sm',
-              groupRateDiscountSummary.status === 'active'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
-                : 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200'
-            ]"
-          >
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div class="flex items-center gap-2">
-                <Icon name="badge" size="sm" class="shrink-0" />
-                <span class="font-semibold">
-                  {{ groupRateDiscountSummary.discount.name || localText('限时分组折扣', 'Limited-time group discount') }}
-                </span>
-                <span class="rounded bg-white/70 px-1.5 py-0.5 text-xs font-semibold dark:bg-black/20">
-                  {{ groupRateDiscountStatusLabel }}
-                </span>
-                <span class="rounded bg-white/70 px-1.5 py-0.5 text-xs font-bold dark:bg-black/20">
-                  {{ formatDiscountLabel(groupRateDiscountSummary.discount.discount_multiplier) }}
-                </span>
-              </div>
-              <span v-if="groupRateDiscountSchedule" class="text-xs font-medium">
-                {{ groupRateDiscountSchedule }}
-              </span>
-            </div>
-          </div>
           <div class="flex flex-wrap items-center gap-3">
             <SearchInput
               v-model="filterSearch"
@@ -140,6 +113,16 @@
                   :group-id="row.group.id"
                   :rate-multiplier="row.group.rate_multiplier"
                   :user-rate-multiplier="userGroupRates[row.group.id]"
+                  :discount-multiplier="row.group.group_rate_discount_multiplier"
+                  :discounted-rate-multiplier="row.group.discounted_rate_multiplier"
+                  :discount-name="row.group.group_rate_discount_name"
+                  :discount-schedule-mode="row.group.group_rate_discount_schedule_mode"
+                  :discount-start-at="row.group.group_rate_discount_start_at"
+                  :discount-end-at="row.group.group_rate_discount_end_at"
+                  :discount-weekdays="row.group.group_rate_discount_weekdays"
+                  :discount-daily-start-time="row.group.group_rate_discount_daily_start_time"
+                  :discount-daily-end-time="row.group.group_rate_discount_daily_end_time"
+                  :discount-timezone="row.group.group_rate_discount_timezone"
                 />
                 <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{
                   t('keys.noGroup')
@@ -451,6 +434,16 @@
                 :group-id="(option as unknown as GroupOption).value"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
+                :discount-multiplier="(option as unknown as GroupOption).discountMultiplier"
+                :discounted-rate-multiplier="(option as unknown as GroupOption).discountedRateMultiplier"
+                :discount-name="(option as unknown as GroupOption).discountName"
+                :discount-schedule-mode="(option as unknown as GroupOption).discountScheduleMode"
+                :discount-start-at="(option as unknown as GroupOption).discountStartAt"
+                :discount-end-at="(option as unknown as GroupOption).discountEndAt"
+                :discount-weekdays="(option as unknown as GroupOption).discountWeekdays"
+                :discount-daily-start-time="(option as unknown as GroupOption).discountDailyStartTime"
+                :discount-daily-end-time="(option as unknown as GroupOption).discountDailyEndTime"
+                :discount-timezone="(option as unknown as GroupOption).discountTimezone"
               />
               <span v-else class="text-gray-400">{{ t('keys.selectGroup') }}</span>
             </template>
@@ -462,6 +455,16 @@
                 :group-id="(option as unknown as GroupOption).value"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
+                :discount-multiplier="(option as unknown as GroupOption).discountMultiplier"
+                :discounted-rate-multiplier="(option as unknown as GroupOption).discountedRateMultiplier"
+                :discount-name="(option as unknown as GroupOption).discountName"
+                :discount-schedule-mode="(option as unknown as GroupOption).discountScheduleMode"
+                :discount-start-at="(option as unknown as GroupOption).discountStartAt"
+                :discount-end-at="(option as unknown as GroupOption).discountEndAt"
+                :discount-weekdays="(option as unknown as GroupOption).discountWeekdays"
+                :discount-daily-start-time="(option as unknown as GroupOption).discountDailyStartTime"
+                :discount-daily-end-time="(option as unknown as GroupOption).discountDailyEndTime"
+                :discount-timezone="(option as unknown as GroupOption).discountTimezone"
                 :description="(option as unknown as GroupOption).description"
                 :selected="selected"
               />
@@ -1058,6 +1061,16 @@
               :group-id="option.value"
               :rate-multiplier="option.rate"
               :user-rate-multiplier="option.userRate"
+              :discount-multiplier="option.discountMultiplier"
+              :discounted-rate-multiplier="option.discountedRateMultiplier"
+              :discount-name="option.discountName"
+              :discount-schedule-mode="option.discountScheduleMode"
+              :discount-start-at="option.discountStartAt"
+              :discount-end-at="option.discountEndAt"
+              :discount-weekdays="option.discountWeekdays"
+              :discount-daily-start-time="option.discountDailyStartTime"
+              :discount-daily-end-time="option.discountDailyEndTime"
+              :discount-timezone="option.discountTimezone"
               :description="option.description"
               :selected="
                 selectedKeyForGroup?.group_id === option.value ||
@@ -1082,7 +1095,6 @@ import { useAppStore } from '@/stores/app'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
-import { useMinuteNow } from '@/composables/useMinuteNow'
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -1103,19 +1115,8 @@ import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
-import {
-  formatDiscountLabel,
-  formatDiscountSchedule,
-  formatDiscountStatusLabel,
-  resolvePublicGroupRateDiscount,
-} from '@/utils/groupRateDiscount'
 
-const { t, locale } = useI18n()
-const discountNow = useMinuteNow()
-
-function localText(zh: string, en: string): string {
-  return locale.value.startsWith('zh') ? zh : en
-}
+const { t } = useI18n()
 
 // Helper to format date for datetime-local input
 const formatDateTimeLocal = (isoDate: string): string => {
@@ -1132,6 +1133,16 @@ interface GroupOption {
   userRate: number | null
   subscriptionType: SubscriptionType
   platform: GroupPlatform
+  discountMultiplier?: number | null
+  discountedRateMultiplier?: number | null
+  discountName?: string | null
+  discountScheduleMode?: string | null
+  discountStartAt?: string | null
+  discountEndAt?: string | null
+  discountWeekdays?: number[] | null
+  discountDailyStartTime?: string | null
+  discountDailyEndTime?: string | null
+  discountTimezone?: string | null
 }
 
 const appStore = useAppStore()
@@ -1188,23 +1199,6 @@ const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
-const groupRateDiscountSummary = computed(() => resolvePublicGroupRateDiscount(
-  publicSettings.value?.group_rate_discount ?? null,
-  publicSettings.value?.upcoming_group_rate_discount ?? null,
-  discountNow.value,
-))
-const groupRateDiscountSchedule = computed(() =>
-  formatDiscountSchedule(
-    groupRateDiscountSummary.value?.discount,
-    locale.value,
-    groupRateDiscountSummary.value?.status,
-  )
-)
-const groupRateDiscountStatusLabel = computed(() =>
-  groupRateDiscountSummary.value
-    ? formatDiscountStatusLabel(groupRateDiscountSummary.value.status, locale.value)
-    : ''
-)
 const dropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
@@ -1306,7 +1300,17 @@ const groupOptions = computed(() =>
     rate: group.rate_multiplier,
     userRate: userGroupRates.value[group.id] ?? null,
     subscriptionType: group.subscription_type,
-    platform: group.platform
+    platform: group.platform,
+    discountMultiplier: group.group_rate_discount_multiplier,
+    discountedRateMultiplier: group.discounted_rate_multiplier,
+    discountName: group.group_rate_discount_name,
+    discountScheduleMode: group.group_rate_discount_schedule_mode,
+    discountStartAt: group.group_rate_discount_start_at,
+    discountEndAt: group.group_rate_discount_end_at,
+    discountWeekdays: group.group_rate_discount_weekdays,
+    discountDailyStartTime: group.group_rate_discount_daily_start_time,
+    discountDailyEndTime: group.group_rate_discount_daily_end_time,
+    discountTimezone: group.group_rate_discount_timezone
   }))
 )
 

@@ -197,6 +197,30 @@ func TestGroupRateDiscountSettings_ActiveAtWeeklySchedule(t *testing.T) {
 	require.Nil(t, settings.ActiveAt(time.Date(2026, 5, 4, 18, 0, 0, 0, time.Local)))
 }
 
+func TestGroupRateDiscountSettings_ActiveAtWeeklyEarlyMorningWindow(t *testing.T) {
+	oldLocal := time.Local
+	time.Local = time.FixedZone("test-local", 8*60*60)
+	t.Cleanup(func() {
+		time.Local = oldLocal
+	})
+
+	settings := GroupRateDiscountSettings{
+		Enabled:            true,
+		Name:               "Night Promo",
+		DiscountMultiplier: 0.7,
+		ScheduleMode:       groupRateDiscountScheduleWeekly,
+		Weekdays:           []int{1, 2, 3, 4, 5, 6, 7},
+		DailyStartTime:     "02:00",
+		DailyEndTime:       "08:00",
+		GroupIDs:           []int64{11},
+	}
+
+	require.Nil(t, settings.ActiveAt(time.Date(2026, 5, 11, 1, 59, 0, 0, time.Local)))
+	require.NotNil(t, settings.ActiveAt(time.Date(2026, 5, 11, 2, 0, 0, 0, time.Local)))
+	require.NotNil(t, settings.ActiveAt(time.Date(2026, 5, 11, 7, 59, 0, 0, time.Local)))
+	require.Nil(t, settings.ActiveAt(time.Date(2026, 5, 11, 8, 0, 0, 0, time.Local)))
+}
+
 func TestGroupRateDiscountSettings_ActiveAtWeeklyCrossMidnight(t *testing.T) {
 	oldLocal := time.Local
 	time.Local = time.FixedZone("test-local", 8*60*60)

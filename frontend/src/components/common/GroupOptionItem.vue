@@ -27,11 +27,17 @@
     <div class="flex shrink-0 items-center gap-2 pt-0.5">
       <!-- Rate pill (platform color) -->
       <span v-if="rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
-        <template v-if="discountDisplay">
+        <template v-if="discountDisplay?.status === 'active'">
           <span class="mr-1 line-through opacity-50">{{ formatRateMultiplier(originalDisplayRate) }}x</span>
           <span class="font-bold">{{ formatRateMultiplier(discountDisplay.discountedRate) }}x</span>
           <span class="ml-1 rounded bg-white/60 px-1 text-[10px] dark:bg-black/20">
             {{ formatDiscountLabel(discountDisplay.multiplier) }}
+          </span>
+        </template>
+        <template v-else-if="discountDisplay?.status === 'upcoming'">
+          <span class="font-bold">{{ formatRateMultiplier(originalDisplayRate) }}x</span>
+          <span class="ml-1 rounded bg-white/60 px-1 text-[10px] dark:bg-black/20">
+            {{ upcomingDiscountPrefix }} {{ formatRateMultiplier(discountDisplay.discountedRate) }}x
           </span>
         </template>
         <template v-else-if="hasCustomRate">
@@ -69,6 +75,7 @@ import {
   resolveGroupRateDiscount,
   resolvePublicGroupRateDiscount,
 } from '@/utils/groupRateDiscount'
+import { useI18n } from 'vue-i18n'
 
 interface Props {
   name: string
@@ -80,8 +87,13 @@ interface Props {
   discountMultiplier?: number | null
   discountedRateMultiplier?: number | null
   discountName?: string | null
+  discountScheduleMode?: string | null
   discountStartAt?: string | null
   discountEndAt?: string | null
+  discountWeekdays?: number[] | null
+  discountDailyStartTime?: string | null
+  discountDailyEndTime?: string | null
+  discountTimezone?: string | null
   description?: string | null
   selected?: boolean
   showCheckmark?: boolean
@@ -94,6 +106,7 @@ const props = withDefaults(defineProps<Props>(), {
   userRateMultiplier: null
 })
 
+const { locale } = useI18n()
 const appStore = useAppStore()
 const now = useMinuteNow()
 const originalDisplayRate = computed(() => props.userRateMultiplier ?? props.rateMultiplier)
@@ -110,12 +123,18 @@ const discountDisplay = computed(() => resolveGroupRateDiscount(
     multiplier: props.discountMultiplier,
     discountedRate: props.discountedRateMultiplier,
     name: props.discountName,
+    scheduleMode: props.discountScheduleMode,
     startAt: props.discountStartAt,
-    endAt: props.discountEndAt
+    endAt: props.discountEndAt,
+    weekdays: props.discountWeekdays,
+    dailyStartTime: props.discountDailyStartTime,
+    dailyEndTime: props.discountDailyEndTime,
+    timezone: props.discountTimezone
   },
   publicDiscountSummary.value?.status === 'upcoming',
   now.value,
 ))
+const upcomingDiscountPrefix = computed(() => locale.value.startsWith('zh') ? '到点后' : 'scheduled')
 
 // Whether user has a custom rate different from default
 const hasCustomRate = computed(() => {

@@ -189,6 +189,30 @@ describe('groupRateDiscount utils', () => {
     expect(discount?.discountedRate).toBeCloseTo(0.14)
   })
 
+  it('uses embedded weekly schedule fields before falling back to public settings', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-04T03:00:00'))
+
+    const discount = resolveGroupRateDiscount(
+      11,
+      0.2,
+      null,
+      {
+        multiplier: 0.7,
+        discountedRate: 0.14,
+        name: '深夜限时折扣',
+        scheduleMode: 'weekly',
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        dailyStartTime: '02:00',
+        dailyEndTime: '08:00',
+        timezone: null,
+      },
+    )
+
+    expect(discount?.status).toBe('active')
+    expect(discount?.discountedRate).toBeCloseTo(0.14)
+  })
+
   it('labels early daily schedules as late night and morning in Chinese', () => {
     expect(formatDiscountSchedule({
       name: '深夜限时折扣',

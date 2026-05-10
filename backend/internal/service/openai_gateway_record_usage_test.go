@@ -349,6 +349,75 @@ func TestOpenAIGatewayServiceRecordUsage_AppliesSelectedGroupDiscount(t *testing
 	require.InDelta(t, expected.ActualCost, userRepo.lastAmount, 1e-12)
 }
 
+func TestOpenAIGatewayServiceRecordUsage_AppliesWeeklySelectedGroupDiscount(t *testing.T) {
+	groupID := int64(11)
+	groupRate := 1.4
+	userRate := 1.8
+	discount := 0.5
+	usage := OpenAIUsage{InputTokens: 15, OutputTokens: 4}
+
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	userRepo := &openAIRecordUsageUserRepoStub{}
+	subRepo := &openAIRecordUsageSubRepoStub{}
+	rateRepo := &openAIUserGroupRateRepoStub{rate: &userRate}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, rateRepo)
+	now := time.Now().In(time.Local)
+	start := now.Add(-5 * time.Minute).Format("15:04")
+	end := now.Add(5 * time.Minute).Format("15:04")
+	svc.settingService = NewSettingService(&openAIRecordUsageSettingRepoStub{
+		values: map[string]string{
+			SettingKeyGroupRateDiscountSettings: `{"enabled":true,"name":"Weekly Promo","discount_multiplier":0.5,"schedule_mode":"weekly","weekdays":[1,2,3,4,5,6,7],"daily_start_time":"` + start + `","daily_end_time":"` + end + `","group_ids":[11]}`,
+		},
+	}, &config.Config{})
+
+	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID: "resp_weekly_group_rate_discount",
+			Usage:     usage,
+			Model:     "gpt-5.1",
+			Duration:  time.Second,
+		},
+		APIKey: &APIKey{
+			ID:      1001,
+			GroupID: i64p(groupID),
+			Group: &Group{
+				ID:             groupID,
+				RateMultiplier: groupRate,
+			},
+		},
+		User:    &User{ID: 2001},
+		Account: &Account{ID: 3001},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.InDelta(t, userRate*discount, usageRepo.lastLog.RateMultiplier, 1e-12)
+	expected := expectedOpenAICost(t, svc, "gpt-5.1", usage, userRate*discount)
+	require.InDelta(t, expected.ActualCost, usageRepo.lastLog.ActualCost, 1e-12)
+	require.InDelta(t, expected.ActualCost, userRepo.lastAmount, 1e-12)
+}
+
+func TestOpenAIGatewayServiceResolveBillingRateMultiplier_DiscountsGroupIDWithoutHydratedGroup(t *testing.T) {
+	groupID := int64(11)
+	discount := 0.5
+	svc := newOpenAIRecordUsageServiceForTest(&openAIRecordUsageLogRepoStub{}, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)
+	now := time.Now().In(time.Local)
+	start := now.Add(-5 * time.Minute).Format("15:04")
+	end := now.Add(5 * time.Minute).Format("15:04")
+	svc.settingService = NewSettingService(&openAIRecordUsageSettingRepoStub{
+		values: map[string]string{
+			SettingKeyGroupRateDiscountSettings: `{"enabled":true,"name":"Weekly Promo","discount_multiplier":0.5,"schedule_mode":"weekly","weekdays":[1,2,3,4,5,6,7],"daily_start_time":"` + start + `","daily_end_time":"` + end + `","group_ids":[11]}`,
+		},
+	}, &config.Config{})
+
+	got := svc.resolveBillingRateMultiplier(context.Background(), &User{ID: 2001}, &APIKey{
+		ID:      1001,
+		GroupID: i64p(groupID),
+	})
+
+	require.InDelta(t, svc.cfg.Default.RateMultiplier*discount, got, 1e-12)
+}
+
 func TestOpenAIGatewayServiceRecordUsage_IncludesEndpointMetadata(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 	userRepo := &openAIRecordUsageUserRepoStub{}
