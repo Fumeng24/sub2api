@@ -209,6 +209,16 @@ export function buildAuthSourceDefaultsState(
   }, {} as AuthSourceDefaultsState);
 }
 
+function defaultAuthSourceDefaultsValue(): AuthSourceDefaultsValue {
+  return {
+    balance: AUTH_SOURCE_DEFAULT_BALANCE,
+    concurrency: AUTH_SOURCE_DEFAULT_CONCURRENCY,
+    subscriptions: [],
+    grant_on_signup: false,
+    grant_on_first_bind: false,
+  };
+}
+
 export function appendAuthSourceDefaultsToUpdateRequest(
   payload: UpdateSettingsRequest,
   authSourceDefaults: AuthSourceDefaultsState,
@@ -216,7 +226,7 @@ export function appendAuthSourceDefaultsToUpdateRequest(
   const target = payload as Record<string, unknown>;
 
   for (const source of AUTH_SOURCE_TYPES) {
-    const current = authSourceDefaults[source];
+    const current = authSourceDefaults[source] ?? defaultAuthSourceDefaultsValue();
     target[`auth_source_default_${source}_balance`] =
       Number(current.balance) || 0;
     target[`auth_source_default_${source}_concurrency`] = Math.max(
