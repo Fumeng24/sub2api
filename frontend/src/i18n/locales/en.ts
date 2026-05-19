@@ -4259,6 +4259,7 @@ export default {
       escalate: 'Escalate to super admin',
       escalateReasonPrompt: 'Enter an escalation reason (optional)',
       escalatedDone: 'Escalated to super admin',
+      viewImage: 'View image',
       balance: {
         operation: 'Balance operation',
         amount: 'Amount',
@@ -4295,10 +4296,12 @@ export default {
       replyPlaceholder: 'Write a reply, or enable admin-only note for internal context...',
       sendReply: 'Send Reply',
       replyAttachments: {
-        title: 'Attachment links',
+        title: 'Attachments',
         add: 'Add attachment',
         namePlaceholder: 'Name',
-        urlPlaceholder: 'https://...'
+        urlPlaceholder: 'https://... or choose an image',
+        chooseImage: 'Choose image',
+        imageSelected: 'Image selected'
       },
       failedToLoad: 'Failed to load tickets',
       failedToLoadDetail: 'Failed to load ticket details',
@@ -6452,16 +6455,20 @@ export default {
     noUnread: 'No unread',
     lastMessageAt: 'Last message',
     attachments: {
-      title: 'Attachment links',
+      title: 'Attachments',
       add: 'Add attachment',
       namePlaceholder: 'Name',
-      urlPlaceholder: 'https://...'
+      urlPlaceholder: 'https://... or choose an image',
+      chooseImage: 'Choose image',
+      imageSelected: 'Image selected'
     },
     replyAttachments: {
-      title: 'Attachment links',
+      title: 'Attachments',
       add: 'Add attachment',
       namePlaceholder: 'Name',
-      urlPlaceholder: 'https://...'
+      urlPlaceholder: 'https://... or choose an image',
+      chooseImage: 'Choose image',
+      imageSelected: 'Image selected'
     },
     context: {
       general: 'Context',
@@ -6501,7 +6508,10 @@ export default {
       body: 'Description',
       bodyPlaceholder: 'Describe the issue, request ID, time range, or relevant screenshot links.',
       bodyMinLength: 'Please write at least {count} characters. More detail helps support resolve it faster.',
-      imagePlaceholder: 'Paste an https image link for the payment or error screenshot',
+      imagePlaceholder: 'Or paste an image link for the payment or error screenshot',
+      chooseImage: 'Choose image',
+      imageSelected: 'Image selected',
+      viewImage: 'View image',
       amountPlaceholder: 'Enter the missing amount',
       orderAmount: 'Credit {amount}, paid {pay}',
       noRecentOrders: 'No recent recharge orders were found. Please include the order number and payment time in your description.',
@@ -6553,8 +6563,11 @@ export default {
       TICKET_TEMPLATE_FIELD_INVALID: 'Please complete the required fields for this ticket type',
       bodyTooShort: 'Description must be at least {count} characters',
       templateFieldRequired: 'Please fill in "{field}"',
-      imageURLRequired: '"{field}" must be a valid http(s) image link',
-      TICKET_ATTACHMENT_INVALID: 'Attachment name and URL must be valid http(s) links, up to 5 items',
+      imageURLRequired: 'Choose an image for "{field}" or enter a valid http(s) image link',
+      imageFileRequired: 'Please choose an image file',
+      imageTooLarge: 'Image must be at most {size}MB',
+      imageReadFailed: 'Failed to read image. Please choose it again.',
+      TICKET_ATTACHMENT_INVALID: 'Attachment name and link must be valid; images can be up to 2MB, up to 5 items',
       TICKET_CLOSED: 'Ticket is closed. Reopen it first',
       TICKET_NOT_FOUND: 'Ticket not found'
     }

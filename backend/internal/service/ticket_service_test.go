@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 	"time"
 
@@ -163,6 +164,31 @@ func TestTicketServiceCreateStoresInitialAttachments(t *testing.T) {
 	require.Equal(t, 1, repo.markReadCalls)
 }
 
+func TestTicketServiceAcceptsInlineImageAttachment(t *testing.T) {
+	repo := newTicketRepoStub(nil)
+	userRepo := &userRepoStub{user: &User{ID: 1, Email: "user@example.com", Role: RoleUser, Status: StatusActive}}
+	svc := NewTicketService(repo, userRepo, nil, nil)
+	dataURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("fake-png"))
+
+	ticket, err := svc.CreateForUser(context.Background(), &CreateTicketInput{
+		UserID:   1,
+		Subject:  "Cannot use model",
+		Body:     "Please check the request",
+		Category: TicketCategoryTechnical,
+		Priority: TicketPriorityHigh,
+		Attachments: []TicketAttachment{{
+			Name:        "screenshot.png",
+			URL:         dataURL,
+			ContentType: "image/png",
+			Size:        8,
+		}},
+	})
+
+	require.NoError(t, err)
+	require.NotZero(t, ticket.ID)
+	require.Equal(t, dataURL, repo.lastMessageCreatePayload.Attachments[0].URL)
+}
+
 func TestTicketServiceRejectsInvalidAttachmentURL(t *testing.T) {
 	repo := newTicketRepoStub(nil)
 	userRepo := &userRepoStub{user: &User{ID: 1, Email: "user@example.com", Role: RoleUser, Status: StatusActive}}
@@ -193,6 +219,70 @@ func TestTicketServiceRequiredImageFieldRequiresFieldValue(t *testing.T) {
 			Name: "unrelated-log.txt",
 			URL:  "https://example.com/log.txt",
 		}},
+	})
+
+	require.ErrorIs(t, err, ErrTicketTemplateFieldInvalid)
+	require.Nil(t, repo.ticket)
+}
+
+func TestTicketServiceImageFieldAcceptsInlineImageDataURL(t *testing.T) {
+	repo := newTicketRepoStub(nil)
+	userRepo := &userRepoStub{user: &User{ID: 1, Email: "user@example.com", Role: RoleUser, Status: StatusActive}}
+	svc := NewTicketService(repo, userRepo, nil, nil)
+	dataURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("fake-png"))
+
+	ticket, err := svc.CreateForUser(context.Background(), &CreateTicketInput{
+		UserID:      1,
+		Subject:     "Group cannot connect",
+		Body:        "The group cannot connect and shows an upstream error.",
+		TemplateKey: "group_connection_issue",
+		ContextData: map[string]any{
+			"group_id":         10,
+			"error_screenshot": dataURL,
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotZero(t, ticket.ID)
+	require.Equal(t, dataURL, repo.ticket.ContextData["error_screenshot"])
+}
+
+func TestTicketServiceImageFieldRejectsNonImageDataURL(t *testing.T) {
+	repo := newTicketRepoStub(nil)
+	userRepo := &userRepoStub{user: &User{ID: 1, Email: "user@example.com", Role: RoleUser, Status: StatusActive}}
+	svc := NewTicketService(repo, userRepo, nil, nil)
+	dataURL := "data:text/plain;base64," + base64.StdEncoding.EncodeToString([]byte("not an image"))
+
+	_, err := svc.CreateForUser(context.Background(), &CreateTicketInput{
+		UserID:      1,
+		Subject:     "Group cannot connect",
+		Body:        "The group cannot connect and shows an upstream error.",
+		TemplateKey: "group_connection_issue",
+		ContextData: map[string]any{
+			"group_id":         10,
+			"error_screenshot": dataURL,
+		},
+	})
+
+	require.ErrorIs(t, err, ErrTicketTemplateFieldInvalid)
+	require.Nil(t, repo.ticket)
+}
+
+func TestTicketServiceImageFieldRejectsSVGDataURL(t *testing.T) {
+	repo := newTicketRepoStub(nil)
+	userRepo := &userRepoStub{user: &User{ID: 1, Email: "user@example.com", Role: RoleUser, Status: StatusActive}}
+	svc := NewTicketService(repo, userRepo, nil, nil)
+	dataURL := "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString([]byte(`<svg onload="alert(1)"></svg>`))
+
+	_, err := svc.CreateForUser(context.Background(), &CreateTicketInput{
+		UserID:      1,
+		Subject:     "Group cannot connect",
+		Body:        "The group cannot connect and shows an upstream error.",
+		TemplateKey: "group_connection_issue",
+		ContextData: map[string]any{
+			"group_id":         10,
+			"error_screenshot": dataURL,
+		},
 	})
 
 	require.ErrorIs(t, err, ErrTicketTemplateFieldInvalid)

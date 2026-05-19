@@ -241,12 +241,65 @@
               @update:modelValue="setContextField(field.key, $event)"
             />
 
+            <div v-else-if="field.type === 'image'" class="space-y-2">
+              <input
+                :id="`ticket-image-${field.key}`"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                class="sr-only"
+                @change="handleImageFieldFile(field.key, $event)"
+              />
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <label
+                  :for="`ticket-image-${field.key}`"
+                  class="btn btn-secondary cursor-pointer justify-center sm:w-auto"
+                >
+                  <Icon name="upload" size="sm" class="mr-1" />
+                  {{ t('tickets.form.chooseImage') }}
+                </label>
+                <input
+                  :value="imageURLInputValue(field.key)"
+                  type="url"
+                  class="input flex-1"
+                  :placeholder="field.placeholder || t('tickets.form.imagePlaceholder')"
+                  @input="setContextField(field.key, eventText($event))"
+                />
+              </div>
+              <div
+                v-if="imagePreviewValue(field.key)"
+                class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-800"
+              >
+                <img
+                  :src="imagePreviewValue(field.key)"
+                  :alt="field.label"
+                  class="h-20 w-20 rounded-md object-cover"
+                />
+                <div class="min-w-0 flex-1 text-sm">
+                  <p class="truncate font-medium text-gray-900 dark:text-white">
+                    {{ imageFileName(field.key) || t('tickets.form.imageSelected') }}
+                  </p>
+                  <a
+                    :href="imagePreviewValue(field.key)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="mt-1 inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 dark:text-primary-400"
+                  >
+                    <Icon name="externalLink" size="xs" />
+                    {{ t('tickets.form.viewImage') }}
+                  </a>
+                </div>
+                <button type="button" class="btn btn-secondary btn-icon" :title="t('common.delete')" @click="clearImageField(field.key)">
+                  <Icon name="x" size="sm" />
+                </button>
+              </div>
+            </div>
+
             <input
               v-else
               :value="textFieldValue(field.key)"
-              :type="field.type === 'image' ? 'url' : 'text'"
+              type="text"
               class="input"
-              :placeholder="field.placeholder || (field.type === 'image' ? t('tickets.form.imagePlaceholder') : '')"
+              :placeholder="field.placeholder || ''"
               @input="setContextField(field.key, eventText($event))"
             />
 
@@ -404,6 +457,7 @@ import TicketAttachmentFields from '@/components/tickets/TicketAttachmentFields.
 import TicketAttachments from '@/components/tickets/TicketAttachments.vue'
 import TicketContextLink from '@/components/tickets/TicketContextLink.vue'
 
+const MAX_TICKET_IMAGE_BYTES = 2 * 1024 * 1024
 const { t } = useI18n()
 const route = useRoute()
 const appStore = useAppStore()
@@ -467,6 +521,7 @@ const createForm = reactive<{
 })
 
 const createContextData = createForm.context_data
+const imageFieldFiles = reactive<Record<string, string>>({})
 
 const columns = computed<Column[]>(() => [
   { key: 'subject', label: t('tickets.columns.subject'), sortable: true, class: 'min-w-[260px]' },
@@ -563,10 +618,69 @@ function selectFieldValue(key: string) {
 
 function setContextField(key: string, value: unknown) {
   createContextData[key] = value
+  if (typeof value !== 'string' || !isImageDataURL(value)) {
+    delete imageFieldFiles[key]
+  }
 }
 
 function eventText(event: Event) {
   return (event.target as HTMLInputElement | HTMLTextAreaElement | null)?.value || ''
+}
+
+function imageURLInputValue(key: string) {
+  const value = String(textFieldValue(key))
+  return isImageDataURL(value) ? '' : value
+}
+
+function imagePreviewValue(key: string) {
+  const value = String(textFieldValue(key)).trim()
+  return isImageReference(value) ? value : ''
+}
+
+function imageFileName(key: string) {
+  return imageFieldFiles[key] || ''
+}
+
+function clearImageField(key: string) {
+  delete createContextData[key]
+  delete imageFieldFiles[key]
+}
+
+async function handleImageFieldFile(key: string, event: Event) {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (input) input.value = ''
+  if (!file) return
+  if (!isAllowedInlineImageType(file.type)) {
+    appStore.showError(t('tickets.errors.imageFileRequired'))
+    return
+  }
+  if (file.size > MAX_TICKET_IMAGE_BYTES) {
+    appStore.showError(t('tickets.errors.imageTooLarge', { size: 2 }))
+    return
+  }
+  try {
+    const dataURL = await readFileAsDataURL(file)
+    createContextData[key] = dataURL
+    imageFieldFiles[key] = file.name
+  } catch {
+    appStore.showError(t('tickets.errors.imageReadFailed'))
+  }
+}
+
+function readFileAsDataURL(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+      } else {
+        reject(new Error('invalid file reader result'))
+      }
+    }
+    reader.onerror = () => reject(reader.error || new Error('failed to read file'))
+    reader.readAsDataURL(file)
+  })
 }
 
 function eventChecked(event: Event) {
@@ -703,6 +817,9 @@ function clearCreateContextData() {
   for (const key of Object.keys(createContextData)) {
     delete createContextData[key]
   }
+  for (const key of Object.keys(imageFieldFiles)) {
+    delete imageFieldFiles[key]
+  }
 }
 
 function handleTemplateChange() {
@@ -780,7 +897,7 @@ function validateTemplateSubmission() {
       appStore.showError(t('tickets.errors.templateFieldRequired', { field: field.label }))
       return false
     }
-    if ((field.type === 'image') && typeof value === 'string' && value.trim() && !isHTTPURL(value)) {
+    if ((field.type === 'image') && typeof value === 'string' && value.trim() && !isImageReference(value)) {
       appStore.showError(t('tickets.errors.imageURLRequired', { field: field.label }))
       return false
     }
@@ -811,6 +928,11 @@ function isEmptyTemplateValue(value: unknown) {
   return false
 }
 
+function isImageReference(value: string) {
+  const trimmed = value.trim()
+  return isHTTPURL(trimmed) || isImageDataURL(trimmed)
+}
+
 function isHTTPURL(value: string) {
   try {
     const parsed = new URL(value.trim())
@@ -818,6 +940,14 @@ function isHTTPURL(value: string) {
   } catch {
     return false
   }
+}
+
+function isImageDataURL(value: string) {
+  return /^data:image\/(?:png|jpe?g|webp|gif);base64,/.test(value.trim())
+}
+
+function isAllowedInlineImageType(value: string) {
+  return ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(value.toLowerCase())
 }
 
 function formatAmount(value: number) {

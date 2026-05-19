@@ -4415,6 +4415,7 @@ export default {
       escalate: '转给超级管理员',
       escalateReasonPrompt: '请输入转交原因（可选）',
       escalatedDone: '已转给超级管理员',
+      viewImage: '查看图片',
       balance: {
         operation: '余额操作',
         amount: '金额',
@@ -4451,10 +4452,12 @@ export default {
       replyPlaceholder: '输入回复内容，勾选后将作为内部备注保存...',
       sendReply: '发送回复',
       replyAttachments: {
-        title: '附件链接',
+        title: '附件',
         add: '添加附件',
         namePlaceholder: '名称',
-        urlPlaceholder: 'https://...'
+        urlPlaceholder: 'https://... 或选择图片',
+        chooseImage: '选择图片',
+        imageSelected: '已选择图片'
       },
       failedToLoad: '加载工单失败',
       failedToLoadDetail: '加载工单详情失败',
@@ -6611,16 +6614,20 @@ export default {
     noUnread: '无未读',
     lastMessageAt: '最后消息',
     attachments: {
-      title: '附件链接',
+      title: '附件',
       add: '添加附件',
       namePlaceholder: '名称',
-      urlPlaceholder: 'https://...'
+      urlPlaceholder: 'https://... 或选择图片',
+      chooseImage: '选择图片',
+      imageSelected: '已选择图片'
     },
     replyAttachments: {
-      title: '附件链接',
+      title: '附件',
       add: '添加附件',
       namePlaceholder: '名称',
-      urlPlaceholder: 'https://...'
+      urlPlaceholder: 'https://... 或选择图片',
+      chooseImage: '选择图片',
+      imageSelected: '已选择图片'
     },
     context: {
       general: '关联上下文',
@@ -6660,7 +6667,10 @@ export default {
       body: '问题描述',
       bodyPlaceholder: '请尽量说明你遇到的问题、请求 ID、时间范围或相关截图链接。',
       bodyMinLength: '请至少填写 {count} 个字，描述越具体处理越快。',
-      imagePlaceholder: '请粘贴支付宝/微信截图或报错截图的 https 图片链接',
+      imagePlaceholder: '也可以粘贴支付宝/微信截图或报错截图的图片链接',
+      chooseImage: '选择图片',
+      imageSelected: '已选择图片',
+      viewImage: '查看图片',
       amountPlaceholder: '请输入未到账金额',
       orderAmount: '到账金额 {amount}，支付金额 {pay}',
       noRecentOrders: '未找到最近充值记录，请在描述中补充订单号和付款时间。',
@@ -6712,8 +6722,11 @@ export default {
       TICKET_TEMPLATE_FIELD_INVALID: '请按工单类型要求补全必填信息',
       bodyTooShort: '问题描述至少需要 {count} 个字',
       templateFieldRequired: '请填写「{field}」',
-      imageURLRequired: '「{field}」必须是有效的 http(s) 图片链接',
-      TICKET_ATTACHMENT_INVALID: '附件名称和链接必须是有效 http(s) 地址，最多 5 个',
+      imageURLRequired: '「{field}」请选择图片，或填写有效的 http(s) 图片链接',
+      imageFileRequired: '请选择图片文件',
+      imageTooLarge: '图片不能超过 {size}MB',
+      imageReadFailed: '读取图片失败，请重新选择',
+      TICKET_ATTACHMENT_INVALID: '附件名称和链接必须有效，图片最大 2MB，最多 5 个',
       TICKET_CLOSED: '工单已关闭，请先重新打开',
       TICKET_NOT_FOUND: '工单不存在'
     }

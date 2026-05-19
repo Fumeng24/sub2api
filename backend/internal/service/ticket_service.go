@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -23,12 +24,21 @@ const (
 	maxTicketAttachmentNameLen        = 120
 	maxTicketAttachmentURLLen         = 1000
 	maxTicketAttachmentTypeLen        = 100
+	maxTicketInlineImageBytes         = 2 * 1024 * 1024
+	maxTicketInlineImageDataURLLen    = 3 * 1024 * 1024
 	ticketNotificationTimeout         = 30 * time.Second
 	defaultTicketNotificationSiteName = "Sub2API"
 	ticketSLAWorkerDefaultInterval    = 5 * time.Minute
 	ticketSLAWorkerMinInterval        = 30 * time.Second
 	ticketSLAWorkerBatchSize          = 100
 )
+
+var ticketInlineImageContentTypes = map[string]struct{}{
+	"image/gif":  {},
+	"image/jpeg": {},
+	"image/png":  {},
+	"image/webp": {},
+}
 
 type TicketService struct {
 	ticketRepo   TicketRepository
@@ -1169,12 +1179,23 @@ func validateTicketTemplateField(field TicketTemplateField, value any) error {
 		return nil
 	}
 	switch field.Type {
-	case TicketTemplateFieldText, TicketTemplateFieldTextarea, TicketTemplateFieldImage:
+	case TicketTemplateFieldText, TicketTemplateFieldTextarea:
 		text := strings.TrimSpace(fmt.Sprint(value))
 		if field.MinLength > 0 && len([]rune(text)) < field.MinLength {
 			return ErrTicketTemplateFieldInvalid
 		}
 		if field.MaxLength > 0 && len([]rune(text)) > field.MaxLength {
+			return ErrTicketTemplateFieldInvalid
+		}
+	case TicketTemplateFieldImage:
+		text := strings.TrimSpace(fmt.Sprint(value))
+		if field.MinLength > 0 && len([]rune(text)) < field.MinLength {
+			return ErrTicketTemplateFieldInvalid
+		}
+		if field.MaxLength > 0 && len([]rune(text)) > field.MaxLength {
+			return ErrTicketTemplateFieldInvalid
+		}
+		if !isValidTicketImageRef(text) {
 			return ErrTicketTemplateFieldInvalid
 		}
 	case TicketTemplateFieldSelect:
@@ -1228,6 +1249,48 @@ func ticketFieldSatisfiedByAttachment(field TicketTemplateField, attachments []T
 		return false
 	}
 	return len(attachments) > 0
+}
+
+func isValidTicketImageRef(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	if isTicketHTTPURL(value) {
+		return true
+	}
+	return isValidTicketImageDataURL(value)
+}
+
+func isTicketHTTPURL(value string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil || parsed == nil || parsed.Host == "" {
+		return false
+	}
+	return parsed.Scheme == "http" || parsed.Scheme == "https"
+}
+
+func isValidTicketImageDataURL(value string) bool {
+	if len(value) > maxTicketInlineImageDataURLLen {
+		return false
+	}
+	prefix, rawBase64, ok := strings.Cut(value, ",")
+	if !ok || rawBase64 == "" {
+		return false
+	}
+	prefix = strings.ToLower(strings.TrimSpace(prefix))
+	if !strings.HasPrefix(prefix, "data:") || !strings.Contains(prefix, ";base64") {
+		return false
+	}
+	contentType := strings.TrimPrefix(strings.SplitN(prefix, ";", 2)[0], "data:")
+	if _, ok := ticketInlineImageContentTypes[contentType]; !ok {
+		return false
+	}
+	decoded, err := base64.StdEncoding.DecodeString(rawBase64)
+	if err != nil {
+		return false
+	}
+	return len(decoded) > 0 && len(decoded) <= maxTicketInlineImageBytes
 }
 
 func numericTicketValue(value any) (float64, bool) {
@@ -1448,16 +1511,15 @@ func normalizeTicketAttachments(in []TicketAttachment) ([]TicketAttachment, erro
 			return nil, ErrTicketAttachmentInvalid
 		}
 		if len(name) > maxTicketAttachmentNameLen ||
-			len(rawURL) > maxTicketAttachmentURLLen ||
 			len(contentType) > maxTicketAttachmentTypeLen ||
 			item.Size < 0 {
 			return nil, ErrTicketAttachmentInvalid
 		}
-		parsed, err := url.Parse(rawURL)
-		if err != nil || parsed == nil || parsed.Host == "" {
-			return nil, ErrTicketAttachmentInvalid
-		}
-		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		if isTicketHTTPURL(rawURL) {
+			if len(rawURL) > maxTicketAttachmentURLLen {
+				return nil, ErrTicketAttachmentInvalid
+			}
+		} else if !isValidTicketImageDataURL(rawURL) {
 			return nil, ErrTicketAttachmentInvalid
 		}
 		out = append(out, TicketAttachment{
@@ -1677,6 +1739,12 @@ func buildTicketAttachmentEmailList(attachments []TicketAttachment) string {
 	var b strings.Builder
 	_, _ = b.WriteString("<p><strong>附件：</strong></p><ul>")
 	for _, item := range attachments {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(item.URL)), "data:image/") {
+			_, _ = b.WriteString("<li>")
+			_, _ = b.WriteString(html.EscapeString(item.Name))
+			_, _ = b.WriteString("（图片已随工单提交，请登录后台查看）</li>")
+			continue
+		}
 		_, _ = b.WriteString("<li><a href=\"")
 		_, _ = b.WriteString(html.EscapeString(item.URL))
 		_, _ = b.WriteString("\">")

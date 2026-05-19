@@ -223,7 +223,24 @@
                   class="rounded-md bg-white px-3 py-2 text-gray-600 dark:bg-dark-900 dark:text-gray-300"
                 >
                   <span class="font-medium text-gray-900 dark:text-white">{{ item.key }}:</span>
-                  <span class="ml-1 break-words">{{ item.value }}</span>
+                  <a
+                    v-if="item.image"
+                    :href="item.value"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="mt-2 block"
+                  >
+                    <img
+                      :src="item.value"
+                      :alt="item.key"
+                      class="max-h-36 max-w-full rounded-md border border-gray-200 object-contain dark:border-dark-700"
+                    />
+                    <span class="mt-1 inline-flex items-center gap-1 text-primary-600 dark:text-primary-400">
+                      <Icon name="externalLink" size="xs" />
+                      {{ t('admin.tickets.viewImage') }}
+                    </span>
+                  </a>
+                  <span v-else class="ml-1 break-words">{{ item.value }}</span>
                 </div>
               </div>
             </div>
@@ -685,7 +702,11 @@ const contextEntries = computed(() => {
   return Object.entries(data)
     .filter(([, value]) => value !== null && value !== undefined && value !== '')
     .slice(0, 12)
-    .map(([key, value]) => ({ key, value: stringifyContextValue(value) }))
+    .map(([key, value]) => ({
+      key,
+      value: stringifyContextValue(value),
+      image: typeof value === 'string' && isImageReference(value)
+    }))
 })
 
 function stringifyContextValue(value: unknown): string {
@@ -699,6 +720,10 @@ function stringifyContextValue(value: unknown): string {
     return JSON.stringify(value)
   }
   return String(value)
+}
+
+function isImageReference(value: string) {
+  return /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(value) || /\.(png|jpe?g|webp|gif)(\?|#|$)/i.test(value)
 }
 
 const statsCards = computed(() => {
