@@ -328,6 +328,16 @@
             <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
           </template>
 
+          <template #cell-actions="{ row }">
+            <button
+              class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+              @click="openUsageTicket(row)"
+            >
+              <Icon name="chatBubble" size="sm" />
+              {{ t('tickets.createTicket') }}
+            </button>
+          </template>
+
           <template #empty>
             <EmptyState :message="t('usage.noRecords')" />
           </template>
@@ -520,6 +530,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { usageAPI, keysAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -541,6 +552,7 @@ import { resolveUsageRequestType } from '@/utils/usageRequestType'
 import { getBillingModeLabel, getBillingModeBadgeClass } from '@/utils/billingMode'
 
 const { t } = useI18n()
+const router = useRouter()
 const appStore = useAppStore()
 
 let abortController: AbortController | null = null
@@ -570,7 +582,8 @@ const columns = computed<Column[]>(() => [
   { key: 'first_token', label: t('usage.firstToken'), sortable: false },
   { key: 'duration', label: t('usage.duration'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
-  { key: 'user_agent', label: t('usage.userAgent'), sortable: false }
+  { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
+  { key: 'actions', label: t('common.actions'), sortable: false }
 ])
 
 const usageLogs = ref<UsageLog[]>([])
@@ -656,6 +669,18 @@ const getRequestTypeLabel = (log: UsageLog): string => {
   if (requestType === 'stream') return t('usage.stream')
   if (requestType === 'sync') return t('usage.sync')
   return t('usage.unknown')
+}
+
+function openUsageTicket(row: UsageLog) {
+  router.push({
+    path: '/tickets',
+    query: {
+      new: '1',
+      context_type: 'usage',
+      context_id: String(row.id),
+      subject: `${t('usage.title')} #${row.id}`
+    }
+  })
 }
 
 const getRequestTypeBadgeClass = (log: UsageLog): string => {

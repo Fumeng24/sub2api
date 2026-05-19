@@ -17,7 +17,15 @@ func NewAdminAuthMiddleware(
 	userService *service.UserService,
 	settingService *service.SettingService,
 ) AdminAuthMiddleware {
-	return AdminAuthMiddleware(adminAuth(authService, userService, settingService))
+	return AdminAuthMiddleware(roleAuth(authService, userService, settingService, false))
+}
+
+func NewAdminOrSupportAuthMiddleware(
+	authService *service.AuthService,
+	userService *service.UserService,
+	settingService *service.SettingService,
+) AdminOrSupportAuthMiddleware {
+	return AdminOrSupportAuthMiddleware(roleAuth(authService, userService, settingService, true))
 }
 
 // adminAuth 管理员认证中间件实现
@@ -28,6 +36,15 @@ func adminAuth(
 	authService *service.AuthService,
 	userService *service.UserService,
 	settingService *service.SettingService,
+) gin.HandlerFunc {
+	return roleAuth(authService, userService, settingService, false)
+}
+
+func roleAuth(
+	authService *service.AuthService,
+	userService *service.UserService,
+	settingService *service.SettingService,
+	allowSupport bool,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// WebSocket upgrade requests cannot set Authorization headers in browsers.
@@ -64,7 +81,7 @@ func adminAuth(
 					AbortWithError(c, 401, "UNAUTHORIZED", "Authorization required")
 					return
 				}
-				if !validateJWTForAdmin(c, token, authService, userService) {
+				if !validateJWTForRole(c, token, authService, userService, allowSupport) {
 					return
 				}
 				c.Next()
@@ -157,6 +174,16 @@ func validateJWTForAdmin(
 	authService *service.AuthService,
 	userService *service.UserService,
 ) bool {
+	return validateJWTForRole(c, token, authService, userService, false)
+}
+
+func validateJWTForRole(
+	c *gin.Context,
+	token string,
+	authService *service.AuthService,
+	userService *service.UserService,
+	allowSupport bool,
+) bool {
 	// 验证 JWT token
 	claims, err := authService.ValidateToken(token)
 	if err != nil {
@@ -188,7 +215,7 @@ func validateJWTForAdmin(
 	}
 
 	// 检查管理员权限
-	if !user.IsAdmin() {
+	if !user.IsAdmin() && !(allowSupport && user.IsSupport()) {
 		AbortWithError(c, 403, "FORBIDDEN", "Admin access required")
 		return false
 	}

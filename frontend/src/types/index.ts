@@ -84,7 +84,7 @@ export interface User {
   linuxdo_bound?: boolean
   oidc_bound?: boolean
   wechat_bound?: boolean
-  role: 'admin' | 'user' // User role for authorization
+  role: 'admin' | 'support' | 'user' // User role for authorization
   balance: number // User balance for API usage
   concurrency: number // Allowed concurrent requests
   rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit
@@ -383,6 +383,172 @@ export interface AnnouncementUserReadStatus {
   balance: number
   eligible: boolean
   read_at?: string
+}
+
+// ==================== Support Ticket Types ====================
+
+export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed'
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
+export type TicketCategory = 'general' | 'billing' | 'usage' | 'technical' | 'account'
+export type TicketMessageSenderType = 'user' | 'admin' | 'system'
+export type TicketMessageVisibility = 'public' | 'internal'
+export type TicketTemplateFieldType =
+  | 'text'
+  | 'textarea'
+  | 'select'
+  | 'group_select'
+  | 'recent_orders'
+  | 'amount'
+  | 'image'
+  | 'attachments'
+
+export interface TicketAttachment {
+  name: string
+  url: string
+  content_type?: string
+  size?: number
+}
+
+export interface TicketMessage {
+  id: number
+  ticket_id: number
+  sender_type: TicketMessageSenderType
+  sender_id?: number | null
+  sender_name: string
+  visibility: TicketMessageVisibility
+  body: string
+  attachments?: TicketAttachment[]
+  edited_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Ticket {
+  id: number
+  ticket_no: string
+  user_id: number
+  user_email: string
+  user_name: string
+  subject: string
+  category: TicketCategory
+  priority: TicketPriority
+  status: TicketStatus
+  source: string
+  template_key: string
+  context_type: string
+  context_id: string
+  context_data?: Record<string, unknown>
+  assignee_id?: number | null
+  escalated_at?: string | null
+  escalated_by?: number | null
+  escalation_reason?: string
+  last_message_at: string
+  last_user_message_at?: string | null
+  last_admin_message_at?: string | null
+  resolved_at?: string | null
+  closed_at?: string | null
+  unread_count: number
+  messages?: TicketMessage[]
+  created_at: string
+  updated_at: string
+}
+
+export interface TicketUnreadSummary {
+  total: number
+  open: number
+  pending: number
+  resolved: number
+  closed: number
+}
+
+export interface TicketStats {
+  total: number
+  open: number
+  pending: number
+  resolved: number
+  closed: number
+  unassigned: number
+  assigned_to_me: number
+  handled_by_me: number
+  escalated: number
+  sla_overdue: number
+  unread: number
+}
+
+export interface TicketTemplateOption {
+  value: string
+  label: string
+}
+
+export interface TicketTemplateField {
+  key: string
+  label: string
+  type: TicketTemplateFieldType | string
+  required?: boolean
+  min_length?: number
+  max_length?: number
+  min_value?: number
+  options?: TicketTemplateOption[]
+  description?: string
+  placeholder?: string
+}
+
+export interface TicketTemplate {
+  key: string
+  name: string
+  description?: string
+  category: TicketCategory | string
+  priority: TicketPriority | string
+  subject_template?: string
+  body_min_length?: number
+  requires_super_admin?: boolean
+  auto_assign_super_admin?: boolean
+  context_type?: string
+  fields?: TicketTemplateField[]
+}
+
+export type TicketPrefillGroup = Pick<Group, 'id' | 'name' | 'rate_multiplier' | 'platform' | 'status'>
+
+export interface TicketPrefillOrder {
+  id: number
+  order_no?: string
+  amount: number
+  pay_amount?: number
+  status: string
+  order_type?: string
+  payment_type?: string
+  out_trade_no?: string
+  created_at: string
+}
+
+export interface TicketPrefillData {
+  groups?: TicketPrefillGroup[]
+  recent_orders?: TicketPrefillOrder[]
+}
+
+export interface CreateTicketRequest {
+  subject: string
+  body: string
+  category?: TicketCategory | string
+  priority?: TicketPriority | string
+  template_key?: string
+  context_type?: string
+  context_id?: string
+  context_data?: Record<string, unknown>
+  attachments?: TicketAttachment[]
+}
+
+export interface AddTicketMessageRequest {
+  body: string
+  internal?: boolean
+  attachments?: TicketAttachment[]
+}
+
+export interface UpdateTicketRequest {
+  status?: TicketStatus | string
+  priority?: TicketPriority | string
+  category?: TicketCategory | string
+  assignee_id?: number
 }
 
 // ==================== Proxy Node Types ====================
@@ -1496,7 +1662,7 @@ export interface UpdateUserRequest {
   password?: string
   username?: string
   notes?: string
-  role?: 'admin' | 'user'
+  role?: 'admin' | 'support' | 'user'
   balance?: number
   concurrency?: number
   status?: 'active' | 'disabled'

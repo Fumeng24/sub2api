@@ -343,6 +343,8 @@ export default {
   nav: {
     dashboard: 'Dashboard',
     announcements: 'Announcements',
+    tickets: 'Tickets',
+    ticketManagement: 'Ticket Management',
     apiKeys: 'API Keys',
     usage: 'Usage',
     redeem: 'Redeem',
@@ -1708,6 +1710,7 @@ export default {
       searchGroups: 'Search groups...',
       fuzzySearch: 'Fuzzy search',
       admin: 'Admin',
+      support: 'Support',
       user: 'User',
       disabled: 'Disabled',
       email: 'Email',
@@ -1728,7 +1731,8 @@ export default {
       form: {
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
-        rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.'
+        rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.',
+        supportRoleHint: 'Support agents can only enter ticket management: claim and reply to ordinary tickets, without user, balance, or system settings access.'
       },
       columns: {
         user: 'User',
@@ -1856,6 +1860,7 @@ export default {
       totalRecharged: 'Total Recharged',
       roles: {
         admin: 'Admin',
+        support: 'Support',
         user: 'User'
       },
       // Settings Dropdowns
@@ -4220,6 +4225,153 @@ export default {
       deleteConfirm: 'Are you sure you want to delete this announcement? This action cannot be undone.'
     },
 
+    // Tickets
+    tickets: {
+      title: 'Ticket Management',
+      description: 'Review and respond to user support tickets',
+      searchPlaceholder: 'Search tickets, subjects, or users...',
+      viewDetail: 'View',
+      empty: 'No tickets',
+      emptyDescription: 'There are no user support tickets to handle right now.',
+      detailTitle: 'Ticket Details',
+      unassigned: 'Unassigned',
+      internalNote: 'Internal Note',
+      unreadCount: '{count} unread',
+      noUnread: 'No unread',
+      stats: {
+        total: 'Total',
+        unassigned: 'Unassigned',
+        assignedToMe: 'Assigned to me',
+        handledByMe: 'Handled by me',
+        escalated: 'Escalated',
+        slaOverdue: 'SLA overdue'
+      },
+      queue: {
+        all: 'All queues',
+        mine: 'My tickets',
+        support: 'Support queue',
+        allNormal: 'All ordinary tickets',
+        superAdmin: 'Super admin queue'
+      },
+      escalated: 'Escalated',
+      claim: 'Claim',
+      claimed: 'Ticket claimed',
+      escalate: 'Escalate to super admin',
+      escalateReasonPrompt: 'Enter an escalation reason (optional)',
+      escalatedDone: 'Escalated to super admin',
+      balance: {
+        operation: 'Balance operation',
+        amount: 'Amount',
+        notes: 'Notes',
+        notesPlaceholder: 'e.g. credit for missing recharge',
+        add: 'Add balance',
+        subtract: 'Subtract balance',
+        set: 'Set exact balance',
+        apply: 'Apply',
+        done: 'Balance adjusted',
+        failed: 'Failed to adjust balance'
+      },
+      bulk: {
+        selected: '{count} selected',
+        apply: 'Apply',
+        updated: 'Updated {count} tickets',
+        keepStatus: 'Keep status',
+        keepPriority: 'Keep priority',
+        keepCategory: 'Keep category'
+      },
+      autoClose: {
+        button: 'Auto Close',
+        title: 'Auto-close resolved tickets',
+        description: 'Close resolved tickets whose resolved time is older than the configured number of days.',
+        days: 'Resolved for at least days',
+        confirm: 'Close Tickets',
+        done: 'Closed {count} tickets'
+      },
+      saveChanges: 'Save Changes',
+      updated: 'Ticket updated',
+      replied: 'Reply sent',
+      reply: 'Reply',
+      internalReply: 'Admin-only note',
+      replyPlaceholder: 'Write a reply, or enable admin-only note for internal context...',
+      sendReply: 'Send Reply',
+      replyAttachments: {
+        title: 'Attachment links',
+        add: 'Add attachment',
+        namePlaceholder: 'Name',
+        urlPlaceholder: 'https://...'
+      },
+      failedToLoad: 'Failed to load tickets',
+      failedToLoadDetail: 'Failed to load ticket details',
+      failedToUpdate: 'Failed to update ticket',
+      failedToReply: 'Failed to send reply',
+      columns: {
+        subject: 'Subject',
+        user: 'User',
+        status: 'Status',
+        priority: 'Priority',
+        category: 'Category',
+        assignee: 'Assignee',
+        lastMessageAt: 'Last Message',
+        unread: 'Unread'
+      },
+      form: {
+        status: 'Status',
+        priority: 'Priority',
+        category: 'Category',
+        assigneeId: 'Assignee Admin ID',
+        assigneePlaceholder: '0',
+        assigneeHint: 'Use 0 to clear the assignee.'
+      },
+      filters: {
+        allStatus: 'All Status',
+        allPriority: 'All Priority',
+        allCategory: 'All Categories',
+        allAssignees: 'All Assignees',
+        allUnread: 'All',
+        onlyUnread: 'Unread only',
+        unassigned: 'Unassigned',
+        assignedToMe: 'Assigned to me'
+      },
+      status: {
+        open: 'Open',
+        pending: 'Replied',
+        resolved: 'Resolved',
+        closed: 'Closed'
+      },
+      priority: {
+        low: 'Low',
+        normal: 'Normal',
+        high: 'High',
+        urgent: 'Urgent'
+      },
+      category: {
+        general: 'General',
+        billing: 'Billing',
+        usage: 'Usage',
+        technical: 'Technical',
+        account: 'Account'
+      },
+      sender: {
+        user: 'User',
+        admin: 'Admin',
+        system: 'System'
+      },
+      errors: {
+        TICKET_INPUT_REQUIRED: 'Ticket input is required',
+        TICKET_SUBJECT_INVALID: 'Ticket subject is required and must be at most 200 characters',
+        TICKET_BODY_REQUIRED: 'Message body is required',
+        TICKET_STATUS_INVALID: 'Invalid ticket status',
+        TICKET_PRIORITY_INVALID: 'Invalid ticket priority',
+        TICKET_CATEGORY_INVALID: 'Invalid ticket category',
+        TICKET_PERMISSION_DENIED: 'You do not have permission to handle this ticket',
+        TICKET_ASSIGNEE_INVALID: 'Tickets can only be assigned to active admins or support agents',
+        TICKET_ATTACHMENT_INVALID: 'Attachment name and URL must be valid http(s) links, up to 5 items',
+        TICKET_IDS_REQUIRED: 'Please select at least one ticket',
+        TICKET_CLOSED: 'Ticket is closed',
+        TICKET_NOT_FOUND: 'Ticket not found'
+      }
+    },
+
     // Promo Codes
     promo: {
       title: 'Promo Code Management',
@@ -6283,6 +6435,129 @@ export default {
     emptyDescription: 'There are no system announcements at this time',
     readStatus: 'You have read this announcement',
     markReadHint: 'Click "Mark as read" to mark this announcement'
+  },
+
+  // Tickets Page
+  tickets: {
+    title: 'Tickets',
+    description: 'Submit issues and view support replies',
+    searchPlaceholder: 'Search ticket subject or number...',
+    createTicket: 'Create Ticket',
+    submitTicket: 'Submit Ticket',
+    viewDetail: 'View',
+    detailTitle: 'Ticket Details',
+    empty: 'No tickets',
+    emptyDescription: 'Create a ticket when you need help. Admin replies will appear here.',
+    unreadCount: '{count} unread',
+    noUnread: 'No unread',
+    lastMessageAt: 'Last message',
+    attachments: {
+      title: 'Attachment links',
+      add: 'Add attachment',
+      namePlaceholder: 'Name',
+      urlPlaceholder: 'https://...'
+    },
+    replyAttachments: {
+      title: 'Attachment links',
+      add: 'Add attachment',
+      namePlaceholder: 'Name',
+      urlPlaceholder: 'https://...'
+    },
+    context: {
+      general: 'Context',
+      usage: 'Usage',
+      order: 'Order',
+      api_key: 'API Key'
+    },
+    closeTicket: 'Close Ticket',
+    reopenTicket: 'Reopen',
+    closedReplyHint: 'This ticket is closed. Reopen it before continuing the conversation.',
+    reply: 'Reply',
+    replyPlaceholder: 'Add more details, screenshot links, or troubleshooting context...',
+    sendReply: 'Send Reply',
+    created: 'Ticket created',
+    replySent: 'Reply sent',
+    closed: 'Ticket closed',
+    reopened: 'Ticket reopened',
+    failedToLoad: 'Failed to load tickets',
+    failedToCreate: 'Failed to create ticket',
+    failedToLoadDetail: 'Failed to load ticket details',
+    failedToReply: 'Failed to send reply',
+    failedToUpdate: 'Failed to update ticket',
+    columns: {
+      subject: 'Subject',
+      status: 'Status',
+      category: 'Category',
+      priority: 'Priority',
+      lastMessageAt: 'Last Message',
+      unread: 'Unread'
+    },
+    form: {
+      template: 'Issue Type',
+      superAdminHint: 'This issue type cannot be handled by ordinary support. It will be escalated to super admin and send an email notice.',
+      subject: 'Subject',
+      category: 'Category',
+      priority: 'Priority',
+      body: 'Description',
+      bodyPlaceholder: 'Describe the issue, request ID, time range, or relevant screenshot links.',
+      bodyMinLength: 'Please write at least {count} characters. More detail helps support resolve it faster.',
+      imagePlaceholder: 'Paste an https image link for the payment or error screenshot',
+      amountPlaceholder: 'Enter the missing amount',
+      orderAmount: 'Credit {amount}, paid {pay}',
+      noRecentOrders: 'No recent recharge orders were found. Please include the order number and payment time in your description.',
+      contextType: 'Context Type',
+      contextTypePlaceholder: 'usage / order / api_key',
+      contextId: 'Context ID',
+      contextIdPlaceholder: 'Related record ID'
+    },
+    filters: {
+      allStatus: 'All Status',
+      allPriority: 'All Priority',
+      allCategory: 'All Categories',
+      allUnread: 'All',
+      onlyUnread: 'Unread only'
+    },
+    status: {
+      open: 'Open',
+      pending: 'Replied',
+      resolved: 'Resolved',
+      closed: 'Closed'
+    },
+    priority: {
+      low: 'Low',
+      normal: 'Normal',
+      high: 'High',
+      urgent: 'Urgent'
+    },
+    category: {
+      general: 'General',
+      billing: 'Billing',
+      usage: 'Usage',
+      technical: 'Technical',
+      account: 'Account'
+    },
+    sender: {
+      user: 'Me',
+      admin: 'Support',
+      system: 'System'
+    },
+    errors: {
+      requiredFields: 'Please fill in the subject and description',
+      TICKET_INPUT_REQUIRED: 'Ticket input is required',
+      TICKET_SUBJECT_INVALID: 'Ticket subject is required and must be at most 200 characters',
+      TICKET_BODY_REQUIRED: 'Message body is required',
+      TICKET_STATUS_INVALID: 'Invalid ticket status',
+      TICKET_PRIORITY_INVALID: 'Invalid ticket priority',
+      TICKET_CATEGORY_INVALID: 'Invalid ticket category',
+      TICKET_TEMPLATE_INVALID: 'Invalid ticket type',
+      TICKET_TEMPLATE_FIELD_INVALID: 'Please complete the required fields for this ticket type',
+      bodyTooShort: 'Description must be at least {count} characters',
+      templateFieldRequired: 'Please fill in "{field}"',
+      imageURLRequired: '"{field}" must be a valid http(s) image link',
+      TICKET_ATTACHMENT_INVALID: 'Attachment name and URL must be valid http(s) links, up to 5 items',
+      TICKET_CLOSED: 'Ticket is closed. Reopen it first',
+      TICKET_NOT_FOUND: 'Ticket not found'
+    }
   },
 
   // User Subscriptions Page

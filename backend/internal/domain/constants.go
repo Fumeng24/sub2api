@@ -13,6 +13,7 @@ const (
 // Role constants
 const (
 	RoleAdmin = "admin"
+	RoleSupport = "support"
 	RoleUser  = "user"
 )
 

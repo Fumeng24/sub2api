@@ -361,6 +361,14 @@
                 <Icon name="edit" size="sm" />
                 <span class="text-xs">{{ t('common.edit') }}</span>
               </button>
+              <!-- Support Ticket Button -->
+              <button
+                @click="openKeyTicket(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20 dark:hover:text-primary-400"
+              >
+                <Icon name="chatBubble" size="sm" />
+                <span class="text-xs">{{ t('tickets.createTicket') }}</span>
+              </button>
               <!-- Delete Button -->
               <button
                 @click="confirmDelete(row)"
@@ -1091,6 +1099,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { useClipboard } from '@/composables/useClipboard'
@@ -1121,6 +1130,7 @@ import {
 } from '@/utils/ccswitchImport'
 
 const { t } = useI18n()
+const router = useRouter()
 
 // Helper to format date for datetime-local input
 const formatDateTimeLocal = (isoDate: string): string => {
@@ -1449,6 +1459,18 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
   sortState.value.sort_order = order
   pagination.value.page = 1
   loadApiKeys()
+}
+
+function openKeyTicket(row: ApiKey) {
+  router.push({
+    path: '/tickets',
+    query: {
+      new: '1',
+      context_type: 'api_key',
+      context_id: String(row.id),
+      subject: `${t('keys.apiKey')} #${row.id}`
+    }
+  })
 }
 
 const editKey = (key: ApiKey) => {

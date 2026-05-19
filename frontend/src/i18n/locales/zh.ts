@@ -343,6 +343,8 @@ export default {
   nav: {
     dashboard: '仪表盘',
     announcements: '公告',
+    tickets: '工单',
+    ticketManagement: '工单管理',
     apiKeys: 'API 密钥',
     usage: '使用记录',
     redeem: '兑换',
@@ -1734,6 +1736,7 @@ export default {
       statusFilter: '状态筛选',
       allStatuses: '全部状态',
       admin: '管理员',
+      support: '客服',
       user: '用户',
       disabled: '禁用',
       email: '邮箱',
@@ -1807,6 +1810,7 @@ export default {
       deleteConfirm: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
       roles: {
         admin: '管理员',
+        support: '客服',
         user: '用户'
       },
       form: {
@@ -1827,7 +1831,8 @@ export default {
         selectStatus: '选择状态',
         rpmLimit: '每分钟请求数 (RPM)',
         rpmLimitPlaceholder: '0 表示不限制',
-        rpmLimitHint: '该用户每分钟最大请求数，0 = 不限制；仅在所用分组未设置 rpm_limit 时作为兜底生效'
+        rpmLimitHint: '该用户每分钟最大请求数，0 = 不限制；仅在所用分组未设置 rpm_limit 时作为兜底生效',
+        supportRoleHint: '客服只能进入工单后台：接单、回复普通工单，无法管理用户、余额和系统设置。'
       },
       adjustBalance: '调整余额',
       adjustConcurrency: '调整并发数',
@@ -4376,6 +4381,153 @@ export default {
       deleteConfirm: '确定要删除该公告吗？此操作无法撤销。'
     },
 
+    // Tickets
+    tickets: {
+      title: '工单管理',
+      description: '查看用户工单并跟进处理',
+      searchPlaceholder: '搜索工单、标题或用户...',
+      viewDetail: '查看',
+      empty: '暂无工单',
+      emptyDescription: '当前没有需要处理的用户工单',
+      detailTitle: '工单详情',
+      unassigned: '未指派',
+      internalNote: '内部备注',
+      unreadCount: '{count} 条未读',
+      noUnread: '无未读',
+      stats: {
+        total: '总数',
+        unassigned: '未指派',
+        assignedToMe: '我的工单',
+        handledByMe: '我已处理',
+        escalated: '已升级',
+        slaOverdue: 'SLA 超时'
+      },
+      queue: {
+        all: '全部队列',
+        mine: '我处理的',
+        support: '客服队列',
+        allNormal: '全部普通工单',
+        superAdmin: '超级管理员队列'
+      },
+      escalated: '已升级',
+      claim: '接单',
+      claimed: '已接单',
+      escalate: '转给超级管理员',
+      escalateReasonPrompt: '请输入转交原因（可选）',
+      escalatedDone: '已转给超级管理员',
+      balance: {
+        operation: '余额操作',
+        amount: '金额',
+        notes: '备注',
+        notesPlaceholder: '例如：充值未到账补款',
+        add: '加余额',
+        subtract: '扣余额',
+        set: '设为指定余额',
+        apply: '执行',
+        done: '余额已调整',
+        failed: '余额调整失败'
+      },
+      bulk: {
+        selected: '已选择 {count} 个',
+        apply: '批量应用',
+        updated: '已更新 {count} 个工单',
+        keepStatus: '保持状态',
+        keepPriority: '保持优先级',
+        keepCategory: '保持分类'
+      },
+      autoClose: {
+        button: '自动关闭',
+        title: '自动关闭已解决工单',
+        description: '将已解决时间早于指定天数的工单自动关闭。',
+        days: '已解决至少多少天',
+        confirm: '关闭工单',
+        done: '已关闭 {count} 个工单'
+      },
+      saveChanges: '保存变更',
+      updated: '工单已更新',
+      replied: '回复已发送',
+      reply: '回复',
+      internalReply: '仅管理员可见',
+      replyPlaceholder: '输入回复内容，勾选后将作为内部备注保存...',
+      sendReply: '发送回复',
+      replyAttachments: {
+        title: '附件链接',
+        add: '添加附件',
+        namePlaceholder: '名称',
+        urlPlaceholder: 'https://...'
+      },
+      failedToLoad: '加载工单失败',
+      failedToLoadDetail: '加载工单详情失败',
+      failedToUpdate: '更新工单失败',
+      failedToReply: '发送回复失败',
+      columns: {
+        subject: '主题',
+        user: '用户',
+        status: '状态',
+        priority: '优先级',
+        category: '分类',
+        assignee: '指派',
+        lastMessageAt: '最后消息',
+        unread: '未读'
+      },
+      form: {
+        status: '状态',
+        priority: '优先级',
+        category: '分类',
+        assigneeId: '指派管理员 ID',
+        assigneePlaceholder: '0',
+        assigneeHint: '填 0 表示取消指派。'
+      },
+      filters: {
+        allStatus: '全部状态',
+        allPriority: '全部优先级',
+        allCategory: '全部分类',
+        allAssignees: '全部指派',
+        allUnread: '全部',
+        onlyUnread: '仅未读',
+        unassigned: '未指派',
+        assignedToMe: '指派给我'
+      },
+      status: {
+        open: '待处理',
+        pending: '已回复',
+        resolved: '已解决',
+        closed: '已关闭'
+      },
+      priority: {
+        low: '低',
+        normal: '普通',
+        high: '高',
+        urgent: '紧急'
+      },
+      category: {
+        general: '通用',
+        billing: '计费',
+        usage: '用量',
+        technical: '技术',
+        account: '账户'
+      },
+      sender: {
+        user: '用户',
+        admin: '管理员',
+        system: '系统'
+      },
+      errors: {
+        TICKET_INPUT_REQUIRED: '工单参数不能为空',
+        TICKET_SUBJECT_INVALID: '工单标题不能为空，且不能超过 200 个字符',
+        TICKET_BODY_REQUIRED: '消息内容不能为空',
+        TICKET_STATUS_INVALID: '工单状态不正确',
+        TICKET_PRIORITY_INVALID: '优先级不正确',
+        TICKET_CATEGORY_INVALID: '工单分类不正确',
+        TICKET_PERMISSION_DENIED: '没有权限处理该工单',
+        TICKET_ASSIGNEE_INVALID: '只能指派给启用状态的管理员或客服',
+        TICKET_IDS_REQUIRED: '请选择至少一个工单',
+        TICKET_ATTACHMENT_INVALID: '附件名称和链接必须是有效 http(s) 地址，最多 5 个',
+        TICKET_CLOSED: '工单已关闭',
+        TICKET_NOT_FOUND: '工单不存在'
+      }
+    },
+
     // Promo Codes
     promo: {
       title: '优惠码管理',
@@ -6442,6 +6594,129 @@ export default {
     emptyDescription: '暂时没有任何系统公告',
     readStatus: '您已阅读此公告',
     markReadHint: '点击"已读"标记此公告'
+  },
+
+  // Tickets Page
+  tickets: {
+    title: '工单',
+    description: '提交问题并查看客服回复',
+    searchPlaceholder: '搜索工单标题或编号...',
+    createTicket: '创建工单',
+    submitTicket: '提交工单',
+    viewDetail: '查看',
+    detailTitle: '工单详情',
+    empty: '暂无工单',
+    emptyDescription: '遇到问题时可以创建工单，管理员会在这里回复你。',
+    unreadCount: '{count} 条未读',
+    noUnread: '无未读',
+    lastMessageAt: '最后消息',
+    attachments: {
+      title: '附件链接',
+      add: '添加附件',
+      namePlaceholder: '名称',
+      urlPlaceholder: 'https://...'
+    },
+    replyAttachments: {
+      title: '附件链接',
+      add: '添加附件',
+      namePlaceholder: '名称',
+      urlPlaceholder: 'https://...'
+    },
+    context: {
+      general: '关联上下文',
+      usage: '用量记录',
+      order: '订单',
+      api_key: 'API Key'
+    },
+    closeTicket: '关闭工单',
+    reopenTicket: '重新打开',
+    closedReplyHint: '该工单已关闭，如需继续沟通请先重新打开。',
+    reply: '回复',
+    replyPlaceholder: '补充问题、截图链接或新的排查信息...',
+    sendReply: '发送回复',
+    created: '工单已创建',
+    replySent: '回复已发送',
+    closed: '工单已关闭',
+    reopened: '工单已重新打开',
+    failedToLoad: '加载工单失败',
+    failedToCreate: '创建工单失败',
+    failedToLoadDetail: '加载工单详情失败',
+    failedToReply: '发送回复失败',
+    failedToUpdate: '更新工单失败',
+    columns: {
+      subject: '主题',
+      status: '状态',
+      category: '分类',
+      priority: '优先级',
+      lastMessageAt: '最后消息',
+      unread: '未读'
+    },
+    form: {
+      template: '问题类型',
+      superAdminHint: '该类型普通客服无法直接处理，会自动升级给超级管理员并发送邮件提醒。',
+      subject: '主题',
+      category: '分类',
+      priority: '优先级',
+      body: '问题描述',
+      bodyPlaceholder: '请尽量说明你遇到的问题、请求 ID、时间范围或相关截图链接。',
+      bodyMinLength: '请至少填写 {count} 个字，描述越具体处理越快。',
+      imagePlaceholder: '请粘贴支付宝/微信截图或报错截图的 https 图片链接',
+      amountPlaceholder: '请输入未到账金额',
+      orderAmount: '到账金额 {amount}，支付金额 {pay}',
+      noRecentOrders: '未找到最近充值记录，请在描述中补充订单号和付款时间。',
+      contextType: '关联类型',
+      contextTypePlaceholder: 'usage / order / api_key',
+      contextId: '关联 ID',
+      contextIdPlaceholder: '关联记录 ID'
+    },
+    filters: {
+      allStatus: '全部状态',
+      allPriority: '全部优先级',
+      allCategory: '全部分类',
+      allUnread: '全部',
+      onlyUnread: '仅未读'
+    },
+    status: {
+      open: '待处理',
+      pending: '已回复',
+      resolved: '已解决',
+      closed: '已关闭'
+    },
+    priority: {
+      low: '低',
+      normal: '普通',
+      high: '高',
+      urgent: '紧急'
+    },
+    category: {
+      general: '通用',
+      billing: '计费',
+      usage: '用量',
+      technical: '技术',
+      account: '账户'
+    },
+    sender: {
+      user: '我',
+      admin: '客服',
+      system: '系统'
+    },
+    errors: {
+      requiredFields: '请填写主题和问题描述',
+      TICKET_INPUT_REQUIRED: '工单参数不能为空',
+      TICKET_SUBJECT_INVALID: '工单标题不能为空，且不能超过 200 个字符',
+      TICKET_BODY_REQUIRED: '消息内容不能为空',
+      TICKET_STATUS_INVALID: '工单状态不正确',
+      TICKET_PRIORITY_INVALID: '优先级不正确',
+      TICKET_CATEGORY_INVALID: '工单分类不正确',
+      TICKET_TEMPLATE_INVALID: '工单类型不正确',
+      TICKET_TEMPLATE_FIELD_INVALID: '请按工单类型要求补全必填信息',
+      bodyTooShort: '问题描述至少需要 {count} 个字',
+      templateFieldRequired: '请填写「{field}」',
+      imageURLRequired: '「{field}」必须是有效的 http(s) 图片链接',
+      TICKET_ATTACHMENT_INVALID: '附件名称和链接必须是有效 http(s) 地址，最多 5 个',
+      TICKET_CLOSED: '工单已关闭，请先重新打开',
+      TICKET_NOT_FOUND: '工单不存在'
+    }
   },
 
   // User Subscriptions Page

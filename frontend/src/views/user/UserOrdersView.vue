@@ -26,6 +26,10 @@
               <Icon name="dollar" size="sm" />
               <span>{{ t('payment.orders.requestRefund') }}</span>
             </button>
+            <button @click="openOrderTicket(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20">
+              <Icon name="chatBubble" size="sm" />
+              <span>{{ t('tickets.createTicket') }}</span>
+            </button>
           </div>
         </template>
       </OrderTable>
@@ -155,6 +159,18 @@ async function confirmCancel() {
 }
 
 function openRefundDialog(order: PaymentOrder) { refundTarget.value = order; refundReason.value = '' }
+
+function openOrderTicket(order: PaymentOrder) {
+  router.push({
+    path: '/tickets',
+    query: {
+      new: '1',
+      context_type: 'order',
+      context_id: String(order.id),
+      subject: `${t('payment.orders.orderId')} #${order.id}`
+    }
+  })
+}
 
 async function confirmRefund() {
   if (!refundTarget.value || !refundReason.value.trim()) return

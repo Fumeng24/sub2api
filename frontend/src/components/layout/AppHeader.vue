@@ -26,6 +26,22 @@
         <!-- Announcement Bell -->
         <AnnouncementBell v-if="user" />
 
+        <!-- Ticket unread shortcut -->
+        <router-link
+          v-if="user && showTicketShortcut"
+          :to="ticketLink"
+          class="relative flex items-center rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+          :title="t('tickets.title')"
+        >
+          <Icon name="chatBubble" size="md" />
+          <span
+            v-if="ticketUnreadCount > 0"
+            class="absolute -right-1 -top-1 min-w-[1.125rem] rounded-full bg-red-500 px-1.5 text-center text-[10px] font-semibold leading-[1.125rem] text-white"
+          >
+            {{ formatBadgeCount(ticketUnreadCount) }}
+          </span>
+        </router-link>
+
         <!-- Docs Link -->
         <a
           v-if="docUrl"
@@ -213,10 +229,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
+import { useAppStore, useAuthStore, useOnboardingStore, useTicketStore } from '@/stores'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini.vue'
@@ -230,6 +246,7 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const adminSettingsStore = useAdminSettingsStore()
 const onboardingStore = useOnboardingStore()
+const ticketStore = useTicketStore()
 
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
@@ -237,6 +254,9 @@ const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
 const docUrl = computed(() => appStore.docUrl)
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
+const ticketLink = computed(() => (authStore.canAccessTicketAdmin ? '/admin/tickets' : '/tickets'))
+const ticketUnreadCount = computed(() => (authStore.canAccessTicketAdmin ? ticketStore.adminUnreadCount : ticketStore.userUnreadCount))
+const showTicketShortcut = computed(() => !appStore.backendModeEnabled || authStore.canAccessTicketAdmin)
 
 // 只在标准模式的管理员下显示新手引导按钮
 const showOnboardingButton = computed(() => {
@@ -320,13 +340,28 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
+function formatBadgeCount(count: number) {
+  return count > 99 ? '99+' : String(count)
+}
+
+function refreshTicketSummary(force = false) {
+  if (!user.value) return
+  ticketStore.fetchUnreadSummary(authStore.canAccessTicketAdmin ? 'admin' : 'user', force)
+}
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  refreshTicketSummary()
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
 })
+
+watch(
+  () => [user.value?.id, user.value?.role],
+  () => refreshTicketSummary(true)
+)
 </script>
 
 <style scoped>

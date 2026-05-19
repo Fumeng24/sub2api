@@ -66,6 +66,14 @@ func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
 }
 
+func (u *User) IsSupport() bool {
+	return u.Role == RoleSupport
+}
+
+func (u *User) CanHandleTickets() bool {
+	return u.IsAdmin() || u.IsSupport()
+}
+
 func (u *User) IsActive() bool {
 	return u.Status == StatusActive
 }

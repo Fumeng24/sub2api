@@ -29,6 +29,7 @@
                 :options="[
                   { value: '', label: t('admin.users.allRoles') },
                   { value: 'admin', label: t('admin.users.admin') },
+                  { value: 'support', label: t('admin.users.support') },
                   { value: 'user', label: t('admin.users.user') }
                 ]"
                 @change="applyFilter"
@@ -293,7 +294,7 @@
           </template>
 
           <template #cell-role="{ value }">
-            <span :class="['badge', value === 'admin' ? 'badge-purple' : 'badge-gray']">
+            <span :class="['badge', roleBadgeClass(value)]">
               {{ t('admin.users.roles.' + value) }}
             </span>
           </template>
@@ -822,6 +823,12 @@ const loadInitialSortState = (): { sort_by: string; sort_order: 'asc' | 'desc' }
   }
 }
 const sortState = reactive(loadInitialSortState())
+
+const roleBadgeClass = (role: string) => {
+  if (role === 'admin') return 'badge-purple'
+  if (role === 'support') return 'badge-primary'
+  return 'badge-gray'
+}
 
 // Groups data for the groups column
 const allGroups = ref<AdminGroup[]>([])

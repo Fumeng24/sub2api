@@ -13,7 +13,14 @@ func RegisterAdminRoutes(
 	v1 *gin.RouterGroup,
 	h *handler.Handlers,
 	adminAuth middleware.AdminAuthMiddleware,
+	adminOrSupportAuth middleware.AdminOrSupportAuthMiddleware,
 ) {
+	supportAdmin := v1.Group("/admin")
+	supportAdmin.Use(gin.HandlerFunc(adminOrSupportAuth))
+	{
+		registerTicketRoutes(supportAdmin, h)
+	}
+
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
 	{
@@ -97,6 +104,23 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+	}
+}
+
+func registerTicketRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	tickets := admin.Group("/tickets")
+	{
+		tickets.GET("", h.Admin.Ticket.List)
+		tickets.GET("/unread-summary", h.Admin.Ticket.UnreadSummary)
+		tickets.GET("/stats", h.Admin.Ticket.Stats)
+		tickets.POST("/batch-update", h.Admin.Ticket.BatchUpdate)
+		tickets.POST("/auto-close-resolved", h.Admin.Ticket.AutoCloseResolved)
+		tickets.GET("/:id", h.Admin.Ticket.GetByID)
+		tickets.PUT("/:id", h.Admin.Ticket.Update)
+		tickets.POST("/:id/claim", h.Admin.Ticket.Claim)
+		tickets.POST("/:id/escalate", h.Admin.Ticket.Escalate)
+		tickets.POST("/:id/balance-adjust", h.Admin.Ticket.AdjustBalance)
+		tickets.POST("/:id/messages", h.Admin.Ticket.AddMessage)
 	}
 }
 

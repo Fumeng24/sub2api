@@ -120,6 +120,7 @@ type CreateUserInput struct {
 	Password      string
 	Username      string
 	Notes         string
+	Role          string
 	Balance       float64
 	Concurrency   int
 	RPMLimit      int
@@ -134,6 +135,7 @@ type UpdateUserInput struct {
 	Balance       *float64 // 使用指针区分"未提供"和"设置为0"
 	Concurrency   *int     // 使用指针区分"未提供"和"设置为0"
 	RPMLimit      *int     // 使用指针区分"未提供"和"设置为0"
+	Role          string
 	Status        string
 	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
 	// GroupRates 用户专属分组倍率配置
@@ -661,11 +663,12 @@ func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error)
 }
 
 func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInput) (*User, error) {
+	role := normalizeAdminManagedUserRole(input.Role)
 	user := &User{
 		Email:         input.Email,
 		Username:      input.Username,
 		Notes:         input.Notes,
-		Role:          RoleUser, // Always create as regular user, never admin
+		Role:          role,
 		Balance:       input.Balance,
 		Concurrency:   input.Concurrency,
 		RPMLimit:      input.RPMLimit,
@@ -696,6 +699,15 @@ func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userI
 		}); err != nil {
 			logger.LegacyPrintf("service.admin", "failed to assign default subscription: user_id=%d group_id=%d err=%v", userID, item.GroupID, err)
 		}
+	}
+}
+
+func normalizeAdminManagedUserRole(role string) string {
+	switch role {
+	case RoleAdmin, RoleSupport, RoleUser:
+		return role
+	default:
+		return RoleUser
 	}
 }
 
@@ -750,6 +762,11 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 
 	if input.RPMLimit != nil {
 		user.RPMLimit = *input.RPMLimit
+	}
+
+	if input.Role != "" {
+		role := normalizeAdminManagedUserRole(input.Role)
+		user.Role = role
 	}
 
 	if input.AllowedGroups != nil {

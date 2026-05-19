@@ -24,10 +24,10 @@
     <!-- Navigation -->
     <nav class="sidebar-nav scrollbar-hide">
       <!-- Admin View: Admin menu first, then personal menu -->
-      <template v-if="isAdmin">
+      <template v-if="canAccessTicketAdmin">
         <!-- Admin Section -->
         <div class="sidebar-section">
-          <template v-for="item in adminNavItems" :key="item.path">
+          <template v-for="item in activeAdminNavItems" :key="item.path">
             <!-- Collapsible group (has children) -->
             <template v-if="item.children?.length">
               <button
@@ -64,7 +64,8 @@
                   @click="handleMenuItemClick(child.path)"
                 >
                   <component :is="child.icon" class="h-4 w-4 flex-shrink-0" />
-                  <span>{{ child.label }}</span>
+                  <span class="min-w-0 flex-1 truncate">{{ child.label }}</span>
+                  <span v-if="child.badge && child.badge > 0" class="sidebar-badge">{{ formatBadgeCount(child.badge) }}</span>
                 </router-link>
               </div>
             </template>
@@ -88,13 +89,16 @@
             >
               <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
               <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
-              <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
+              <span class="sidebar-label sidebar-label-flex" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+                <span class="min-w-0 truncate">{{ item.label }}</span>
+                <span v-if="item.badge && item.badge > 0" class="sidebar-badge">{{ formatBadgeCount(item.badge) }}</span>
+              </span>
             </router-link>
           </template>
         </div>
 
-        <!-- Personal Section for Admin (hidden in simple mode) -->
-        <div v-if="!authStore.isSimpleMode" class="sidebar-section">
+        <!-- Personal Section for admins/support agents -->
+        <div v-if="showPersonalSectionForPrivilegedUser" class="sidebar-section">
           <div class="sidebar-section-title" :class="{ 'sidebar-section-title-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
             <span class="sidebar-section-title-text" :class="{ 'sidebar-section-title-text-collapsed': sidebarCollapsed }">
               {{ t('nav.myAccount') }}
@@ -102,7 +106,7 @@
           </div>
 
           <router-link
-            v-for="item in personalNavItems"
+            v-for="item in privilegedPersonalNavItems"
             :key="item.path"
             :to="item.path"
             class="sidebar-link mb-1"
@@ -113,7 +117,10 @@
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
-            <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
+            <span class="sidebar-label sidebar-label-flex" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+              <span class="min-w-0 truncate">{{ item.label }}</span>
+              <span v-if="item.badge && item.badge > 0" class="sidebar-badge">{{ formatBadgeCount(item.badge) }}</span>
+            </span>
           </router-link>
         </div>
       </template>
@@ -133,7 +140,10 @@
           >
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
-            <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
+            <span class="sidebar-label sidebar-label-flex" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+              <span class="min-w-0 truncate">{{ item.label }}</span>
+              <span v-if="item.badge && item.badge > 0" class="sidebar-badge">{{ formatBadgeCount(item.badge) }}</span>
+            </span>
           </router-link>
         </div>
       </template>
@@ -183,7 +193,7 @@
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
+import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore, useTicketStore } from '@/stores'
 import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
@@ -193,6 +203,7 @@ interface NavItem {
   label: string
   icon: unknown
   iconSvg?: string
+  badge?: number
   hideInSimpleMode?: boolean
   children?: NavItem[]
   /**
@@ -232,10 +243,13 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
+const ticketStore = useTicketStore()
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
+const isSupport = computed(() => authStore.isSupport)
+const canAccessTicketAdmin = computed(() => authStore.canAccessTicketAdmin)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
 // Track which parent nav groups are expanded
@@ -246,6 +260,8 @@ const siteName = computed(() => appStore.siteName)
 const siteLogo = computed(() => appStore.siteLogo)
 const siteVersion = computed(() => appStore.siteVersion)
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
+const userTicketBadge = computed(() => ticketStore.userUnreadCount)
+const adminTicketBadge = computed(() => ticketStore.adminUnreadCount)
 
 // SVG Icon Components
 const DashboardIcon = {
@@ -448,6 +464,21 @@ const BellIcon = {
           'stroke-linecap': 'round',
           'stroke-linejoin': 'round',
           d: 'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9a6 6 0 10-12 0v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0'
+        })
+      ]
+    )
+}
+
+const ChatBubbleIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z'
         })
       ]
     )
@@ -667,6 +698,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/tickets', label: t('nav.tickets'), icon: ChatBubbleIcon, badge: userTicketBadge.value },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
@@ -734,6 +766,7 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
     { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
+    { path: '/admin/tickets', label: t('nav.ticketManagement'), icon: ChatBubbleIcon, badge: adminTicketBadge.value },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
     { path: '/admin/risk-control', label: t('nav.riskControl'), icon: ShieldIcon, hideInSimpleMode: true, featureFlag: flagRiskControl },
     { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
@@ -786,6 +819,14 @@ const adminNavItems = computed((): NavItem[] => {
   }
   return visible
 })
+
+const supportNavItems = computed((): NavItem[] => [
+  { path: '/admin/tickets', label: t('nav.ticketManagement'), icon: ChatBubbleIcon, badge: adminTicketBadge.value }
+])
+
+const activeAdminNavItems = computed(() => (isSupport.value ? supportNavItems.value : adminNavItems.value))
+const showPersonalSectionForPrivilegedUser = computed(() => isSupport.value || (isAdmin.value && !authStore.isSimpleMode))
+const privilegedPersonalNavItems = computed(() => (isSupport.value ? userNavItems.value : personalNavItems.value))
 
 function toggleSidebar() {
   appStore.toggleSidebar()
@@ -864,6 +905,23 @@ function handleGroupClick(item: NavItem) {
   }
 }
 
+function formatBadgeCount(count: number) {
+  return count > 99 ? '99+' : String(count)
+}
+
+function refreshTicketBadges(force = false) {
+  if (authStore.canAccessTicketAdmin) {
+    ticketStore.fetchUnreadSummary('admin', force)
+    if (authStore.isAdmin && !authStore.isSimpleMode) {
+      ticketStore.fetchUnreadSummary('user', force)
+    }
+    return
+  }
+  if (!appStore.backendModeEnabled) {
+    ticketStore.fetchUnreadSummary('user', force)
+  }
+}
+
 // Initialize theme
 const savedTheme = localStorage.getItem('theme')
 if (
@@ -876,11 +934,12 @@ if (
 
 // Fetch admin settings (for feature-gated nav items like Ops).
 watch(
-  isAdmin,
-  (v) => {
-    if (v) {
+  canAccessTicketAdmin,
+  () => {
+    if (authStore.isAdmin) {
       adminSettingsStore.fetch()
     }
+    refreshTicketBadges(true)
   },
   { immediate: true }
 )
@@ -889,6 +948,7 @@ onMounted(() => {
   if (isAdmin.value) {
     adminSettingsStore.fetch()
   }
+  refreshTicketBadges()
 })
 </script>
 
@@ -1007,6 +1067,18 @@ onMounted(() => {
   opacity: 0;
   transform: translateX(-4px);
   pointer-events: none;
+}
+
+.sidebar-badge {
+  min-width: 1.25rem;
+  border-radius: 9999px;
+  background: rgb(239 68 68);
+  padding: 0 0.375rem;
+  text-align: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  color: white;
 }
 
 /* Custom SVG icon in sidebar: constrain size without overriding uploaded SVG colors */

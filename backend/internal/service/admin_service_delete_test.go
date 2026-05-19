@@ -23,6 +23,7 @@ type userRepoStub struct {
 	created       []*User
 	updated       []*User
 	deletedIDs    []int64
+	usersByID     map[int64]*User
 	usersByEmail  map[string]*User
 	getByEmailErr error
 }
@@ -48,6 +49,14 @@ func (s *userRepoStub) GetByID(ctx context.Context, id int64) (*User, error) {
 		return nil, s.getErr
 	}
 	if s.user == nil {
+		return nil, ErrUserNotFound
+	}
+	if s.usersByID != nil {
+		if user, ok := s.usersByID[id]; ok {
+			return user, nil
+		}
+	}
+	if s.user.ID != 0 && s.user.ID != id {
 		return nil, ErrUserNotFound
 	}
 	return s.user, nil
