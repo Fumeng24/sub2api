@@ -268,6 +268,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		AffiliateEnabled: settings.AffiliateEnabled,
 
 		GroupRateDiscountSettings: dto.GroupRateDiscountSettingsFromService(settings.GroupRateDiscountSettings),
+		TicketSystemConfig:        settings.TicketSystemConfig,
 	}
 
 	// OpenAI fast policy (stored under a dedicated setting key)
@@ -575,6 +576,9 @@ type UpdateSettingsRequest struct {
 
 	// Group rate discount campaign
 	GroupRateDiscountSettings *dto.GroupRateDiscountSettings `json:"group_rate_discount_settings"`
+
+	// Support ticket system config
+	TicketSystemConfig *service.TicketSystemSettings `json:"ticket_system_config"`
 
 	// 风控中心功能开关
 	RiskControlEnabled *bool `json:"risk_control_enabled"`
@@ -1535,6 +1539,12 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.GroupRateDiscountSettings
 		}(),
+		TicketSystemConfig: func() service.TicketSystemSettings {
+			if req.TicketSystemConfig != nil {
+				return service.NormalizeTicketSystemSettings(*req.TicketSystemConfig)
+			}
+			return previousSettings.TicketSystemConfig
+		}(),
 		RiskControlEnabled: func() bool {
 			if req.RiskControlEnabled != nil {
 				return *req.RiskControlEnabled
@@ -1824,6 +1834,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AffiliateEnabled: updatedSettings.AffiliateEnabled,
 
 		GroupRateDiscountSettings: dto.GroupRateDiscountSettingsFromService(updatedSettings.GroupRateDiscountSettings),
+		TicketSystemConfig:        updatedSettings.TicketSystemConfig,
 		RiskControlEnabled:        updatedSettings.RiskControlEnabled,
 	}
 	if fastPolicy, err := h.settingService.GetOpenAIFastPolicySettings(c.Request.Context()); err != nil {
@@ -2234,6 +2245,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if !equalGroupRateDiscountSettings(before.GroupRateDiscountSettings, after.GroupRateDiscountSettings) {
 		changed = append(changed, "group_rate_discount_settings")
 	}
+	if !equalTicketSystemSettings(before.TicketSystemConfig, after.TicketSystemConfig) {
+		changed = append(changed, "ticket_system_config")
+	}
 	if before.RiskControlEnabled != after.RiskControlEnabled {
 		changed = append(changed, "risk_control_enabled")
 	}
@@ -2252,6 +2266,12 @@ func equalGroupRateDiscountSettings(a, b service.GroupRateDiscountSettings) bool
 		a.DailyStartTime == b.DailyStartTime &&
 		a.DailyEndTime == b.DailyEndTime &&
 		equalInt64Slice(a.GroupIDs, b.GroupIDs)
+}
+
+func equalTicketSystemSettings(a, b service.TicketSystemSettings) bool {
+	aj, errA := json.Marshal(service.NormalizeTicketSystemSettings(a))
+	bj, errB := json.Marshal(service.NormalizeTicketSystemSettings(b))
+	return errA == nil && errB == nil && string(aj) == string(bj)
 }
 
 func appendAuthSourceDefaultChanges(changed []string, before *service.AuthSourceDefaultSettings, after *service.AuthSourceDefaultSettings) []string {

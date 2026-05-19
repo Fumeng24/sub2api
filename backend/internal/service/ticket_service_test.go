@@ -134,6 +134,10 @@ func (s *ticketRepoStub) AutoCloseResolved(context.Context, time.Time) (int, err
 	return 0, nil
 }
 
+func (s *ticketRepoStub) ListSLAActionable(context.Context, time.Time, int) ([]Ticket, error) {
+	return nil, nil
+}
+
 func TestTicketServiceCreateStoresInitialAttachments(t *testing.T) {
 	repo := newTicketRepoStub(nil)
 	userRepo := &userRepoStub{user: &User{ID: 1, Email: "user@example.com", Username: "alice", Role: RoleUser, Status: StatusActive}}

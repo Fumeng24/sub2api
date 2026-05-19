@@ -8,6 +8,7 @@ import type {
   BasePaginationResponse,
   FetchOptions,
   Ticket,
+  TicketAdminCapabilities,
   TicketMessage,
   TicketStats,
   TicketUnreadSummary,
@@ -85,6 +86,11 @@ export async function getStats(): Promise<TicketStats> {
   return data
 }
 
+export async function getCapabilities(): Promise<TicketAdminCapabilities> {
+  const { data } = await apiClient.get<TicketAdminCapabilities>('/admin/tickets/capabilities')
+  return data
+}
+
 export async function batchUpdate(request: {
   ids: number[]
   status?: string
@@ -111,6 +117,7 @@ const ticketsAPI = {
   adjustBalance,
   getUnreadSummary,
   getStats,
+  getCapabilities,
   batchUpdate,
   autoCloseResolved
 }

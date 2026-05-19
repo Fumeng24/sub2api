@@ -69,6 +69,8 @@ type Ticket struct {
 	EscalatedAt        *time.Time
 	EscalatedBy        *int64
 	EscalationReason   string
+	SLADueAt           *time.Time
+	SLARemindedAt      *time.Time
 	LastMessageAt      time.Time
 	LastUserMessageAt  *time.Time
 	LastAdminMessageAt *time.Time

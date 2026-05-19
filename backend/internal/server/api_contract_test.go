@@ -836,6 +836,94 @@ func TestAPIContracts(t *testing.T) {
 						"daily_end_time": "23:59",
 						"group_ids": []
 					},
+					"ticket_system_config": {
+						"templates": [
+							{
+								"key": "general",
+								"name": "其他问题",
+								"description": "没有匹配分类时使用",
+								"category": "general",
+								"priority": "normal",
+								"subject_template": "其他问题",
+								"body_min_length": 10,
+								"requires_super_admin": false,
+								"auto_assign_super_admin": false,
+								"context_type": "general"
+							},
+							{
+								"key": "group_connection_issue",
+								"name": "分组连接不上",
+								"description": "请提供正在使用的分组、报错截图和详细现象",
+								"category": "technical",
+								"priority": "high",
+								"subject_template": "分组连接问题",
+								"body_min_length": 15,
+								"requires_super_admin": false,
+								"auto_assign_super_admin": false,
+								"context_type": "group",
+								"fields": [
+									{"key": "group_id", "label": "正在使用的分组", "type": "group_select", "required": true},
+									{"key": "error_screenshot", "label": "报错截图", "type": "image", "required": true}
+								]
+							},
+							{
+								"key": "billing_missing_payment",
+								"name": "充值未到账",
+								"description": "普通客服无法补款，会自动升级给超级管理员并邮件通知",
+								"category": "billing",
+								"priority": "urgent",
+								"subject_template": "充值未到账",
+								"body_min_length": 15,
+								"requires_super_admin": true,
+								"auto_assign_super_admin": true,
+								"context_type": "order",
+								"fields": [
+									{"key": "recent_order_ids", "label": "最近 5 条充值记录", "type": "recent_orders", "required": true},
+									{"key": "missing_amount", "label": "未到账金额", "type": "amount", "required": true, "min_value": 0},
+									{"key": "payment_screenshot", "label": "支付宝或微信支付截图", "type": "image", "required": true}
+								]
+							},
+							{
+								"key": "api_key_issue",
+								"name": "API Key 有问题",
+								"description": "请描述 Key 的调用现象和错误信息",
+								"category": "usage",
+								"priority": "normal",
+								"subject_template": "API Key 使用问题",
+								"body_min_length": 15,
+								"requires_super_admin": false,
+								"auto_assign_super_admin": false,
+								"context_type": "api_key",
+								"fields": [
+									{"key": "api_key_id", "label": "API Key ID", "type": "text", "required": false},
+									{"key": "error_message", "label": "错误信息", "type": "textarea", "required": false, "min_length": 5}
+								]
+							}
+						],
+						"support_permissions": {
+							"can_view_all": false,
+							"can_view_escalated": false,
+							"can_internal_note": true,
+							"can_close": true,
+							"can_transfer": false,
+							"can_batch_update": false,
+							"can_update_priority": false,
+							"can_update_category": false,
+							"can_reply_unassigned": false,
+							"can_reply_assigned_to_self": true,
+							"can_escalate": true
+						},
+						"sla": {
+							"enabled": true,
+							"first_response_minutes": 1440,
+							"reminder_before_minutes": 60,
+							"auto_escalate_after_minutes": 0,
+							"reminder_notifications": true,
+							"auto_escalate_notifications": true,
+							"auto_close_resolved_days": 0,
+							"worker_interval_seconds": 300
+						}
+					},
 					"risk_control_enabled": false,
 					"affiliate_enabled": false,
 					"wechat_connect_enabled": false,
@@ -1060,6 +1148,94 @@ func TestAPIContracts(t *testing.T) {
 						"daily_start_time": "00:00",
 						"daily_end_time": "23:59",
 						"group_ids": []
+					},
+					"ticket_system_config": {
+						"templates": [
+							{
+								"key": "general",
+								"name": "其他问题",
+								"description": "没有匹配分类时使用",
+								"category": "general",
+								"priority": "normal",
+								"subject_template": "其他问题",
+								"body_min_length": 10,
+								"requires_super_admin": false,
+								"auto_assign_super_admin": false,
+								"context_type": "general"
+							},
+							{
+								"key": "group_connection_issue",
+								"name": "分组连接不上",
+								"description": "请提供正在使用的分组、报错截图和详细现象",
+								"category": "technical",
+								"priority": "high",
+								"subject_template": "分组连接问题",
+								"body_min_length": 15,
+								"requires_super_admin": false,
+								"auto_assign_super_admin": false,
+								"context_type": "group",
+								"fields": [
+									{"key": "group_id", "label": "正在使用的分组", "type": "group_select", "required": true},
+									{"key": "error_screenshot", "label": "报错截图", "type": "image", "required": true}
+								]
+							},
+							{
+								"key": "billing_missing_payment",
+								"name": "充值未到账",
+								"description": "普通客服无法补款，会自动升级给超级管理员并邮件通知",
+								"category": "billing",
+								"priority": "urgent",
+								"subject_template": "充值未到账",
+								"body_min_length": 15,
+								"requires_super_admin": true,
+								"auto_assign_super_admin": true,
+								"context_type": "order",
+								"fields": [
+									{"key": "recent_order_ids", "label": "最近 5 条充值记录", "type": "recent_orders", "required": true},
+									{"key": "missing_amount", "label": "未到账金额", "type": "amount", "required": true, "min_value": 0},
+									{"key": "payment_screenshot", "label": "支付宝或微信支付截图", "type": "image", "required": true}
+								]
+							},
+							{
+								"key": "api_key_issue",
+								"name": "API Key 有问题",
+								"description": "请描述 Key 的调用现象和错误信息",
+								"category": "usage",
+								"priority": "normal",
+								"subject_template": "API Key 使用问题",
+								"body_min_length": 15,
+								"requires_super_admin": false,
+								"auto_assign_super_admin": false,
+								"context_type": "api_key",
+								"fields": [
+									{"key": "api_key_id", "label": "API Key ID", "type": "text", "required": false},
+									{"key": "error_message", "label": "错误信息", "type": "textarea", "required": false, "min_length": 5}
+								]
+							}
+						],
+						"support_permissions": {
+							"can_view_all": false,
+							"can_view_escalated": false,
+							"can_internal_note": true,
+							"can_close": true,
+							"can_transfer": false,
+							"can_batch_update": false,
+							"can_update_priority": false,
+							"can_update_category": false,
+							"can_reply_unassigned": false,
+							"can_reply_assigned_to_self": true,
+							"can_escalate": true
+						},
+						"sla": {
+							"enabled": true,
+							"first_response_minutes": 1440,
+							"reminder_before_minutes": 60,
+							"auto_escalate_after_minutes": 0,
+							"reminder_notifications": true,
+							"auto_escalate_notifications": true,
+							"auto_close_resolved_days": 0,
+							"worker_interval_seconds": 300
+						}
 					},
 					"risk_control_enabled": false,
 					"affiliate_enabled": false,

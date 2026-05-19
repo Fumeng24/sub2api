@@ -230,6 +230,34 @@ func (_c *TicketCreate) SetNillableEscalationReason(v *string) *TicketCreate {
 	return _c
 }
 
+// SetSLADueAt sets the "sla_due_at" field.
+func (_c *TicketCreate) SetSLADueAt(v time.Time) *TicketCreate {
+	_c.mutation.SetSLADueAt(v)
+	return _c
+}
+
+// SetNillableSLADueAt sets the "sla_due_at" field if the given value is not nil.
+func (_c *TicketCreate) SetNillableSLADueAt(v *time.Time) *TicketCreate {
+	if v != nil {
+		_c.SetSLADueAt(*v)
+	}
+	return _c
+}
+
+// SetSLARemindedAt sets the "sla_reminded_at" field.
+func (_c *TicketCreate) SetSLARemindedAt(v time.Time) *TicketCreate {
+	_c.mutation.SetSLARemindedAt(v)
+	return _c
+}
+
+// SetNillableSLARemindedAt sets the "sla_reminded_at" field if the given value is not nil.
+func (_c *TicketCreate) SetNillableSLARemindedAt(v *time.Time) *TicketCreate {
+	if v != nil {
+		_c.SetSLARemindedAt(*v)
+	}
+	return _c
+}
+
 // SetLastMessageAt sets the "last_message_at" field.
 func (_c *TicketCreate) SetLastMessageAt(v time.Time) *TicketCreate {
 	_c.mutation.SetLastMessageAt(v)
@@ -655,6 +683,14 @@ func (_c *TicketCreate) createSpec() (*Ticket, *sqlgraph.CreateSpec) {
 		_spec.SetField(ticket.FieldEscalationReason, field.TypeString, value)
 		_node.EscalationReason = value
 	}
+	if value, ok := _c.mutation.SLADueAt(); ok {
+		_spec.SetField(ticket.FieldSLADueAt, field.TypeTime, value)
+		_node.SLADueAt = &value
+	}
+	if value, ok := _c.mutation.SLARemindedAt(); ok {
+		_spec.SetField(ticket.FieldSLARemindedAt, field.TypeTime, value)
+		_node.SLARemindedAt = &value
+	}
 	if value, ok := _c.mutation.LastMessageAt(); ok {
 		_spec.SetField(ticket.FieldLastMessageAt, field.TypeTime, value)
 		_node.LastMessageAt = value
@@ -1004,6 +1040,42 @@ func (u *TicketUpsert) SetEscalationReason(v string) *TicketUpsert {
 // UpdateEscalationReason sets the "escalation_reason" field to the value that was provided on create.
 func (u *TicketUpsert) UpdateEscalationReason() *TicketUpsert {
 	u.SetExcluded(ticket.FieldEscalationReason)
+	return u
+}
+
+// SetSLADueAt sets the "sla_due_at" field.
+func (u *TicketUpsert) SetSLADueAt(v time.Time) *TicketUpsert {
+	u.Set(ticket.FieldSLADueAt, v)
+	return u
+}
+
+// UpdateSLADueAt sets the "sla_due_at" field to the value that was provided on create.
+func (u *TicketUpsert) UpdateSLADueAt() *TicketUpsert {
+	u.SetExcluded(ticket.FieldSLADueAt)
+	return u
+}
+
+// ClearSLADueAt clears the value of the "sla_due_at" field.
+func (u *TicketUpsert) ClearSLADueAt() *TicketUpsert {
+	u.SetNull(ticket.FieldSLADueAt)
+	return u
+}
+
+// SetSLARemindedAt sets the "sla_reminded_at" field.
+func (u *TicketUpsert) SetSLARemindedAt(v time.Time) *TicketUpsert {
+	u.Set(ticket.FieldSLARemindedAt, v)
+	return u
+}
+
+// UpdateSLARemindedAt sets the "sla_reminded_at" field to the value that was provided on create.
+func (u *TicketUpsert) UpdateSLARemindedAt() *TicketUpsert {
+	u.SetExcluded(ticket.FieldSLARemindedAt)
+	return u
+}
+
+// ClearSLARemindedAt clears the value of the "sla_reminded_at" field.
+func (u *TicketUpsert) ClearSLARemindedAt() *TicketUpsert {
+	u.SetNull(ticket.FieldSLARemindedAt)
 	return u
 }
 
@@ -1425,6 +1497,48 @@ func (u *TicketUpsertOne) SetEscalationReason(v string) *TicketUpsertOne {
 func (u *TicketUpsertOne) UpdateEscalationReason() *TicketUpsertOne {
 	return u.Update(func(s *TicketUpsert) {
 		s.UpdateEscalationReason()
+	})
+}
+
+// SetSLADueAt sets the "sla_due_at" field.
+func (u *TicketUpsertOne) SetSLADueAt(v time.Time) *TicketUpsertOne {
+	return u.Update(func(s *TicketUpsert) {
+		s.SetSLADueAt(v)
+	})
+}
+
+// UpdateSLADueAt sets the "sla_due_at" field to the value that was provided on create.
+func (u *TicketUpsertOne) UpdateSLADueAt() *TicketUpsertOne {
+	return u.Update(func(s *TicketUpsert) {
+		s.UpdateSLADueAt()
+	})
+}
+
+// ClearSLADueAt clears the value of the "sla_due_at" field.
+func (u *TicketUpsertOne) ClearSLADueAt() *TicketUpsertOne {
+	return u.Update(func(s *TicketUpsert) {
+		s.ClearSLADueAt()
+	})
+}
+
+// SetSLARemindedAt sets the "sla_reminded_at" field.
+func (u *TicketUpsertOne) SetSLARemindedAt(v time.Time) *TicketUpsertOne {
+	return u.Update(func(s *TicketUpsert) {
+		s.SetSLARemindedAt(v)
+	})
+}
+
+// UpdateSLARemindedAt sets the "sla_reminded_at" field to the value that was provided on create.
+func (u *TicketUpsertOne) UpdateSLARemindedAt() *TicketUpsertOne {
+	return u.Update(func(s *TicketUpsert) {
+		s.UpdateSLARemindedAt()
+	})
+}
+
+// ClearSLARemindedAt clears the value of the "sla_reminded_at" field.
+func (u *TicketUpsertOne) ClearSLARemindedAt() *TicketUpsertOne {
+	return u.Update(func(s *TicketUpsert) {
+		s.ClearSLARemindedAt()
 	})
 }
 
@@ -2028,6 +2142,48 @@ func (u *TicketUpsertBulk) SetEscalationReason(v string) *TicketUpsertBulk {
 func (u *TicketUpsertBulk) UpdateEscalationReason() *TicketUpsertBulk {
 	return u.Update(func(s *TicketUpsert) {
 		s.UpdateEscalationReason()
+	})
+}
+
+// SetSLADueAt sets the "sla_due_at" field.
+func (u *TicketUpsertBulk) SetSLADueAt(v time.Time) *TicketUpsertBulk {
+	return u.Update(func(s *TicketUpsert) {
+		s.SetSLADueAt(v)
+	})
+}
+
+// UpdateSLADueAt sets the "sla_due_at" field to the value that was provided on create.
+func (u *TicketUpsertBulk) UpdateSLADueAt() *TicketUpsertBulk {
+	return u.Update(func(s *TicketUpsert) {
+		s.UpdateSLADueAt()
+	})
+}
+
+// ClearSLADueAt clears the value of the "sla_due_at" field.
+func (u *TicketUpsertBulk) ClearSLADueAt() *TicketUpsertBulk {
+	return u.Update(func(s *TicketUpsert) {
+		s.ClearSLADueAt()
+	})
+}
+
+// SetSLARemindedAt sets the "sla_reminded_at" field.
+func (u *TicketUpsertBulk) SetSLARemindedAt(v time.Time) *TicketUpsertBulk {
+	return u.Update(func(s *TicketUpsert) {
+		s.SetSLARemindedAt(v)
+	})
+}
+
+// UpdateSLARemindedAt sets the "sla_reminded_at" field to the value that was provided on create.
+func (u *TicketUpsertBulk) UpdateSLARemindedAt() *TicketUpsertBulk {
+	return u.Update(func(s *TicketUpsert) {
+		s.UpdateSLARemindedAt()
+	})
+}
+
+// ClearSLARemindedAt clears the value of the "sla_reminded_at" field.
+func (u *TicketUpsertBulk) ClearSLARemindedAt() *TicketUpsertBulk {
+	return u.Update(func(s *TicketUpsert) {
+		s.ClearSLARemindedAt()
 	})
 }
 

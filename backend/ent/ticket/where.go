@@ -135,6 +135,16 @@ func EscalationReason(v string) predicate.Ticket {
 	return predicate.Ticket(sql.FieldEQ(FieldEscalationReason, v))
 }
 
+// SLADueAt applies equality check predicate on the "sla_due_at" field. It's identical to SLADueAtEQ.
+func SLADueAt(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldEQ(FieldSLADueAt, v))
+}
+
+// SLARemindedAt applies equality check predicate on the "sla_reminded_at" field. It's identical to SLARemindedAtEQ.
+func SLARemindedAt(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldEQ(FieldSLARemindedAt, v))
+}
+
 // LastMessageAt applies equality check predicate on the "last_message_at" field. It's identical to LastMessageAtEQ.
 func LastMessageAt(v time.Time) predicate.Ticket {
 	return predicate.Ticket(sql.FieldEQ(FieldLastMessageAt, v))
@@ -1138,6 +1148,106 @@ func EscalationReasonEqualFold(v string) predicate.Ticket {
 // EscalationReasonContainsFold applies the ContainsFold predicate on the "escalation_reason" field.
 func EscalationReasonContainsFold(v string) predicate.Ticket {
 	return predicate.Ticket(sql.FieldContainsFold(FieldEscalationReason, v))
+}
+
+// SLADueAtEQ applies the EQ predicate on the "sla_due_at" field.
+func SLADueAtEQ(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldEQ(FieldSLADueAt, v))
+}
+
+// SLADueAtNEQ applies the NEQ predicate on the "sla_due_at" field.
+func SLADueAtNEQ(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldNEQ(FieldSLADueAt, v))
+}
+
+// SLADueAtIn applies the In predicate on the "sla_due_at" field.
+func SLADueAtIn(vs ...time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldIn(FieldSLADueAt, vs...))
+}
+
+// SLADueAtNotIn applies the NotIn predicate on the "sla_due_at" field.
+func SLADueAtNotIn(vs ...time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldNotIn(FieldSLADueAt, vs...))
+}
+
+// SLADueAtGT applies the GT predicate on the "sla_due_at" field.
+func SLADueAtGT(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldGT(FieldSLADueAt, v))
+}
+
+// SLADueAtGTE applies the GTE predicate on the "sla_due_at" field.
+func SLADueAtGTE(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldGTE(FieldSLADueAt, v))
+}
+
+// SLADueAtLT applies the LT predicate on the "sla_due_at" field.
+func SLADueAtLT(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldLT(FieldSLADueAt, v))
+}
+
+// SLADueAtLTE applies the LTE predicate on the "sla_due_at" field.
+func SLADueAtLTE(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldLTE(FieldSLADueAt, v))
+}
+
+// SLADueAtIsNil applies the IsNil predicate on the "sla_due_at" field.
+func SLADueAtIsNil() predicate.Ticket {
+	return predicate.Ticket(sql.FieldIsNull(FieldSLADueAt))
+}
+
+// SLADueAtNotNil applies the NotNil predicate on the "sla_due_at" field.
+func SLADueAtNotNil() predicate.Ticket {
+	return predicate.Ticket(sql.FieldNotNull(FieldSLADueAt))
+}
+
+// SLARemindedAtEQ applies the EQ predicate on the "sla_reminded_at" field.
+func SLARemindedAtEQ(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldEQ(FieldSLARemindedAt, v))
+}
+
+// SLARemindedAtNEQ applies the NEQ predicate on the "sla_reminded_at" field.
+func SLARemindedAtNEQ(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldNEQ(FieldSLARemindedAt, v))
+}
+
+// SLARemindedAtIn applies the In predicate on the "sla_reminded_at" field.
+func SLARemindedAtIn(vs ...time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldIn(FieldSLARemindedAt, vs...))
+}
+
+// SLARemindedAtNotIn applies the NotIn predicate on the "sla_reminded_at" field.
+func SLARemindedAtNotIn(vs ...time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldNotIn(FieldSLARemindedAt, vs...))
+}
+
+// SLARemindedAtGT applies the GT predicate on the "sla_reminded_at" field.
+func SLARemindedAtGT(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldGT(FieldSLARemindedAt, v))
+}
+
+// SLARemindedAtGTE applies the GTE predicate on the "sla_reminded_at" field.
+func SLARemindedAtGTE(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldGTE(FieldSLARemindedAt, v))
+}
+
+// SLARemindedAtLT applies the LT predicate on the "sla_reminded_at" field.
+func SLARemindedAtLT(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldLT(FieldSLARemindedAt, v))
+}
+
+// SLARemindedAtLTE applies the LTE predicate on the "sla_reminded_at" field.
+func SLARemindedAtLTE(v time.Time) predicate.Ticket {
+	return predicate.Ticket(sql.FieldLTE(FieldSLARemindedAt, v))
+}
+
+// SLARemindedAtIsNil applies the IsNil predicate on the "sla_reminded_at" field.
+func SLARemindedAtIsNil() predicate.Ticket {
+	return predicate.Ticket(sql.FieldIsNull(FieldSLARemindedAt))
+}
+
+// SLARemindedAtNotNil applies the NotNil predicate on the "sla_reminded_at" field.
+func SLARemindedAtNotNil() predicate.Ticket {
+	return predicate.Ticket(sql.FieldNotNull(FieldSLARemindedAt))
 }
 
 // LastMessageAtEQ applies the EQ predicate on the "last_message_at" field.

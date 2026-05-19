@@ -226,6 +226,9 @@ type SystemSettings struct {
 	// Group rate discount campaign
 	GroupRateDiscountSettings GroupRateDiscountSettings `json:"group_rate_discount_settings"`
 
+	// Support ticket system config
+	TicketSystemConfig service.TicketSystemSettings `json:"ticket_system_config"`
+
 	// OpenAI fast/flex policy
 	OpenAIFastPolicySettings *OpenAIFastPolicySettings `json:"openai_fast_policy_settings,omitempty"`
 }

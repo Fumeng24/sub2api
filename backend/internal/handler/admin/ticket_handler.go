@@ -114,6 +114,20 @@ func (h *TicketHandler) UnreadSummary(c *gin.Context) {
 	response.Success(c, summary)
 }
 
+func (h *TicketHandler) Capabilities(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+	capabilities, err := h.ticketService.CapabilitiesForAdmin(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, capabilities)
+}
+
 func (h *TicketHandler) GetByID(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {

@@ -606,6 +606,26 @@ func parseGroupRateDiscountSettings(raw string) GroupRateDiscountSettings {
 	return normalizeGroupRateDiscountSettings(settings)
 }
 
+func defaultTicketSystemSettingsJSON() string {
+	settings := DefaultTicketSystemSettings()
+	payload, err := json.Marshal(settings)
+	if err != nil {
+		return `{"templates":[],"support_permissions":{},"sla":{"enabled":true,"first_response_minutes":1440,"reminder_before_minutes":60,"auto_escalate_after_minutes":0,"reminder_notifications":true,"auto_escalate_notifications":true,"auto_close_resolved_days":0,"worker_interval_seconds":300}}`
+	}
+	return string(payload)
+}
+
+func parseTicketSystemSettings(raw string) TicketSystemSettings {
+	if strings.TrimSpace(raw) == "" {
+		return DefaultTicketSystemSettings()
+	}
+	var settings TicketSystemSettings
+	if err := json.Unmarshal([]byte(raw), &settings); err != nil {
+		return DefaultTicketSystemSettings()
+	}
+	return NormalizeTicketSystemSettings(settings)
+}
+
 func normalizeGroupRateDiscountSettings(settings GroupRateDiscountSettings) GroupRateDiscountSettings {
 	settings.Name = strings.TrimSpace(settings.Name)
 	if settings.Name == "" {
@@ -1667,6 +1687,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	if err := s.validateGroupRateDiscountSettings(ctx, &settings.GroupRateDiscountSettings); err != nil {
 		return nil, err
 	}
+	settings.TicketSystemConfig = NormalizeTicketSystemSettings(settings.TicketSystemConfig)
 	normalizedWhitelist, err := NormalizeRegistrationEmailSuffixWhitelist(settings.RegistrationEmailSuffixWhitelist)
 	if err != nil {
 		return nil, infraerrors.BadRequest("INVALID_REGISTRATION_EMAIL_SUFFIX_WHITELIST", err.Error())
@@ -1925,6 +1946,12 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		return nil, fmt.Errorf("marshal group rate discount settings: %w", err)
 	}
 	updates[SettingKeyGroupRateDiscountSettings] = string(groupRateDiscountJSON)
+
+	ticketSystemConfigJSON, err := json.Marshal(settings.TicketSystemConfig)
+	if err != nil {
+		return nil, fmt.Errorf("marshal ticket system config: %w", err)
+	}
+	updates[SettingKeyTicketSystemConfig] = string(ticketSystemConfigJSON)
 
 	// Affiliate (邀请返利) feature switch
 	updates[SettingKeyAffiliateEnabled] = strconv.FormatBool(settings.AffiliateEnabled)
@@ -2748,6 +2775,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		// Available channels feature (default disabled; opt-in)
 		SettingKeyAvailableChannelsEnabled:  "false",
 		SettingKeyGroupRateDiscountSettings: `{"enabled":false,"name":"限时折扣","discount_multiplier":1,"schedule_mode":"weekly","start_at":"","end_at":"","weekdays":[1,2,3,4,5,6,7],"daily_start_time":"00:00","daily_end_time":"23:59","group_ids":[]}`,
+		SettingKeyTicketSystemConfig:        defaultTicketSystemSettingsJSON(),
 
 		// Affiliate (邀请返利) feature (default disabled; opt-in)
 		SettingKeyAffiliateEnabled: "false",
@@ -3118,6 +3146,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	// Available channels feature (default: disabled; strict true)
 	result.AvailableChannelsEnabled = settings[SettingKeyAvailableChannelsEnabled] == "true"
 	result.GroupRateDiscountSettings = parseGroupRateDiscountSettings(settings[SettingKeyGroupRateDiscountSettings])
+	result.TicketSystemConfig = parseTicketSystemSettings(settings[SettingKeyTicketSystemConfig])
 
 	// Affiliate (邀请返利) feature (default: disabled; strict true)
 	result.AffiliateEnabled = settings[SettingKeyAffiliateEnabled] == "true"

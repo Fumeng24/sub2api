@@ -165,6 +165,9 @@ type SystemSettings struct {
 	// Group rate discount campaign
 	GroupRateDiscountSettings GroupRateDiscountSettings `json:"group_rate_discount_settings"`
 
+	// Support ticket system config
+	TicketSystemConfig TicketSystemSettings `json:"ticket_system_config"`
+
 	// Claude Code version check
 	MinClaudeCodeVersion string
 	MaxClaudeCodeVersion string

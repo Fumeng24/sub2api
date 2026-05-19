@@ -33154,6 +33154,8 @@ type TicketMutation struct {
 	escalated_by          *int64
 	addescalated_by       *int64
 	escalation_reason     *string
+	sla_due_at            *time.Time
+	sla_reminded_at       *time.Time
 	last_message_at       *time.Time
 	last_user_message_at  *time.Time
 	last_admin_message_at *time.Time
@@ -33984,6 +33986,104 @@ func (m *TicketMutation) ResetEscalationReason() {
 	m.escalation_reason = nil
 }
 
+// SetSLADueAt sets the "sla_due_at" field.
+func (m *TicketMutation) SetSLADueAt(t time.Time) {
+	m.sla_due_at = &t
+}
+
+// SLADueAt returns the value of the "sla_due_at" field in the mutation.
+func (m *TicketMutation) SLADueAt() (r time.Time, exists bool) {
+	v := m.sla_due_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSLADueAt returns the old "sla_due_at" field's value of the Ticket entity.
+// If the Ticket object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TicketMutation) OldSLADueAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSLADueAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSLADueAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSLADueAt: %w", err)
+	}
+	return oldValue.SLADueAt, nil
+}
+
+// ClearSLADueAt clears the value of the "sla_due_at" field.
+func (m *TicketMutation) ClearSLADueAt() {
+	m.sla_due_at = nil
+	m.clearedFields[ticket.FieldSLADueAt] = struct{}{}
+}
+
+// SLADueAtCleared returns if the "sla_due_at" field was cleared in this mutation.
+func (m *TicketMutation) SLADueAtCleared() bool {
+	_, ok := m.clearedFields[ticket.FieldSLADueAt]
+	return ok
+}
+
+// ResetSLADueAt resets all changes to the "sla_due_at" field.
+func (m *TicketMutation) ResetSLADueAt() {
+	m.sla_due_at = nil
+	delete(m.clearedFields, ticket.FieldSLADueAt)
+}
+
+// SetSLARemindedAt sets the "sla_reminded_at" field.
+func (m *TicketMutation) SetSLARemindedAt(t time.Time) {
+	m.sla_reminded_at = &t
+}
+
+// SLARemindedAt returns the value of the "sla_reminded_at" field in the mutation.
+func (m *TicketMutation) SLARemindedAt() (r time.Time, exists bool) {
+	v := m.sla_reminded_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSLARemindedAt returns the old "sla_reminded_at" field's value of the Ticket entity.
+// If the Ticket object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TicketMutation) OldSLARemindedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSLARemindedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSLARemindedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSLARemindedAt: %w", err)
+	}
+	return oldValue.SLARemindedAt, nil
+}
+
+// ClearSLARemindedAt clears the value of the "sla_reminded_at" field.
+func (m *TicketMutation) ClearSLARemindedAt() {
+	m.sla_reminded_at = nil
+	m.clearedFields[ticket.FieldSLARemindedAt] = struct{}{}
+}
+
+// SLARemindedAtCleared returns if the "sla_reminded_at" field was cleared in this mutation.
+func (m *TicketMutation) SLARemindedAtCleared() bool {
+	_, ok := m.clearedFields[ticket.FieldSLARemindedAt]
+	return ok
+}
+
+// ResetSLARemindedAt resets all changes to the "sla_reminded_at" field.
+func (m *TicketMutation) ResetSLARemindedAt() {
+	m.sla_reminded_at = nil
+	delete(m.clearedFields, ticket.FieldSLARemindedAt)
+}
+
 // SetLastMessageAt sets the "last_message_at" field.
 func (m *TicketMutation) SetLastMessageAt(t time.Time) {
 	m.last_message_at = &t
@@ -34430,7 +34530,7 @@ func (m *TicketMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TicketMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 26)
 	if m.ticket_no != nil {
 		fields = append(fields, ticket.FieldTicketNo)
 	}
@@ -34481,6 +34581,12 @@ func (m *TicketMutation) Fields() []string {
 	}
 	if m.escalation_reason != nil {
 		fields = append(fields, ticket.FieldEscalationReason)
+	}
+	if m.sla_due_at != nil {
+		fields = append(fields, ticket.FieldSLADueAt)
+	}
+	if m.sla_reminded_at != nil {
+		fields = append(fields, ticket.FieldSLARemindedAt)
 	}
 	if m.last_message_at != nil {
 		fields = append(fields, ticket.FieldLastMessageAt)
@@ -34545,6 +34651,10 @@ func (m *TicketMutation) Field(name string) (ent.Value, bool) {
 		return m.EscalatedBy()
 	case ticket.FieldEscalationReason:
 		return m.EscalationReason()
+	case ticket.FieldSLADueAt:
+		return m.SLADueAt()
+	case ticket.FieldSLARemindedAt:
+		return m.SLARemindedAt()
 	case ticket.FieldLastMessageAt:
 		return m.LastMessageAt()
 	case ticket.FieldLastUserMessageAt:
@@ -34602,6 +34712,10 @@ func (m *TicketMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldEscalatedBy(ctx)
 	case ticket.FieldEscalationReason:
 		return m.OldEscalationReason(ctx)
+	case ticket.FieldSLADueAt:
+		return m.OldSLADueAt(ctx)
+	case ticket.FieldSLARemindedAt:
+		return m.OldSLARemindedAt(ctx)
 	case ticket.FieldLastMessageAt:
 		return m.OldLastMessageAt(ctx)
 	case ticket.FieldLastUserMessageAt:
@@ -34744,6 +34858,20 @@ func (m *TicketMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetEscalationReason(v)
 		return nil
+	case ticket.FieldSLADueAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSLADueAt(v)
+		return nil
+	case ticket.FieldSLARemindedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSLARemindedAt(v)
+		return nil
 	case ticket.FieldLastMessageAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -34871,6 +34999,12 @@ func (m *TicketMutation) ClearedFields() []string {
 	if m.FieldCleared(ticket.FieldEscalatedBy) {
 		fields = append(fields, ticket.FieldEscalatedBy)
 	}
+	if m.FieldCleared(ticket.FieldSLADueAt) {
+		fields = append(fields, ticket.FieldSLADueAt)
+	}
+	if m.FieldCleared(ticket.FieldSLARemindedAt) {
+		fields = append(fields, ticket.FieldSLARemindedAt)
+	}
 	if m.FieldCleared(ticket.FieldLastUserMessageAt) {
 		fields = append(fields, ticket.FieldLastUserMessageAt)
 	}
@@ -34905,6 +35039,12 @@ func (m *TicketMutation) ClearField(name string) error {
 		return nil
 	case ticket.FieldEscalatedBy:
 		m.ClearEscalatedBy()
+		return nil
+	case ticket.FieldSLADueAt:
+		m.ClearSLADueAt()
+		return nil
+	case ticket.FieldSLARemindedAt:
+		m.ClearSLARemindedAt()
 		return nil
 	case ticket.FieldLastUserMessageAt:
 		m.ClearLastUserMessageAt()
@@ -34976,6 +35116,12 @@ func (m *TicketMutation) ResetField(name string) error {
 		return nil
 	case ticket.FieldEscalationReason:
 		m.ResetEscalationReason()
+		return nil
+	case ticket.FieldSLADueAt:
+		m.ResetSLADueAt()
+		return nil
+	case ticket.FieldSLARemindedAt:
+		m.ResetSLARemindedAt()
 		return nil
 	case ticket.FieldLastMessageAt:
 		m.ResetLastMessageAt()

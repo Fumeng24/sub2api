@@ -25,6 +25,8 @@ type Ticket struct {
 	EscalatedAt        *time.Time      `json:"escalated_at,omitempty"`
 	EscalatedBy        *int64          `json:"escalated_by,omitempty"`
 	EscalationReason   string          `json:"escalation_reason,omitempty"`
+	SLADueAt           *time.Time      `json:"sla_due_at,omitempty"`
+	SLARemindedAt      *time.Time      `json:"sla_reminded_at,omitempty"`
 	LastMessageAt      time.Time       `json:"last_message_at"`
 	LastUserMessageAt  *time.Time      `json:"last_user_message_at,omitempty"`
 	LastAdminMessageAt *time.Time      `json:"last_admin_message_at,omitempty"`
@@ -73,6 +75,8 @@ func TicketFromService(t *service.Ticket) *Ticket {
 		EscalatedAt:        t.EscalatedAt,
 		EscalatedBy:        t.EscalatedBy,
 		EscalationReason:   t.EscalationReason,
+		SLADueAt:           t.SLADueAt,
+		SLARemindedAt:      t.SLARemindedAt,
 		LastMessageAt:      t.LastMessageAt,
 		LastUserMessageAt:  t.LastUserMessageAt,
 		LastAdminMessageAt: t.LastAdminMessageAt,

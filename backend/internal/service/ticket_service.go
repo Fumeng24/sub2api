@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -24,6 +25,9 @@ const (
 	maxTicketAttachmentTypeLen        = 100
 	ticketNotificationTimeout         = 30 * time.Second
 	defaultTicketNotificationSiteName = "Sub2API"
+	ticketSLAWorkerDefaultInterval    = 5 * time.Minute
+	ticketSLAWorkerMinInterval        = 30 * time.Second
+	ticketSLAWorkerBatchSize          = 100
 )
 
 type TicketService struct {
@@ -31,6 +35,10 @@ type TicketService struct {
 	userRepo     UserRepository
 	emailService *EmailService
 	settingRepo  SettingRepository
+	slaStop      chan struct{}
+	slaStartOnce sync.Once
+	slaStopOnce  sync.Once
+	slaWG        sync.WaitGroup
 }
 
 func NewTicketService(ticketRepo TicketRepository, userRepo UserRepository, emailService *EmailService, settingRepo SettingRepository) *TicketService {
@@ -39,6 +47,7 @@ func NewTicketService(ticketRepo TicketRepository, userRepo UserRepository, emai
 		userRepo:     userRepo,
 		emailService: emailService,
 		settingRepo:  settingRepo,
+		slaStop:      make(chan struct{}),
 	}
 }
 
@@ -63,11 +72,11 @@ func (s *TicketService) CreateForUser(ctx context.Context, input *CreateTicketIn
 	if err != nil {
 		return nil, err
 	}
-	templates, err := s.ListTemplates(ctx)
+	settings, err := s.GetSystemSettings(ctx)
 	if err != nil {
 		return nil, err
 	}
-	template := findTicketTemplate(templates, input.TemplateKey)
+	template := findTicketTemplate(settings.Templates, input.TemplateKey)
 	if input.TemplateKey != "" && template == nil {
 		return nil, ErrTicketTemplateInvalid
 	}
@@ -128,6 +137,7 @@ func (s *TicketService) CreateForUser(ctx context.Context, input *CreateTicketIn
 		t.EscalatedAt = &now
 		t.EscalationReason = "requires super admin"
 	}
+	applyTicketSLA(t, settings.SLA, now)
 	senderID := user.ID
 	msg := &TicketMessage{
 		SenderType:  TicketMessageSenderUser,
@@ -143,7 +153,7 @@ func (s *TicketService) CreateForUser(ctx context.Context, input *CreateTicketIn
 	}
 	t.Messages = []TicketMessage{*msg}
 	_ = s.ticketRepo.MarkRead(ctx, t.ID, TicketReadActorUser, user.ID, &msg.ID)
-	s.notifyAdminsForUserTicket(ctx, t, msg, "created")
+	s.notifyTicketStaff(ctx, t, msg, "created")
 	return t, nil
 }
 
@@ -170,22 +180,29 @@ func (s *TicketService) ListForAdmin(ctx context.Context, adminID int64, params 
 		return nil, nil, ErrTicketPermissionDenied
 	}
 	if admin.IsSupport() {
-		if filters.Queue == "super_admin" || filters.EscalatedOnly {
+		perms := s.supportPermissions(ctx)
+		if !perms.CanViewEscalated && (filters.Queue == "super_admin" || filters.EscalatedOnly) {
 			return []Ticket{}, emptyTicketPagination(params), nil
 		}
 		requestedQueue := filters.Queue
-		filters.Queue = "support"
+		if !perms.CanViewEscalated {
+			filters.Queue = "support"
+		}
 		if filters.AssigneeID == nil {
 			switch requestedQueue {
 			case "mine":
 				id := admin.ID
 				filters.AssigneeID = &id
 			case "all":
-				// Support agents can see all non-escalated tickets to help triage.
+				if !perms.CanViewAll {
+					id := admin.ID
+					filters.SupportActorID = &id
+				}
 			default:
-				// Default support queue includes unassigned and their own tickets.
-				id := admin.ID
-				filters.SupportActorID = &id
+				if !perms.CanViewAll {
+					id := admin.ID
+					filters.SupportActorID = &id
+				}
 			}
 		}
 	}
@@ -230,8 +247,14 @@ func (s *TicketService) GetForAdmin(ctx context.Context, ticketID, adminID int64
 	if !admin.CanHandleTickets() || !admin.IsActive() {
 		return nil, ErrTicketPermissionDenied
 	}
-	if admin.IsSupport() && t.EscalatedAt != nil {
-		return nil, ErrTicketPermissionDenied
+	if admin.IsSupport() {
+		perms := s.supportPermissions(ctx)
+		if t.EscalatedAt != nil && !perms.CanViewEscalated {
+			return nil, ErrTicketPermissionDenied
+		}
+		if t.EscalatedAt == nil && !perms.CanViewAll && t.AssigneeID != nil && *t.AssigneeID != admin.ID {
+			return nil, ErrTicketPermissionDenied
+		}
 	}
 	messages, err := s.ticketRepo.ListMessages(ctx, ticketID, true)
 	if err != nil {
@@ -275,6 +298,7 @@ func (s *TicketService) AddUserMessage(ctx context.Context, ticketID, userID int
 	t.LastUserMessageAt = &now
 	t.ResolvedAt = nil
 	t.ClosedAt = nil
+	applyTicketSLA(t, s.ticketSLASettings(ctx), now)
 	senderID := user.ID
 	msg := &TicketMessage{
 		TicketID:    ticketID,
@@ -289,7 +313,7 @@ func (s *TicketService) AddUserMessage(ctx context.Context, ticketID, userID int
 		return nil, fmt.Errorf("add user ticket message: %w", err)
 	}
 	_ = s.ticketRepo.MarkRead(ctx, ticketID, TicketReadActorUser, userID, &msg.ID)
-	s.notifyAdminsForUserTicket(ctx, t, msg, "updated")
+	s.notifyTicketStaff(ctx, t, msg, "updated")
 	return msg, nil
 }
 
@@ -318,10 +342,14 @@ func (s *TicketService) AddAdminMessage(ctx context.Context, ticketID, adminID i
 		return nil, ErrTicketPermissionDenied
 	}
 	if admin.IsSupport() {
+		perms := s.supportPermissions(ctx)
 		if t.EscalatedAt != nil {
 			return nil, ErrTicketPermissionDenied
 		}
-		if t.AssigneeID == nil || *t.AssigneeID != admin.ID {
+		if input.Internal && !perms.CanInternalNote {
+			return nil, ErrTicketPermissionDenied
+		}
+		if !supportCanReplyTicket(perms, t, admin.ID) {
 			return nil, ErrTicketPermissionDenied
 		}
 	}
@@ -355,6 +383,7 @@ func (s *TicketService) AddAdminMessage(ctx context.Context, ticketID, adminID i
 	t.LastAdminMessageAt = &now
 	t.ResolvedAt = nil
 	t.ClosedAt = nil
+	clearTicketSLA(t)
 	if err := s.ticketRepo.AddMessageAndUpdateTicket(ctx, msg, t); err != nil {
 		return nil, fmt.Errorf("add admin ticket message: %w", err)
 	}
@@ -376,13 +405,20 @@ func (s *TicketService) UpdateForAdmin(ctx context.Context, ticketID int64, inpu
 		return nil, err
 	}
 	if actor.IsSupport() {
+		perms := s.supportPermissions(ctx)
 		if t.EscalatedAt != nil {
 			return nil, ErrTicketPermissionDenied
 		}
-		if input.AssigneeID != nil || input.Category != nil || input.Priority != nil {
+		if input.AssigneeID != nil && !perms.CanTransfer {
 			return nil, ErrTicketPermissionDenied
 		}
-		if t.AssigneeID == nil || *t.AssigneeID != actor.ID {
+		if input.Category != nil && !perms.CanUpdateCategory {
+			return nil, ErrTicketPermissionDenied
+		}
+		if input.Priority != nil && !perms.CanUpdatePriority {
+			return nil, ErrTicketPermissionDenied
+		}
+		if !perms.CanViewAll && !isTicketAssignedTo(t, actor.ID) {
 			return nil, ErrTicketPermissionDenied
 		}
 	}
@@ -392,7 +428,15 @@ func (s *TicketService) UpdateForAdmin(ctx context.Context, ticketID int64, inpu
 		if !isValidTicketStatus(status) {
 			return nil, ErrTicketStatusInvalid
 		}
+		if actor.IsSupport() && (status == TicketStatusClosed || status == TicketStatusResolved) && !s.supportPermissions(ctx).CanClose {
+			return nil, ErrTicketPermissionDenied
+		}
 		applyTicketStatus(t, status, time.Now())
+		if status == TicketStatusOpen {
+			applyTicketSLA(t, s.ticketSLASettings(ctx), time.Now())
+		} else if status == TicketStatusPending || status == TicketStatusResolved || status == TicketStatusClosed {
+			clearTicketSLA(t)
+		}
 	}
 	if input.Priority != nil {
 		priority, err := normalizeTicketPriority(*input.Priority)
@@ -437,6 +481,9 @@ func (s *TicketService) ClaimForAdmin(ctx context.Context, ticketID, adminID int
 	if t.EscalatedAt != nil && !admin.IsAdmin() {
 		return nil, ErrTicketPermissionDenied
 	}
+	if admin.IsSupport() && !s.supportPermissions(ctx).CanTransfer && t.AssigneeID != nil && *t.AssigneeID != admin.ID {
+		return nil, ErrTicketPermissionDenied
+	}
 	t.AssigneeID = &admin.ID
 	if err := s.ticketRepo.Update(ctx, t); err != nil {
 		return nil, fmt.Errorf("claim ticket: %w", err)
@@ -456,11 +503,17 @@ func (s *TicketService) EscalateForAdmin(ctx context.Context, ticketID, adminID 
 	if !admin.CanHandleTickets() || !admin.IsActive() {
 		return nil, ErrTicketPermissionDenied
 	}
-	if !admin.IsAdmin() && t.AssigneeID != nil && *t.AssigneeID != admin.ID {
-		return nil, ErrTicketPermissionDenied
+	if !admin.IsAdmin() {
+		perms := s.supportPermissions(ctx)
+		if !perms.CanEscalate || !supportCanReplyTicket(perms, t, admin.ID) {
+			return nil, ErrTicketPermissionDenied
+		}
 	}
 	now := time.Now()
 	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil, ErrTicketEscalationReasonRequired
+	}
 	if len(reason) > 500 {
 		reason = reason[:500]
 	}
@@ -468,6 +521,7 @@ func (s *TicketService) EscalateForAdmin(ctx context.Context, ticketID, adminID 
 	t.EscalatedBy = &admin.ID
 	t.EscalationReason = reason
 	t.AssigneeID = nil
+	clearTicketSLA(t)
 	msg := &TicketMessage{
 		TicketID:    ticketID,
 		SenderType:  TicketMessageSenderSystem,
@@ -479,7 +533,7 @@ func (s *TicketService) EscalateForAdmin(ctx context.Context, ticketID, adminID 
 	if err := s.ticketRepo.AddMessageAndUpdateTicket(ctx, msg, t); err != nil {
 		return nil, fmt.Errorf("escalate ticket: %w", err)
 	}
-	s.notifyAdminsForUserTicket(ctx, t, msg, "escalated")
+	s.notifyTicketStaff(ctx, t, msg, "escalated")
 	return t, nil
 }
 
@@ -489,6 +543,13 @@ func (s *TicketService) BatchUpdateForAdmin(ctx context.Context, input *BatchUpd
 	}
 	if len(input.IDs) == 0 {
 		return 0, ErrTicketIDsRequired
+	}
+	actor, err := s.ticketAdminActor(ctx, input.ActorID)
+	if err != nil {
+		return 0, err
+	}
+	if actor.IsSupport() && !s.supportPermissions(ctx).CanBatchUpdate {
+		return 0, ErrTicketPermissionDenied
 	}
 	seen := make(map[int64]struct{}, len(input.IDs))
 	count := 0
@@ -534,7 +595,7 @@ func (s *TicketService) UnreadSummaryForAdmin(ctx context.Context, adminID int64
 		return nil, err
 	}
 	if admin.IsSupport() {
-		return s.ticketRepo.UnreadSummary(ctx, nil, TicketReadActorAdmin, adminID, true, supportTicketQueueFilters(admin.ID))
+		return s.ticketRepo.UnreadSummary(ctx, nil, TicketReadActorAdmin, adminID, true, s.supportTicketQueueFilters(ctx, admin.ID))
 	}
 	return s.ticketRepo.UnreadSummary(ctx, nil, TicketReadActorAdmin, adminID, true)
 }
@@ -546,7 +607,7 @@ func (s *TicketService) StatsForAdmin(ctx context.Context, adminID int64) (*Tick
 	}
 	var stats *TicketStats
 	if admin.IsSupport() {
-		stats, err = s.ticketRepo.Stats(ctx, supportTicketQueueFilters(admin.ID))
+		stats, err = s.ticketRepo.Stats(ctx, s.supportTicketQueueFilters(ctx, admin.ID))
 	} else {
 		stats, err = s.ticketRepo.Stats(ctx)
 	}
@@ -566,11 +627,60 @@ func (s *TicketService) StatsForAdmin(ctx context.Context, adminID int64) (*Tick
 	return stats, nil
 }
 
-func supportTicketQueueFilters(adminID int64) TicketListFilters {
-	return TicketListFilters{
-		Queue:          "support",
-		SupportActorID: &adminID,
+func (s *TicketService) CapabilitiesForAdmin(ctx context.Context, adminID int64) (*TicketAdminCapabilities, error) {
+	admin, err := s.ticketAdminActor(ctx, adminID)
+	if err != nil {
+		return nil, err
 	}
+
+	perms := defaultTicketSupportPermissions()
+	if admin.IsAdmin() {
+		perms = TicketSupportPermissions{
+			CanViewAll:             true,
+			CanViewEscalated:       true,
+			CanInternalNote:        true,
+			CanClose:               true,
+			CanTransfer:            true,
+			CanBatchUpdate:         true,
+			CanUpdatePriority:      true,
+			CanUpdateCategory:      true,
+			CanReplyUnassigned:     true,
+			CanReplyAssignedToSelf: true,
+			CanEscalate:            true,
+		}
+	} else if admin.IsSupport() {
+		perms = s.supportPermissions(ctx)
+	}
+
+	return &TicketAdminCapabilities{
+		Role:                 admin.Role,
+		IsSuperAdmin:         admin.IsAdmin(),
+		SupportPermissions:   perms,
+		CanViewAll:           admin.IsAdmin() || perms.CanViewAll,
+		CanViewEscalated:     admin.IsAdmin() || perms.CanViewEscalated,
+		CanInternalNote:      admin.IsAdmin() || perms.CanInternalNote,
+		CanClose:             admin.IsAdmin() || perms.CanClose,
+		CanTransfer:          admin.IsAdmin() || perms.CanTransfer,
+		CanBatchUpdate:       admin.IsAdmin() || perms.CanBatchUpdate,
+		CanUpdatePriority:    admin.IsAdmin() || perms.CanUpdatePriority,
+		CanUpdateCategory:    admin.IsAdmin() || perms.CanUpdateCategory,
+		CanReplyUnassigned:   admin.IsAdmin() || perms.CanReplyUnassigned,
+		CanReplyAssignedSelf: admin.IsAdmin() || perms.CanReplyAssignedToSelf,
+		CanEscalate:          admin.IsAdmin() || perms.CanEscalate,
+		CanAdjustBalance:     admin.IsAdmin(),
+	}, nil
+}
+
+func (s *TicketService) supportTicketQueueFilters(ctx context.Context, adminID int64) TicketListFilters {
+	filters := TicketListFilters{}
+	perms := s.supportPermissions(ctx)
+	if !perms.CanViewEscalated {
+		filters.Queue = "support"
+	}
+	if !perms.CanViewAll {
+		filters.SupportActorID = &adminID
+	}
+	return filters
 }
 
 func (s *TicketService) AutoCloseResolved(ctx context.Context, adminID int64, days int) (int, error) {
@@ -597,6 +707,7 @@ func (s *TicketService) CloseForUser(ctx context.Context, ticketID, userID int64
 		return nil, err
 	}
 	applyTicketStatus(t, TicketStatusClosed, time.Now())
+	clearTicketSLA(t)
 	if err := s.ticketRepo.Update(ctx, t); err != nil {
 		return nil, fmt.Errorf("close ticket: %w", err)
 	}
@@ -609,91 +720,335 @@ func (s *TicketService) ReopenForUser(ctx context.Context, ticketID, userID int6
 		return nil, err
 	}
 	applyTicketStatus(t, TicketStatusOpen, time.Now())
+	applyTicketSLA(t, s.ticketSLASettings(ctx), time.Now())
 	if err := s.ticketRepo.Update(ctx, t); err != nil {
 		return nil, fmt.Errorf("reopen ticket: %w", err)
 	}
 	return t, nil
 }
 
+func (s *TicketService) Start() {
+	if s == nil || s.ticketRepo == nil {
+		return
+	}
+	s.slaStartOnce.Do(func() {
+		s.slaWG.Add(1)
+		go s.runSLAWorker()
+	})
+}
+
+func (s *TicketService) Stop() {
+	if s == nil {
+		return
+	}
+	s.slaStopOnce.Do(func() {
+		close(s.slaStop)
+	})
+	s.slaWG.Wait()
+}
+
+func (s *TicketService) runSLAWorker() {
+	defer s.slaWG.Done()
+	interval := ticketSLAWorkerDefaultInterval
+	if settings := s.ticketSLASettings(context.Background()); settings.WorkerIntervalSeconds > 0 {
+		interval = time.Duration(settings.WorkerIntervalSeconds) * time.Second
+	}
+	if interval < ticketSLAWorkerMinInterval {
+		interval = ticketSLAWorkerMinInterval
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	s.processSLATickets(context.Background(), time.Now())
+	for {
+		select {
+		case <-ticker.C:
+			s.processSLATickets(context.Background(), time.Now())
+		case <-s.slaStop:
+			return
+		}
+	}
+}
+
+func (s *TicketService) processSLATickets(ctx context.Context, now time.Time) {
+	settings := s.ticketSLASettings(ctx)
+	if !settings.Enabled || s.ticketRepo == nil {
+		return
+	}
+	actionableBefore := now
+	if settings.ReminderBeforeMinutes > 0 && settings.ReminderNotifications {
+		actionableBefore = now.Add(time.Duration(settings.ReminderBeforeMinutes) * time.Minute)
+	}
+	if settings.AutoEscalateAfterMinutes > 0 {
+		escalationBefore := now.Add(-time.Duration(settings.AutoEscalateAfterMinutes) * time.Minute)
+		if escalationBefore.After(actionableBefore) {
+			actionableBefore = escalationBefore
+		}
+	}
+	tickets, err := s.ticketRepo.ListSLAActionable(ctx, actionableBefore, ticketSLAWorkerBatchSize)
+	if err != nil {
+		slog.Error("ticket sla scan failed", "error", err)
+		return
+	}
+	for i := range tickets {
+		s.processSLATicket(ctx, &tickets[i], settings, now)
+	}
+	if settings.AutoCloseResolvedDays > 0 {
+		before := now.Add(-time.Duration(settings.AutoCloseResolvedDays) * 24 * time.Hour)
+		if _, err := s.ticketRepo.AutoCloseResolved(ctx, before); err != nil {
+			slog.Error("ticket auto-close resolved failed", "error", err)
+		}
+	}
+}
+
+func (s *TicketService) processSLATicket(ctx context.Context, t *Ticket, settings TicketSLASettings, now time.Time) {
+	if t == nil || t.SLADueAt == nil || t.Status == TicketStatusResolved || t.Status == TicketStatusClosed {
+		return
+	}
+	overdueAt := *t.SLADueAt
+	if settings.AutoEscalateAfterMinutes > 0 {
+		overdueAt = overdueAt.Add(time.Duration(settings.AutoEscalateAfterMinutes) * time.Minute)
+	}
+	if settings.AutoEscalateAfterMinutes > 0 && !now.Before(overdueAt) && t.EscalatedAt == nil {
+		reason := "SLA overdue auto-escalation"
+		if _, err := s.escalateTicketSystem(ctx, t, reason, settings.AutoEscalateNotifications); err != nil {
+			slog.Error("ticket sla auto-escalate failed", "ticket_id", t.ID, "error", err)
+		}
+		return
+	}
+	if settings.ReminderBeforeMinutes <= 0 || !settings.ReminderNotifications || t.SLARemindedAt != nil {
+		return
+	}
+	reminderAt := t.SLADueAt.Add(-time.Duration(settings.ReminderBeforeMinutes) * time.Minute)
+	if now.Before(reminderAt) {
+		return
+	}
+	remindedAt := now
+	t.SLARemindedAt = &remindedAt
+	msg := &TicketMessage{
+		TicketID:    t.ID,
+		SenderType:  TicketMessageSenderSystem,
+		SenderName:  "system",
+		Visibility:  TicketMessageVisibilityInternal,
+		Body:        "SLA reminder: this ticket is approaching its response deadline.",
+		Attachments: nil,
+	}
+	if err := s.ticketRepo.AddMessageAndUpdateTicket(ctx, msg, t); err != nil {
+		slog.Error("ticket sla reminder update failed", "ticket_id", t.ID, "error", err)
+		return
+	}
+	s.notifyTicketStaff(ctx, t, msg, "sla_reminder")
+}
+
+func (s *TicketService) escalateTicketSystem(ctx context.Context, t *Ticket, reason string, notify bool) (*Ticket, error) {
+	if t == nil {
+		return nil, ErrTicketNotFound
+	}
+	now := time.Now()
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "SLA overdue auto-escalation"
+	}
+	if len(reason) > 500 {
+		reason = reason[:500]
+	}
+	t.EscalatedAt = &now
+	t.EscalatedBy = nil
+	t.EscalationReason = reason
+	t.AssigneeID = nil
+	clearTicketSLA(t)
+	msg := &TicketMessage{
+		TicketID:    t.ID,
+		SenderType:  TicketMessageSenderSystem,
+		SenderName:  "system",
+		Visibility:  TicketMessageVisibilityInternal,
+		Body:        reason,
+		Attachments: nil,
+	}
+	if err := s.ticketRepo.AddMessageAndUpdateTicket(ctx, msg, t); err != nil {
+		return nil, fmt.Errorf("system escalate ticket: %w", err)
+	}
+	if notify {
+		s.notifyTicketStaff(ctx, t, msg, "escalated")
+	}
+	return t, nil
+}
+
 func (s *TicketService) ListTemplates(ctx context.Context) ([]TicketTemplate, error) {
+	settings, err := s.GetSystemSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return settings.Templates, nil
+}
+
+func (s *TicketService) GetSystemSettings(ctx context.Context) (TicketSystemSettings, error) {
 	settings := defaultTicketSystemSettings()
 	if s == nil || s.settingRepo == nil {
-		return settings.Templates, nil
+		return settings, nil
 	}
 	raw, err := s.settingRepo.GetValue(ctx, SettingKeyTicketSystemConfig)
 	if err != nil || strings.TrimSpace(raw) == "" {
-		return settings.Templates, nil
+		return settings, nil
 	}
 	var configured TicketSystemSettings
 	if err := json.Unmarshal([]byte(raw), &configured); err != nil {
-		return settings.Templates, nil
+		return settings, nil
 	}
-	templates := sanitizeTicketTemplates(configured.Templates)
-	if len(templates) == 0 {
-		return settings.Templates, nil
-	}
-	return templates, nil
+	return normalizeTicketSystemSettings(configured), nil
+}
+
+func DefaultTicketSystemSettings() TicketSystemSettings {
+	return defaultTicketSystemSettings()
+}
+
+func NormalizeTicketSystemSettings(in TicketSystemSettings) TicketSystemSettings {
+	return normalizeTicketSystemSettings(in)
 }
 
 func defaultTicketSystemSettings() TicketSystemSettings {
 	zero := 0.0
-	return TicketSystemSettings{Templates: []TicketTemplate{
-		{
-			Key:             "general",
-			Name:            "其他问题",
-			Description:     "没有匹配分类时使用",
-			Category:        TicketCategoryGeneral,
-			Priority:        TicketPriorityNormal,
-			SubjectTemplate: "其他问题",
-			BodyMinLength:   10,
-			ContextType:     "general",
-		},
-		{
-			Key:             "group_connection_issue",
-			Name:            "分组连接不上",
-			Description:     "请提供正在使用的分组、报错截图和详细现象",
-			Category:        TicketCategoryTechnical,
-			Priority:        TicketPriorityHigh,
-			SubjectTemplate: "分组连接问题",
-			BodyMinLength:   15,
-			ContextType:     "group",
-			Fields: []TicketTemplateField{
-				{Key: "group_id", Label: "正在使用的分组", Type: TicketTemplateFieldGroupSelect, Required: true},
-				{Key: "error_screenshot", Label: "报错截图", Type: TicketTemplateFieldImage, Required: true},
+	return TicketSystemSettings{
+		Templates: []TicketTemplate{
+			{
+				Key:             "general",
+				Name:            "其他问题",
+				Description:     "没有匹配分类时使用",
+				Category:        TicketCategoryGeneral,
+				Priority:        TicketPriorityNormal,
+				SubjectTemplate: "其他问题",
+				BodyMinLength:   10,
+				ContextType:     "general",
+			},
+			{
+				Key:             "group_connection_issue",
+				Name:            "分组连接不上",
+				Description:     "请提供正在使用的分组、报错截图和详细现象",
+				Category:        TicketCategoryTechnical,
+				Priority:        TicketPriorityHigh,
+				SubjectTemplate: "分组连接问题",
+				BodyMinLength:   15,
+				ContextType:     "group",
+				Fields: []TicketTemplateField{
+					{Key: "group_id", Label: "正在使用的分组", Type: TicketTemplateFieldGroupSelect, Required: true},
+					{Key: "error_screenshot", Label: "报错截图", Type: TicketTemplateFieldImage, Required: true},
+				},
+			},
+			{
+				Key:                  "billing_missing_payment",
+				Name:                 "充值未到账",
+				Description:          "普通客服无法补款，会自动升级给超级管理员并邮件通知",
+				Category:             TicketCategoryBilling,
+				Priority:             TicketPriorityUrgent,
+				SubjectTemplate:      "充值未到账",
+				BodyMinLength:        15,
+				RequiresSuperAdmin:   true,
+				AutoAssignSuperAdmin: true,
+				ContextType:          "order",
+				Fields: []TicketTemplateField{
+					{Key: "recent_order_ids", Label: "最近 5 条充值记录", Type: TicketTemplateFieldRecentOrders, Required: true},
+					{Key: "missing_amount", Label: "未到账金额", Type: TicketTemplateFieldAmount, Required: true, MinValue: &zero},
+					{Key: "payment_screenshot", Label: "支付宝或微信支付截图", Type: TicketTemplateFieldImage, Required: true},
+				},
+			},
+			{
+				Key:             "api_key_issue",
+				Name:            "API Key 有问题",
+				Description:     "请描述 Key 的调用现象和错误信息",
+				Category:        TicketCategoryUsage,
+				Priority:        TicketPriorityNormal,
+				SubjectTemplate: "API Key 使用问题",
+				BodyMinLength:   15,
+				ContextType:     "api_key",
+				Fields: []TicketTemplateField{
+					{Key: "api_key_id", Label: "API Key ID", Type: TicketTemplateFieldText, Required: false},
+					{Key: "error_message", Label: "错误信息", Type: TicketTemplateFieldTextarea, Required: false, MinLength: 5},
+				},
 			},
 		},
-		{
-			Key:                  "billing_missing_payment",
-			Name:                 "充值未到账",
-			Description:          "普通客服无法补款，会自动升级给超级管理员并邮件通知",
-			Category:             TicketCategoryBilling,
-			Priority:             TicketPriorityUrgent,
-			SubjectTemplate:      "充值未到账",
-			BodyMinLength:        15,
-			RequiresSuperAdmin:   true,
-			AutoAssignSuperAdmin: true,
-			ContextType:          "order",
-			Fields: []TicketTemplateField{
-				{Key: "recent_order_ids", Label: "最近 5 条充值记录", Type: TicketTemplateFieldRecentOrders, Required: true},
-				{Key: "missing_amount", Label: "未到账金额", Type: TicketTemplateFieldAmount, Required: true, MinValue: &zero},
-				{Key: "payment_screenshot", Label: "支付宝或微信支付截图", Type: TicketTemplateFieldImage, Required: true},
-			},
-		},
-		{
-			Key:             "api_key_issue",
-			Name:            "API Key 有问题",
-			Description:     "请描述 Key 的调用现象和错误信息",
-			Category:        TicketCategoryUsage,
-			Priority:        TicketPriorityNormal,
-			SubjectTemplate: "API Key 使用问题",
-			BodyMinLength:   15,
-			ContextType:     "api_key",
-			Fields: []TicketTemplateField{
-				{Key: "api_key_id", Label: "API Key ID", Type: TicketTemplateFieldText, Required: false},
-				{Key: "error_message", Label: "错误信息", Type: TicketTemplateFieldTextarea, Required: false, MinLength: 5},
-			},
-		},
-	}}
+		SupportPermissions: defaultTicketSupportPermissions(),
+		SLA:                defaultTicketSLASettings(),
+	}
+}
+
+func defaultTicketSupportPermissions() TicketSupportPermissions {
+	return TicketSupportPermissions{
+		CanViewAll:             false,
+		CanViewEscalated:       false,
+		CanInternalNote:        true,
+		CanClose:               true,
+		CanTransfer:            false,
+		CanBatchUpdate:         false,
+		CanUpdatePriority:      false,
+		CanUpdateCategory:      false,
+		CanReplyUnassigned:     false,
+		CanReplyAssignedToSelf: true,
+		CanEscalate:            true,
+	}
+}
+
+func defaultTicketSLASettings() TicketSLASettings {
+	return TicketSLASettings{
+		Enabled:                   true,
+		FirstResponseMinutes:      24 * 60,
+		ReminderBeforeMinutes:     60,
+		AutoEscalateAfterMinutes:  0,
+		ReminderNotifications:     true,
+		AutoEscalateNotifications: true,
+		AutoCloseResolvedDays:     0,
+		WorkerIntervalSeconds:     int(ticketSLAWorkerDefaultInterval / time.Second),
+	}
+}
+
+func normalizeTicketSystemSettings(in TicketSystemSettings) TicketSystemSettings {
+	defaults := defaultTicketSystemSettings()
+	out := defaults
+	if templates := sanitizeTicketTemplates(in.Templates); len(templates) > 0 {
+		out.Templates = templates
+	}
+	out.SupportPermissions = normalizeTicketSupportPermissions(in.SupportPermissions)
+	out.SLA = normalizeTicketSLASettings(in.SLA)
+	return out
+}
+
+func normalizeTicketSupportPermissions(in TicketSupportPermissions) TicketSupportPermissions {
+	defaults := defaultTicketSupportPermissions()
+	out := defaults
+	out.CanViewAll = in.CanViewAll
+	out.CanViewEscalated = in.CanViewEscalated
+	out.CanInternalNote = in.CanInternalNote
+	out.CanClose = in.CanClose
+	out.CanTransfer = in.CanTransfer
+	out.CanBatchUpdate = in.CanBatchUpdate
+	out.CanUpdatePriority = in.CanUpdatePriority
+	out.CanUpdateCategory = in.CanUpdateCategory
+	out.CanReplyUnassigned = in.CanReplyUnassigned
+	out.CanReplyAssignedToSelf = in.CanReplyAssignedToSelf
+	out.CanEscalate = in.CanEscalate
+	return out
+}
+
+func normalizeTicketSLASettings(in TicketSLASettings) TicketSLASettings {
+	defaults := defaultTicketSLASettings()
+	out := defaults
+	out.Enabled = in.Enabled
+	if in.FirstResponseMinutes > 0 {
+		out.FirstResponseMinutes = clampInt(in.FirstResponseMinutes, 1, 30*24*60)
+	}
+	if in.ReminderBeforeMinutes >= 0 {
+		out.ReminderBeforeMinutes = clampInt(in.ReminderBeforeMinutes, 0, out.FirstResponseMinutes)
+	}
+	if in.AutoEscalateAfterMinutes >= 0 {
+		out.AutoEscalateAfterMinutes = clampInt(in.AutoEscalateAfterMinutes, 0, 30*24*60)
+	}
+	out.ReminderNotifications = in.ReminderNotifications
+	out.AutoEscalateNotifications = in.AutoEscalateNotifications
+	if in.AutoCloseResolvedDays >= 0 {
+		out.AutoCloseResolvedDays = clampInt(in.AutoCloseResolvedDays, 0, 365)
+	}
+	if in.WorkerIntervalSeconds > 0 {
+		out.WorkerIntervalSeconds = clampInt(in.WorkerIntervalSeconds, int(ticketSLAWorkerMinInterval/time.Second), 24*60*60)
+	}
+	return out
 }
 
 func sanitizeTicketTemplates(in []TicketTemplate) []TicketTemplate {
@@ -976,6 +1331,22 @@ func (s *TicketService) validateTicketAssignee(ctx context.Context, assigneeID *
 	return &id, nil
 }
 
+func (s *TicketService) supportPermissions(ctx context.Context) TicketSupportPermissions {
+	settings, err := s.GetSystemSettings(ctx)
+	if err != nil {
+		return defaultTicketSupportPermissions()
+	}
+	return settings.SupportPermissions
+}
+
+func (s *TicketService) ticketSLASettings(ctx context.Context) TicketSLASettings {
+	settings, err := s.GetSystemSettings(ctx)
+	if err != nil {
+		return defaultTicketSLASettings()
+	}
+	return settings.SLA
+}
+
 func (s *TicketService) ticketAdminActor(ctx context.Context, actorID int64) (*User, error) {
 	if actorID <= 0 {
 		return nil, ErrTicketPermissionDenied
@@ -988,6 +1359,57 @@ func (s *TicketService) ticketAdminActor(ctx context.Context, actorID int64) (*U
 		return nil, ErrTicketPermissionDenied
 	}
 	return user, nil
+}
+
+func isTicketAssignedTo(t *Ticket, adminID int64) bool {
+	return t != nil && t.AssigneeID != nil && *t.AssigneeID == adminID
+}
+
+func supportCanReplyTicket(perms TicketSupportPermissions, t *Ticket, adminID int64) bool {
+	if t == nil {
+		return false
+	}
+	if perms.CanReplyAssignedToSelf && isTicketAssignedTo(t, adminID) {
+		return true
+	}
+	if perms.CanReplyUnassigned && t.AssigneeID == nil {
+		return true
+	}
+	if perms.CanViewAll && t.EscalatedAt == nil {
+		return true
+	}
+	return false
+}
+
+func applyTicketSLA(t *Ticket, settings TicketSLASettings, now time.Time) {
+	if t == nil {
+		return
+	}
+	if !settings.Enabled || settings.FirstResponseMinutes <= 0 || t.EscalatedAt != nil || t.Status == TicketStatusPending || t.Status == TicketStatusResolved || t.Status == TicketStatusClosed {
+		clearTicketSLA(t)
+		return
+	}
+	dueAt := now.Add(time.Duration(settings.FirstResponseMinutes) * time.Minute)
+	t.SLADueAt = &dueAt
+	t.SLARemindedAt = nil
+}
+
+func clearTicketSLA(t *Ticket) {
+	if t == nil {
+		return
+	}
+	t.SLADueAt = nil
+	t.SLARemindedAt = nil
+}
+
+func clampInt(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 func (s *TicketService) populateUnreadCounts(ctx context.Context, items []Ticket, actorType string, actorID int64, includeInternal bool) error {
@@ -1046,11 +1468,11 @@ func normalizeTicketAttachments(in []TicketAttachment) ([]TicketAttachment, erro
 	return out, nil
 }
 
-func (s *TicketService) notifyAdminsForUserTicket(ctx context.Context, t *Ticket, msg *TicketMessage, event string) {
+func (s *TicketService) notifyTicketStaff(ctx context.Context, t *Ticket, msg *TicketMessage, event string) {
 	if s == nil || s.emailService == nil || t == nil || msg == nil {
 		return
 	}
-	recipients := s.adminTicketRecipients(ctx, t)
+	recipients := s.ticketStaffRecipients(ctx, t, event)
 	if len(recipients) == 0 {
 		return
 	}
@@ -1080,19 +1502,54 @@ func (s *TicketService) notifyUserForAdminReply(ctx context.Context, t *Ticket, 
 	s.sendTicketNotificationAsync(recipients, subject, body, "ticket_id", t.ID, "event", "admin_reply")
 }
 
-func (s *TicketService) adminTicketRecipients(ctx context.Context, t *Ticket) []string {
+func (s *TicketService) ticketStaffRecipients(ctx context.Context, t *Ticket, event string) []string {
 	if t == nil || s.userRepo == nil {
 		return nil
 	}
 	var recipients []string
+	if event == "escalated" || t.EscalatedAt != nil {
+		if admin, err := s.userRepo.GetFirstAdmin(ctx); err == nil && admin != nil && admin.IsAdmin() && admin.IsActive() {
+			recipients = append(recipients, admin.Email)
+		}
+		return dedupeTicketEmails(recipients)
+	}
 	if t.AssigneeID != nil && *t.AssigneeID > 0 {
-		if admin, err := s.userRepo.GetByID(ctx, *t.AssigneeID); err == nil && admin != nil && admin.IsAdmin() && admin.IsActive() {
+		if assignee, err := s.userRepo.GetByID(ctx, *t.AssigneeID); err == nil && assignee != nil && assignee.CanHandleTickets() && assignee.IsActive() {
+			recipients = append(recipients, assignee.Email)
+		}
+	}
+	if len(recipients) == 0 && (event == "created" || event == "updated" || event == "sla_reminder") {
+		recipients = append(recipients, s.ticketSupportRecipients(ctx)...)
+	}
+	if len(recipients) == 0 && (event == "created" || event == "sla_reminder") {
+		if admin, err := s.userRepo.GetFirstAdmin(ctx); err == nil && admin != nil {
 			recipients = append(recipients, admin.Email)
 		}
 	}
-	if len(recipients) == 0 {
-		if admin, err := s.userRepo.GetFirstAdmin(ctx); err == nil && admin != nil {
-			recipients = append(recipients, admin.Email)
+	return dedupeTicketEmails(recipients)
+}
+
+func (s *TicketService) ticketSupportRecipients(ctx context.Context) []string {
+	if s == nil || s.userRepo == nil {
+		return nil
+	}
+	includeSubscriptions := false
+	users, _, err := s.userRepo.ListWithFilters(ctx, pagination.PaginationParams{
+		Page:     1,
+		PageSize: 50,
+	}, UserListFilters{
+		Role:                 RoleSupport,
+		Status:               StatusActive,
+		IncludeSubscriptions: &includeSubscriptions,
+	})
+	if err != nil {
+		slog.Debug("ticket support notification recipients unavailable", "error", err)
+		return nil
+	}
+	recipients := make([]string, 0, len(users))
+	for i := range users {
+		if users[i].IsSupport() && users[i].IsActive() {
+			recipients = append(recipients, users[i].Email)
 		}
 	}
 	return dedupeTicketEmails(recipients)

@@ -48,6 +48,10 @@ const (
 	FieldEscalatedBy = "escalated_by"
 	// FieldEscalationReason holds the string denoting the escalation_reason field in the database.
 	FieldEscalationReason = "escalation_reason"
+	// FieldSLADueAt holds the string denoting the sla_due_at field in the database.
+	FieldSLADueAt = "sla_due_at"
+	// FieldSLARemindedAt holds the string denoting the sla_reminded_at field in the database.
+	FieldSLARemindedAt = "sla_reminded_at"
 	// FieldLastMessageAt holds the string denoting the last_message_at field in the database.
 	FieldLastMessageAt = "last_message_at"
 	// FieldLastUserMessageAt holds the string denoting the last_user_message_at field in the database.
@@ -104,6 +108,8 @@ var Columns = []string{
 	FieldEscalatedAt,
 	FieldEscalatedBy,
 	FieldEscalationReason,
+	FieldSLADueAt,
+	FieldSLARemindedAt,
 	FieldLastMessageAt,
 	FieldLastUserMessageAt,
 	FieldLastAdminMessageAt,
@@ -264,6 +270,16 @@ func ByEscalatedBy(opts ...sql.OrderTermOption) OrderOption {
 // ByEscalationReason orders the results by the escalation_reason field.
 func ByEscalationReason(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldEscalationReason, opts...).ToFunc()
+}
+
+// BySLADueAt orders the results by the sla_due_at field.
+func BySLADueAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSLADueAt, opts...).ToFunc()
+}
+
+// BySLARemindedAt orders the results by the sla_reminded_at field.
+func BySLARemindedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSLARemindedAt, opts...).ToFunc()
 }
 
 // ByLastMessageAt orders the results by the last_message_at field.

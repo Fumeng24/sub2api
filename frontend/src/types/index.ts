@@ -475,6 +475,20 @@ export interface TicketStats {
   unread: number
 }
 
+export interface TicketSupportPermissions {
+  can_view_all: boolean
+  can_view_escalated: boolean
+  can_internal_note: boolean
+  can_close: boolean
+  can_transfer: boolean
+  can_batch_update: boolean
+  can_update_priority: boolean
+  can_update_category: boolean
+  can_reply_unassigned: boolean
+  can_reply_assigned_to_self: boolean
+  can_escalate: boolean
+}
+
 export interface TicketTemplateOption {
   value: string
   label: string
@@ -501,10 +515,45 @@ export interface TicketTemplate {
   priority: TicketPriority | string
   subject_template?: string
   body_min_length?: number
-  requires_super_admin?: boolean
-  auto_assign_super_admin?: boolean
+  requires_super_admin: boolean
+  auto_assign_super_admin: boolean
   context_type?: string
   fields?: TicketTemplateField[]
+}
+
+export interface TicketSLASettings {
+  enabled: boolean
+  first_response_minutes: number
+  reminder_before_minutes: number
+  auto_escalate_after_minutes: number
+  reminder_notifications: boolean
+  auto_escalate_notifications: boolean
+  auto_close_resolved_days: number
+  worker_interval_seconds: number
+}
+
+export interface TicketSystemSettings {
+  templates: TicketTemplate[]
+  support_permissions: TicketSupportPermissions
+  sla: TicketSLASettings
+}
+
+export interface TicketAdminCapabilities {
+  role: 'admin' | 'support' | string
+  is_super_admin: boolean
+  support_permissions: TicketSupportPermissions
+  can_view_all: boolean
+  can_view_escalated: boolean
+  can_internal_note: boolean
+  can_close: boolean
+  can_transfer: boolean
+  can_batch_update: boolean
+  can_update_priority: boolean
+  can_update_category: boolean
+  can_reply_unassigned: boolean
+  can_reply_assigned_to_self: boolean
+  can_escalate: boolean
+  can_adjust_balance: boolean
 }
 
 export type TicketPrefillGroup = Pick<Group, 'id' | 'name' | 'rate_multiplier' | 'platform' | 'status'>

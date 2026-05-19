@@ -1653,15 +1653,15 @@ func init() {
 	// ticket.EscalationReasonValidator is a validator for the "escalation_reason" field. It is called by the builders before save.
 	ticket.EscalationReasonValidator = ticketDescEscalationReason.Validators[0].(func(string) error)
 	// ticketDescLastMessageAt is the schema descriptor for last_message_at field.
-	ticketDescLastMessageAt := ticketFields[17].Descriptor()
+	ticketDescLastMessageAt := ticketFields[19].Descriptor()
 	// ticket.DefaultLastMessageAt holds the default value on creation for the last_message_at field.
 	ticket.DefaultLastMessageAt = ticketDescLastMessageAt.Default.(func() time.Time)
 	// ticketDescCreatedAt is the schema descriptor for created_at field.
-	ticketDescCreatedAt := ticketFields[22].Descriptor()
+	ticketDescCreatedAt := ticketFields[24].Descriptor()
 	// ticket.DefaultCreatedAt holds the default value on creation for the created_at field.
 	ticket.DefaultCreatedAt = ticketDescCreatedAt.Default.(func() time.Time)
 	// ticketDescUpdatedAt is the schema descriptor for updated_at field.
-	ticketDescUpdatedAt := ticketFields[23].Descriptor()
+	ticketDescUpdatedAt := ticketFields[25].Descriptor()
 	// ticket.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	ticket.DefaultUpdatedAt = ticketDescUpdatedAt.Default.(func() time.Time)
 	// ticket.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

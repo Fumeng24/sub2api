@@ -113,6 +113,7 @@ func registerTicketRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		tickets.GET("", h.Admin.Ticket.List)
 		tickets.GET("/unread-summary", h.Admin.Ticket.UnreadSummary)
 		tickets.GET("/stats", h.Admin.Ticket.Stats)
+		tickets.GET("/capabilities", h.Admin.Ticket.Capabilities)
 		tickets.POST("/batch-update", h.Admin.Ticket.BatchUpdate)
 		tickets.POST("/auto-close-resolved", h.Admin.Ticket.AutoCloseResolved)
 		tickets.GET("/:id", h.Admin.Ticket.GetByID)

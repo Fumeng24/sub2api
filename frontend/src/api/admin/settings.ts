@@ -9,6 +9,7 @@ import type {
   CustomMenuItem,
   LoginAgreementDocument,
   NotifyEmailEntry,
+  TicketSystemSettings,
 } from "@/types";
 
 export interface DefaultSubscriptionSetting {
@@ -552,6 +553,9 @@ export interface SystemSettings {
   // Group rate discount campaign
   group_rate_discount_settings: GroupRateDiscountSettings;
 
+  // Support ticket system
+  ticket_system_config: TicketSystemSettings;
+
   // OpenAI fast/flex policy
   openai_fast_policy_settings?: OpenAIFastPolicySettings;
 }
@@ -749,6 +753,9 @@ export interface UpdateSettingsRequest {
 
   // Group rate discount campaign
   group_rate_discount_settings?: GroupRateDiscountSettings;
+
+  // Support ticket system
+  ticket_system_config?: TicketSystemSettings;
 
   // OpenAI fast/flex policy
   openai_fast_policy_settings?: OpenAIFastPolicySettings;

@@ -299,6 +299,46 @@ func (_u *TicketUpdate) SetNillableEscalationReason(v *string) *TicketUpdate {
 	return _u
 }
 
+// SetSLADueAt sets the "sla_due_at" field.
+func (_u *TicketUpdate) SetSLADueAt(v time.Time) *TicketUpdate {
+	_u.mutation.SetSLADueAt(v)
+	return _u
+}
+
+// SetNillableSLADueAt sets the "sla_due_at" field if the given value is not nil.
+func (_u *TicketUpdate) SetNillableSLADueAt(v *time.Time) *TicketUpdate {
+	if v != nil {
+		_u.SetSLADueAt(*v)
+	}
+	return _u
+}
+
+// ClearSLADueAt clears the value of the "sla_due_at" field.
+func (_u *TicketUpdate) ClearSLADueAt() *TicketUpdate {
+	_u.mutation.ClearSLADueAt()
+	return _u
+}
+
+// SetSLARemindedAt sets the "sla_reminded_at" field.
+func (_u *TicketUpdate) SetSLARemindedAt(v time.Time) *TicketUpdate {
+	_u.mutation.SetSLARemindedAt(v)
+	return _u
+}
+
+// SetNillableSLARemindedAt sets the "sla_reminded_at" field if the given value is not nil.
+func (_u *TicketUpdate) SetNillableSLARemindedAt(v *time.Time) *TicketUpdate {
+	if v != nil {
+		_u.SetSLARemindedAt(*v)
+	}
+	return _u
+}
+
+// ClearSLARemindedAt clears the value of the "sla_reminded_at" field.
+func (_u *TicketUpdate) ClearSLARemindedAt() *TicketUpdate {
+	_u.mutation.ClearSLARemindedAt()
+	return _u
+}
+
 // SetLastMessageAt sets the "last_message_at" field.
 func (_u *TicketUpdate) SetLastMessageAt(v time.Time) *TicketUpdate {
 	_u.mutation.SetLastMessageAt(v)
@@ -657,6 +697,18 @@ func (_u *TicketUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.EscalationReason(); ok {
 		_spec.SetField(ticket.FieldEscalationReason, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SLADueAt(); ok {
+		_spec.SetField(ticket.FieldSLADueAt, field.TypeTime, value)
+	}
+	if _u.mutation.SLADueAtCleared() {
+		_spec.ClearField(ticket.FieldSLADueAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SLARemindedAt(); ok {
+		_spec.SetField(ticket.FieldSLARemindedAt, field.TypeTime, value)
+	}
+	if _u.mutation.SLARemindedAtCleared() {
+		_spec.ClearField(ticket.FieldSLARemindedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.LastMessageAt(); ok {
 		_spec.SetField(ticket.FieldLastMessageAt, field.TypeTime, value)
@@ -1067,6 +1119,46 @@ func (_u *TicketUpdateOne) SetNillableEscalationReason(v *string) *TicketUpdateO
 	return _u
 }
 
+// SetSLADueAt sets the "sla_due_at" field.
+func (_u *TicketUpdateOne) SetSLADueAt(v time.Time) *TicketUpdateOne {
+	_u.mutation.SetSLADueAt(v)
+	return _u
+}
+
+// SetNillableSLADueAt sets the "sla_due_at" field if the given value is not nil.
+func (_u *TicketUpdateOne) SetNillableSLADueAt(v *time.Time) *TicketUpdateOne {
+	if v != nil {
+		_u.SetSLADueAt(*v)
+	}
+	return _u
+}
+
+// ClearSLADueAt clears the value of the "sla_due_at" field.
+func (_u *TicketUpdateOne) ClearSLADueAt() *TicketUpdateOne {
+	_u.mutation.ClearSLADueAt()
+	return _u
+}
+
+// SetSLARemindedAt sets the "sla_reminded_at" field.
+func (_u *TicketUpdateOne) SetSLARemindedAt(v time.Time) *TicketUpdateOne {
+	_u.mutation.SetSLARemindedAt(v)
+	return _u
+}
+
+// SetNillableSLARemindedAt sets the "sla_reminded_at" field if the given value is not nil.
+func (_u *TicketUpdateOne) SetNillableSLARemindedAt(v *time.Time) *TicketUpdateOne {
+	if v != nil {
+		_u.SetSLARemindedAt(*v)
+	}
+	return _u
+}
+
+// ClearSLARemindedAt clears the value of the "sla_reminded_at" field.
+func (_u *TicketUpdateOne) ClearSLARemindedAt() *TicketUpdateOne {
+	_u.mutation.ClearSLARemindedAt()
+	return _u
+}
+
 // SetLastMessageAt sets the "last_message_at" field.
 func (_u *TicketUpdateOne) SetLastMessageAt(v time.Time) *TicketUpdateOne {
 	_u.mutation.SetLastMessageAt(v)
@@ -1455,6 +1547,18 @@ func (_u *TicketUpdateOne) sqlSave(ctx context.Context) (_node *Ticket, err erro
 	}
 	if value, ok := _u.mutation.EscalationReason(); ok {
 		_spec.SetField(ticket.FieldEscalationReason, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SLADueAt(); ok {
+		_spec.SetField(ticket.FieldSLADueAt, field.TypeTime, value)
+	}
+	if _u.mutation.SLADueAtCleared() {
+		_spec.ClearField(ticket.FieldSLADueAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SLARemindedAt(); ok {
+		_spec.SetField(ticket.FieldSLARemindedAt, field.TypeTime, value)
+	}
+	if _u.mutation.SLARemindedAtCleared() {
+		_spec.ClearField(ticket.FieldSLARemindedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.LastMessageAt(); ok {
 		_spec.SetField(ticket.FieldLastMessageAt, field.TypeTime, value)

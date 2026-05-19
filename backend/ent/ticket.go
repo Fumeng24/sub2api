@@ -52,6 +52,10 @@ type Ticket struct {
 	EscalatedBy *int64 `json:"escalated_by,omitempty"`
 	// 升级原因
 	EscalationReason string `json:"escalation_reason,omitempty"`
+	// SLA响应截止时间
+	SLADueAt *time.Time `json:"sla_due_at,omitempty"`
+	// SLA催办通知时间
+	SLARemindedAt *time.Time `json:"sla_reminded_at,omitempty"`
 	// 最后消息时间
 	LastMessageAt time.Time `json:"last_message_at,omitempty"`
 	// 最后用户回复时间
@@ -112,7 +116,7 @@ func (*Ticket) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case ticket.FieldTicketNo, ticket.FieldUserEmail, ticket.FieldUserName, ticket.FieldSubject, ticket.FieldCategory, ticket.FieldPriority, ticket.FieldStatus, ticket.FieldSource, ticket.FieldTemplateKey, ticket.FieldContextType, ticket.FieldContextID, ticket.FieldEscalationReason:
 			values[i] = new(sql.NullString)
-		case ticket.FieldEscalatedAt, ticket.FieldLastMessageAt, ticket.FieldLastUserMessageAt, ticket.FieldLastAdminMessageAt, ticket.FieldResolvedAt, ticket.FieldClosedAt, ticket.FieldCreatedAt, ticket.FieldUpdatedAt:
+		case ticket.FieldEscalatedAt, ticket.FieldSLADueAt, ticket.FieldSLARemindedAt, ticket.FieldLastMessageAt, ticket.FieldLastUserMessageAt, ticket.FieldLastAdminMessageAt, ticket.FieldResolvedAt, ticket.FieldClosedAt, ticket.FieldCreatedAt, ticket.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -241,6 +245,20 @@ func (_m *Ticket) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field escalation_reason", values[i])
 			} else if value.Valid {
 				_m.EscalationReason = value.String
+			}
+		case ticket.FieldSLADueAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field sla_due_at", values[i])
+			} else if value.Valid {
+				_m.SLADueAt = new(time.Time)
+				*_m.SLADueAt = value.Time
+			}
+		case ticket.FieldSLARemindedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field sla_reminded_at", values[i])
+			} else if value.Valid {
+				_m.SLARemindedAt = new(time.Time)
+				*_m.SLARemindedAt = value.Time
 			}
 		case ticket.FieldLastMessageAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -390,6 +408,16 @@ func (_m *Ticket) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("escalation_reason=")
 	builder.WriteString(_m.EscalationReason)
+	builder.WriteString(", ")
+	if v := _m.SLADueAt; v != nil {
+		builder.WriteString("sla_due_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SLARemindedAt; v != nil {
+		builder.WriteString("sla_reminded_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("last_message_at=")
 	builder.WriteString(_m.LastMessageAt.Format(time.ANSIC))

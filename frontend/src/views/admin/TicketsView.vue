@@ -46,7 +46,7 @@
               >
                 <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
               </button>
-              <button v-if="isSuperAdmin" class="btn btn-secondary" @click="showAutoCloseDialog = true">
+              <button v-if="capabilities?.is_super_admin" class="btn btn-secondary" @click="showAutoCloseDialog = true">
                 <Icon name="clock" size="md" class="mr-1" />
                 {{ t('admin.tickets.autoClose.button') }}
               </button>
@@ -54,19 +54,19 @@
           </div>
 
           <div
-            v-if="selectedCount > 0"
+            v-if="selectedCount > 0 && canBatchUpdate"
             class="flex flex-wrap items-center gap-3 rounded-lg border border-primary-200 bg-primary-50 p-3 dark:border-primary-900/40 dark:bg-primary-900/20"
           >
             <span class="text-sm font-medium text-primary-700 dark:text-primary-200">
               {{ t('admin.tickets.bulk.selected', { count: selectedCount }) }}
             </span>
             <Select v-model="bulkForm.status" :options="bulkStatusOptions" class="w-full sm:w-36" />
-            <Select v-if="isSuperAdmin" v-model="bulkForm.priority" :options="bulkPriorityOptions" class="w-full sm:w-36" />
-            <Select v-if="isSuperAdmin" v-model="bulkForm.category" :options="bulkCategoryOptions" class="w-full sm:w-40" />
-            <Select v-if="isSuperAdmin" v-model="bulkForm.assignee_id" :options="assigneeUpdateOptions" class="w-full sm:w-52" searchable />
+            <Select v-if="canUpdatePriority" v-model="bulkForm.priority" :options="bulkPriorityOptions" class="w-full sm:w-36" />
+            <Select v-if="canUpdateCategory" v-model="bulkForm.category" :options="bulkCategoryOptions" class="w-full sm:w-40" />
+            <Select v-if="canTransfer" v-model="bulkForm.assignee_id" :options="assigneeUpdateOptions" class="w-full sm:w-52" searchable />
             <div class="ml-auto flex items-center gap-2">
               <button class="btn btn-secondary" @click="clearSelection">{{ t('common.cancel') }}</button>
-              <button class="btn btn-primary" :disabled="bulkUpdating || !hasBulkChanges || (isSupportAgent && !bulkForm.status)" @click="handleBulkUpdate">
+              <button class="btn btn-primary" :disabled="bulkUpdating || !hasBulkChanges" @click="handleBulkUpdate">
                 {{ bulkUpdating ? t('common.processing') : t('admin.tickets.bulk.apply') }}
               </button>
             </div>
@@ -87,6 +87,7 @@
         >
           <template #header-select>
             <input
+              v-if="canBatchUpdate"
               type="checkbox"
               class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               :checked="allPageSelected"
@@ -97,6 +98,7 @@
 
           <template #cell-select="{ row }">
             <input
+              v-if="canBatchUpdate"
               type="checkbox"
               class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               :checked="isSelected(row.id)"
@@ -238,7 +240,7 @@
             {{ claiming ? t('common.processing') : t('admin.tickets.claim') }}
           </button>
           <button
-            v-if="selectedTicket && !selectedTicket.escalated_at"
+            v-if="canEscalateSelectedTicket"
             class="btn btn-secondary"
             :disabled="escalating"
             @click="handleEscalateTicket"
@@ -247,35 +249,35 @@
           </button>
         </div>
 
-        <form class="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-dark-700" @submit.prevent="handleSaveTicket">
+        <form v-if="canEditSelectedTicket" class="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-dark-700" @submit.prevent="handleSaveTicket">
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div>
+            <div v-if="canCloseTicket">
               <label class="input-label">{{ t('admin.tickets.form.status') }}</label>
               <Select v-model="ticketForm.status" :options="statusOptions" />
             </div>
-            <div v-if="isSuperAdmin">
+            <div v-if="canUpdatePriority">
               <label class="input-label">{{ t('admin.tickets.form.priority') }}</label>
               <Select v-model="ticketForm.priority" :options="priorityOptions" />
             </div>
-            <div v-if="isSuperAdmin">
+            <div v-if="canUpdateCategory">
               <label class="input-label">{{ t('admin.tickets.form.category') }}</label>
               <Select v-model="ticketForm.category" :options="categoryOptions" />
             </div>
-            <div v-if="isSuperAdmin">
+            <div v-if="canTransfer">
               <label class="input-label">{{ t('admin.tickets.form.assigneeId') }}</label>
               <Select v-model="ticketForm.assignee_id" :options="assigneeUpdateOptions" searchable />
             </div>
           </div>
 
           <div class="flex justify-end">
-            <button type="submit" class="btn btn-primary" :disabled="savingTicket">
+            <button type="submit" class="btn btn-primary" :disabled="savingTicket || !hasTicketFormChanges">
               {{ savingTicket ? t('common.saving') : t('admin.tickets.saveChanges') }}
             </button>
           </div>
         </form>
 
         <form
-          v-if="isSuperAdmin"
+          v-if="canAdjustBalance"
           class="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-900/20"
           @submit.prevent="handleBalanceAdjust"
         >
@@ -332,10 +334,10 @@
           </template>
         </div>
 
-        <form class="space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-dark-800" @submit.prevent="handleReply">
+        <form v-if="canReplySelectedTicket" class="space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-dark-800" @submit.prevent="handleReply">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <label class="input-label mb-0">{{ t('admin.tickets.reply') }}</label>
-            <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <label v-if="canInternalNote" class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
               <input v-model="replyInternal" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
               <span>{{ t('admin.tickets.internalReply') }}</span>
             </label>
@@ -390,7 +392,7 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { formatDateTime } from '@/utils/format'
 import type { Column } from '@/components/common/types'
-import type { AdminUser, Ticket, TicketAttachment, TicketCategory, TicketMessage, TicketPriority, TicketStats, TicketStatus } from '@/types'
+import type { AdminUser, Ticket, TicketAdminCapabilities, TicketAttachment, TicketCategory, TicketMessage, TicketPriority, TicketStats, TicketStatus } from '@/types'
 
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -412,6 +414,7 @@ const ticketStore = useTicketStore()
 const tickets = ref<Ticket[]>([])
 const adminUsers = ref<AdminUser[]>([])
 const ticketStats = ref<TicketStats | null>(null)
+const capabilities = ref<TicketAdminCapabilities | null>(null)
 const loading = ref(false)
 const detailLoading = ref(false)
 const savingTicket = ref(false)
@@ -476,6 +479,16 @@ const balanceForm = reactive({
 const currentAdminId = computed(() => authStore.user?.id ?? 0)
 const isSuperAdmin = computed(() => authStore.isAdmin)
 const isSupportAgent = computed(() => authStore.isSupport)
+const canViewAll = computed(() => Boolean(capabilities.value?.can_view_all || capabilities.value?.is_super_admin))
+const canViewEscalated = computed(() => Boolean(capabilities.value?.can_view_escalated || capabilities.value?.is_super_admin))
+const canInternalNote = computed(() => Boolean(capabilities.value?.can_internal_note || capabilities.value?.is_super_admin))
+const canCloseTicket = computed(() => Boolean(capabilities.value?.can_close || capabilities.value?.is_super_admin))
+const canTransfer = computed(() => Boolean(capabilities.value?.can_transfer || capabilities.value?.is_super_admin))
+const canBatchUpdate = computed(() => Boolean(capabilities.value?.can_batch_update || capabilities.value?.is_super_admin))
+const canUpdatePriority = computed(() => Boolean(capabilities.value?.can_update_priority || capabilities.value?.is_super_admin))
+const canUpdateCategory = computed(() => Boolean(capabilities.value?.can_update_category || capabilities.value?.is_super_admin))
+const canEscalate = computed(() => Boolean(capabilities.value?.can_escalate || capabilities.value?.is_super_admin))
+const canAdjustBalance = computed(() => Boolean(capabilities.value?.can_adjust_balance || capabilities.value?.is_super_admin))
 
 const columns = computed<Column[]>(() => [
   { key: 'select', label: '', class: 'w-10' },
@@ -536,11 +549,17 @@ const unreadFilterOptions = computed(() => [
 
 const queueFilterOptions = computed(() => {
   if (isSupportAgent.value) {
-    return [
+    const options = [
       { value: '', label: t('admin.tickets.queue.support') },
-      { value: 'mine', label: t('admin.tickets.queue.mine') },
-      { value: 'all', label: t('admin.tickets.queue.allNormal') }
+      { value: 'mine', label: t('admin.tickets.queue.mine') }
     ]
+    if (canViewAll.value) {
+      options.push({ value: 'all', label: t('admin.tickets.queue.allNormal') })
+    }
+    if (canViewEscalated.value) {
+      options.push({ value: 'super_admin', label: t('admin.tickets.queue.superAdmin') })
+    }
+    return options
   }
   return [
     { value: '', label: t('admin.tickets.queue.all') },
@@ -615,7 +634,49 @@ const canClaimSelectedTicket = computed(() => {
   if (!selectedTicket.value || currentAdminId.value <= 0) return false
   if (selectedTicket.value.assignee_id === currentAdminId.value) return false
   if (selectedTicket.value.escalated_at && !isSuperAdmin.value) return false
+  if (isSupportAgent.value && selectedTicket.value.assignee_id && !canTransfer.value) return false
   return true
+})
+
+const canReplySelectedTicket = computed(() => {
+  const ticket = selectedTicket.value
+  if (!ticket) return false
+  if (ticket.escalated_at && !isSuperAdmin.value) return false
+  if (isSuperAdmin.value) return true
+  if (!isSupportAgent.value) return false
+  if (ticket.assignee_id === currentAdminId.value) {
+    return Boolean(capabilities.value?.can_reply_assigned_to_self)
+  }
+  if (!ticket.assignee_id) {
+    return Boolean(capabilities.value?.can_reply_unassigned || canViewAll.value)
+  }
+  return canViewAll.value
+})
+
+const canEscalateSelectedTicket = computed(() => {
+  const ticket = selectedTicket.value
+  if (!ticket || ticket.escalated_at) return false
+  if (isSuperAdmin.value) return true
+  return canEscalate.value && canReplySelectedTicket.value
+})
+
+const canEditSelectedTicket = computed(() => {
+  if (!selectedTicket.value) return false
+  if (selectedTicket.value.escalated_at && !isSuperAdmin.value) return false
+  return canCloseTicket.value || canUpdatePriority.value || canUpdateCategory.value || canTransfer.value
+})
+
+const hasTicketFormChanges = computed(() => {
+  const ticket = selectedTicket.value
+  if (!ticket) return false
+  if (canCloseTicket.value && ticketForm.status !== ticket.status) return true
+  if (canUpdatePriority.value && ticketForm.priority !== ticket.priority) return true
+  if (canUpdateCategory.value && ticketForm.category !== ticket.category) return true
+  if (canTransfer.value) {
+    const assignee = ticket.assignee_id && ticket.assignee_id > 0 ? String(ticket.assignee_id) : '0'
+    if (ticketForm.assignee_id !== assignee) return true
+  }
+  return false
 })
 
 const contextEntries = computed(() => {
@@ -710,6 +771,20 @@ async function fetchStats() {
   }
 }
 
+async function fetchCapabilities() {
+  try {
+    capabilities.value = await adminAPI.tickets.getCapabilities()
+    if (isSupportAgent.value && filters.queue === 'all' && !canViewAll.value) {
+      filters.queue = ''
+    }
+    if (isSupportAgent.value && filters.queue === 'super_admin' && !canViewEscalated.value) {
+      filters.queue = ''
+    }
+  } catch (error: unknown) {
+    console.error('Failed to load ticket capabilities:', error)
+  }
+}
+
 async function fetchAdminUsers() {
   try {
     const [admins, supports] = await Promise.all([
@@ -742,7 +817,7 @@ async function fetchAdminUsers() {
 }
 
 async function refreshAll() {
-  await Promise.all([fetchTickets(), fetchStats()])
+  await Promise.all([fetchCapabilities(), fetchTickets(), fetchStats()])
 }
 
 function handleSearch() {
@@ -753,6 +828,12 @@ function handleSearch() {
 }
 
 function applyFilters() {
+  if (isSupportAgent.value && filters.queue === 'all' && !canViewAll.value) {
+    filters.queue = ''
+  }
+  if (isSupportAgent.value && filters.queue === 'super_admin' && !canViewEscalated.value) {
+    filters.queue = ''
+  }
   pagination.page = 1
   fetchTickets()
 }
@@ -821,15 +902,21 @@ async function handleSaveTicket() {
   if (!selectedTicket.value) return
   savingTicket.value = true
   try {
-    const payload: Record<string, unknown> = {
-      status: ticketForm.status,
+    const payload: Record<string, unknown> = {}
+    if (canCloseTicket.value) {
+      payload.status = ticketForm.status
     }
-    if (isSuperAdmin.value) {
-      const assigneeValue = Number.parseInt(ticketForm.assignee_id || '0', 10)
+    if (canUpdatePriority.value) {
       payload.priority = ticketForm.priority
+    }
+    if (canUpdateCategory.value) {
       payload.category = ticketForm.category
+    }
+    if (canTransfer.value) {
+      const assigneeValue = Number.parseInt(ticketForm.assignee_id || '0', 10)
       payload.assignee_id = Number.isFinite(assigneeValue) ? assigneeValue : 0
     }
+    if (Object.keys(payload).length === 0) return
     const updated = await adminAPI.tickets.update(selectedTicket.value.id, payload)
     selectedTicket.value = updated
     syncTicketForm(updated)
@@ -901,11 +988,12 @@ async function handleBalanceAdjust() {
 
 async function handleReply() {
   if (!selectedTicket.value || !replyBody.value.trim()) return
+  if (!canReplySelectedTicket.value) return
   replying.value = true
   try {
     await adminAPI.tickets.addMessage(selectedTicket.value.id, {
       body: replyBody.value.trim(),
-      internal: replyInternal.value,
+      internal: canInternalNote.value ? replyInternal.value : false,
       attachments: normalizeAttachments(replyAttachments.value)
     })
     replyBody.value = ''
@@ -931,6 +1019,7 @@ function eventChecked(event: Event) {
 }
 
 function toggleSelection(id: number, checked: boolean) {
+  if (!canBatchUpdate.value) return
   const next = new Set(selectedIds.value)
   if (checked) {
     next.add(id)
@@ -941,6 +1030,7 @@ function toggleSelection(id: number, checked: boolean) {
 }
 
 function togglePageSelection(checked: boolean) {
+  if (!canBatchUpdate.value) return
   const next = new Set(selectedIds.value)
   for (const ticket of tickets.value) {
     if (checked) {
@@ -961,7 +1051,7 @@ function clearSelection() {
 }
 
 async function handleBulkUpdate() {
-  if (selectedIds.value.size === 0 || !hasBulkChanges.value) return
+  if (selectedIds.value.size === 0 || !hasBulkChanges.value || !canBatchUpdate.value) return
   bulkUpdating.value = true
   try {
     const assigneeID = bulkForm.assignee_id ? Number.parseInt(bulkForm.assignee_id, 10) : undefined
@@ -975,9 +1065,13 @@ async function handleBulkUpdate() {
       ids: Array.from(selectedIds.value),
       status: bulkForm.status || undefined
     }
-    if (isSuperAdmin.value) {
+    if (canUpdatePriority.value) {
       payload.priority = bulkForm.priority || undefined
+    }
+    if (canUpdateCategory.value) {
       payload.category = bulkForm.category || undefined
+    }
+    if (canTransfer.value) {
       payload.assignee_id = Number.isFinite(assigneeID) ? assigneeID : undefined
     }
     const res = await adminAPI.tickets.batchUpdate(payload)
@@ -1055,6 +1149,7 @@ function senderLabel(message: TicketMessage) {
 }
 
 onMounted(() => {
+  fetchCapabilities()
   fetchTickets()
   fetchStats()
   fetchAdminUsers()

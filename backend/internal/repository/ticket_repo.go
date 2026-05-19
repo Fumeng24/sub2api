@@ -287,7 +287,8 @@ func (r *ticketRepository) Stats(ctx context.Context, filters ...service.TicketL
 		slaOverdue, err := applyTicketListFilters(r.client.Ticket.Query(), filters[0]).
 			Where(
 				ticket.StatusIn(service.TicketStatusOpen, service.TicketStatusPending),
-				ticket.LastMessageAtLT(time.Now().Add(-24*time.Hour)),
+				ticket.SLADueAtNotNil(),
+				ticket.SLADueAtLT(time.Now()),
 			).
 			Count(ctx)
 		if err != nil {
@@ -306,7 +307,8 @@ func (r *ticketRepository) Stats(ctx context.Context, filters ...service.TicketL
 		COUNT(*) FILTER (WHERE assignee_id IS NULL)::bigint,
 	COUNT(*) FILTER (
 		WHERE status IN ('open', 'pending')
-			AND last_message_at < NOW() - INTERVAL '24 hours'
+			AND sla_due_at IS NOT NULL
+			AND sla_due_at < NOW()
 	)::bigint
 FROM tickets
 `)
@@ -373,6 +375,25 @@ WHERE status = 'resolved'
 	return int(rows), nil
 }
 
+func (r *ticketRepository) ListSLAActionable(ctx context.Context, before time.Time, limit int) ([]service.Ticket, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	items, err := r.client.Ticket.Query().
+		Where(
+			ticket.StatusIn(service.TicketStatusOpen, service.TicketStatusPending),
+			ticket.SLADueAtNotNil(),
+			ticket.SLADueAtLTE(before),
+		).
+		Order(dbent.Asc(ticket.FieldSLADueAt), dbent.Asc(ticket.FieldID)).
+		Limit(limit).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return ticketEntitiesToService(items), nil
+}
+
 func (r *ticketRepository) withTx(ctx context.Context, fn func(txCtx context.Context, txClient *dbent.Client) error) error {
 	if tx := dbent.TxFromContext(ctx); tx != nil {
 		return fn(ctx, tx.Client())
@@ -422,6 +443,12 @@ func createTicketEntity(ctx context.Context, client *dbent.Client, t *service.Ti
 	if t.EscalationReason != "" {
 		builder.SetEscalationReason(t.EscalationReason)
 	}
+	if t.SLADueAt != nil {
+		builder.SetSLADueAt(*t.SLADueAt)
+	}
+	if t.SLARemindedAt != nil {
+		builder.SetSLARemindedAt(*t.SLARemindedAt)
+	}
 	if t.LastUserMessageAt != nil {
 		builder.SetLastUserMessageAt(*t.LastUserMessageAt)
 	}
@@ -470,6 +497,16 @@ func updateTicketEntity(ctx context.Context, client *dbent.Client, t *service.Ti
 		builder.ClearEscalatedBy()
 	}
 	builder.SetEscalationReason(t.EscalationReason)
+	if t.SLADueAt != nil {
+		builder.SetSLADueAt(*t.SLADueAt)
+	} else {
+		builder.ClearSLADueAt()
+	}
+	if t.SLARemindedAt != nil {
+		builder.SetSLARemindedAt(*t.SLARemindedAt)
+	} else {
+		builder.ClearSLARemindedAt()
+	}
 	if t.LastUserMessageAt != nil {
 		builder.SetLastUserMessageAt(*t.LastUserMessageAt)
 	} else {
@@ -676,6 +713,8 @@ func ticketEntityToService(m *dbent.Ticket) *service.Ticket {
 		EscalatedAt:        m.EscalatedAt,
 		EscalatedBy:        m.EscalatedBy,
 		EscalationReason:   m.EscalationReason,
+		SLADueAt:           m.SLADueAt,
+		SLARemindedAt:      m.SLARemindedAt,
 		LastMessageAt:      m.LastMessageAt,
 		LastUserMessageAt:  m.LastUserMessageAt,
 		LastAdminMessageAt: m.LastAdminMessageAt,

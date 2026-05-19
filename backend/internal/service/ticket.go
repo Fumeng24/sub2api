@@ -85,7 +85,11 @@ var (
 		"TICKET_ATTACHMENT_INVALID",
 		"ticket attachment is invalid",
 	)
-	ErrTicketIDsRequired = infraerrors.BadRequest("TICKET_IDS_REQUIRED", "ticket ids are required")
+	ErrTicketIDsRequired              = infraerrors.BadRequest("TICKET_IDS_REQUIRED", "ticket ids are required")
+	ErrTicketEscalationReasonRequired = infraerrors.BadRequest(
+		"TICKET_ESCALATION_REASON_REQUIRED",
+		"ticket escalation reason is required",
+	)
 )
 
 type Ticket = domain.Ticket
@@ -192,8 +196,53 @@ type TicketTemplate struct {
 	Fields               []TicketTemplateField `json:"fields,omitempty"`
 }
 
+type TicketSupportPermissions struct {
+	CanViewAll             bool `json:"can_view_all"`
+	CanViewEscalated       bool `json:"can_view_escalated"`
+	CanInternalNote        bool `json:"can_internal_note"`
+	CanClose               bool `json:"can_close"`
+	CanTransfer            bool `json:"can_transfer"`
+	CanBatchUpdate         bool `json:"can_batch_update"`
+	CanUpdatePriority      bool `json:"can_update_priority"`
+	CanUpdateCategory      bool `json:"can_update_category"`
+	CanReplyUnassigned     bool `json:"can_reply_unassigned"`
+	CanReplyAssignedToSelf bool `json:"can_reply_assigned_to_self"`
+	CanEscalate            bool `json:"can_escalate"`
+}
+
+type TicketSLASettings struct {
+	Enabled                   bool `json:"enabled"`
+	FirstResponseMinutes      int  `json:"first_response_minutes"`
+	ReminderBeforeMinutes     int  `json:"reminder_before_minutes"`
+	AutoEscalateAfterMinutes  int  `json:"auto_escalate_after_minutes"`
+	ReminderNotifications     bool `json:"reminder_notifications"`
+	AutoEscalateNotifications bool `json:"auto_escalate_notifications"`
+	AutoCloseResolvedDays     int  `json:"auto_close_resolved_days"`
+	WorkerIntervalSeconds     int  `json:"worker_interval_seconds"`
+}
+
 type TicketSystemSettings struct {
-	Templates []TicketTemplate `json:"templates"`
+	Templates          []TicketTemplate         `json:"templates"`
+	SupportPermissions TicketSupportPermissions `json:"support_permissions"`
+	SLA                TicketSLASettings        `json:"sla"`
+}
+
+type TicketAdminCapabilities struct {
+	Role                 string                   `json:"role"`
+	IsSuperAdmin         bool                     `json:"is_super_admin"`
+	SupportPermissions   TicketSupportPermissions `json:"support_permissions"`
+	CanViewAll           bool                     `json:"can_view_all"`
+	CanViewEscalated     bool                     `json:"can_view_escalated"`
+	CanInternalNote      bool                     `json:"can_internal_note"`
+	CanClose             bool                     `json:"can_close"`
+	CanTransfer          bool                     `json:"can_transfer"`
+	CanBatchUpdate       bool                     `json:"can_batch_update"`
+	CanUpdatePriority    bool                     `json:"can_update_priority"`
+	CanUpdateCategory    bool                     `json:"can_update_category"`
+	CanReplyUnassigned   bool                     `json:"can_reply_unassigned"`
+	CanReplyAssignedSelf bool                     `json:"can_reply_assigned_to_self"`
+	CanEscalate          bool                     `json:"can_escalate"`
+	CanAdjustBalance     bool                     `json:"can_adjust_balance"`
 }
 
 type TicketBalanceAdjustmentInput struct {
@@ -227,6 +276,7 @@ type TicketRepository interface {
 	Stats(ctx context.Context, filters ...TicketListFilters) (*TicketStats, error)
 	StatsForAssignee(ctx context.Context, assigneeID int64) (*TicketStats, error)
 	AutoCloseResolved(ctx context.Context, before time.Time) (int, error)
+	ListSLAActionable(ctx context.Context, before time.Time, limit int) ([]Ticket, error)
 }
 
 func isValidTicketStatus(status string) bool {

@@ -96,6 +96,16 @@ func (Ticket) Fields() []ent.Field {
 			MaxLen(500).
 			Default("").
 			Comment("升级原因"),
+		field.Time("sla_due_at").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}).
+			Comment("SLA响应截止时间"),
+		field.Time("sla_reminded_at").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}).
+			Comment("SLA催办通知时间"),
 		field.Time("last_message_at").
 			Default(time.Now).
 			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}).
@@ -146,6 +156,8 @@ func (Ticket) Indexes() []ent.Index {
 		index.Fields("assignee_id"),
 		index.Fields("template_key"),
 		index.Fields("escalated_at"),
+		index.Fields("sla_due_at"),
+		index.Fields("sla_reminded_at"),
 		index.Fields("last_message_at"),
 		index.Fields("created_at"),
 		index.Fields("status", "last_message_at"),

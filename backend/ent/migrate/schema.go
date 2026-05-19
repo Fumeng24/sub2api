@@ -1267,6 +1267,8 @@ var (
 		{Name: "escalated_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "escalated_by", Type: field.TypeInt64, Nullable: true},
 		{Name: "escalation_reason", Type: field.TypeString, Size: 500, Default: ""},
+		{Name: "sla_due_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "sla_reminded_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "last_message_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "last_user_message_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "last_admin_message_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
@@ -1312,19 +1314,29 @@ var (
 				Columns: []*schema.Column{TicketsColumns[15]},
 			},
 			{
-				Name:    "ticket_last_message_at",
+				Name:    "ticket_sla_due_at",
 				Unique:  false,
 				Columns: []*schema.Column{TicketsColumns[18]},
 			},
 			{
+				Name:    "ticket_sla_reminded_at",
+				Unique:  false,
+				Columns: []*schema.Column{TicketsColumns[19]},
+			},
+			{
+				Name:    "ticket_last_message_at",
+				Unique:  false,
+				Columns: []*schema.Column{TicketsColumns[20]},
+			},
+			{
 				Name:    "ticket_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TicketsColumns[23]},
+				Columns: []*schema.Column{TicketsColumns[25]},
 			},
 			{
 				Name:    "ticket_status_last_message_at",
 				Unique:  false,
-				Columns: []*schema.Column{TicketsColumns[8], TicketsColumns[18]},
+				Columns: []*schema.Column{TicketsColumns[8], TicketsColumns[20]},
 			},
 			{
 				Name:    "ticket_user_id_status",

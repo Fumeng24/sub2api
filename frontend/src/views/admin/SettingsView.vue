@@ -4780,6 +4780,277 @@
 
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                  {{ localText('工单系统', 'Support tickets') }}
+                </h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {{ localText('自定义用户可选的工单类型、必填字段、客服权限矩阵、SLA、自动催办和超时升级。', 'Customize ticket types, required fields, support permissions, SLA, reminders, and escalation rules.') }}
+                </p>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" @click="resetTicketSystemSettings">
+                {{ localText('恢复默认', 'Reset defaults') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-8 p-6">
+            <section class="space-y-3">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+                  {{ localText('客服权限矩阵', 'Support permission matrix') }}
+                </h3>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ localText('超级管理员始终拥有全部权限；这里控制 support 角色能做什么。', 'Super admins always keep full access; this controls what the support role can do.') }}
+                </p>
+              </div>
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <label
+                  v-for="permission in ticketPermissionOptions"
+                  :key="permission.key"
+                  class="flex min-h-[92px] items-start justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-dark-700 dark:bg-dark-800"
+                >
+                  <span>
+                    <span class="block text-sm font-medium text-gray-800 dark:text-gray-100">
+                      {{ permission.label }}
+                    </span>
+                    <span class="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">
+                      {{ permission.hint }}
+                    </span>
+                  </span>
+                  <Toggle v-model="form.ticket_system_config.support_permissions[permission.key]" />
+                </label>
+              </div>
+            </section>
+
+            <section class="space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+                    {{ localText('SLA 与自动化', 'SLA and automation') }}
+                  </h3>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ localText('首次响应计时从用户提交或用户追问开始；客服公开回复、解决、关闭或升级后会清除普通客服 SLA。', 'First-response timing starts when users create or reply; public admin replies, resolve, close, or escalation clear the support SLA.') }}
+                  </p>
+                </div>
+                <Toggle v-model="form.ticket_system_config.sla.enabled" />
+              </div>
+
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div>
+                  <label class="input-label">{{ localText('首次响应分钟', 'First response minutes') }}</label>
+                  <input v-model.number="form.ticket_system_config.sla.first_response_minutes" type="number" min="1" max="43200" class="input" />
+                </div>
+                <div>
+                  <label class="input-label">{{ localText('提前催办分钟', 'Reminder minutes before due') }}</label>
+                  <input v-model.number="form.ticket_system_config.sla.reminder_before_minutes" type="number" min="0" max="43200" class="input" />
+                </div>
+                <div>
+                  <label class="input-label">{{ localText('超时后升级分钟', 'Escalate minutes after due') }}</label>
+                  <input v-model.number="form.ticket_system_config.sla.auto_escalate_after_minutes" type="number" min="0" max="43200" class="input" />
+                  <p class="input-hint">{{ localText('填 0 表示不自动升级。', '0 disables auto escalation.') }}</p>
+                </div>
+                <div>
+                  <label class="input-label">{{ localText('扫描间隔秒', 'Worker interval seconds') }}</label>
+                  <input v-model.number="form.ticket_system_config.sla.worker_interval_seconds" type="number" min="30" max="86400" class="input" />
+                </div>
+                <label class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-dark-700">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    {{ localText('发送催办通知', 'Send reminder email') }}
+                  </span>
+                  <Toggle v-model="form.ticket_system_config.sla.reminder_notifications" />
+                </label>
+                <label class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-dark-700">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    {{ localText('升级时通知超管', 'Notify super admin on escalation') }}
+                  </span>
+                  <Toggle v-model="form.ticket_system_config.sla.auto_escalate_notifications" />
+                </label>
+                <div>
+                  <label class="input-label">{{ localText('自动关闭已解决天数', 'Auto-close resolved days') }}</label>
+                  <input v-model.number="form.ticket_system_config.sla.auto_close_resolved_days" type="number" min="0" max="365" class="input" />
+                  <p class="input-hint">{{ localText('填 0 表示不自动关闭。', '0 disables auto close.') }}</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+                    {{ localText('用户可选工单类型', 'User ticket types') }}
+                  </h3>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ localText('可为不同问题配置默认分类、优先级、描述字数、是否直达超级管理员，以及用户必须填写的字段。', 'Configure category, priority, minimum description length, super-admin routing, and required user fields per issue type.') }}
+                  </p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" @click="addTicketTemplate">
+                  {{ localText('新增类型', 'Add type') }}
+                </button>
+              </div>
+
+              <div class="space-y-4">
+                <div
+                  v-for="(template, templateIndex) in form.ticket_system_config.templates"
+                  :key="`${template.key}-${templateIndex}`"
+                  class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900"
+                >
+                  <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div class="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div>
+                        <label class="input-label">{{ localText('标识', 'Key') }}</label>
+                        <input v-model="template.key" type="text" class="input font-mono" placeholder="group_connection_issue" />
+                      </div>
+                      <div>
+                        <label class="input-label">{{ localText('名称', 'Name') }}</label>
+                        <input v-model="template.name" type="text" class="input" />
+                      </div>
+                      <div>
+                        <label class="input-label">{{ localText('分类', 'Category') }}</label>
+                        <Select v-model="template.category" :options="ticketCategoryOptions" />
+                      </div>
+                      <div>
+                        <label class="input-label">{{ localText('优先级', 'Priority') }}</label>
+                        <Select v-model="template.priority" :options="ticketPriorityOptions" />
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button type="button" class="btn btn-secondary btn-sm" @click="duplicateTicketTemplate(templateIndex)">
+                        {{ localText('复制', 'Copy') }}
+                      </button>
+                      <button type="button" class="btn btn-danger btn-sm" @click="removeTicketTemplate(templateIndex)">
+                        {{ localText('删除', 'Delete') }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div class="md:col-span-2">
+                      <label class="input-label">{{ localText('说明', 'Description') }}</label>
+                      <input v-model="template.description" type="text" class="input" />
+                    </div>
+                    <div>
+                      <label class="input-label">{{ localText('默认标题', 'Subject template') }}</label>
+                      <input v-model="template.subject_template" type="text" class="input" />
+                    </div>
+                    <div>
+                      <label class="input-label">{{ localText('最少描述字数', 'Body min length') }}</label>
+                      <input v-model.number="template.body_min_length" type="number" min="0" max="2000" class="input" />
+                    </div>
+                    <div>
+                      <label class="input-label">{{ localText('上下文类型', 'Context type') }}</label>
+                      <input v-model="template.context_type" type="text" class="input" placeholder="group / order / api_key" />
+                    </div>
+                    <label class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-dark-700">
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {{ localText('需要超级管理员', 'Requires super admin') }}
+                      </span>
+                      <Toggle v-model="template.requires_super_admin" />
+                    </label>
+                    <label class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-dark-700">
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {{ localText('自动分配给超管', 'Auto assign super admin') }}
+                      </span>
+                      <Toggle v-model="template.auto_assign_super_admin" />
+                    </label>
+                  </div>
+
+                  <div class="mt-5 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                        {{ localText('字段要求', 'Field requirements') }}
+                      </h4>
+                      <button type="button" class="btn btn-secondary btn-sm" @click="addTicketTemplateField(template)">
+                        {{ localText('新增字段', 'Add field') }}
+                      </button>
+                    </div>
+
+                    <div
+                      v-if="!template.fields || template.fields.length === 0"
+                      class="rounded border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 dark:border-dark-600 dark:text-gray-400"
+                    >
+                      {{ localText('此类型只要求用户填写描述。', 'This type only requires the user description.') }}
+                    </div>
+
+                    <div
+                      v-for="(field, fieldIndex) in template.fields || []"
+                      :key="`${field.key}-${fieldIndex}`"
+                      class="rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-800"
+                    >
+                      <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+                        <div>
+                          <label class="input-label">{{ localText('字段标识', 'Field key') }}</label>
+                          <input v-model="field.key" type="text" class="input font-mono" />
+                        </div>
+                        <div>
+                          <label class="input-label">{{ localText('字段名称', 'Field label') }}</label>
+                          <input v-model="field.label" type="text" class="input" />
+                        </div>
+                        <div>
+                          <label class="input-label">{{ localText('类型', 'Type') }}</label>
+                          <Select v-model="field.type" :options="ticketFieldTypeOptions" />
+                        </div>
+                        <div>
+                          <label class="input-label">{{ localText('最小长度', 'Min length') }}</label>
+                          <input v-model.number="field.min_length" type="number" min="0" class="input" />
+                        </div>
+                        <div>
+                          <label class="input-label">{{ localText('最大长度', 'Max length') }}</label>
+                          <input v-model.number="field.max_length" type="number" min="0" class="input" />
+                        </div>
+                        <div class="flex items-end justify-between gap-3">
+                          <label class="flex items-center gap-2 pb-2 text-sm text-gray-700 dark:text-gray-200">
+                            <input v-model="field.required" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                            {{ localText('必填', 'Required') }}
+                          </label>
+                          <button type="button" class="btn btn-danger btn-sm" @click="removeTicketTemplateField(template, fieldIndex)">
+                            {{ localText('删除', 'Delete') }}
+                          </button>
+                        </div>
+                        <div>
+                          <label class="input-label">{{ localText('最小金额', 'Min amount') }}</label>
+                          <input v-model.number="field.min_value" type="number" min="0" step="0.01" class="input" />
+                        </div>
+                        <div class="md:col-span-2">
+                          <label class="input-label">{{ localText('占位提示', 'Placeholder') }}</label>
+                          <input v-model="field.placeholder" type="text" class="input" />
+                        </div>
+                        <div class="md:col-span-3">
+                          <label class="input-label">{{ localText('说明', 'Description') }}</label>
+                          <input v-model="field.description" type="text" class="input" />
+                        </div>
+                      </div>
+
+                      <div v-if="field.type === 'select'" class="mt-3 space-y-2">
+                        <div class="flex items-center justify-between">
+                          <label class="input-label mb-0">{{ localText('下拉选项', 'Select options') }}</label>
+                          <button type="button" class="btn btn-secondary btn-sm" @click="addTicketFieldOption(field)">
+                            {{ localText('新增选项', 'Add option') }}
+                          </button>
+                        </div>
+                        <div
+                          v-for="(option, optionIndex) in field.options || []"
+                          :key="optionIndex"
+                          class="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                        >
+                          <input v-model="option.value" type="text" class="input font-mono" placeholder="value" />
+                          <input v-model="option.label" type="text" class="input" :placeholder="localText('显示名称', 'Label')" />
+                          <button type="button" class="btn btn-secondary btn-sm" @click="removeTicketFieldOption(field, optionIndex)">
+                            {{ localText('移除', 'Remove') }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ localText('分组周期折扣', 'Recurring Group Discount') }}
             </h2>
@@ -6354,6 +6625,12 @@ import type {
   LoginAgreementDocument,
   NotifyEmailEntry,
   Proxy,
+  TicketCategory,
+  TicketPriority,
+  TicketSystemSettings,
+  TicketTemplate,
+  TicketTemplateField,
+  TicketTemplateFieldType,
 } from "@/types";
 import type { ProviderInstance } from "@/types/payment";
 import AppLayout from "@/components/layout/AppLayout.vue";
@@ -6633,8 +6910,225 @@ const defaultGroupRateDiscountSettings = (): GroupRateDiscountSettings => ({
   group_ids: [],
 });
 
+const defaultTicketSupportPermissions = () => ({
+  can_view_all: false,
+  can_view_escalated: false,
+  can_internal_note: true,
+  can_close: true,
+  can_transfer: false,
+  can_batch_update: false,
+  can_update_priority: false,
+  can_update_category: false,
+  can_reply_unassigned: false,
+  can_reply_assigned_to_self: true,
+  can_escalate: true,
+});
+
+const defaultTicketSystemSettings = (): TicketSystemSettings => ({
+  templates: [
+    {
+      key: "general",
+      name: "其他问题",
+      description: "没有匹配分类时使用",
+      category: "general",
+      priority: "normal",
+      subject_template: "其他问题",
+      body_min_length: 10,
+      requires_super_admin: false,
+      auto_assign_super_admin: false,
+      context_type: "general",
+      fields: [],
+    },
+    {
+      key: "group_connection_issue",
+      name: "分组连接不上",
+      description: "要求用户选择正在使用的分组，并提供报错截图。",
+      category: "technical",
+      priority: "high",
+      subject_template: "分组连接问题",
+      body_min_length: 15,
+      requires_super_admin: false,
+      auto_assign_super_admin: false,
+      context_type: "group",
+      fields: [
+        {
+          key: "group_id",
+          label: "正在使用的分组",
+          type: "group_select",
+          required: true,
+        },
+        {
+          key: "error_screenshot",
+          label: "报错截图",
+          type: "image",
+          required: true,
+        },
+      ],
+    },
+    {
+      key: "billing_missing_payment",
+      name: "充值未到账",
+      description: "自动带最近充值记录并升级给超级管理员处理。",
+      category: "billing",
+      priority: "urgent",
+      subject_template: "充值未到账",
+      body_min_length: 15,
+      requires_super_admin: true,
+      auto_assign_super_admin: true,
+      context_type: "order",
+      fields: [
+        {
+          key: "recent_order_ids",
+          label: "最近 5 条充值记录",
+          type: "recent_orders",
+          required: true,
+        },
+        {
+          key: "missing_amount",
+          label: "未到账金额",
+          type: "amount",
+          required: true,
+          min_value: 0,
+        },
+        {
+          key: "payment_screenshot",
+          label: "支付宝或微信支付截图",
+          type: "image",
+          required: true,
+        },
+      ],
+    },
+    {
+      key: "api_key_issue",
+      name: "API Key 有问题",
+      description: "引导用户提供 Key 和错误信息。",
+      category: "usage",
+      priority: "normal",
+      subject_template: "API Key 使用问题",
+      body_min_length: 15,
+      requires_super_admin: false,
+      auto_assign_super_admin: false,
+      context_type: "api_key",
+      fields: [
+        {
+          key: "api_key_id",
+          label: "API Key ID",
+          type: "text",
+          required: false,
+        },
+        {
+          key: "error_message",
+          label: "错误信息",
+          type: "textarea",
+          required: false,
+          min_length: 5,
+        },
+      ],
+    },
+  ],
+  support_permissions: defaultTicketSupportPermissions(),
+  sla: {
+    enabled: true,
+    first_response_minutes: 1440,
+    reminder_before_minutes: 60,
+    auto_escalate_after_minutes: 0,
+    reminder_notifications: true,
+    auto_escalate_notifications: true,
+    auto_close_resolved_days: 0,
+    worker_interval_seconds: 300,
+  },
+});
+
 const groupRateDiscountScheduleOnce = "once";
 const groupRateDiscountScheduleWeekly = "weekly";
+
+const ticketCategoryOptions = computed(() => [
+  { value: "general", label: localText("通用", "General") },
+  { value: "billing", label: localText("充值账务", "Billing") },
+  { value: "usage", label: localText("使用问题", "Usage") },
+  { value: "technical", label: localText("技术故障", "Technical") },
+  { value: "account", label: localText("账号问题", "Account") },
+]);
+
+const ticketPriorityOptions = computed(() => [
+  { value: "low", label: localText("低", "Low") },
+  { value: "normal", label: localText("普通", "Normal") },
+  { value: "high", label: localText("高", "High") },
+  { value: "urgent", label: localText("紧急", "Urgent") },
+]);
+
+const ticketFieldTypeOptions = computed(() => [
+  { value: "text", label: localText("短文本", "Text") },
+  { value: "textarea", label: localText("长文本", "Textarea") },
+  { value: "select", label: localText("下拉选项", "Select") },
+  { value: "group_select", label: localText("用户分组选择", "Group select") },
+  { value: "recent_orders", label: localText("最近充值记录", "Recent orders") },
+  { value: "amount", label: localText("金额", "Amount") },
+  { value: "image", label: localText("图片地址", "Image") },
+  { value: "attachments", label: localText("附件", "Attachments") },
+]);
+
+const ticketPermissionOptions = computed(() => [
+  {
+    key: "can_view_all",
+    label: localText("看全部工单", "View all tickets"),
+    hint: localText("关闭后客服只能看到未分配和分配给自己的普通工单。", "When off, support agents see only unassigned and their own normal tickets."),
+  },
+  {
+    key: "can_view_escalated",
+    label: localText("看已升级工单", "View escalated tickets"),
+    hint: localText("仅查看；处理仍应由超级管理员完成。", "View only; handling should still stay with super admins."),
+  },
+  {
+    key: "can_internal_note",
+    label: localText("写内部备注", "Write internal notes"),
+    hint: localText("内部备注用户不可见。", "Internal notes are hidden from users."),
+  },
+  {
+    key: "can_close",
+    label: localText("关闭/解决工单", "Close or resolve"),
+    hint: localText("允许客服把普通工单标记为已解决或已关闭。", "Allow support agents to resolve or close normal tickets."),
+  },
+  {
+    key: "can_transfer",
+    label: localText("转派/认领他人工单", "Transfer tickets"),
+    hint: localText("允许修改处理人或接手已分配给其他人的工单。", "Allow changing assignees or claiming tickets assigned to others."),
+  },
+  {
+    key: "can_batch_update",
+    label: localText("批量处理", "Batch update"),
+    hint: localText("允许在列表页批量修改状态。", "Allow bulk status changes in the list."),
+  },
+  {
+    key: "can_update_priority",
+    label: localText("修改优先级", "Update priority"),
+    hint: localText("允许客服修改普通工单优先级。", "Allow support agents to change priority on normal tickets."),
+  },
+  {
+    key: "can_update_category",
+    label: localText("修改分类", "Update category"),
+    hint: localText("允许客服修改普通工单分类。", "Allow support agents to change category on normal tickets."),
+  },
+  {
+    key: "can_reply_unassigned",
+    label: localText("回复未分配工单", "Reply unassigned"),
+    hint: localText("关闭后客服需先认领再回复。", "When off, support agents must claim before replying."),
+  },
+  {
+    key: "can_reply_assigned_to_self",
+    label: localText("回复自己的工单", "Reply assigned to self"),
+    hint: localText("通常建议开启。", "Usually keep this enabled."),
+  },
+  {
+    key: "can_escalate",
+    label: localText("升级给超级管理员", "Escalate to super admin"),
+    hint: localText("升级时必须填写原因，并只通知超级管理员。", "Escalation requires a reason and only notifies super admins."),
+  },
+] as Array<{
+  key: keyof TicketSystemSettings["support_permissions"];
+  label: string;
+  hint: string;
+}>);
 
 type SettingsForm = Omit<
   SystemSettings,
@@ -6842,6 +7336,7 @@ const form = reactive<SettingsForm>({
   // Available Channels feature switch
   available_channels_enabled: false,
   group_rate_discount_settings: defaultGroupRateDiscountSettings(),
+  ticket_system_config: defaultTicketSystemSettings(),
   // Affiliate (邀请返利) feature switch
   affiliate_enabled: false,
 });
@@ -7217,6 +7712,303 @@ function normalizeGroupRateDiscountFormSettings(
     settings.end_at = "";
   }
   return settings;
+}
+
+function normalizeTicketTemplateKey(value: string, fallback: string): string {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/_{2,}/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized || fallback;
+}
+
+function normalizeTicketSystemSettings(
+  source: Partial<TicketSystemSettings> | null | undefined,
+): TicketSystemSettings {
+  const defaults = defaultTicketSystemSettings();
+  const templates = Array.isArray(source?.templates)
+    ? source.templates
+        .map((template, index) => normalizeTicketTemplate(template, index))
+        .filter((template) => template.key && template.name)
+    : defaults.templates;
+  return {
+    templates: templates.length > 0 ? templates : defaults.templates,
+    support_permissions: {
+      ...defaults.support_permissions,
+      ...(source?.support_permissions || {}),
+    },
+    sla: {
+      ...defaults.sla,
+      ...(source?.sla || {}),
+    },
+  };
+}
+
+function normalizeTicketTemplate(
+  source: Partial<TicketTemplate>,
+  index: number,
+): TicketTemplate {
+  const fallback = defaultTicketSystemSettings().templates[index];
+  const key = normalizeTicketTemplateKey(
+    source.key || fallback?.key || "",
+    `template_${index + 1}`,
+  );
+  return {
+    key,
+    name: String(source.name || fallback?.name || key).trim(),
+    description: String(source.description || "").trim(),
+    category: normalizeTicketCategoryValue(source.category || fallback?.category),
+    priority: normalizeTicketPriorityValue(source.priority || fallback?.priority),
+    subject_template: String(
+      source.subject_template || fallback?.subject_template || "",
+    ).trim(),
+    body_min_length: Math.max(0, Math.floor(Number(source.body_min_length) || 0)),
+    requires_super_admin: Boolean(source.requires_super_admin),
+    auto_assign_super_admin: Boolean(source.auto_assign_super_admin),
+    context_type: String(source.context_type || "").trim(),
+    fields: Array.isArray(source.fields)
+      ? source.fields
+          .map((field, fieldIndex) =>
+            normalizeTicketTemplateField(field, fieldIndex),
+          )
+          .filter((field) => field.key && field.label)
+      : [],
+  };
+}
+
+function normalizeTicketTemplateField(
+  source: Partial<TicketTemplateField>,
+  index: number,
+): TicketTemplateField {
+  return {
+    key: normalizeTicketTemplateKey(source.key || "", `field_${index + 1}`),
+    label: String(source.label || "").trim() || `Field ${index + 1}`,
+    type: normalizeTicketFieldType(source.type),
+    required: Boolean(source.required),
+    min_length: Math.max(0, Math.floor(Number(source.min_length) || 0)),
+    max_length: Math.max(0, Math.floor(Number(source.max_length) || 0)),
+    min_value:
+      source.min_value === null || source.min_value === undefined
+        ? undefined
+        : Number(source.min_value),
+    options: Array.isArray(source.options)
+      ? source.options
+          .map((option) => ({
+            value: String(option.value || "").trim(),
+            label: String(option.label || "").trim(),
+          }))
+          .filter((option) => option.value && option.label)
+      : [],
+    description: String(source.description || "").trim(),
+    placeholder: String(source.placeholder || "").trim(),
+  };
+}
+
+function normalizeTicketCategoryValue(value: unknown): TicketCategory {
+  const allowed: TicketCategory[] = [
+    "general",
+    "billing",
+    "usage",
+    "technical",
+    "account",
+  ];
+  return allowed.includes(value as TicketCategory)
+    ? (value as TicketCategory)
+    : "general";
+}
+
+function normalizeTicketPriorityValue(value: unknown): TicketPriority {
+  const allowed: TicketPriority[] = ["low", "normal", "high", "urgent"];
+  return allowed.includes(value as TicketPriority)
+    ? (value as TicketPriority)
+    : "normal";
+}
+
+function normalizeTicketFieldType(value: unknown): TicketTemplateFieldType {
+  const allowed: TicketTemplateFieldType[] = [
+    "text",
+    "textarea",
+    "select",
+    "group_select",
+    "recent_orders",
+    "amount",
+    "image",
+    "attachments",
+  ];
+  return allowed.includes(value as TicketTemplateFieldType)
+    ? (value as TicketTemplateFieldType)
+    : "text";
+}
+
+function addTicketTemplate() {
+  form.ticket_system_config.templates.push({
+    key: `custom_${Date.now()}`,
+    name: localText("自定义问题", "Custom issue"),
+    description: "",
+    category: "general",
+    priority: "normal",
+    subject_template: "",
+    body_min_length: 15,
+    requires_super_admin: false,
+    auto_assign_super_admin: false,
+    context_type: "",
+    fields: [],
+  });
+}
+
+function duplicateTicketTemplate(index: number) {
+  const current = form.ticket_system_config.templates[index];
+  if (!current) return;
+  form.ticket_system_config.templates.splice(index + 1, 0, {
+    ...JSON.parse(JSON.stringify(current)),
+    key: `${current.key}_copy_${Date.now()}`,
+    name: `${current.name} Copy`,
+  });
+}
+
+function removeTicketTemplate(index: number) {
+  if (form.ticket_system_config.templates.length <= 1) {
+    appStore.showError(
+      localText("至少保留一个工单类型。", "Keep at least one ticket type."),
+    );
+    return;
+  }
+  form.ticket_system_config.templates.splice(index, 1);
+}
+
+function addTicketTemplateField(template: TicketTemplate) {
+  if (!Array.isArray(template.fields)) {
+    template.fields = [];
+  }
+  template.fields.push({
+    key: `field_${template.fields.length + 1}`,
+    label: localText("字段名称", "Field label"),
+    type: "text",
+    required: false,
+    min_length: 0,
+    max_length: 0,
+    options: [],
+  });
+}
+
+function removeTicketTemplateField(template: TicketTemplate, index: number) {
+  template.fields?.splice(index, 1);
+}
+
+function addTicketFieldOption(field: TicketTemplateField) {
+  if (!Array.isArray(field.options)) {
+    field.options = [];
+  }
+  field.options.push({
+    value: `option_${field.options.length + 1}`,
+    label: localText("选项", "Option"),
+  });
+}
+
+function removeTicketFieldOption(field: TicketTemplateField, index: number) {
+  field.options?.splice(index, 1);
+}
+
+function resetTicketSystemSettings() {
+  form.ticket_system_config = defaultTicketSystemSettings();
+}
+
+function validateTicketSystemSettings(
+  settings: TicketSystemSettings,
+): TicketSystemSettings | null {
+  const normalized = normalizeTicketSystemSettings(settings);
+  const seenTemplates = new Set<string>();
+  for (const template of normalized.templates) {
+    if (!template.key || !template.name) {
+      appStore.showError(
+        localText(
+          "工单类型的标识和名称不能为空。",
+          "Ticket type key and name are required.",
+        ),
+      );
+      return null;
+    }
+    if (seenTemplates.has(template.key)) {
+      appStore.showError(
+        localText(
+          `工单类型标识重复：${template.key}`,
+          `Duplicate ticket type key: ${template.key}`,
+        ),
+      );
+      return null;
+    }
+    seenTemplates.add(template.key);
+    const seenFields = new Set<string>();
+    for (const field of template.fields || []) {
+      if (!field.key || !field.label) {
+        appStore.showError(
+          localText(
+            `${template.name} 存在空字段。`,
+            `${template.name} has an empty field.`,
+          ),
+        );
+        return null;
+      }
+      if (seenFields.has(field.key)) {
+        appStore.showError(
+          localText(
+            `${template.name} 字段标识重复：${field.key}`,
+            `${template.name} has duplicate field key: ${field.key}`,
+          ),
+        );
+        return null;
+      }
+      seenFields.add(field.key);
+      if (field.type === "select" && (!field.options || field.options.length === 0)) {
+        appStore.showError(
+          localText(
+            `${template.name} 的下拉字段需要至少一个选项。`,
+            `${template.name} select fields need at least one option.`,
+          ),
+        );
+        return null;
+      }
+      if ((field.max_length || 0) > 0 && (field.min_length || 0) > (field.max_length || 0)) {
+        appStore.showError(
+          localText(
+            `${template.name} 字段最小长度不能大于最大长度。`,
+            `${template.name} field min length cannot exceed max length.`,
+          ),
+        );
+        return null;
+      }
+    }
+  }
+  normalized.sla.first_response_minutes = Math.max(
+    1,
+    Math.floor(Number(normalized.sla.first_response_minutes) || 1440),
+  );
+  normalized.sla.reminder_before_minutes = Math.max(
+    0,
+    Math.floor(Number(normalized.sla.reminder_before_minutes) || 0),
+  );
+  normalized.sla.auto_escalate_after_minutes = Math.max(
+    0,
+    Math.floor(Number(normalized.sla.auto_escalate_after_minutes) || 0),
+  );
+  normalized.sla.auto_close_resolved_days = Math.max(
+    0,
+    Math.floor(Number(normalized.sla.auto_close_resolved_days) || 0),
+  );
+  normalized.sla.worker_interval_seconds = Math.max(
+    30,
+    Math.floor(Number(normalized.sla.worker_interval_seconds) || 300),
+  );
+  if (
+    normalized.sla.reminder_before_minutes >
+    normalized.sla.first_response_minutes
+  ) {
+    normalized.sla.reminder_before_minutes =
+      normalized.sla.first_response_minutes;
+  }
+  return normalized;
 }
 
 const registrationEmailSuffixWhitelistSeparatorKeys = new Set([
@@ -7598,6 +8390,9 @@ async function loadSettings() {
     );
     form.group_rate_discount_settings = normalizeGroupRateDiscountFormSettings(
       settings.group_rate_discount_settings,
+    );
+    form.ticket_system_config = normalizeTicketSystemSettings(
+      settings.ticket_system_config,
     );
     registrationEmailSuffixWhitelistTags.value =
       normalizeRegistrationEmailSuffixDomains(
@@ -8004,6 +8799,12 @@ async function saveSettings() {
       form.wechat_connect_mobile_enabled,
       form.wechat_connect_mode,
     );
+    const ticketSystemConfig = validateTicketSystemSettings(
+      form.ticket_system_config,
+    );
+    if (!ticketSystemConfig) {
+      return;
+    }
 
     const payload: UpdateSettingsRequest = {
       registration_enabled: form.registration_enabled,
@@ -8188,6 +8989,7 @@ async function saveSettings() {
       // Available Channels feature switch
       available_channels_enabled: form.available_channels_enabled,
       group_rate_discount_settings: discountSettings,
+      ticket_system_config: ticketSystemConfig,
       // Affiliate (邀请返利) feature switch
       affiliate_enabled: form.affiliate_enabled,
     };
@@ -8231,6 +9033,9 @@ async function saveSettings() {
     }
     form.group_rate_discount_settings = normalizeGroupRateDiscountFormSettings(
       updated.group_rate_discount_settings,
+    );
+    form.ticket_system_config = normalizeTicketSystemSettings(
+      updated.ticket_system_config,
     );
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(updated));
     registrationEmailSuffixWhitelistTags.value =
