@@ -177,7 +177,7 @@ GROUP BY m.ticket_id
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var (

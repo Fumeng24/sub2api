@@ -431,10 +431,12 @@ func (s *TicketService) UpdateForAdmin(ctx context.Context, ticketID int64, inpu
 		if actor.IsSupport() && (status == TicketStatusClosed || status == TicketStatusResolved) && !s.supportPermissions(ctx).CanClose {
 			return nil, ErrTicketPermissionDenied
 		}
-		applyTicketStatus(t, status, time.Now())
-		if status == TicketStatusOpen {
-			applyTicketSLA(t, s.ticketSLASettings(ctx), time.Now())
-		} else if status == TicketStatusPending || status == TicketStatusResolved || status == TicketStatusClosed {
+		now := time.Now()
+		applyTicketStatus(t, status, now)
+		switch status {
+		case TicketStatusOpen:
+			applyTicketSLA(t, s.ticketSLASettings(ctx), now)
+		case TicketStatusPending, TicketStatusResolved, TicketStatusClosed:
 			clearTicketSLA(t)
 		}
 	}
@@ -1477,11 +1479,14 @@ func (s *TicketService) notifyTicketStaff(ctx context.Context, t *Ticket, msg *T
 		return
 	}
 	siteName := s.ticketSiteName(ctx)
-	eventLabel := "新工单"
-	if event == "updated" {
+	var eventLabel string
+	switch event {
+	case "updated":
 		eventLabel = "用户回复"
-	} else if event == "escalated" {
+	case "escalated":
 		eventLabel = "工单升级"
+	default:
+		eventLabel = "新工单"
 	}
 	subject := fmt.Sprintf("[%s] %s %s", sanitizeEmailHeader(siteName), eventLabel, sanitizeEmailHeader(t.TicketNo))
 	body := buildTicketNotificationBody(siteName, eventLabel, t, msg, true)
@@ -1670,15 +1675,15 @@ func buildTicketAttachmentEmailList(attachments []TicketAttachment) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("<p><strong>附件：</strong></p><ul>")
+	_, _ = b.WriteString("<p><strong>附件：</strong></p><ul>")
 	for _, item := range attachments {
-		b.WriteString("<li><a href=\"")
-		b.WriteString(html.EscapeString(item.URL))
-		b.WriteString("\">")
-		b.WriteString(html.EscapeString(item.Name))
-		b.WriteString("</a></li>")
+		_, _ = b.WriteString("<li><a href=\"")
+		_, _ = b.WriteString(html.EscapeString(item.URL))
+		_, _ = b.WriteString("\">")
+		_, _ = b.WriteString(html.EscapeString(item.Name))
+		_, _ = b.WriteString("</a></li>")
 	}
-	b.WriteString("</ul>")
+	_, _ = b.WriteString("</ul>")
 	return b.String()
 }
 

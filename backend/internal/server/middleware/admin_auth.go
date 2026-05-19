@@ -28,18 +28,6 @@ func NewAdminOrSupportAuthMiddleware(
 	return AdminOrSupportAuthMiddleware(roleAuth(authService, userService, settingService, true))
 }
 
-// adminAuth 管理员认证中间件实现
-// 支持两种认证方式（通过不同的 header 区分）：
-// 1. Admin API Key: x-api-key: <admin-api-key>
-// 2. JWT Token: Authorization: Bearer <jwt-token> (需要管理员角色)
-func adminAuth(
-	authService *service.AuthService,
-	userService *service.UserService,
-	settingService *service.SettingService,
-) gin.HandlerFunc {
-	return roleAuth(authService, userService, settingService, false)
-}
-
 func roleAuth(
 	authService *service.AuthService,
 	userService *service.UserService,
@@ -215,7 +203,7 @@ func validateJWTForRole(
 	}
 
 	// 检查管理员权限
-	if !user.IsAdmin() && !(allowSupport && user.IsSupport()) {
+	if !user.IsAdmin() && (!allowSupport || !user.IsSupport()) {
 		AbortWithError(c, 403, "FORBIDDEN", "Admin access required")
 		return false
 	}
