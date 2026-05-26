@@ -22,7 +22,7 @@ import (
 const (
 	updateCacheKey = "update_check_cache"
 	updateCacheTTL = 1200 // 20 minutes
-	githubRepo     = "Wei-Shaw/sub2api"
+	githubRepo     = "Fumeng24/sub2api"
 
 	// Security: allowed download domains for updates
 	allowedDownloadHost = "github.com"
@@ -149,22 +149,35 @@ func (s *UpdateService) PerformUpdate(ctx context.Context) error {
 		return fmt.Errorf("no update available")
 	}
 
-	// Find matching archive and checksum for current platform
-	archiveName := s.getArchiveName()
+	// Find matching update asset and checksum for current platform.
+	// Supports both upstream archives (sub2api_<version>_linux_amd64.tar.gz)
+	// and fork simple assets (sub2api-linux-amd64).
 	var downloadURL string
 	var checksumURL string
+	var selectedAssetName string
 
 	for _, asset := range info.ReleaseInfo.Assets {
-		if strings.Contains(asset.Name, archiveName) && !strings.HasSuffix(asset.Name, ".txt") {
+		if s.isCompatibleReleaseAsset(asset.Name) {
 			downloadURL = asset.DownloadURL
-		}
-		if asset.Name == "checksums.txt" {
-			checksumURL = asset.DownloadURL
+			selectedAssetName = asset.Name
+			break
 		}
 	}
 
 	if downloadURL == "" {
 		return fmt.Errorf("no compatible release found for %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	// Prefer a checksum dedicated to the selected asset, then fall back to the
+	// upstream checksums.txt convention.
+	for _, asset := range info.ReleaseInfo.Assets {
+		if selectedAssetName != "" && asset.Name == selectedAssetName+".sha256" {
+			checksumURL = asset.DownloadURL
+			break
+		}
+		if checksumURL == "" && asset.Name == "checksums.txt" {
+			checksumURL = asset.DownloadURL
+		}
 	}
 
 	// SECURITY: Validate download URL is from trusted domain
@@ -310,10 +323,34 @@ func (s *UpdateService) downloadFile(ctx context.Context, downloadURL, dest stri
 	return s.githubClient.DownloadFile(ctx, downloadURL, dest, maxDownloadSize)
 }
 
-func (s *UpdateService) getArchiveName() string {
+func (s *UpdateService) isCompatibleReleaseAsset(name string) bool {
+	if isUpdateChecksumAsset(name) {
+		return false
+	}
+
+	assetName := strings.ToLower(name)
+	for _, pattern := range s.getPlatformAssetNamePatterns() {
+		if strings.Contains(assetName, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *UpdateService) getPlatformAssetNamePatterns() []string {
 	osName := runtime.GOOS
 	arch := runtime.GOARCH
-	return fmt.Sprintf("%s_%s", osName, arch)
+	return []string{
+		fmt.Sprintf("%s_%s", osName, arch),
+		fmt.Sprintf("%s-%s", osName, arch),
+	}
+}
+
+func isUpdateChecksumAsset(name string) bool {
+	assetName := strings.ToLower(name)
+	return assetName == "checksums.txt" ||
+		strings.HasSuffix(assetName, ".sha256") ||
+		strings.HasSuffix(assetName, ".sha256sum")
 }
 
 // validateDownloadURL checks if the URL is from an allowed domain
