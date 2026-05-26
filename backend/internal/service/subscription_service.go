@@ -199,7 +199,8 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 		now := time.Now()
 		var newExpiresAt time.Time
 
-		if existingSub.ExpiresAt.After(now) {
+		isExpired := !existingSub.ExpiresAt.After(now)
+		if !isExpired {
 			// 未过期：从当前过期时间累加
 			newExpiresAt = existingSub.ExpiresAt.AddDate(0, 0, validityDays)
 		} else {
@@ -212,65 +213,8 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 			newExpiresAt = MaxExpiresAt
 		}
 
-		// 开启事务：ExtendExpiry + UpdateStatus + UpdateNotes 在同一事务中完成
-		tx, err := s.entClient.Tx(ctx)
-		if err != nil {
-			return nil, false, fmt.Errorf("begin transaction: %w", err)
-		}
-		txCtx := dbent.NewTxContext(ctx, tx)
-
-		// 更新过期时间
-		if err := s.userSubRepo.ExtendExpiry(txCtx, existingSub.ID, newExpiresAt); err != nil {
-			_ = tx.Rollback()
-			return nil, false, fmt.Errorf("extend subscription: %w", err)
-		}
-
-		// 仅在窗口已过期或未激活时重置；窗口仍有效时保留当前用量
-		// 注：并发的 CheckAndResetWindows 调用对已过期窗口是幂等安全的
-		windowStart := time.Now()
-		if existingSub.DailyWindowStart == nil || existingSub.NeedsDailyReset() {
-			if err := s.userSubRepo.ResetDailyUsage(txCtx, existingSub.ID, windowStart); err != nil {
-				_ = tx.Rollback()
-				return nil, false, fmt.Errorf("reset daily window on extend: %w", err)
-			}
-		}
-		if existingSub.WeeklyWindowStart == nil || existingSub.NeedsWeeklyReset() {
-			if err := s.userSubRepo.ResetWeeklyUsage(txCtx, existingSub.ID, windowStart); err != nil {
-				_ = tx.Rollback()
-				return nil, false, fmt.Errorf("reset weekly window on extend: %w", err)
-			}
-		}
-		if existingSub.MonthlyWindowStart == nil || existingSub.NeedsMonthlyReset() {
-			if err := s.userSubRepo.ResetMonthlyUsage(txCtx, existingSub.ID, windowStart); err != nil {
-				_ = tx.Rollback()
-				return nil, false, fmt.Errorf("reset monthly window on extend: %w", err)
-			}
-		}
-
-		// 如果订阅已过期或被暂停，恢复为active状态
-		if existingSub.Status != SubscriptionStatusActive {
-			if err := s.userSubRepo.UpdateStatus(txCtx, existingSub.ID, SubscriptionStatusActive); err != nil {
-				_ = tx.Rollback()
-				return nil, false, fmt.Errorf("update subscription status: %w", err)
-			}
-		}
-
-		// 追加备注
-		if input.Notes != "" {
-			newNotes := existingSub.Notes
-			if newNotes != "" {
-				newNotes += "\n"
-			}
-			newNotes += input.Notes
-			if err := s.userSubRepo.UpdateNotes(txCtx, existingSub.ID, newNotes); err != nil {
-				_ = tx.Rollback()
-				return nil, false, fmt.Errorf("update subscription notes: %w", err)
-			}
-		}
-
-		// 提交事务
-		if err := tx.Commit(); err != nil {
-			return nil, false, fmt.Errorf("commit transaction: %w", err)
+		if err := s.updateExistingSubscriptionTerm(ctx, existingSub, input.Notes, now, newExpiresAt, isExpired); err != nil {
+			return nil, false, err
 		}
 
 		// 失效订阅缓存
@@ -307,6 +251,116 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 	}
 
 	return sub, false, nil // false 表示是新建
+}
+
+func (s *SubscriptionService) updateExistingSubscriptionTerm(
+	ctx context.Context,
+	existingSub *UserSubscription,
+	notes string,
+	startsAt time.Time,
+	newExpiresAt time.Time,
+	isExpired bool,
+) error {
+	return s.withSubscriptionUpdateTx(ctx, func(txCtx context.Context) error {
+		if isExpired {
+			renewed := renewedSubscriptionTerm(existingSub, notes, startsAt, newExpiresAt)
+			if err := s.userSubRepo.Update(txCtx, renewed); err != nil {
+				return fmt.Errorf("renew expired subscription: %w", err)
+			}
+			return nil
+		}
+
+		// 更新过期时间
+		if err := s.userSubRepo.ExtendExpiry(txCtx, existingSub.ID, newExpiresAt); err != nil {
+			return fmt.Errorf("extend subscription: %w", err)
+		}
+
+		// 仅在窗口已过期或未激活时重置；窗口仍有效时保留当前用量。
+		if existingSub.DailyWindowStart == nil || existingSub.NeedsDailyReset() {
+			if err := s.userSubRepo.ResetDailyUsage(txCtx, existingSub.ID, startsAt); err != nil {
+				return fmt.Errorf("reset daily window on extend: %w", err)
+			}
+		}
+		if existingSub.WeeklyWindowStart == nil || existingSub.NeedsWeeklyReset() {
+			if err := s.userSubRepo.ResetWeeklyUsage(txCtx, existingSub.ID, startsAt); err != nil {
+				return fmt.Errorf("reset weekly window on extend: %w", err)
+			}
+		}
+		if existingSub.MonthlyWindowStart == nil || existingSub.NeedsMonthlyReset() {
+			if err := s.userSubRepo.ResetMonthlyUsage(txCtx, existingSub.ID, startsAt); err != nil {
+				return fmt.Errorf("reset monthly window on extend: %w", err)
+			}
+		}
+
+		// 如果订阅被暂停，恢复为 active 状态
+		if existingSub.Status != SubscriptionStatusActive {
+			if err := s.userSubRepo.UpdateStatus(txCtx, existingSub.ID, SubscriptionStatusActive); err != nil {
+				return fmt.Errorf("update subscription status: %w", err)
+			}
+		}
+
+		// 追加备注
+		if notes != "" {
+			if err := s.userSubRepo.UpdateNotes(txCtx, existingSub.ID, appendSubscriptionNotes(existingSub.Notes, notes)); err != nil {
+				return fmt.Errorf("update subscription notes: %w", err)
+			}
+		}
+
+		return nil
+	})
+}
+
+func (s *SubscriptionService) withSubscriptionUpdateTx(ctx context.Context, fn func(context.Context) error) error {
+	if s.entClient == nil {
+		return fn(ctx)
+	}
+
+	tx, err := s.entClient.Tx(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	txCtx := dbent.NewTxContext(ctx, tx)
+
+	if err := fn(txCtx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+func renewedSubscriptionTerm(existingSub *UserSubscription, notes string, startsAt, expiresAt time.Time) *UserSubscription {
+	renewed := *existingSub
+	windowStart := startOfDay(startsAt)
+	renewed.StartsAt = startsAt
+	renewed.ExpiresAt = expiresAt
+	renewed.Status = SubscriptionStatusActive
+	renewed.DailyWindowStart = &windowStart
+	renewed.WeeklyWindowStart = &windowStart
+	renewed.MonthlyWindowStart = &windowStart
+	renewed.DailyUsageUSD = 0
+	renewed.WeeklyUsageUSD = 0
+	renewed.MonthlyUsageUSD = 0
+	renewed.Notes = appendSubscriptionNotes(existingSub.Notes, notes)
+	return &renewed
+}
+
+func appendSubscriptionNotes(existingNotes, newNotes string) string {
+	if newNotes == "" {
+		return existingNotes
+	}
+	if existingNotes == "" {
+		return newNotes
+	}
+	return existingNotes + "\n" + newNotes
+}
+
+// startOfDay returns midnight for the date in the same location as t.
+func startOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 }
 
 // createSubscription 创建新订阅（内部方法）
@@ -1057,6 +1111,9 @@ func (s *SubscriptionService) calculateProgress(sub *UserSubscription, group *Gr
 	if group.HasDailyLimit() && sub.DailyWindowStart != nil {
 		limit := *group.DailyLimitUSD
 		resetsAt := sub.DailyWindowStart.Add(24 * time.Hour)
+		if dailyResetTime := sub.DailyResetTime(); dailyResetTime != nil {
+			resetsAt = *dailyResetTime
+		}
 		progress.Daily = &UsageWindowProgress{
 			LimitUSD:        limit,
 			UsedUSD:         sub.DailyUsageUSD,

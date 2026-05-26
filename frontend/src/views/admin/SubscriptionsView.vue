@@ -238,7 +238,7 @@
                   v-if="
                     row.daily_window_start &&
                     row.status === 'active' &&
-                    formatResetTime(row.daily_window_start, 'daily', row.expires_at)
+                    formatDailyUsageWindow(row)
                   "
                 >
                   <svg
@@ -254,7 +254,7 @@
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>{{ formatResetTime(row.daily_window_start, 'daily', row.expires_at) }}</span>
+                  <span>{{ formatDailyUsageWindow(row) }}</span>
                 </div>
               </div>
 
@@ -802,6 +802,7 @@ import Select from '@/components/common/Select.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { getRemainingDurationParts, isOneTimeDailyQuota, type RemainingDurationParts } from '@/utils/subscriptionQuota'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -1452,9 +1453,42 @@ const getProgressClass = (used: number | null | undefined, limit: number | null)
   return 'bg-green-500'
 }
 
+const formatResetDuration = (parts: RemainingDurationParts): string => {
+  if (parts.days > 0) {
+    return t('admin.subscriptions.resetInDaysHours', { days: parts.days, hours: parts.hours })
+  }
+
+  if (parts.hours > 0) {
+    return t('admin.subscriptions.resetInHoursMinutes', { hours: parts.hours, minutes: parts.minutes })
+  }
+
+  return t('admin.subscriptions.resetInMinutes', { minutes: parts.minutes })
+}
+
+const formatQuotaEndDuration = (parts: RemainingDurationParts): string => {
+  if (parts.days > 0) {
+    return t('admin.subscriptions.quotaEndsInDaysHours', { days: parts.days, hours: parts.hours })
+  }
+
+  if (parts.hours > 0) {
+    return t('admin.subscriptions.quotaEndsInHoursMinutes', { hours: parts.hours, minutes: parts.minutes })
+  }
+
+  return t('admin.subscriptions.quotaEndsInMinutes', { minutes: parts.minutes })
+}
+
+const formatDailyUsageWindow = (subscription: UserSubscription): string => {
+  if (isOneTimeDailyQuota(subscription) && subscription.expires_at) {
+    const parts = getRemainingDurationParts(subscription.expires_at)
+    return parts ? formatQuotaEndDuration(parts) : ''
+  }
+
+  return formatResetTime(subscription.daily_window_start, 'daily', subscription.expires_at)
+}
+
 // Format reset time based on window start and period type
 const formatResetTime = (
-  windowStart: string,
+  windowStart: string | null,
   period: 'daily' | 'weekly' | 'monthly',
   expiresAt?: string | null
 ): string => {
@@ -1477,8 +1511,8 @@ const formatResetTime = (
       break
   }
 
-  const diffMs = resetTime.getTime() - now.getTime()
-  if (diffMs <= 0) return ''
+  const parts = getRemainingDurationParts(resetTime, now)
+  if (!parts) return ''
 
   // 订阅先到期时，这次"重置"永远不会发生 → 隐藏
   if (expiresAt) {
@@ -1486,18 +1520,7 @@ const formatResetTime = (
     if (resetTime > expires) return ''
   }
 
-  const diffSeconds = Math.floor(diffMs / 1000)
-  const days = Math.floor(diffSeconds / 86400)
-  const hours = Math.floor((diffSeconds % 86400) / 3600)
-  const minutes = Math.floor((diffSeconds % 3600) / 60)
-
-  if (days > 0) {
-    return t('admin.subscriptions.resetInDaysHours', { days, hours })
-  } else if (hours > 0) {
-    return t('admin.subscriptions.resetInHoursMinutes', { hours, minutes })
-  } else {
-    return t('admin.subscriptions.resetInMinutes', { minutes })
-  }
+  return formatResetDuration(parts)
 }
 
 // Handle click outside to close dropdowns

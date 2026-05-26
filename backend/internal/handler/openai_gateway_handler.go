@@ -246,7 +246,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 2. Re-check billing eligibility after wait
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -285,6 +285,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				zap.Int("excluded_account_count", len(failedAccountIDs)),
 			)
 			if len(failedAccountIDs) == 0 {
+				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 				if errors.Is(err, service.ErrNoAvailableCompactAccounts) {
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "compact_not_supported", "No available OpenAI accounts support /responses/compact", streamStarted)
 					return
@@ -300,6 +301,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			return
 		}
 		if selection == nil || selection.Account == nil {
+			markOpsRoutingCapacityLimited(c)
 			h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts", streamStarted)
 			return
 		}
@@ -333,11 +335,16 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
-		result, err := h.gatewayService.Forward(c.Request.Context(), c, account, forwardBody)
+		writerSizeBeforeForward := c.Writer.Size()
+		result, err := func() (*service.OpenAIForwardResult, error) {
+			defer func() {
+				if accountReleaseFunc != nil {
+					accountReleaseFunc()
+				}
+			}()
+			return h.gatewayService.Forward(c.Request.Context(), c, account, forwardBody)
+		}()
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
-		if accountReleaseFunc != nil {
-			accountReleaseFunc()
-		}
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
 		responseLatencyMs := forwardDurationMs
 		if upstreamLatencyMs > 0 && forwardDurationMs > upstreamLatencyMs {
@@ -357,6 +364,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			} else {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
+					if c.Writer.Size() != writerSizeBeforeForward {
+						h.handleFailoverExhausted(c, failoverErr, true)
+						return
+					}
 					h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
 					// 池模式：同账号重试
 					if failoverErr.RetryableOnSameAccount {
@@ -385,6 +396,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						return
 					}
 					switchCount++
+					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount) {
+						h.handleFailoverExhausted(c, failoverErr, streamStarted)
+						return
+					}
 					reqLog.Warn("openai.upstream_failover_switching",
 						zap.Int64("account_id", account.ID),
 						zap.Int("upstream_status", failoverErr.StatusCode),
@@ -639,7 +654,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		defer userReleaseFunc()
 	}
 
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -683,6 +698,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			)
 			if len(failedAccountIDs) == 0 {
 				if err != nil {
+					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 					h.anthropicStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "Service temporarily unavailable", streamStarted)
 					return
 				}
@@ -696,6 +712,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			}
 		}
 		if selection == nil || selection.Account == nil {
+			markOpsRoutingCapacityLimited(c)
 			h.anthropicStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts", streamStarted)
 			return
 		}
@@ -719,12 +736,16 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		if channelMappingMsg.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMappingMsg.MappedModel)
 		}
-		result, err := h.gatewayService.ForwardAsAnthropic(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
+		result, err := func() (*service.OpenAIForwardResult, error) {
+			defer func() {
+				if accountReleaseFunc != nil {
+					accountReleaseFunc()
+				}
+			}()
+			return h.gatewayService.ForwardAsAnthropic(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
+		}()
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
-		if accountReleaseFunc != nil {
-			accountReleaseFunc()
-		}
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
 		responseLatencyMs := forwardDurationMs
 		if upstreamLatencyMs > 0 && forwardDurationMs > upstreamLatencyMs {
@@ -772,6 +793,10 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 						return
 					}
 					switchCount++
+					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount) {
+						h.handleAnthropicFailoverExhausted(c, failoverErr, streamStarted)
+						return
+					}
 					reqLog.Warn("openai_messages.upstream_failover_switching",
 						zap.Int64("account_id", account.ID),
 						zap.Int("upstream_status", failoverErr.StatusCode),
@@ -998,6 +1023,7 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 	reqLog *zap.Logger,
 ) (func(), bool) {
 	if selection == nil || selection.Account == nil {
+		markOpsRoutingCapacityLimited(c)
 		h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts", *streamStarted)
 		return nil, false
 	}
@@ -1008,6 +1034,7 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 		return wrapReleaseOnDone(ctx, selection.ReleaseFunc), true
 	}
 	if selection.WaitPlan == nil {
+		markOpsRoutingCapacityLimited(c)
 		h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts", *streamStarted)
 		return nil, false
 	}
@@ -1214,7 +1241,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	currentUserRelease = wrapReleaseOnDone(ctx, userReleaseFunc)
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai.websocket_billing_eligibility_check_failed", zap.Error(err))
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
 		return
@@ -1604,6 +1631,11 @@ func (h *OpenAIGatewayHandler) handleConcurrencyError(c *gin.Context, err error,
 func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *service.UpstreamFailoverError, streamStarted bool) {
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
+	if service.IsOpenAISilentRefusalErrorBody(responseBody) {
+		service.SetOpsUpstreamError(c, statusCode, service.OpenAISilentRefusalClientMessage(), "")
+		h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", service.OpenAISilentRefusalClientMessage(), streamStarted)
+		return
+	}
 
 	// 先检查透传规则
 	if h.errorPassthroughService != nil && len(responseBody) > 0 {
@@ -1665,6 +1697,15 @@ func (h *OpenAIGatewayHandler) mapUpstreamError(statusCode int) (int, string, st
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *OpenAIGatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
 	if streamStarted {
+		// /v1/responses 的严格 SDK（Codex CLI）要求终止事件必须属于
+		// response.completed/failed/incomplete/cancelled 集合。
+		// 通用 `event: error` 帧不被识别为终止事件，会导致
+		// "stream closed before response.completed"。
+		if inboundIsResponses(c) {
+			if writeResponsesFailedSSE(c, errType, message) {
+				return
+			}
+		}
 		// Stream already started, send error as SSE event then close
 		flusher, ok := c.Writer.(http.Flusher)
 		if ok {
@@ -1684,8 +1725,16 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareError(c *gin.Context, status 
 
 // ensureForwardErrorResponse 在 Forward 返回错误但尚未写响应时补写统一错误响应。
 func (h *OpenAIGatewayHandler) ensureForwardErrorResponse(c *gin.Context, streamStarted bool) bool {
-	if c == nil || c.Writer == nil || c.Writer.Written() {
+	if c == nil || c.Writer == nil {
 		return false
+	}
+	// 旧实现在 Writer.Written 时直接 return false，导致 ping 已 flush 之后的
+	// 上游错误（http2 timeout、连接中断等）完全无法把错误传给客户端——
+	// HTTP 200 已锁死，TCP 直接 EOF，Codex CLI 报 "stream closed before response.completed"。
+	// 这里改成：Writer 已写过时强制走 streamStarted 分支，让
+	// handleStreamingAwareError 通过 SSE 发协议合规的 response.failed。
+	if c.Writer.Written() {
+		streamStarted = true
 	}
 	h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed", streamStarted)
 	return true

@@ -131,14 +131,10 @@
                 ></div>
               </div>
               <p
-                v-if="subscription.daily_window_start && formatResetTime(subscription.daily_window_start, 24, subscription.expires_at)"
+                v-if="subscription.daily_window_start && formatDailyUsageWindow(subscription)"
                 class="text-xs text-gray-500 dark:text-dark-400"
               >
-                {{
-                  t('userSubscriptions.resetIn', {
-                    time: formatResetTime(subscription.daily_window_start, 24, subscription.expires_at)
-                  })
-                }}
+                {{ formatDailyUsageWindow(subscription) }}
               </p>
 
               <!-- Auto Reset Toggle -->
@@ -304,6 +300,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { platformBorderClass, platformBadgeClass, platformButtonClass, platformLabel } from '@/utils/platformColors'
+import { getRemainingDurationParts, isOneTimeDailyQuota, type RemainingDurationParts } from '@/utils/subscriptionQuota'
 
 function platformAccentDotClass(p: string): string {
   switch (p) {
@@ -501,6 +498,18 @@ function getExpirationClass(expiresAt: string): string {
   return 'text-gray-700 dark:text-gray-300'
 }
 
+function formatDurationParts(parts: RemainingDurationParts): string {
+  if (parts.days > 0) {
+    return `${parts.days}d ${parts.hours}h`
+  }
+
+  if (parts.hours > 0) {
+    return `${parts.hours}h ${parts.minutes}m`
+  }
+
+  return `${parts.minutes}m`
+}
+
 function formatResetTime(
   windowStart: string | null,
   windowHours: number,
@@ -510,10 +519,9 @@ function formatResetTime(
 
   const start = new Date(windowStart)
   const end = new Date(start.getTime() + windowHours * 60 * 60 * 1000)
-  const now = new Date()
-  const diff = end.getTime() - now.getTime()
+  const parts = getRemainingDurationParts(end)
 
-  if (diff <= 0) return ''
+  if (!parts) return ''
 
   // 订阅先到期时，这次"重置"永远不会发生 → 隐藏
   if (expiresAt) {
@@ -521,20 +529,18 @@ function formatResetTime(
     if (end > expires) return ''
   }
 
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  return formatDurationParts(parts)
+}
 
-  if (hours > 24) {
-    const days = Math.floor(hours / 24)
-    const remainingHours = hours % 24
-    return `${days}d ${remainingHours}h`
+function formatDailyUsageWindow(subscription: UserSubscription): string {
+  if (isOneTimeDailyQuota(subscription) && subscription.expires_at) {
+    const parts = getRemainingDurationParts(subscription.expires_at)
+    if (!parts) return ''
+    return t('userSubscriptions.quotaEndsIn', { time: formatDurationParts(parts) })
   }
 
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`
-  }
-
-  return `${minutes}m`
+  const resetTime = formatResetTime(subscription.daily_window_start, 24, subscription.expires_at)
+  return resetTime ? t('userSubscriptions.resetIn', { time: resetTime }) : ''
 }
 
 onMounted(() => {
