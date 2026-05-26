@@ -205,13 +205,15 @@ func TestIsFixedDailyPeriodExpired_ZeroPeriodStart(t *testing.T) {
 }
 
 func TestIsFixedDailyPeriodExpired_NotExpired(t *testing.T) {
+	resetHour := float64((time.Now().UTC().Hour() + 1) % 24)
 	a := &Account{Extra: map[string]any{
 		"quota_daily_reset_mode": "fixed",
-		"quota_daily_reset_hour": float64(9),
+		"quota_daily_reset_hour": resetHour,
 		"quota_reset_timezone":   "UTC",
 	}}
 	// Period started after the most recent reset → not expired
-	// (This test uses a time very close to "now", which is after the last reset)
+	// Use the next UTC hour as the configured reset hour so the most recent
+	// reset is never within the last minute, even when the test runs near :00.
 	periodStart := time.Now().Add(-1 * time.Minute)
 	assert.False(t, a.isFixedDailyPeriodExpired(periodStart))
 }
