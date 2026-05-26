@@ -68,6 +68,28 @@ end
 
 return 1
 `)
+
+	// setOutboxWatermarkScript keeps the outbox cursor monotonic.
+	// A slow poll batch can finish after a newer batch and try to write an
+	// older cursor; ignoring that stale write prevents replaying old outbox rows.
+	setOutboxWatermarkScript = redis.NewScript(`
+local current = redis.call('GET', KEYS[1])
+local nextValue = tonumber(ARGV[1])
+
+if nextValue == nil then
+	return redis.error_reply('invalid outbox watermark')
+end
+
+if current ~= false then
+	local currentValue = tonumber(current)
+	if currentValue ~= nil and currentValue > nextValue then
+		return 0
+	end
+end
+
+redis.call('SET', KEYS[1], ARGV[1])
+return 1
+`)
 )
 
 type schedulerCache struct {
@@ -338,7 +360,13 @@ func (c *schedulerCache) GetOutboxWatermark(ctx context.Context) (int64, error) 
 }
 
 func (c *schedulerCache) SetOutboxWatermark(ctx context.Context, id int64) error {
-	return c.rdb.Set(ctx, schedulerOutboxWatermarkKey, strconv.FormatInt(id, 10), 0).Err()
+	_, err := setOutboxWatermarkScript.Run(
+		ctx,
+		c.rdb,
+		[]string{schedulerOutboxWatermarkKey},
+		strconv.FormatInt(id, 10),
+	).Result()
+	return err
 }
 
 func (c *schedulerCache) SetBucketMembers(ctx context.Context, bucket service.SchedulerBucket, accountIDs []int64) error {
