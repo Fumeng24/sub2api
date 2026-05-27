@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -157,6 +158,13 @@ type UpdateGroupRequest struct {
 	RPMLimit *int `json:"rpm_limit"`
 	// 从指定分组复制账号（同步操作：先清空当前分组的账号绑定，再绑定源分组的账号）
 	CopyAccountsFromGroupIDs []int64 `json:"copy_accounts_from_group_ids"`
+}
+
+type GroupRateChangeNotificationRequest struct {
+	NewRateMultiplier float64    `json:"new_rate_multiplier"`
+	WindowMinutes     int        `json:"window_minutes"`
+	EffectiveAt       *time.Time `json:"effective_at"`
+	Message           string     `json:"message"`
 }
 
 // List handles listing all groups with pagination
@@ -339,6 +347,78 @@ func (h *GroupHandler) Update(c *gin.Context) {
 	}
 
 	response.Success(c, dto.GroupFromServiceAdmin(group))
+}
+
+// PreviewGroupRateChangeNotification previews recent users affected by a group rate change.
+// POST /api/v1/admin/groups/:id/rate-change-notification/preview
+func (h *GroupHandler) PreviewGroupRateChangeNotification(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+
+	var req GroupRateChangeNotificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if req.NewRateMultiplier <= 0 {
+		response.BadRequest(c, "new_rate_multiplier must be > 0")
+		return
+	}
+	if req.WindowMinutes > 24*60 {
+		response.BadRequest(c, "window_minutes must be <= 1440")
+		return
+	}
+
+	preview, err := h.adminService.PreviewGroupRateChangeNotification(c.Request.Context(), groupID, service.GroupRateChangeNotificationInput{
+		NewRateMultiplier: req.NewRateMultiplier,
+		WindowMinutes:     req.WindowMinutes,
+		EffectiveAt:       req.EffectiveAt,
+		Message:           req.Message,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, preview)
+}
+
+// SendGroupRateChangeNotification sends advance notice emails to recent group users.
+// POST /api/v1/admin/groups/:id/rate-change-notification/send
+func (h *GroupHandler) SendGroupRateChangeNotification(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+
+	var req GroupRateChangeNotificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if req.NewRateMultiplier <= 0 {
+		response.BadRequest(c, "new_rate_multiplier must be > 0")
+		return
+	}
+	if req.WindowMinutes > 24*60 {
+		response.BadRequest(c, "window_minutes must be <= 1440")
+		return
+	}
+
+	result, err := h.adminService.SendGroupRateChangeNotification(c.Request.Context(), groupID, service.GroupRateChangeNotificationInput{
+		NewRateMultiplier: req.NewRateMultiplier,
+		WindowMinutes:     req.WindowMinutes,
+		EffectiveAt:       req.EffectiveAt,
+		Message:           req.Message,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
 }
 
 // Delete handles deleting a group

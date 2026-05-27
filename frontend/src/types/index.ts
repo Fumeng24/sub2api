@@ -920,6 +920,45 @@ export interface UpdateGroupRequest {
   copy_accounts_from_group_ids?: number[]
 }
 
+export interface GroupRateChangeNotificationRequest {
+  new_rate_multiplier: number
+  window_minutes?: number
+  effective_at?: string
+  message?: string
+}
+
+export interface GroupRateChangeNotificationUser {
+  user_id: number
+  email: string
+  username: string
+  request_count: number
+  actual_cost: number
+  last_used_at: string
+}
+
+export interface GroupRateChangeNotificationPreview {
+  group_id: number
+  group_name: string
+  old_rate_multiplier: number
+  new_rate_multiplier: number
+  window_minutes: number
+  effective_at: string
+  message?: string
+  user_count: number
+  skipped_count: number
+  users: GroupRateChangeNotificationUser[]
+}
+
+export interface GroupRateChangeNotificationSendResult {
+  group_id: number
+  user_count: number
+  sent: number
+  skipped: number
+  failed: number
+  last_error?: string
+  effective_at: string
+}
+
 // ==================== Account & Proxy Types ====================
 
 export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity'

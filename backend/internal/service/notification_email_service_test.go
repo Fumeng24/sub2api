@@ -140,6 +140,7 @@ func TestNotificationEmailAdditionalEventsAreListedAndPreviewable(t *testing.T) 
 		{NotificationEmailEventAccountQuotaAlert, "account_name"},
 		{NotificationEmailEventContentModerationViolation, "moderation_category"},
 		{NotificationEmailEventContentModerationDisabled, "violation_count"},
+		{NotificationEmailEventGroupRateChangeNotice, "new_rate_multiplier"},
 		{NotificationEmailEventOpsAlert, "rule_name"},
 		{NotificationEmailEventOpsScheduledReport, "report_html"},
 	}
@@ -147,7 +148,11 @@ func TestNotificationEmailAdditionalEventsAreListedAndPreviewable(t *testing.T) 
 	for _, check := range checks {
 		info, ok := events[check.event]
 		require.Truef(t, ok, "expected %s to be listed", check.event)
-		require.False(t, info.Optional)
+		if check.event == NotificationEmailEventGroupRateChangeNotice {
+			require.True(t, info.Optional)
+		} else {
+			require.False(t, info.Optional)
+		}
 		require.Contains(t, info.Placeholders, check.placeholder)
 
 		preview, err := svc.PreviewTemplate(ctx, NotificationEmailPreviewInput{Event: check.event, Locale: "zh"})

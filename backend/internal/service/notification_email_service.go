@@ -30,6 +30,7 @@ const (
 	NotificationEmailEventAccountQuotaAlert           = "account.quota_alert"
 	NotificationEmailEventContentModerationViolation  = "content_moderation.violation_notice"
 	NotificationEmailEventContentModerationDisabled   = "content_moderation.account_disabled"
+	NotificationEmailEventGroupRateChangeNotice       = "group.rate_change_notice"
 	NotificationEmailEventOpsAlert                    = "ops.alert"
 	NotificationEmailEventOpsScheduledReport          = "ops.scheduled_report"
 
@@ -874,6 +875,14 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 			"moderation_score":    "0.982",
 			"violation_count":     "2",
 			"ban_threshold":       "3",
+			"old_rate_multiplier": "1",
+			"new_rate_multiplier": "1.25",
+			"effective_at":        "2026-05-20 12:30 UTC",
+			"window_minutes":      "30",
+			"request_count":       "18",
+			"actual_cost":         "3.42",
+			"last_used_at":        "2026-05-20 12:10 UTC",
+			"admin_message":       "本次调整将用于覆盖上游成本变化。",
 			"rule_name":           "错误率过高",
 			"severity":            "critical",
 			"alert_status":        "firing",
@@ -920,6 +929,14 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 		"moderation_score":    "0.982",
 		"violation_count":     "2",
 		"ban_threshold":       "3",
+		"old_rate_multiplier": "1",
+		"new_rate_multiplier": "1.25",
+		"effective_at":        "2026-05-20 12:30 UTC",
+		"window_minutes":      "30",
+		"request_count":       "18",
+		"actual_cost":         "3.42",
+		"last_used_at":        "2026-05-20 12:10 UTC",
+		"admin_message":       "This adjustment reflects upstream cost changes.",
 		"rule_name":           "High error rate",
 		"severity":            "critical",
 		"alert_status":        "firing",
@@ -947,6 +964,7 @@ var notificationEmailEventOrder = []string{
 	NotificationEmailEventAccountQuotaAlert,
 	NotificationEmailEventContentModerationViolation,
 	NotificationEmailEventContentModerationDisabled,
+	NotificationEmailEventGroupRateChangeNotice,
 	NotificationEmailEventOpsAlert,
 	NotificationEmailEventOpsScheduledReport,
 }
@@ -1034,6 +1052,15 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Optional:    false,
 		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...),
 			"triggered_at", "group_name", "moderation_category", "moderation_score", "violation_count", "ban_threshold"),
+	},
+	NotificationEmailEventGroupRateChangeNotice: {
+		Event:       NotificationEmailEventGroupRateChangeNotice,
+		Label:       "Group rate change notice",
+		Description: "Optional advance notice sent to recent users before a group rate multiplier changes.",
+		Category:    "billing",
+		Optional:    true,
+		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...),
+			"group_name", "old_rate_multiplier", "new_rate_multiplier", "effective_at", "window_minutes", "request_count", "actual_cost", "last_used_at", "admin_message", "unsubscribe_url"),
 	},
 	NotificationEmailEventOpsAlert: {
 		Event:       NotificationEmailEventOpsAlert,
@@ -1275,6 +1302,38 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
   <tr><td>累计触发次数</td><td>{{violation_count}} / {{ban_threshold}}</td></tr>
 </table>
 <p>如需申诉或恢复账号，请联系平台管理员处理。</p>`),
+		},
+	},
+	NotificationEmailEventGroupRateChangeNotice: {
+		notificationEmailDefaultLocale: {
+			Subject: "[{{site_name}}] {{group_name}} rate change notice",
+			HTML: notificationEmailCard("#0f766e", "Group rate change notice", `
+<p>Hello {{recipient_name}},</p>
+<p>The rate multiplier for <strong>{{group_name}}</strong> is scheduled to change from <strong>{{old_rate_multiplier}}x</strong> to <strong>{{new_rate_multiplier}}x</strong>.</p>
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td>Effective at</td><td>{{effective_at}}</td></tr>
+  <tr><td>Recent usage window</td><td>{{window_minutes}} minutes</td></tr>
+  <tr><td>Your recent requests</td><td>{{request_count}}</td></tr>
+  <tr><td>Your recent billed cost</td><td>${{actual_cost}}</td></tr>
+  <tr><td>Last used at</td><td>{{last_used_at}}</td></tr>
+</table>
+<p>Administrator note: {{admin_message}}</p>
+<p class="muted"><a href="{{unsubscribe_url}}">Unsubscribe from optional billing notices</a></p>`),
+		},
+		notificationEmailLocaleChinese: {
+			Subject: "[{{site_name}}] {{group_name}} 费率调整通知",
+			HTML: notificationEmailCard("#0f766e", "分组费率调整通知", `
+<p>{{recipient_name}}，您好：</p>
+<p><strong>{{group_name}}</strong> 分组费率倍数计划从 <strong>{{old_rate_multiplier}}x</strong> 调整为 <strong>{{new_rate_multiplier}}x</strong>。</p>
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td>生效时间</td><td>{{effective_at}}</td></tr>
+  <tr><td>统计窗口</td><td>最近 {{window_minutes}} 分钟</td></tr>
+  <tr><td>您的请求数</td><td>{{request_count}}</td></tr>
+  <tr><td>您的计费金额</td><td>${{actual_cost}}</td></tr>
+  <tr><td>最近使用时间</td><td>{{last_used_at}}</td></tr>
+</table>
+<p>管理员备注：{{admin_message}}</p>
+<p class="muted"><a href="{{unsubscribe_url}}">退订此类计费通知</a></p>`),
 		},
 	},
 	NotificationEmailEventOpsAlert: {

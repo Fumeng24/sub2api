@@ -3424,6 +3424,49 @@ func (r *usageLogRepository) GetAllGroupUsageSummary(ctx context.Context, todayS
 	return results, nil
 }
 
+func (r *usageLogRepository) ListRecentGroupUsers(ctx context.Context, groupID int64, since time.Time, limit int) ([]service.GroupRecentUserUsage, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	query := `
+		SELECT
+			ul.user_id,
+			COALESCE(u.email, '') AS email,
+			COALESCE(u.username, '') AS username,
+			COUNT(*)::bigint AS request_count,
+			COALESCE(SUM(ul.actual_cost), 0) AS actual_cost,
+			MAX(ul.created_at) AS last_used_at
+		FROM usage_logs ul
+		JOIN users u ON u.id = ul.user_id
+		WHERE ul.group_id = $1
+			AND ul.created_at >= $2
+			AND ul.actual_cost > 0
+			AND u.status = $3
+			AND u.deleted_at IS NULL
+		GROUP BY ul.user_id, u.email, u.username
+		ORDER BY MAX(ul.created_at) DESC
+		LIMIT $4
+	`
+	rows, err := r.sql.QueryContext(ctx, query, groupID, since, service.StatusActive, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	results := make([]service.GroupRecentUserUsage, 0)
+	for rows.Next() {
+		var row service.GroupRecentUserUsage
+		if err := rows.Scan(&row.UserID, &row.Email, &row.Username, &row.RequestCount, &row.ActualCost, &row.LastUsedAt); err != nil {
+			return nil, err
+		}
+		results = append(results, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // resolveModelDimensionExpression maps model source type to a safe SQL expression.
 func resolveModelDimensionExpression(modelType string) string {
 	requestedExpr := "COALESCE(NULLIF(TRIM(requested_model), ''), model)"

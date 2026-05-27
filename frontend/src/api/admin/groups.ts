@@ -9,6 +9,9 @@ import type {
   GroupPlatform,
   CreateGroupRequest,
   UpdateGroupRequest,
+  GroupRateChangeNotificationPreview,
+  GroupRateChangeNotificationRequest,
+  GroupRateChangeNotificationSendResult,
   PaginatedResponse
 } from '@/types'
 
@@ -94,6 +97,28 @@ export async function create(groupData: CreateGroupRequest): Promise<AdminGroup>
  */
 export async function update(id: number, updates: UpdateGroupRequest): Promise<AdminGroup> {
   const { data } = await apiClient.put<AdminGroup>(`/admin/groups/${id}`, updates)
+  return data
+}
+
+export async function previewRateChangeNotification(
+  id: number,
+  payload: GroupRateChangeNotificationRequest
+): Promise<GroupRateChangeNotificationPreview> {
+  const { data } = await apiClient.post<GroupRateChangeNotificationPreview>(
+    `/admin/groups/${id}/rate-change-notification/preview`,
+    payload
+  )
+  return data
+}
+
+export async function sendRateChangeNotification(
+  id: number,
+  payload: GroupRateChangeNotificationRequest
+): Promise<GroupRateChangeNotificationSendResult> {
+  const { data } = await apiClient.post<GroupRateChangeNotificationSendResult>(
+    `/admin/groups/${id}/rate-change-notification/send`,
+    payload
+  )
   return data
 }
 
@@ -309,6 +334,8 @@ export const groupsAPI = {
   getById,
   create,
   update,
+  previewRateChangeNotification,
+  sendRateChangeNotification,
   delete: deleteGroup,
   toggleStatus,
   getStats,

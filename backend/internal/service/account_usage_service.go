@@ -54,6 +54,7 @@ type UsageLogRepository interface {
 	GetAPIKeyUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) ([]usagestats.APIKeyUsageTrendPoint, error)
 	GetUserUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) ([]usagestats.UserUsageTrendPoint, error)
 	GetUserSpendingRanking(ctx context.Context, startTime, endTime time.Time, limit int) (*usagestats.UserSpendingRankingResponse, error)
+	ListRecentGroupUsers(ctx context.Context, groupID int64, since time.Time, limit int) ([]GroupRecentUserUsage, error)
 	GetBatchUserUsageStats(ctx context.Context, userIDs []int64, startTime, endTime time.Time) (map[int64]*usagestats.BatchUserUsageStats, error)
 	GetBatchAPIKeyUsageStats(ctx context.Context, apiKeyIDs []int64, startTime, endTime time.Time) (map[int64]*usagestats.BatchAPIKeyUsageStats, error)
 
@@ -77,6 +78,15 @@ type UsageLogRepository interface {
 	GetAccountStatsAggregated(ctx context.Context, accountID int64, startTime, endTime time.Time) (*usagestats.UsageStats, error)
 	GetModelStatsAggregated(ctx context.Context, modelName string, startTime, endTime time.Time) (*usagestats.UsageStats, error)
 	GetDailyStatsAggregated(ctx context.Context, userID int64, startTime, endTime time.Time) ([]map[string]any, error)
+}
+
+type GroupRecentUserUsage struct {
+	UserID       int64     `json:"user_id"`
+	Email        string    `json:"email"`
+	Username     string    `json:"username"`
+	RequestCount int64     `json:"request_count"`
+	ActualCost   float64   `json:"actual_cost"`
+	LastUsedAt   time.Time `json:"last_used_at"`
 }
 
 type accountWindowStatsBatchReader interface {

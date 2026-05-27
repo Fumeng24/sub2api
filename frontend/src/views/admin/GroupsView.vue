@@ -1680,6 +1680,146 @@
             data-tour="group-form-multiplier"
           />
         </div>
+        <div
+          class="rounded-lg border border-teal-200 bg-teal-50/70 p-3 dark:border-teal-900/60 dark:bg-teal-950/20"
+        >
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ t("admin.groups.rateNotice.title") }}
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t("admin.groups.rateNotice.subtitle") }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              :disabled="rateNoticeLoading || !rateNoticeRateChanged"
+              @click="handlePreviewRateChangeNotice"
+            >
+              <Icon
+                name="search"
+                size="sm"
+                :class="rateNoticeLoading ? 'animate-spin' : ''"
+                class="mr-1.5"
+              />
+              {{
+                rateNoticeLoading
+                  ? t("admin.groups.rateNotice.previewing")
+                  : t("admin.groups.rateNotice.preview")
+              }}
+            </button>
+          </div>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div>
+              <label class="input-label text-xs">{{
+                t("admin.groups.rateNotice.windowMinutes")
+              }}</label>
+              <input
+                v-model.number="rateNoticeForm.window_minutes"
+                type="number"
+                min="1"
+                max="1440"
+                step="1"
+                class="input"
+              />
+            </div>
+            <div>
+              <label class="input-label text-xs">{{
+                t("admin.groups.rateNotice.effectiveAt")
+              }}</label>
+              <input
+                v-model="rateNoticeForm.effective_at"
+                type="datetime-local"
+                class="input"
+              />
+            </div>
+          </div>
+          <textarea
+            v-model="rateNoticeForm.message"
+            rows="2"
+            class="input mt-3"
+            :placeholder="t('admin.groups.rateNotice.messagePlaceholder')"
+          ></textarea>
+          <p
+            v-if="!rateNoticeRateChanged"
+            class="mt-2 text-xs text-amber-700 dark:text-amber-300"
+          >
+            {{ t("admin.groups.rateNotice.rateRequired") }}
+          </p>
+          <div
+            v-if="rateNoticePreview"
+            class="mt-3 rounded-md border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-800"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-sm text-gray-700 dark:text-gray-300">
+                {{
+                  t("admin.groups.rateNotice.previewSummary", {
+                    count: rateNoticePreview.user_count,
+                    skipped: rateNoticePreview.skipped_count,
+                  })
+                }}
+              </p>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                :disabled="
+                  rateNoticeSending || rateNoticePreview.user_count === 0
+                "
+                @click="handleSendRateChangeNotice"
+              >
+                <Icon
+                  name="mail"
+                  size="sm"
+                  :class="rateNoticeSending ? 'animate-spin' : ''"
+                  class="mr-1.5"
+                />
+                {{
+                  rateNoticeSending
+                    ? t("admin.groups.rateNotice.sending")
+                    : t("admin.groups.rateNotice.send")
+                }}
+              </button>
+            </div>
+            <div
+              v-if="rateNoticePreview.users.length > 0"
+              class="mt-2 max-h-36 overflow-auto text-xs"
+            >
+              <div
+                v-for="user in rateNoticePreview.users.slice(0, 8)"
+                :key="user.user_id"
+                class="grid grid-cols-[1fr_auto_auto] gap-2 border-t border-gray-100 py-1.5 dark:border-dark-700"
+              >
+                <span class="truncate text-gray-800 dark:text-gray-200">
+                  {{ user.username || user.email }}
+                </span>
+                <span class="text-gray-500 dark:text-gray-400">
+                  {{ user.request_count }}
+                </span>
+                <span class="text-gray-500 dark:text-gray-400">
+                  {{ formatDateTime(user.last_used_at) }}
+                </span>
+              </div>
+            </div>
+            <p
+              v-if="rateNoticeResult"
+              class="mt-2 text-xs"
+              :class="
+                rateNoticeResult.failed > 0
+                  ? 'text-amber-700 dark:text-amber-300'
+                  : 'text-emerald-700 dark:text-emerald-300'
+              "
+            >
+              {{
+                t("admin.groups.rateNotice.resultSummary", {
+                  sent: rateNoticeResult.sent,
+                  failed: rateNoticeResult.failed,
+                })
+              }}
+            </p>
+          </div>
+        </div>
         <div>
           <label class="input-label">{{ t("admin.groups.form.rpmLimit") }}</label>
           <input
@@ -2836,7 +2976,13 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useOnboardingStore } from "@/stores/onboarding";
 import { adminAPI } from "@/api/admin";
-import type { AdminGroup, GroupPlatform, SubscriptionType } from "@/types";
+import type {
+  AdminGroup,
+  GroupPlatform,
+  GroupRateChangeNotificationPreview,
+  GroupRateChangeNotificationSendResult,
+  SubscriptionType,
+} from "@/types";
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import TablePageLayout from "@/components/layout/TablePageLayout.vue";
@@ -3093,6 +3239,12 @@ const showRateMultipliersModal = ref(false);
 const rateMultipliersGroup = ref<AdminGroup | null>(null);
 const showRPMOverridesModal = ref(false);
 const rpmOverridesGroup = ref<AdminGroup | null>(null);
+const rateNoticePreview = ref<GroupRateChangeNotificationPreview | null>(null);
+const rateNoticeResult = ref<GroupRateChangeNotificationSendResult | null>(
+  null,
+);
+const rateNoticeLoading = ref(false);
+const rateNoticeSending = ref(false);
 const sortableGroups = ref<AdminGroup[]>([]);
 const createMessagesDispatchDefaults = createDefaultMessagesDispatchFormState();
 const editMessagesDispatchDefaults = createDefaultMessagesDispatchFormState();
@@ -3425,6 +3577,12 @@ const editForm = reactive({
   rpm_limit: 0 as number,
 });
 
+const rateNoticeForm = reactive({
+  window_minutes: 30,
+  effective_at: "",
+  message: "",
+});
+
 type ImagePricingFormState = {
   rate_multiplier: number;
   image_rate_independent: boolean;
@@ -3545,6 +3703,110 @@ const formatCost = (cost: number): string => {
   if (cost >= 1000) return cost.toFixed(0);
   if (cost >= 100) return cost.toFixed(1);
   return cost.toFixed(2);
+};
+
+const padDatePart = (value: number) => String(value).padStart(2, "0");
+
+const toLocalDateTimeInputValue = (date: Date) => {
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(
+    date.getDate(),
+  )}T${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+};
+
+const resetRateNoticeState = (resetForm = false) => {
+  rateNoticePreview.value = null;
+  rateNoticeResult.value = null;
+  if (resetForm) {
+    rateNoticeForm.window_minutes = 30;
+    rateNoticeForm.effective_at = toLocalDateTimeInputValue(
+      new Date(Date.now() + 30 * 60 * 1000),
+    );
+    rateNoticeForm.message = "";
+  }
+};
+
+const rateNoticeRateChanged = computed(() => {
+  if (!editingGroup.value) return false;
+  const nextRate = Number(editForm.rate_multiplier);
+  return (
+    Number.isFinite(nextRate) &&
+    nextRate > 0 &&
+    Math.abs(nextRate - editingGroup.value.rate_multiplier) > 0.000001
+  );
+});
+
+const buildRateNoticePayload = () => {
+  const effectiveAt = rateNoticeForm.effective_at
+    ? new Date(rateNoticeForm.effective_at)
+    : null;
+  return {
+    new_rate_multiplier: Number(editForm.rate_multiplier),
+    window_minutes: Number(rateNoticeForm.window_minutes) || 30,
+    effective_at:
+      effectiveAt && !Number.isNaN(effectiveAt.getTime())
+        ? effectiveAt.toISOString()
+        : undefined,
+    message: rateNoticeForm.message.trim() || undefined,
+  };
+};
+
+const formatDateTime = (value: string) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+};
+
+const handlePreviewRateChangeNotice = async () => {
+  if (!editingGroup.value || !rateNoticeRateChanged.value) {
+    appStore.showError(t("admin.groups.rateNotice.rateRequired"));
+    return;
+  }
+  rateNoticeLoading.value = true;
+  rateNoticeResult.value = null;
+  try {
+    rateNoticePreview.value =
+      await adminAPI.groups.previewRateChangeNotification(
+        editingGroup.value.id,
+        buildRateNoticePayload(),
+      );
+  } catch (error: any) {
+    appStore.showError(
+      error.response?.data?.detail ||
+        t("admin.groups.rateNotice.failedToPreview"),
+    );
+    console.error("Error previewing rate change notification:", error);
+  } finally {
+    rateNoticeLoading.value = false;
+  }
+};
+
+const handleSendRateChangeNotice = async () => {
+  if (!editingGroup.value || !rateNoticePreview.value) return;
+  rateNoticeSending.value = true;
+  try {
+    const result = await adminAPI.groups.sendRateChangeNotification(
+      editingGroup.value.id,
+      buildRateNoticePayload(),
+    );
+    rateNoticeResult.value = result;
+    const summary = t("admin.groups.rateNotice.sentSummary", {
+      sent: result.sent,
+      failed: result.failed,
+    });
+    if (result.failed > 0) {
+      appStore.showError(summary);
+    } else {
+      appStore.showSuccess(summary);
+    }
+  } catch (error: any) {
+    appStore.showError(
+      error.response?.data?.detail || t("admin.groups.rateNotice.failedToSend"),
+    );
+    console.error("Error sending rate change notification:", error);
+  } finally {
+    rateNoticeSending.value = false;
+  }
 };
 
 const loadUsageSummary = async () => {
@@ -3794,6 +4056,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.mcp_xml_inject = group.mcp_xml_inject ?? true;
   editForm.copy_accounts_from_group_ids = []; // 复制账号字段每次编辑时重置为空
   editForm.rpm_limit = group.rpm_limit ?? 0;
+  resetRateNoticeState(true);
   // 加载模型路由规则（异步加载账号名称）
   editModelRoutingRules.value = await convertApiFormatToRoutingRules(
     group.model_routing,
@@ -3810,6 +4073,7 @@ const closeEditModal = () => {
   editingGroup.value = null;
   editModelRoutingRules.value = [];
   editForm.copy_accounts_from_group_ids = [];
+  resetRateNoticeState(true);
   resetMessagesDispatchFormState(editForm);
 };
 
@@ -3991,6 +4255,16 @@ watch(
     }
   }
 )
+
+watch(
+  [
+    () => editForm.rate_multiplier,
+    () => rateNoticeForm.window_minutes,
+    () => rateNoticeForm.effective_at,
+    () => rateNoticeForm.message,
+  ],
+  () => resetRateNoticeState(false),
+);
 
 // 点击外部关闭账号搜索下拉框
 const handleClickOutside = (event: MouseEvent) => {

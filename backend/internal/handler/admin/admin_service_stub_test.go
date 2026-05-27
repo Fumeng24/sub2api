@@ -275,6 +275,21 @@ func (s *stubAdminService) UpdateGroup(ctx context.Context, id int64, input *ser
 	return &group, nil
 }
 
+func (s *stubAdminService) PreviewGroupRateChangeNotification(ctx context.Context, groupID int64, input service.GroupRateChangeNotificationInput) (*service.GroupRateChangeNotificationPreview, error) {
+	return &service.GroupRateChangeNotificationPreview{
+		GroupID:           groupID,
+		GroupName:         "group",
+		OldRateMultiplier: 1,
+		NewRateMultiplier: input.NewRateMultiplier,
+		WindowMinutes:     input.WindowMinutes,
+		Users:             []service.GroupRateChangeNotificationUser{},
+	}, nil
+}
+
+func (s *stubAdminService) SendGroupRateChangeNotification(ctx context.Context, groupID int64, input service.GroupRateChangeNotificationInput) (*service.GroupRateChangeNotificationSendResult, error) {
+	return &service.GroupRateChangeNotificationSendResult{GroupID: groupID}, nil
+}
+
 func (s *stubAdminService) DeleteGroup(ctx context.Context, id int64) error {
 	return nil
 }
