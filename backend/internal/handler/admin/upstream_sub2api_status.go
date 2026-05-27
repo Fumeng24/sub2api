@@ -748,7 +748,7 @@ func (p *upstreamSub2APIStatusClient) doJSON(ctx context.Context, method, target
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
@@ -807,7 +807,7 @@ func (p *upstreamSub2APIStatusClient) doNewAPIJSON(ctx context.Context, method, 
 	if err != nil {
 		return 0, nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
