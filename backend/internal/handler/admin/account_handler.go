@@ -58,6 +58,7 @@ type AccountHandler struct {
 	sessionLimitCache       service.SessionLimitCache
 	rpmCache                service.RPMCache
 	tokenCacheInvalidator   service.TokenCacheInvalidator
+	upstreamSub2API         *upstreamSub2APIStatusClient
 }
 
 // NewAccountHandler creates a new admin account handler
@@ -90,6 +91,7 @@ func NewAccountHandler(
 		sessionLimitCache:       sessionLimitCache,
 		rpmCache:                rpmCache,
 		tokenCacheInvalidator:   tokenCacheInvalidator,
+		upstreamSub2API:         newUpstreamSub2APIStatusClient(),
 	}
 }
 

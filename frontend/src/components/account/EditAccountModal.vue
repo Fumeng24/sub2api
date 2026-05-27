@@ -68,6 +68,48 @@
           />
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
         </div>
+        <div class="rounded-lg border border-gray-200 p-3 dark:border-dark-600">
+          <div class="mb-3">
+            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t('admin.accounts.upstreamSub2API.loginTitle') }}
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.upstreamSub2API.loginHint') }}
+            </p>
+          </div>
+          <div class="grid gap-3 md:grid-cols-3">
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.panelType') }}</label>
+              <select v-model="editUpstreamPanelType" class="input">
+                <option value="auto">{{ t('admin.accounts.upstreamSub2API.panelTypes.auto') }}</option>
+                <option value="sub2api">sub2api</option>
+                <option value="newapi">New API</option>
+              </select>
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.email') }}</label>
+              <input
+                v-model="editUpstreamSub2APIEmail"
+                type="text"
+                class="input"
+                :placeholder="t('admin.accounts.upstreamSub2API.emailPlaceholder')"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.password') }}</label>
+              <input
+                v-model="editUpstreamSub2APIPassword"
+                type="password"
+                class="input"
+                autocomplete="new-password"
+                data-1p-ignore
+                data-lpignore="true"
+                data-bwignore="true"
+                :placeholder="t('admin.accounts.upstreamSub2API.passwordPlaceholder')"
+              />
+            </div>
+          </div>
+        </div>
 
         <!-- Model Restriction Section (不适用于 Antigravity) -->
         <div v-if="account.platform !== 'antigravity'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
@@ -564,6 +606,48 @@
             placeholder="sk-..."
           />
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 p-3 dark:border-dark-600">
+          <div class="mb-3">
+            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t('admin.accounts.upstreamSub2API.loginTitle') }}
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.upstreamSub2API.loginHint') }}
+            </p>
+          </div>
+          <div class="grid gap-3 md:grid-cols-3">
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.panelType') }}</label>
+              <select v-model="editUpstreamPanelType" class="input">
+                <option value="auto">{{ t('admin.accounts.upstreamSub2API.panelTypes.auto') }}</option>
+                <option value="sub2api">sub2api</option>
+                <option value="newapi">New API</option>
+              </select>
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.email') }}</label>
+              <input
+                v-model="editUpstreamSub2APIEmail"
+                type="text"
+                class="input"
+                :placeholder="t('admin.accounts.upstreamSub2API.emailPlaceholder')"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.password') }}</label>
+              <input
+                v-model="editUpstreamSub2APIPassword"
+                type="password"
+                class="input"
+                autocomplete="new-password"
+                data-1p-ignore
+                data-lpignore="true"
+                data-bwignore="true"
+                :placeholder="t('admin.accounts.upstreamSub2API.passwordPlaceholder')"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2297,6 +2381,9 @@ interface TempUnschedRuleForm {
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
+const editUpstreamPanelType = ref<'auto' | 'sub2api' | 'newapi'>('auto')
+const editUpstreamSub2APIEmail = ref('')
+const editUpstreamSub2APIPassword = ref('')
 // Bedrock credentials
 const editBedrockAccessKeyId = ref('')
 const editBedrockSecretAccessKey = ref('')
@@ -2650,6 +2737,14 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   // Load intercept warmup requests setting (applies to all account types)
   const credentials = newAccount.credentials as Record<string, unknown> | undefined
   interceptWarmupRequests.value = credentials?.intercept_warmup_requests === true
+  editUpstreamPanelType.value =
+    credentials?.upstream_panel_type === 'sub2api' || credentials?.upstream_panel_type === 'newapi'
+      ? credentials.upstream_panel_type
+      : 'auto'
+  editUpstreamSub2APIEmail.value = typeof credentials?.upstream_sub2api_email === 'string'
+    ? credentials.upstream_sub2api_email
+    : ''
+  editUpstreamSub2APIPassword.value = ''
   autoPauseOnExpired.value = newAccount.auto_pause_on_expired === true
   editVertexProjectId.value = ''
   editVertexClientEmail.value = ''
@@ -3402,6 +3497,16 @@ const handleSubmit = async () => {
         appStore.showError(t('admin.accounts.apiKeyIsRequired'))
         return
       }
+      if (editUpstreamSub2APIEmail.value.trim()) {
+        newCredentials.upstream_panel_type = editUpstreamPanelType.value
+        newCredentials.upstream_sub2api_email = editUpstreamSub2APIEmail.value.trim()
+      } else {
+        delete newCredentials.upstream_panel_type
+        delete newCredentials.upstream_sub2api_email
+      }
+      if (editUpstreamSub2APIPassword.value.trim()) {
+        newCredentials.upstream_sub2api_password = editUpstreamSub2APIPassword.value.trim()
+      }
 
       // Add model mapping if configured（OpenAI 开启自动透传时保留现有映射，不再编辑）
       if (shouldApplyModelMapping) {
@@ -3456,6 +3561,16 @@ const handleSubmit = async () => {
 
       if (editApiKey.value.trim()) {
         newCredentials.api_key = editApiKey.value.trim()
+      }
+      if (editUpstreamSub2APIEmail.value.trim()) {
+        newCredentials.upstream_panel_type = editUpstreamPanelType.value
+        newCredentials.upstream_sub2api_email = editUpstreamSub2APIEmail.value.trim()
+      } else {
+        delete newCredentials.upstream_panel_type
+        delete newCredentials.upstream_sub2api_email
+      }
+      if (editUpstreamSub2APIPassword.value.trim()) {
+        newCredentials.upstream_sub2api_password = editUpstreamSub2APIPassword.value.trim()
       }
 
       // Add intercept warmup requests setting

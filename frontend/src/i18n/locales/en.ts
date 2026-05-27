@@ -3667,6 +3667,33 @@ export default {
         pleaseEnterBaseUrl: 'Please enter upstream Base URL',
         pleaseEnterApiKey: 'Please enter upstream API Key'
       },
+      upstreamSub2API: {
+        title: 'Upstream panel',
+        loginTitle: 'Upstream panel login',
+        loginHint: 'Optional. When configured, the accounts page caches the upstream login state and matches the API key to its upstream group, platform, balance, and current rate.',
+        panelType: 'Upstream type',
+        panelTypes: {
+          auto: 'Auto detect'
+        },
+        email: 'Upstream login account',
+        emailPlaceholder: 'Email or username',
+        password: 'Upstream login password',
+        passwordPlaceholder: 'Leave empty to keep current password',
+        passwordCreatePlaceholder: 'Upstream account password',
+        statusOk: 'Upstream {platform} · {group} · {rate}',
+        statusError: 'Upstream info error',
+        status: 'Status',
+        key: 'API Key',
+        group: 'Group',
+        platform: 'Platform',
+        defaultRate: 'Default rate',
+        effectiveRate: 'Current rate',
+        balance: 'User balance',
+        remaining: 'Key remaining',
+        message: 'Error',
+        fetchedAt: 'Fetched at',
+        cached: 'cached'
+      },
       // OAuth flow
       oauth: {
         title: 'Claude Account Authorization',

@@ -798,6 +798,48 @@
           />
           <p class="input-hint">{{ t('admin.accounts.upstream.apiKeyHint') }}</p>
         </div>
+        <div class="rounded-lg border border-gray-200 p-3 dark:border-dark-600">
+          <div class="mb-3">
+            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t('admin.accounts.upstreamSub2API.loginTitle') }}
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.upstreamSub2API.loginHint') }}
+            </p>
+          </div>
+          <div class="grid gap-3 md:grid-cols-3">
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.panelType') }}</label>
+              <select v-model="upstreamPanelType" class="input">
+                <option value="auto">{{ t('admin.accounts.upstreamSub2API.panelTypes.auto') }}</option>
+                <option value="sub2api">sub2api</option>
+                <option value="newapi">New API</option>
+              </select>
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.email') }}</label>
+              <input
+                v-model="upstreamSub2APIEmail"
+                type="text"
+                class="input"
+                :placeholder="t('admin.accounts.upstreamSub2API.emailPlaceholder')"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.password') }}</label>
+              <input
+                v-model="upstreamSub2APIPassword"
+                type="password"
+                class="input"
+                autocomplete="new-password"
+                data-1p-ignore
+                data-lpignore="true"
+                data-bwignore="true"
+                :placeholder="t('admin.accounts.upstreamSub2API.passwordCreatePlaceholder')"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Vertex Service Account -->
@@ -1042,6 +1084,49 @@
             "
           />
           <p class="input-hint">{{ apiKeyHint }}</p>
+        </div>
+
+        <div class="rounded-lg border border-gray-200 p-3 dark:border-dark-600">
+          <div class="mb-3">
+            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t('admin.accounts.upstreamSub2API.loginTitle') }}
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.upstreamSub2API.loginHint') }}
+            </p>
+          </div>
+          <div class="grid gap-3 md:grid-cols-3">
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.panelType') }}</label>
+              <select v-model="upstreamPanelType" class="input">
+                <option value="auto">{{ t('admin.accounts.upstreamSub2API.panelTypes.auto') }}</option>
+                <option value="sub2api">sub2api</option>
+                <option value="newapi">New API</option>
+              </select>
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.email') }}</label>
+              <input
+                v-model="upstreamSub2APIEmail"
+                type="text"
+                class="input"
+                :placeholder="t('admin.accounts.upstreamSub2API.emailPlaceholder')"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t('admin.accounts.upstreamSub2API.password') }}</label>
+              <input
+                v-model="upstreamSub2APIPassword"
+                type="password"
+                class="input"
+                autocomplete="new-password"
+                data-1p-ignore
+                data-lpignore="true"
+                data-bwignore="true"
+                :placeholder="t('admin.accounts.upstreamSub2API.passwordCreatePlaceholder')"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- Gemini API Key tier selection -->
@@ -3282,6 +3367,9 @@ const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_acco
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
+const upstreamPanelType = ref<'auto' | 'sub2api' | 'newapi'>('auto')
+const upstreamSub2APIEmail = ref('')
+const upstreamSub2APIPassword = ref('')
 const editQuotaLimit = ref<number | null>(null)
 const editQuotaDailyLimit = ref<number | null>(null)
 const editQuotaWeeklyLimit = ref<number | null>(null)
@@ -4047,6 +4135,9 @@ const resetForm = () => {
   addMethod.value = 'oauth'
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
+  upstreamPanelType.value = 'auto'
+  upstreamSub2APIEmail.value = ''
+  upstreamSub2APIPassword.value = ''
   editQuotaLimit.value = null
   editQuotaDailyLimit.value = null
   editQuotaWeeklyLimit.value = null
@@ -4378,6 +4469,13 @@ const handleSubmit = async () => {
       base_url: upstreamBaseUrl.value.trim(),
       api_key: upstreamApiKey.value.trim()
     }
+    if (upstreamSub2APIEmail.value.trim()) {
+      credentials.upstream_panel_type = upstreamPanelType.value
+      credentials.upstream_sub2api_email = upstreamSub2APIEmail.value.trim()
+    }
+    if (upstreamSub2APIPassword.value.trim()) {
+      credentials.upstream_sub2api_password = upstreamSub2APIPassword.value.trim()
+    }
 
     // Antigravity 只使用映射模式
     const antigravityModelMapping = buildModelMappingObject(
@@ -4437,6 +4535,13 @@ const handleSubmit = async () => {
   const credentials: Record<string, unknown> = {
     base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
     api_key: apiKeyValue.value.trim()
+  }
+  if (upstreamSub2APIEmail.value.trim()) {
+    credentials.upstream_panel_type = upstreamPanelType.value
+    credentials.upstream_sub2api_email = upstreamSub2APIEmail.value.trim()
+  }
+  if (upstreamSub2APIPassword.value.trim()) {
+    credentials.upstream_sub2api_password = upstreamSub2APIPassword.value.trim()
   }
   if (form.platform === 'gemini') {
     credentials.tier_id = geminiTierAIStudio.value

@@ -254,6 +254,17 @@
                 <span :class="['h-1.5 w-1.5 rounded-full', getOpenAICompactMeta(row)?.dotClass]" />
                 <span>{{ getOpenAICompactMeta(row)?.label }}</span>
               </div>
+              <div
+                v-if="upstreamSub2APIStatusMap.get(row.id)"
+                :class="[
+                  'inline-flex max-w-[220px] items-center gap-1.5 pl-0.5 text-[11px] font-medium leading-4',
+                  getUpstreamSub2APIStatusMeta(row)?.className
+                ]"
+                :title="getUpstreamSub2APITitle(row)"
+              >
+                <span :class="['h-1.5 w-1.5 rounded-full', getUpstreamSub2APIStatusMeta(row)?.dotClass]" />
+                <span class="truncate">{{ getUpstreamSub2APILabel(row) }}</span>
+              </div>
             </div>
           </template>
           <template #cell-capacity="{ row }">
@@ -347,7 +358,7 @@
       </template>
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
-    <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
+    <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="() => reload(true)" />
     <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
@@ -388,6 +399,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
+import type { UpstreamSub2APIAccountStatus } from '@/api/admin/accounts'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
 import { useTableSelection } from '@/composables/useTableSelection'
@@ -561,6 +573,9 @@ const todayStatsError = ref<string | null>(null)
 const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
+const upstreamSub2APIStatusMap = ref<Map<number, UpstreamSub2APIAccountStatus>>(new Map())
+const upstreamSub2APIStatusReqSeq = ref(0)
+const pendingUpstreamSub2APIStatusRefresh = ref(false)
 
 const buildDefaultTodayStats = (): WindowStats => ({
   requests: 0,
@@ -611,6 +626,24 @@ const refreshTodayStatsBatch = async () => {
     if (reqSeq === todayStatsReqSeq.value) {
       todayStatsLoading.value = false
     }
+  }
+}
+
+const refreshUpstreamSub2APIStatuses = async (force = false) => {
+  const accountIDs = accounts.value.map(account => account.id)
+  const reqSeq = ++upstreamSub2APIStatusReqSeq.value
+  if (accountIDs.length === 0) {
+    upstreamSub2APIStatusMap.value = new Map()
+    return
+  }
+
+  try {
+    const statuses = await adminAPI.accounts.getUpstreamSub2APIStatus(accountIDs, force)
+    if (reqSeq !== upstreamSub2APIStatusReqSeq.value) return
+    upstreamSub2APIStatusMap.value = new Map(statuses.map(status => [status.account_id, status]))
+  } catch (error) {
+    if (reqSeq !== upstreamSub2APIStatusReqSeq.value) return
+    console.error('Failed to load upstream sub2api status:', error)
   }
 }
 
@@ -783,11 +816,12 @@ const resetAutoRefreshCache = () => {
 
 const isFirstLoad = ref(true)
 
-const load = async () => {
+const load = async (forceUpstreamStatus = false) => {
   const requestParams = params as any
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = false
+  pendingUpstreamSub2APIStatusRefresh.value = false
   if (isFirstLoad.value) {
     requestParams.lite = '1'
   }
@@ -797,20 +831,24 @@ const load = async () => {
     delete requestParams.lite
   }
   await refreshTodayStatsBatch()
+  await refreshUpstreamSub2APIStatuses(forceUpstreamStatus)
 }
 
-const reload = async () => {
+const reload = async (forceUpstreamStatus = false) => {
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = false
+  pendingUpstreamSub2APIStatusRefresh.value = false
   await baseReload()
   await refreshTodayStatsBatch()
+  await refreshUpstreamSub2APIStatuses(forceUpstreamStatus)
 }
 
 const debouncedReload = () => {
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = true
+  pendingUpstreamSub2APIStatusRefresh.value = true
   baseDebouncedReload()
 }
 
@@ -818,6 +856,7 @@ const handlePageChange = (page: number) => {
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = true
+  pendingUpstreamSub2APIStatusRefresh.value = true
   baseHandlePageChange(page)
 }
 
@@ -825,6 +864,7 @@ const handlePageSizeChange = (size: number) => {
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = true
+  pendingUpstreamSub2APIStatusRefresh.value = true
   baseHandlePageSizeChange(size)
 }
 
@@ -838,6 +878,7 @@ const handleSort = (key: string, order: AccountSortOrder) => {
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = true
+  pendingUpstreamSub2APIStatusRefresh.value = true
   load()
 }
 
@@ -846,6 +887,12 @@ watch(loading, (isLoading, wasLoading) => {
     pendingTodayStatsRefresh.value = false
     refreshTodayStatsBatch().catch((error) => {
       console.error('Failed to refresh account today stats after table load:', error)
+    })
+  }
+  if (wasLoading && !isLoading && pendingUpstreamSub2APIStatusRefresh.value) {
+    pendingUpstreamSub2APIStatusRefresh.value = false
+    refreshUpstreamSub2APIStatuses().catch((error) => {
+      console.error('Failed to refresh upstream sub2api status after table load:', error)
     })
   }
 })
@@ -963,6 +1010,7 @@ const refreshAccountsIncrementally = async () => {
     }
 
     await refreshTodayStatsBatch()
+    await refreshUpstreamSub2APIStatuses()
   } catch (error) {
     console.error('Auto refresh failed:', error)
   } finally {
@@ -971,7 +1019,7 @@ const refreshAccountsIncrementally = async () => {
 }
 
 const handleManualRefresh = async () => {
-  await load()
+  await load(true)
   // Force usage cells to refetch /usage on explicit user refresh.
   usageManualRefreshToken.value += 1
 }
@@ -1012,7 +1060,7 @@ const openBulkVerify = () => {
 
 const syncPendingListChanges = async () => {
   hasPendingListSync.value = false
-  await load()
+  await load(true)
   // Keep behavior consistent with manual refresh.
   usageManualRefreshToken.value += 1
 }
@@ -1113,6 +1161,103 @@ function getOpenAICompactTitle(row: any): string {
   const label = getOpenAICompactMeta(row)?.label || ''
   if (!checkedAt) return label
   return `${label} | ${t('admin.accounts.openai.compactLastChecked')}: ${formatDateTime(new Date(checkedAt))}`
+}
+
+function getUpstreamSub2APIStatusMeta(row: Account): { className: string; dotClass: string } | null {
+  const status = upstreamSub2APIStatusMap.value.get(row.id)
+  if (!status) return null
+  if (status.status === 'ok') {
+    return {
+      className: 'text-cyan-700 dark:text-cyan-300',
+      dotClass: 'bg-cyan-500 shadow-[0_0_0_2px_rgba(6,182,212,0.14)]'
+    }
+  }
+  return {
+    className: 'text-amber-700 dark:text-amber-300',
+    dotClass: 'bg-amber-500 shadow-[0_0_0_2px_rgba(245,158,11,0.14)]'
+  }
+}
+
+function formatUpstreamSub2APIRate(value?: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-'
+  return `${value.toFixed(3).replace(/\.?0+$/, '')}x`
+}
+
+function formatUpstreamSub2APIMoney(value?: number, unit?: string): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-'
+  const formatted = value >= 100 ? value.toFixed(1) : value.toFixed(2)
+  if (unit && unit.toUpperCase() !== 'USD') {
+    return `${formatted} ${unit}`
+  }
+  return `$${formatted}`
+}
+
+function upstreamSub2APIPlatformLabel(platform?: string): string {
+  if (!platform) return '-'
+  const key = `admin.accounts.platforms.${platform}`
+  const translated = t(key)
+  return translated === key ? platform : translated
+}
+
+function upstreamPanelKindLabel(kind?: string): string {
+  switch (kind) {
+    case 'sub2api':
+      return 'sub2api'
+    case 'newapi':
+      return 'New API'
+    default:
+      return t('admin.accounts.upstreamSub2API.panelTypes.auto')
+  }
+}
+
+function getUpstreamSub2APILabel(row: Account): string {
+  const status = upstreamSub2APIStatusMap.value.get(row.id)
+  if (!status) return ''
+  if (status.status !== 'ok') {
+    return t('admin.accounts.upstreamSub2API.statusError')
+  }
+  const platform = upstreamSub2APIPlatformLabel(status.upstream_group_platform)
+  const group = status.upstream_group_name || `#${status.upstream_group_id || '-'}`
+  const rate = formatUpstreamSub2APIRate(status.upstream_group_effective_rate_multiplier)
+  return t('admin.accounts.upstreamSub2API.statusOk', { platform, group, rate })
+}
+
+function getUpstreamSub2APITitle(row: Account): string {
+  const status = upstreamSub2APIStatusMap.value.get(row.id)
+  if (!status) return ''
+  const lines = [
+    `${t('admin.accounts.upstreamSub2API.title')}: ${status.base_url}`,
+    `${t('admin.accounts.upstreamSub2API.panelType')}: ${upstreamPanelKindLabel(status.upstream_kind)}`,
+    `${t('admin.accounts.upstreamSub2API.status')}: ${status.status}`,
+  ]
+  if (status.upstream_key_name) {
+    lines.push(`${t('admin.accounts.upstreamSub2API.key')}: ${status.upstream_key_name}`)
+  }
+  if (status.upstream_group_name || status.upstream_group_id) {
+    lines.push(
+      `${t('admin.accounts.upstreamSub2API.group')}: ${status.upstream_group_name || ''}${status.upstream_group_id ? ` (#${status.upstream_group_id})` : ''}`
+    )
+  }
+  if (status.upstream_group_platform) {
+    lines.push(`${t('admin.accounts.upstreamSub2API.platform')}: ${upstreamSub2APIPlatformLabel(status.upstream_group_platform)}`)
+  }
+  if (typeof status.upstream_group_default_rate_multiplier === 'number') {
+    lines.push(`${t('admin.accounts.upstreamSub2API.defaultRate')}: ${formatUpstreamSub2APIRate(status.upstream_group_default_rate_multiplier)}`)
+  }
+  if (typeof status.upstream_group_effective_rate_multiplier === 'number') {
+    lines.push(`${t('admin.accounts.upstreamSub2API.effectiveRate')}: ${formatUpstreamSub2APIRate(status.upstream_group_effective_rate_multiplier)}`)
+  }
+  if (typeof status.user_balance === 'number') {
+    lines.push(`${t('admin.accounts.upstreamSub2API.balance')}: ${formatUpstreamSub2APIMoney(status.user_balance, status.balance_unit)}`)
+  }
+  if (typeof status.key_remaining === 'number') {
+    lines.push(`${t('admin.accounts.upstreamSub2API.remaining')}: ${formatUpstreamSub2APIMoney(status.key_remaining, status.balance_unit)}`)
+  }
+  if (status.message) {
+    lines.push(`${t('admin.accounts.upstreamSub2API.message')}: ${status.message}`)
+  }
+  lines.push(`${t('admin.accounts.upstreamSub2API.fetchedAt')}: ${formatDateTime(new Date(status.fetched_at))}${status.cached ? ` (${t('admin.accounts.upstreamSub2API.cached')})` : ''}`)
+  return lines.join('\n')
 }
 
 function getAntigravityTierClass(row: any): string {
@@ -1504,6 +1649,9 @@ const patchAccountInList = (updatedAccount: Account) => {
 }
 const handleAccountUpdated = (updatedAccount: Account) => {
   patchAccountInList(updatedAccount)
+  refreshUpstreamSub2APIStatuses(true).catch((error) => {
+    console.error('Failed to refresh upstream sub2api status after account update:', error)
+  })
   enterAutoRefreshSilentWindow()
 }
 const formatExportTimestamp = () => {

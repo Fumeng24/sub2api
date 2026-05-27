@@ -3808,6 +3808,33 @@ export default {
         pleaseEnterBaseUrl: '请输入上游 Base URL',
         pleaseEnterApiKey: '请输入上游 API Key'
       },
+      upstreamSub2API: {
+        title: '上游面板',
+        loginTitle: '上游面板登录信息',
+        loginHint: '可选。填写后账号页会缓存上游登录态，并按 API Key 匹配上游分组、平台、余额和当前倍率。',
+        panelType: '上游类型',
+        panelTypes: {
+          auto: '自动识别'
+        },
+        email: '上游登录账号',
+        emailPlaceholder: '邮箱或用户名',
+        password: '上游登录密码',
+        passwordPlaceholder: '留空保持当前密码',
+        passwordCreatePlaceholder: '上游账号密码',
+        statusOk: '上游 {platform} · {group} · {rate}',
+        statusError: '上游信息异常',
+        status: '状态',
+        key: 'API Key',
+        group: '分组',
+        platform: '平台',
+        defaultRate: '默认倍率',
+        effectiveRate: '当前倍率',
+        balance: '用户余额',
+        remaining: 'Key 剩余额度',
+        message: '错误',
+        fetchedAt: '获取时间',
+        cached: '缓存'
+      },
       // OAuth flow
       oauth: {
         title: 'Claude 账号授权',

@@ -22,6 +22,30 @@ import type {
   CheckMixedChannelResponse
 } from '@/types'
 
+export interface UpstreamSub2APIAccountStatus {
+  account_id: number
+  account_name: string
+  local_platform: string
+  base_url: string
+  upstream_kind?: 'sub2api' | 'newapi' | 'auto' | string
+  status: string
+  message?: string
+  fetched_at: string
+  cached: boolean
+  user_balance?: number
+  key_remaining?: number
+  balance_unit?: string
+  usage_mode?: string
+  usage_plan_name?: string
+  upstream_key_id?: number
+  upstream_key_name?: string
+  upstream_group_id?: number
+  upstream_group_name?: string
+  upstream_group_platform?: string
+  upstream_group_default_rate_multiplier?: number
+  upstream_group_effective_rate_multiplier?: number
+}
+
 /**
  * List all accounts with pagination
  * @param page - Page number (default: 1)
@@ -122,6 +146,23 @@ export async function listWithEtag(
  */
 export async function getById(id: number): Promise<Account> {
   const { data } = await apiClient.get<Account>(`/admin/accounts/${id}`)
+  return data
+}
+
+export async function getUpstreamSub2APIStatus(
+  accountIds: number[],
+  force: boolean = false
+): Promise<UpstreamSub2APIAccountStatus[]> {
+  if (accountIds.length === 0) return []
+  const { data } = await apiClient.get<UpstreamSub2APIAccountStatus[]>(
+    '/admin/accounts/upstream-sub2api-status',
+    {
+      params: {
+        account_ids: accountIds.join(','),
+        force: force ? 'true' : undefined
+      }
+    }
+  )
   return data
 }
 
@@ -658,6 +699,7 @@ export const accountsAPI = {
   list,
   listWithEtag,
   getById,
+  getUpstreamSub2APIStatus,
   create,
   update,
   checkMixedChannelRisk,
