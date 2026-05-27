@@ -141,6 +141,9 @@ type UpdateUserInput struct {
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
 	GroupRates map[int64]*float64
+	// GroupDiscounts 用户专属分组折扣配置
+	// map[groupID]*discount，nil 表示删除该分组的专属折扣
+	GroupDiscounts map[int64]*float64
 }
 
 type AdminBindAuthIdentityInput struct {
@@ -540,6 +543,10 @@ type userGroupRateBatchReader interface {
 	GetByUserIDs(ctx context.Context, userIDs []int64) (map[int64]map[int64]float64, error)
 }
 
+type userGroupDiscountBatchReader interface {
+	GetDiscountsByUserIDs(ctx context.Context, userIDs []int64) (map[int64]map[int64]float64, error)
+}
+
 // NewAdminService creates a new AdminService
 func NewAdminService(
 	userRepo UserRepository,
@@ -604,13 +611,13 @@ func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, fi
 			}
 		}
 	}
-	// 批量加载用户专属分组倍率
+	// 批量加载用户专属分组倍率/折扣
 	if s.userGroupRateRepo != nil && len(users) > 0 {
+		userIDs := make([]int64, 0, len(users))
+		for i := range users {
+			userIDs = append(userIDs, users[i].ID)
+		}
 		if batchRepo, ok := s.userGroupRateRepo.(userGroupRateBatchReader); ok {
-			userIDs := make([]int64, 0, len(users))
-			for i := range users {
-				userIDs = append(userIDs, users[i].ID)
-			}
 			ratesByUser, err := batchRepo.GetByUserIDs(ctx, userIDs)
 			if err != nil {
 				logger.LegacyPrintf("service.admin", "failed to load user group rates in batch: err=%v", err)
@@ -624,6 +631,21 @@ func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, fi
 			}
 		} else {
 			s.loadUserGroupRatesOneByOne(ctx, users)
+		}
+		if batchRepo, ok := s.userGroupRateRepo.(userGroupDiscountBatchReader); ok {
+			discountsByUser, err := batchRepo.GetDiscountsByUserIDs(ctx, userIDs)
+			if err != nil {
+				logger.LegacyPrintf("service.admin", "failed to load user group discounts in batch: err=%v", err)
+				s.loadUserGroupDiscountsOneByOne(ctx, users)
+			} else {
+				for i := range users {
+					if discounts, ok := discountsByUser[users[i].ID]; ok {
+						users[i].GroupDiscounts = discounts
+					}
+				}
+			}
+		} else {
+			s.loadUserGroupDiscountsOneByOne(ctx, users)
 		}
 	}
 	return users, result.Total, nil
@@ -643,6 +665,20 @@ func (s *adminServiceImpl) loadUserGroupRatesOneByOne(ctx context.Context, users
 	}
 }
 
+func (s *adminServiceImpl) loadUserGroupDiscountsOneByOne(ctx context.Context, users []User) {
+	if s.userGroupRateRepo == nil {
+		return
+	}
+	for i := range users {
+		discounts, err := s.userGroupRateRepo.GetDiscountsByUserID(ctx, users[i].ID)
+		if err != nil {
+			logger.LegacyPrintf("service.admin", "failed to load user group discounts: user_id=%d err=%v", users[i].ID, err)
+			continue
+		}
+		users[i].GroupDiscounts = discounts
+	}
+}
+
 func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error) {
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
@@ -654,13 +690,19 @@ func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error)
 	} else {
 		user.LastUsedAt = lastUsedAt
 	}
-	// 加载用户专属分组倍率
+	// 加载用户专属分组倍率/折扣
 	if s.userGroupRateRepo != nil {
 		rates, err := s.userGroupRateRepo.GetByUserID(ctx, id)
 		if err != nil {
 			logger.LegacyPrintf("service.admin", "failed to load user group rates: user_id=%d err=%v", id, err)
 		} else {
 			user.GroupRates = rates
+		}
+		discounts, err := s.userGroupRateRepo.GetDiscountsByUserID(ctx, id)
+		if err != nil {
+			logger.LegacyPrintf("service.admin", "failed to load user group discounts: user_id=%d err=%v", id, err)
+		} else {
+			user.GroupDiscounts = discounts
 		}
 	}
 	return user, nil
@@ -721,6 +763,14 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		for groupID, rate := range input.GroupRates {
 			if rate != nil && *rate <= 0 {
 				return nil, fmt.Errorf("rate_multiplier must be > 0 (group_id=%d)", groupID)
+			}
+		}
+	}
+	// 校验用户专属分组折扣：必须 > 0（nil 合法，表示清除专属折扣）
+	if input.GroupDiscounts != nil {
+		for groupID, discount := range input.GroupDiscounts {
+			if discount != nil && *discount <= 0 {
+				return nil, fmt.Errorf("discount_multiplier must be > 0 (group_id=%d)", groupID)
 			}
 		}
 	}
@@ -785,6 +835,12 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if input.GroupRates != nil && s.userGroupRateRepo != nil {
 		if err := s.userGroupRateRepo.SyncUserGroupRates(ctx, user.ID, input.GroupRates); err != nil {
 			logger.LegacyPrintf("service.admin", "failed to sync user group rates: user_id=%d err=%v", user.ID, err)
+		}
+	}
+	// 同步用户专属分组折扣
+	if input.GroupDiscounts != nil && s.userGroupRateRepo != nil {
+		if err := s.userGroupRateRepo.SyncUserGroupDiscounts(ctx, user.ID, input.GroupDiscounts); err != nil {
+			logger.LegacyPrintf("service.admin", "failed to sync user group discounts: user_id=%d err=%v", user.ID, err)
 		}
 	}
 

@@ -21,6 +21,65 @@
       </div>
 
       <div v-else class="space-y-6">
+        <!-- 批量折扣工具 -->
+        <div
+          v-if="groupConfigs.length > 0"
+          class="rounded-xl border border-primary-100 bg-primary-50/70 p-4 dark:border-primary-900/50 dark:bg-primary-950/20"
+        >
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div class="min-w-0">
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                {{ t('admin.users.bulkDiscountTitle') }}
+              </h4>
+              <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                {{ t('admin.users.bulkDiscountHint') }}
+              </p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+                {{ bulkDiscountPreview }}
+              </p>
+            </div>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <label class="block">
+                <span class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {{ t('admin.users.bulkDiscountInput') }}
+                </span>
+                <div class="relative">
+                  <input
+                    v-model.number="bulkDiscountValue"
+                    data-testid="bulk-discount-input"
+                    type="number"
+                    min="0.1"
+                    max="10"
+                    step="0.1"
+                    class="hide-spinner w-28 rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
+                  />
+                  <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                    {{ t('admin.users.bulkDiscountUnit') }}
+                  </span>
+                </div>
+              </label>
+              <button
+                type="button"
+                data-testid="apply-bulk-discount"
+                class="btn btn-primary whitespace-nowrap px-4"
+                :disabled="bulkDiscountTargetCount === 0"
+                @click="applyBulkDiscount"
+              >
+                {{ t('admin.users.bulkDiscountApply') }}
+              </button>
+              <button
+                type="button"
+                data-testid="clear-bulk-rates"
+                class="btn btn-secondary whitespace-nowrap px-4"
+                :disabled="bulkDiscountTargetCount === 0"
+                @click="clearBulkCustomRates"
+              >
+                {{ t('admin.users.bulkDiscountClear') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- 专属分组区域 -->
         <div v-if="exclusiveGroups.length > 0">
           <div class="mb-3 flex items-center gap-2">
@@ -77,6 +136,23 @@
                       </span>
                       <span v-else class="font-medium text-gray-700 dark:text-gray-300">{{ formatRateMultiplier(config.defaultRate) }}x</span>
                     </span>
+                    <span
+                      v-if="config.customDiscount !== null"
+                      class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    >
+                      {{ t('admin.users.dynamicDiscountBadge', {
+                        discount: formatRateMultiplier(config.customDiscount * 10),
+                        rate: formatRateMultiplier(dynamicDiscountRate(config)),
+                      }) }}
+                      <button
+                        type="button"
+                        class="ml-0.5 rounded px-1 text-emerald-600 hover:bg-emerald-200 dark:text-emerald-200 dark:hover:bg-emerald-800"
+                        :title="t('admin.users.dynamicDiscountClear')"
+                        @click="clearCustomDiscount(config.groupId)"
+                      >
+                        ×
+                      </button>
+                    </span>
                   </div>
                 </div>
 
@@ -85,11 +161,11 @@
                   <label class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ t('admin.users.customRate') }}</label>
                   <input
                     type="number"
-                    step="0.001"
-                    min="0.001"
+                    step="0.0001"
+                    min="0.0001"
                     :value="config.customRate ?? ''"
                     @input="updateCustomRate(config.groupId, ($event.target as HTMLInputElement).value)"
-                    :placeholder="String(config.defaultRate)"
+                    :placeholder="formatRateMultiplier(config.defaultRate)"
                     class="hide-spinner w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
                   />
                 </div>
@@ -140,6 +216,23 @@
                       </span>
                       <span v-else class="font-medium text-gray-700 dark:text-gray-300">{{ formatRateMultiplier(config.defaultRate) }}x</span>
                     </span>
+                    <span
+                      v-if="config.customDiscount !== null"
+                      class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    >
+                      {{ t('admin.users.dynamicDiscountBadge', {
+                        discount: formatRateMultiplier(config.customDiscount * 10),
+                        rate: formatRateMultiplier(dynamicDiscountRate(config)),
+                      }) }}
+                      <button
+                        type="button"
+                        class="ml-0.5 rounded px-1 text-emerald-600 hover:bg-emerald-200 dark:text-emerald-200 dark:hover:bg-emerald-800"
+                        :title="t('admin.users.dynamicDiscountClear')"
+                        @click="clearCustomDiscount(config.groupId)"
+                      >
+                        ×
+                      </button>
+                    </span>
                   </div>
                 </div>
 
@@ -148,11 +241,11 @@
                   <label class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ t('admin.users.customRate') }}</label>
                   <input
                     type="number"
-                    step="0.001"
-                    min="0.001"
+                    step="0.0001"
+                    min="0.0001"
                     :value="config.customRate ?? ''"
                     @input="updateCustomRate(config.groupId, ($event.target as HTMLInputElement).value)"
-                    :placeholder="String(config.defaultRate)"
+                    :placeholder="formatRateMultiplier(config.defaultRate)"
                     class="hide-spinner w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
                   />
                 </div>
@@ -196,7 +289,7 @@ import { adminAPI } from '@/api/admin'
 import type { AdminUser, Group, GroupPlatform } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
-import { resolveGroupRateDiscount, formatRateMultiplier } from '@/utils/groupRateDiscount'
+import { resolveGroupRateDiscount, formatRateMultiplier, roundRateMultiplier } from '@/utils/groupRateDiscount'
 
 interface GroupRateConfig {
   groupId: number
@@ -206,6 +299,7 @@ interface GroupRateConfig {
   defaultRate: number
   discountMultiplier: number | null
   customRate: number | null
+  customDiscount: number | null
   isSelected: boolean
 }
 
@@ -217,8 +311,10 @@ const appStore = useAppStore()
 const groups = ref<Group[]>([])
 const groupConfigs = ref<GroupRateConfig[]>([])
 const originalGroupRates = ref<Record<number, number>>({}) // 记录原始专属倍率，用于检测删除
+const originalGroupDiscounts = ref<Record<number, number>>({}) // 记录原始专属折扣，用于检测删除
 const loading = ref(false)
 const submitting = ref(false)
+const bulkDiscountValue = ref<number | string>(8)
 
 // 分离专属分组和公开分组
 const exclusiveGroups = computed(() => groups.value.filter((g) => g.is_exclusive))
@@ -226,6 +322,27 @@ const publicGroups = computed(() => groups.value.filter((g) => !g.is_exclusive))
 
 const exclusiveGroupConfigs = computed(() => groupConfigs.value.filter((c) => c.isExclusive))
 const publicGroupConfigs = computed(() => groupConfigs.value.filter((c) => !c.isExclusive))
+const bulkDiscountTargets = computed(() =>
+  groupConfigs.value.filter((c) => !c.isExclusive || c.isSelected)
+)
+const bulkDiscountTargetCount = computed(() => bulkDiscountTargets.value.length)
+const bulkDiscountFactor = computed(() => {
+  const discount = Number(bulkDiscountValue.value)
+  if (!Number.isFinite(discount) || discount <= 0) return 0
+  return discount / 10
+})
+const bulkDiscountPreview = computed(() => {
+  const discount = Number(bulkDiscountValue.value)
+  const factor = bulkDiscountFactor.value
+  if (!Number.isFinite(discount) || discount <= 0 || factor <= 0) {
+    return t('admin.users.bulkDiscountInvalid')
+  }
+  return t('admin.users.bulkDiscountPreview', {
+    discount: formatRateMultiplier(discount),
+    factor: formatRateMultiplier(factor),
+    count: bulkDiscountTargetCount.value,
+  })
+})
 
 watch(
   () => props.show,
@@ -246,9 +363,11 @@ const load = async () => {
     // 初始化配置
     const userAllowedGroups = props.user?.allowed_groups || []
     const userGroupRates = props.user?.group_rates || {}
+    const userGroupDiscounts = props.user?.group_discounts || {}
 
     // 保存原始专属倍率，用于检测删除操作
     originalGroupRates.value = { ...userGroupRates }
+    originalGroupDiscounts.value = { ...userGroupDiscounts }
 
     groupConfigs.value = groups.value.map((g) => ({
       groupId: g.id,
@@ -258,6 +377,7 @@ const load = async () => {
       defaultRate: g.rate_multiplier,
       discountMultiplier: resolveGroupRateDiscount(g.id, g.rate_multiplier, appStore.cachedPublicSettings?.group_rate_discount ?? null)?.multiplier ?? null,
       customRate: userGroupRates[g.id] ?? null,
+      customDiscount: userGroupDiscounts[g.id] ?? null,
       // 专属分组：检查是否在 allowed_groups 中
       // 公开分组：始终选中
       isSelected: g.is_exclusive ? userAllowedGroups.includes(g.id) : true,
@@ -284,8 +404,65 @@ const updateCustomRate = (groupId: number, value: string) => {
     } else {
       const numValue = parseFloat(value)
       config.customRate = isNaN(numValue) ? null : numValue
+      if (config.customRate !== null) {
+        config.customDiscount = null
+      }
     }
   }
+}
+
+const clearCustomDiscount = (groupId: number) => {
+  const config = groupConfigs.value.find((c) => c.groupId === groupId)
+  if (config) {
+    config.customDiscount = null
+  }
+}
+
+const dynamicDiscountRate = (config: GroupRateConfig) => {
+  if (config.customDiscount === null) return config.defaultRate
+  return config.defaultRate * config.customDiscount
+}
+
+const validateBulkDiscount = () => {
+  const discount = Number(bulkDiscountValue.value)
+  if (!Number.isFinite(discount) || discount <= 0 || discount > 10) {
+    appStore.showError(t('admin.users.bulkDiscountInvalid'))
+    return null
+  }
+  if (bulkDiscountTargetCount.value === 0) {
+    appStore.showError(t('admin.users.bulkDiscountNoTargets'))
+    return null
+  }
+  return discount
+}
+
+const applyBulkDiscount = () => {
+  const discount = validateBulkDiscount()
+  if (discount === null) return
+
+  const factor = discount / 10
+  for (const config of bulkDiscountTargets.value) {
+    config.customDiscount = roundRateMultiplier(factor)
+    config.customRate = null
+  }
+  appStore.showSuccess(t('admin.users.bulkDiscountApplied', {
+    discount: formatRateMultiplier(discount),
+    count: bulkDiscountTargetCount.value,
+  }))
+}
+
+const clearBulkCustomRates = () => {
+  if (bulkDiscountTargetCount.value === 0) {
+    appStore.showError(t('admin.users.bulkDiscountNoTargets'))
+    return
+  }
+  for (const config of bulkDiscountTargets.value) {
+    config.customRate = null
+    config.customDiscount = null
+  }
+  appStore.showSuccess(t('admin.users.bulkDiscountCleared', {
+    count: bulkDiscountTargetCount.value,
+  }))
 }
 
 const handleSave = async () => {
@@ -296,25 +473,42 @@ const handleSave = async () => {
     // 构建 allowed_groups（仅包含专属分组中被勾选的）
     const allowedGroups = groupConfigs.value.filter((c) => c.isExclusive && c.isSelected).map((c) => c.groupId)
 
-    // 构建 group_rates
+    // 构建 group_rates/group_discounts
     // - 有新专属倍率: 设置为该值
     // - 原本有专属倍率但现在被清空: 设置为 null（表示删除）
+    // - 有专属折扣: 清空固定倍率并设置折扣，分组调价后自动跟随
     const groupRates: Record<number, number | null> = {}
+    const groupDiscounts: Record<number, number | null> = {}
     for (const c of groupConfigs.value) {
       const hadOriginalRate = originalGroupRates.value[c.groupId] !== undefined
+      const hadOriginalDiscount = originalGroupDiscounts.value[c.groupId] !== undefined
 
       if (c.customRate !== null) {
         // 有专属倍率
         groupRates[c.groupId] = c.customRate
+        if (hadOriginalDiscount) {
+          groupDiscounts[c.groupId] = null
+        }
+      } else if (c.customDiscount !== null) {
+        // 有专属折扣：必须清空固定倍率，否则后端会优先使用固定倍率
+        groupDiscounts[c.groupId] = c.customDiscount
+        if (hadOriginalRate) {
+          groupRates[c.groupId] = null
+        }
       } else if (hadOriginalRate) {
         // 原本有专属倍率，现在被清空，需要显式删除
         groupRates[c.groupId] = null
+      }
+
+      if (c.customDiscount === null && hadOriginalDiscount) {
+        groupDiscounts[c.groupId] = null
       }
     }
 
     await adminAPI.users.update(props.user.id, {
       allowed_groups: allowedGroups,
       group_rates: Object.keys(groupRates).length > 0 ? groupRates : undefined,
+      group_discounts: Object.keys(groupDiscounts).length > 0 ? groupDiscounts : undefined,
     })
 
     appStore.showSuccess(t('admin.users.groupConfigUpdated'))

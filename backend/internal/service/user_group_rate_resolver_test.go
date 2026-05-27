@@ -17,12 +17,15 @@ type userGroupRateResolverRepoStub struct {
 	calls int
 }
 
-func (s *userGroupRateResolverRepoStub) GetByUserAndGroup(ctx context.Context, userID, groupID int64) (*float64, error) {
+func (s *userGroupRateResolverRepoStub) GetRateConfigByUserAndGroup(ctx context.Context, userID, groupID int64) (*UserGroupRateConfig, error) {
 	s.calls++
 	if s.err != nil {
 		return nil, s.err
 	}
-	return s.rate, nil
+	if s.rate == nil {
+		return nil, nil
+	}
+	return &UserGroupRateConfig{RateMultiplier: s.rate}, nil
 }
 
 func TestNewUserGroupRateResolver_Defaults(t *testing.T) {
@@ -50,14 +53,14 @@ func TestUserGroupRateResolverResolve_InvalidCacheEntryLoadsRepoAndCaches(t *tes
 	rate := 1.7
 	repo := &userGroupRateResolverRepoStub{rate: &rate}
 	cache := gocache.New(time.Minute, time.Minute)
-	cache.Set("101:202", "bad-cache", time.Minute)
+	cache.Set("101:202:1.2", "bad-cache", time.Minute)
 	resolver := newUserGroupRateResolver(repo, cache, time.Minute, nil, "service.test")
 
 	got := resolver.Resolve(context.Background(), 101, 202, 1.2)
 	require.Equal(t, rate, got)
 	require.Equal(t, 1, repo.calls)
 
-	cached, ok := cache.Get("101:202")
+	cached, ok := cache.Get("101:202:1.2")
 	require.True(t, ok)
 	require.Equal(t, rate, cached)
 

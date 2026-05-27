@@ -119,12 +119,15 @@ type openAIUserGroupRateRepoStub struct {
 	calls int
 }
 
-func (s *openAIUserGroupRateRepoStub) GetByUserAndGroup(ctx context.Context, userID, groupID int64) (*float64, error) {
+func (s *openAIUserGroupRateRepoStub) GetRateConfigByUserAndGroup(ctx context.Context, userID, groupID int64) (*UserGroupRateConfig, error) {
 	s.calls++
 	if s.err != nil {
 		return nil, s.err
 	}
-	return s.rate, nil
+	if s.rate == nil {
+		return nil, nil
+	}
+	return &UserGroupRateConfig{RateMultiplier: s.rate}, nil
 }
 
 type openAIRecordUsageSettingRepoStub struct {

@@ -105,6 +105,8 @@ export interface AdminUser extends User {
   last_used_at?: string | null
   // 用户专属分组倍率配置 (group_id -> rate_multiplier)
   group_rates?: Record<number, number>
+  // 用户专属分组折扣配置 (group_id -> discount_multiplier)，0.8 表示当前分组倍率的 8 折
+  group_discounts?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）
   current_concurrency?: number
 }
@@ -1753,6 +1755,9 @@ export interface UpdateUserRequest {
   // 用户专属分组倍率配置 (group_id -> rate_multiplier | null)
   // null 表示删除该分组的专属倍率
   group_rates?: Record<number, number | null>
+  // 用户专属分组折扣配置 (group_id -> discount_multiplier | null)
+  // null 表示删除该分组的专属折扣
+  group_discounts?: Record<number, number | null>
 }
 
 export interface ChangePasswordRequest {

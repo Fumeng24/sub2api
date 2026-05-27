@@ -204,27 +204,7 @@ func (r *ticketRepository) UnreadSummary(ctx context.Context, userID *int64, act
 	if len(filters) > 0 {
 		q = applyTicketListFilters(q, filters[0])
 	}
-	q = q.Where(predicate.Ticket(func(s *entsql.Selector) {
-		s.Where(entsql.ExprP(
-			`EXISTS (
-				SELECT 1
-				FROM ticket_messages m
-				LEFT JOIN ticket_reads r
-					ON r.ticket_id = m.ticket_id
-					AND r.actor_type = ?
-					AND r.actor_id = ?
-				WHERE m.ticket_id = `+s.C(ticket.FieldID)+`
-					AND (?::boolean OR m.visibility = 'public')
-					AND (m.sender_id IS NULL OR m.sender_type <> ? OR m.sender_id <> ?)
-					AND m.id > COALESCE(r.last_read_message_id, 0)
-			)`,
-			actorType,
-			actorID,
-			includeInternal,
-			actorType,
-			actorID,
-		))
-	}))
+	q = q.Where(ticketUnreadPredicate(actorType, actorID, includeInternal))
 
 	var rows []struct {
 		Status string `json:"status"`
@@ -589,32 +569,31 @@ func applyTicketListFilters(q *dbent.TicketQuery, filters service.TicketListFilt
 		))
 	}
 	if filters.UnreadOnly && filters.ReadActorID > 0 {
-		actorType := filters.ReadActorType
-		actorID := filters.ReadActorID
-		includeInternal := filters.IncludeInternal
-		q = q.Where(predicate.Ticket(func(s *entsql.Selector) {
-			s.Where(entsql.ExprP(
-				`EXISTS (
-					SELECT 1
-					FROM ticket_messages m
-					LEFT JOIN ticket_reads r
-						ON r.ticket_id = m.ticket_id
-						AND r.actor_type = ?
-						AND r.actor_id = ?
-					WHERE m.ticket_id = `+s.C(ticket.FieldID)+`
-						AND (?::boolean OR m.visibility = 'public')
-						AND (m.sender_id IS NULL OR m.sender_type <> ? OR m.sender_id <> ?)
-						AND m.id > COALESCE(r.last_read_message_id, 0)
-				)`,
-				actorType,
-				actorID,
-				includeInternal,
-				actorType,
-				actorID,
-			))
-		}))
+		q = q.Where(ticketUnreadPredicate(filters.ReadActorType, filters.ReadActorID, filters.IncludeInternal))
 	}
 	return q
+}
+
+func ticketUnreadPredicate(actorType string, actorID int64, includeInternal bool) predicate.Ticket {
+	return predicate.Ticket(func(s *entsql.Selector) {
+		s.Where(entsql.P(func(b *entsql.Builder) {
+			b.WriteString("EXISTS (SELECT 1 FROM ticket_messages m LEFT JOIN ticket_reads r ON r.ticket_id = m.ticket_id AND r.actor_type = ")
+			b.Arg(actorType)
+			b.WriteString(" AND r.actor_id = ")
+			b.Arg(actorID)
+			b.WriteString(" WHERE m.ticket_id = ")
+			b.WriteString(s.C(ticket.FieldID))
+			b.WriteString(" AND (")
+			b.Arg(includeInternal)
+			b.WriteString(" OR m.visibility = ")
+			b.Arg(service.TicketMessageVisibilityPublic)
+			b.WriteString(") AND (m.sender_id IS NULL OR m.sender_type <> ")
+			b.Arg(actorType)
+			b.WriteString(" OR m.sender_id <> ")
+			b.Arg(actorID)
+			b.WriteString(") AND m.id > COALESCE(r.last_read_message_id, 0))")
+		}))
+	})
 }
 
 func listTickets(ctx context.Context, q *dbent.TicketQuery, params pagination.PaginationParams) ([]service.Ticket, *pagination.PaginationResult, error) {

@@ -794,12 +794,12 @@ func (s *APIKeyService) SearchAPIKeys(ctx context.Context, userID int64, keyword
 }
 
 // GetUserGroupRates 获取用户的专属分组倍率配置
-// 返回 map[groupID]rateMultiplier
+// 返回 map[groupID]effectiveRateMultiplier
 func (s *APIKeyService) GetUserGroupRates(ctx context.Context, userID int64) (map[int64]float64, error) {
 	if s.userGroupRateRepo == nil {
 		return nil, nil
 	}
-	rates, err := s.userGroupRateRepo.GetByUserID(ctx, userID)
+	rates, err := s.userGroupRateRepo.GetEffectiveByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user group rates: %w", err)
 	}

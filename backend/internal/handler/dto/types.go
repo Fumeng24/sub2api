@@ -45,6 +45,9 @@ type AdminUser struct {
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]rateMultiplier
 	GroupRates map[int64]float64 `json:"group_rates,omitempty"`
+	// GroupDiscounts 用户专属分组折扣配置
+	// map[groupID]discountMultiplier，0.8 表示当前分组倍率的 8 折
+	GroupDiscounts map[int64]float64 `json:"group_discounts,omitempty"`
 }
 
 type APIKey struct {
