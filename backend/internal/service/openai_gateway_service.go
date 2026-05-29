@@ -1341,33 +1341,6 @@ func isOpenAIAccountEligibleForRequest(ctx context.Context, account *Account, re
 	return true
 }
 
-// prioritizeOpenAICompactAccounts re-orders a slice so that accounts with known
-// compact support are tried first, followed by unknown, then explicitly unsupported.
-// The relative order within each tier is preserved.
-func prioritizeOpenAICompactAccounts(accounts []*Account) []*Account {
-	if len(accounts) == 0 {
-		return nil
-	}
-	supported := make([]*Account, 0, len(accounts))
-	unknown := make([]*Account, 0, len(accounts))
-	unsupported := make([]*Account, 0, len(accounts))
-	for _, account := range accounts {
-		switch openAICompactSupportTier(account) {
-		case 2:
-			supported = append(supported, account)
-		case 1:
-			unknown = append(unknown, account)
-		default:
-			unsupported = append(unsupported, account)
-		}
-	}
-	out := make([]*Account, 0, len(accounts))
-	out = append(out, supported...)
-	out = append(out, unknown...)
-	out = append(out, unsupported...)
-	return out
-}
-
 func orderOpenAISchedulerScoresForCompact(scores []schedulerAccountScore, includeUnsupported bool) []schedulerAccountScore {
 	if len(scores) == 0 {
 		return nil
@@ -1609,39 +1582,6 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 		}
 	}
 	return nil, compactBlocked
-}
-
-// isBetterAccount 判断 candidate 是否比 current 更优。
-// 规则：优先级更高（数值更小）优先；同优先级时，未使用过的优先，其次是最久未使用的。
-//
-// isBetterAccount checks if candidate is better than current.
-// Rules: higher priority (lower value) wins; same priority: never used > least recently used.
-func (s *OpenAIGatewayService) isBetterAccount(candidate, current *Account) bool {
-	// 优先级更高（数值更小）
-	// Higher priority (lower value)
-	if candidate.Priority < current.Priority {
-		return true
-	}
-	if candidate.Priority > current.Priority {
-		return false
-	}
-
-	// 同优先级，比较最后使用时间
-	// Same priority, compare last used time
-	switch {
-	case candidate.LastUsedAt == nil && current.LastUsedAt != nil:
-		// candidate 从未使用，优先
-		return true
-	case candidate.LastUsedAt != nil && current.LastUsedAt == nil:
-		// current 从未使用，保持
-		return false
-	case candidate.LastUsedAt == nil && current.LastUsedAt == nil:
-		// 都未使用，保持
-		return false
-	default:
-		// 都使用过，选择最久未使用的
-		return candidate.LastUsedAt.Before(*current.LastUsedAt)
-	}
 }
 
 // SelectAccountWithLoadAwareness selects an account with load-awareness and wait plan.

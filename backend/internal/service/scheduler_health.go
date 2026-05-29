@@ -124,13 +124,6 @@ func (s *accountSchedulerHealthStats) loadOrCreate(key accountSchedulerHealthKey
 	return entry
 }
 
-func (s *accountSchedulerHealthStats) size() int {
-	if s == nil {
-		return 0
-	}
-	return int(s.count.Load())
-}
-
 func (s *accountSchedulerHealthStats) snapshot(accountID int64, model, endpoint string, allowHalfOpen bool) schedulerHealthSnapshot {
 	key := makeAccountSchedulerHealthKey(accountID, model, endpoint)
 	snap := schedulerHealthSnapshot{
@@ -268,7 +261,7 @@ func (s *accountSchedulerHealthStats) reportFailure(accountID int64, model, endp
 }
 
 func (e *accountSchedulerHealthEntry) recordRecent(failed bool) {
-	if e.recent == nil || len(e.recent) == 0 {
+	if len(e.recent) == 0 {
 		e.recent = make([]bool, 20)
 	}
 	e.recent[e.recentPos] = failed
