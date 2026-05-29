@@ -1242,6 +1242,13 @@ func TestOpenAIResponsesWebSocket_FailoverOnUpstreamUsageLimitEvent(t *testing.T
 				"openai_apikey_responses_websockets_v2_enabled": true,
 				"openai_apikey_responses_websockets_v2_mode":    service.OpenAIWSIngressModePassthrough,
 			},
+			AccountGroups: []service.AccountGroup{{
+				AccountID: 9902,
+				GroupID:   groupID,
+				Role:      service.AccountGroupRolePrimary,
+				Weight:    100,
+				SortOrder: 1,
+			}},
 		},
 		{
 			ID:          9903,
@@ -1260,6 +1267,13 @@ func TestOpenAIResponsesWebSocket_FailoverOnUpstreamUsageLimitEvent(t *testing.T
 				"openai_apikey_responses_websockets_v2_enabled": true,
 				"openai_apikey_responses_websockets_v2_mode":    service.OpenAIWSIngressModePassthrough,
 			},
+			AccountGroups: []service.AccountGroup{{
+				AccountID: 9903,
+				GroupID:   groupID,
+				Role:      service.AccountGroupRoleBackup,
+				Weight:    100,
+				SortOrder: 2,
+			}},
 		},
 	}
 

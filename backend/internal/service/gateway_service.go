@@ -568,6 +568,33 @@ func (s *GatewayService) TempUnscheduleRetryableError(ctx context.Context, accou
 	}
 }
 
+func (s *GatewayService) ReportAccountScheduleSuccess(accountID int64, model, endpoint string, firstTokenMs *int) {
+	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
+		return
+	}
+	s.schedulerHealth.reportSuccess(accountID, model, endpoint, firstTokenMs)
+}
+
+func (s *GatewayService) ReportAccountScheduleFailure(ctx context.Context, accountID int64, model, endpoint string, failoverErr *UpstreamFailoverError) {
+	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
+		return
+	}
+	statusCode := 0
+	var body []byte
+	var headers http.Header
+	if failoverErr != nil {
+		statusCode = failoverErr.StatusCode
+		body = failoverErr.ResponseBody
+		headers = failoverErr.ResponseHeaders
+	}
+	category := schedulerFailureCategory(statusCode, body)
+	cooldown := schedulerCooldownForCategory(category, headers)
+	s.schedulerHealth.reportFailure(accountID, model, endpoint, category, cooldown)
+	if ctxEndpoint := schedulerEndpointFromContext(ctx, ""); ctxEndpoint != "" && !strings.EqualFold(ctxEndpoint, endpoint) {
+		s.schedulerHealth.reportFailure(accountID, model, ctxEndpoint, category, cooldown)
+	}
+}
+
 // GatewayService handles API gateway operations
 type GatewayService struct {
 	accountRepo           AccountRepository
@@ -607,6 +634,7 @@ type GatewayService struct {
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	schedulerHealth       *accountSchedulerHealthStats
 }
 
 // NewGatewayService creates a new GatewayService
@@ -676,6 +704,7 @@ func NewGatewayService(
 		resolver:              resolver,
 		balanceNotifyService:  balanceNotifyService,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
+		schedulerHealth:       newAccountSchedulerHealthStats(),
 	}
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		userGroupRateRepo,
@@ -1564,6 +1593,8 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		return nil, err
 	}
 	preferOAuth := platform == PlatformGemini
+	schedulerEndpoint := schedulerEndpointFromContext(ctx, platform)
+	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	if s.debugModelRoutingEnabled() && platform == PlatformAnthropic && requestedModel != "" {
 		logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] load-aware enabled: group_id=%v model=%s session=%s platform=%s", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), platform)
 	}
@@ -1617,7 +1648,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	if len(routingAccountIDs) > 0 && s.concurrencyService != nil {
 		// 1. 过滤出路由列表中可调度的账号
 		var routingCandidates []*Account
-		var filteredExcluded, filteredMissing, filteredUnsched, filteredPlatform, filteredModelScope, filteredModelMapping, filteredWindowCost int
+		var filteredExcluded, filteredMissing, filteredUnsched, filteredPlatform, filteredModelScope, filteredModelMapping, filteredWindowCost, filteredHealth int
 		var modelScopeSkippedIDs []int64 // 记录因模型限流被跳过的账号 ID
 		for _, routingAccountID := range routingAccountIDs {
 			if isExcluded(routingAccountID) {
@@ -1659,13 +1690,20 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			if !s.isAccountSchedulableForRPM(ctx, account, false) {
 				continue
 			}
+			if needsUpstreamCheck && groupID != nil && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel) {
+				continue
+			}
+			if !s.isGatewayAccountSchedulerHealthCandidateAllowed(account.ID, requestedModel, schedulerEndpoint) {
+				filteredHealth++
+				continue
+			}
 			routingCandidates = append(routingCandidates, account)
 		}
 
 		if s.debugModelRoutingEnabled() {
-			logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routed candidates: group_id=%v model=%s routed=%d candidates=%d filtered(excluded=%d missing=%d unsched=%d platform=%d model_scope=%d model_mapping=%d window_cost=%d)",
+			logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routed candidates: group_id=%v model=%s routed=%d candidates=%d filtered(excluded=%d missing=%d unsched=%d platform=%d model_scope=%d model_mapping=%d window_cost=%d health=%d)",
 				derefGroupID(groupID), requestedModel, len(routingAccountIDs), len(routingCandidates),
-				filteredExcluded, filteredMissing, filteredUnsched, filteredPlatform, filteredModelScope, filteredModelMapping, filteredWindowCost)
+				filteredExcluded, filteredMissing, filteredUnsched, filteredPlatform, filteredModelScope, filteredModelMapping, filteredWindowCost, filteredHealth)
 			if len(modelScopeSkippedIDs) > 0 {
 				logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] model_rate_limited accounts skipped: group_id=%v model=%s account_ids=%v",
 					derefGroupID(groupID), requestedModel, modelScopeSkippedIDs)
@@ -1689,10 +1727,13 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 						gatePass := s.isAccountSchedulableForSelection(stickyAccount) &&
 							s.isAccountAllowedForPlatform(stickyAccount, platform, useMixed) &&
+							(group == nil || !group.RequirePrivacySet || stickyAccount.IsPrivacySet()) &&
 							(requestedModel == "" || s.isModelSupportedByAccountWithContext(ctx, stickyAccount, requestedModel)) &&
 							s.isAccountSchedulableForModelSelection(ctx, stickyAccount, requestedModel) &&
 							s.isAccountSchedulableForQuota(stickyAccount) &&
-							s.isAccountSchedulableForWindowCost(ctx, stickyAccount, true)
+							s.isAccountSchedulableForWindowCost(ctx, stickyAccount, true) &&
+							(!needsUpstreamCheck || groupID == nil || !s.isUpstreamModelRestrictedByChannel(ctx, *groupID, stickyAccount, requestedModel)) &&
+							s.isGatewayAccountSchedulerHealthAllowed(stickyAccount.ID, requestedModel, schedulerEndpoint)
 
 						rpmPass := gatePass && s.isAccountSchedulableForRPM(ctx, stickyAccount, true)
 
@@ -1771,72 +1812,46 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			}
 			routingLoadMap, _ := s.concurrencyService.GetAccountsLoadBatch(ctx, routingLoads)
 
-			// 3. 按负载感知排序
-			var routingAvailable []accountWithLoad
-			for _, acc := range routingCandidates {
-				loadInfo := routingLoadMap[acc.ID]
-				if loadInfo == nil {
-					loadInfo = &AccountLoadInfo{AccountID: acc.ID}
-				}
-				if loadInfo.LoadRate < 100 {
-					routingAvailable = append(routingAvailable, accountWithLoad{account: acc, loadInfo: loadInfo})
-				}
-			}
-
-			if len(routingAvailable) > 0 {
-				// 排序：优先级 > 负载率 > 最后使用时间
-				sort.SliceStable(routingAvailable, func(i, j int) bool {
-					a, b := routingAvailable[i], routingAvailable[j]
-					if a.account.Priority != b.account.Priority {
-						return a.account.Priority < b.account.Priority
+			routingOrder := s.orderGatewaySchedulerCandidates(routingCandidates, groupID, requestedModel, schedulerEndpoint, routingLoadMap, preferOAuth, sessionHash, "routing")
+			if len(routingOrder) > 0 {
+				for _, item := range routingOrder {
+					acc := item.Account
+					if acc == nil {
+						continue
 					}
-					if a.loadInfo.LoadRate != b.loadInfo.LoadRate {
-						return a.loadInfo.LoadRate < b.loadInfo.LoadRate
-					}
-					switch {
-					case a.account.LastUsedAt == nil && b.account.LastUsedAt != nil:
-						return true
-					case a.account.LastUsedAt != nil && b.account.LastUsedAt == nil:
-						return false
-					case a.account.LastUsedAt == nil && b.account.LastUsedAt == nil:
-						return false
-					default:
-						return a.account.LastUsedAt.Before(*b.account.LastUsedAt)
-					}
-				})
-				shuffleWithinSortGroups(routingAvailable)
-
-				// 4. 尝试获取槽位
-				for _, item := range routingAvailable {
-					result, err := s.tryAcquireAccountSlot(ctx, item.account.ID, item.account.Concurrency)
+					result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
 					if err == nil && result.Acquired {
 						// 会话数量限制检查
-						if !s.checkAndRegisterSession(ctx, item.account, sessionHash) {
+						if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
 							result.ReleaseFunc() // 释放槽位，继续尝试下一个账号
 							continue
 						}
 						if sessionHash != "" && s.cache != nil {
-							_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, item.account.ID, stickySessionTTL)
+							_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, acc.ID, stickySessionTTL)
 						}
 						if s.debugModelRoutingEnabled() {
-							logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routed select: group_id=%v model=%s session=%s account=%d", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), item.account.ID)
+							logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routed select: group_id=%v model=%s session=%s account=%d", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), acc.ID)
 						}
-						return s.newSelectionResult(ctx, item.account, true, result.ReleaseFunc, nil)
+						return s.newSelectionResult(ctx, acc, true, result.ReleaseFunc, nil)
 					}
 				}
 
-				// 5. 所有路由账号槽位满，尝试返回等待计划（选择负载最低的）
-				// 遍历找到第一个满足会话限制的账号
-				for _, item := range routingAvailable {
-					if !s.checkAndRegisterSession(ctx, item.account, sessionHash) {
+				waitScores := buildSchedulerAccountWaitScores(routingCandidates, groupID, requestedModel, schedulerEndpoint, routingLoadMap, s.schedulerHealth)
+				waitOrder := buildRoleAwareSchedulerOrder(waitScores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "routing_wait")
+				for _, item := range waitOrder {
+					acc := item.Account
+					if acc == nil {
+						continue
+					}
+					if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
 						continue // 会话限制已满，尝试下一个
 					}
 					if s.debugModelRoutingEnabled() {
-						logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routed wait: group_id=%v model=%s session=%s account=%d", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), item.account.ID)
+						logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routed wait: group_id=%v model=%s session=%s account=%d", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), acc.ID)
 					}
-					return s.newSelectionResult(ctx, item.account, false, nil, &AccountWaitPlan{
-						AccountID:      item.account.ID,
-						MaxConcurrency: item.account.Concurrency,
+					return s.newSelectionResult(ctx, acc, false, nil, &AccountWaitPlan{
+						AccountID:      acc.ID,
+						MaxConcurrency: acc.Concurrency,
 						Timeout:        cfg.StickySessionWaitTimeout,
 						MaxWaiting:     cfg.StickySessionMaxWaiting,
 					})
@@ -1869,12 +1884,15 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 				// accounts 列表构建，账号一定在分组内。而 scheduler snapshot 缓存
 				// 反序列化后 AccountGroups 字段为空，导致 isAccountInGroup 永远返回 false。
 				platformOK := s.isAccountAllowedForPlatform(account, platform, useMixed)
+				privacyOK := group == nil || !group.RequirePrivacySet || account.IsPrivacySet()
 				modelSupported := requestedModel == "" || s.isModelSupportedByAccountWithContext(ctx, account, requestedModel)
 				modelSchedulable := s.isAccountSchedulableForModelSelection(ctx, account, requestedModel)
 				quotaOK := s.isAccountSchedulableForQuota(account)
 				windowCostOK := s.isAccountSchedulableForWindowCost(ctx, account, true)
 				rpmOK := s.isAccountSchedulableForRPM(ctx, account, true)
 				schedulable := s.isAccountSchedulableForSelection(account)
+				upstreamOK := !needsUpstreamCheck || groupID == nil || !s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel)
+				healthOK := s.isGatewayAccountSchedulerHealthAllowed(account.ID, requestedModel, schedulerEndpoint)
 
 				slog.Debug("sticky.layer1_5_no_routing_checks",
 					"account_id", accountID,
@@ -1882,14 +1900,17 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					"clear_sticky", clearSticky,
 					"schedulable", schedulable,
 					"platform_ok", platformOK,
+					"privacy_ok", privacyOK,
 					"model_supported", modelSupported,
 					"model_schedulable", modelSchedulable,
 					"quota_ok", quotaOK,
 					"window_cost_ok", windowCostOK,
 					"rpm_ok", rpmOK,
+					"upstream_ok", upstreamOK,
+					"health_ok", healthOK,
 				)
 
-				if !clearSticky && platformOK && modelSupported && modelSchedulable && quotaOK && windowCostOK && rpmOK && schedulable {
+				if !clearSticky && platformOK && privacyOK && modelSupported && modelSchedulable && quotaOK && windowCostOK && rpmOK && schedulable && upstreamOK && healthOK {
 					result, err := s.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
 					if err == nil && result.Acquired {
 						// 会话数量限制检查
@@ -1978,31 +1999,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		if isExcluded(acc.ID) {
 			continue
 		}
-		// Scheduler snapshots can be temporarily stale (bucket rebuild is throttled);
-		// re-check schedulability here so recently rate-limited/overloaded accounts
-		// are not selected again before the bucket is rebuilt.
-		if !s.isAccountSchedulableForSelection(acc) {
-			continue
-		}
-		if !s.isAccountAllowedForPlatform(acc, platform, useMixed) {
-			continue
-		}
-		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
-			continue
-		}
-		if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
-			continue
-		}
-		// 配额检查
-		if !s.isAccountSchedulableForQuota(acc) {
-			continue
-		}
-		// 窗口费用检查（非粘性会话路径）
-		if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
-			continue
-		}
-		// RPM 检查（非粘性会话路径）
-		if !s.isAccountSchedulableForRPM(ctx, acc, false) {
+		if !s.isGatewayAccountStaticEligibleForSelection(ctx, acc, groupID, requestedModel, platform, useMixed, group, needsUpstreamCheck, false, schedulerEndpoint) {
 			continue
 		}
 		candidates = append(candidates, acc)
@@ -2010,76 +2007,6 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 	if len(candidates) == 0 {
 		return nil, ErrNoAvailableAccounts
-	}
-
-	// Layer 2a: 候选池快速获取（如果启用）
-	if s.slotPoolService != nil && s.slotPoolService.IsEnabled() {
-		// 构造 bucket（与 scheduler snapshot 一致）
-		bucketMode := SchedulerModeSingle
-		if hasForcePlatform {
-			bucketMode = SchedulerModeForced
-		} else if useMixed {
-			bucketMode = SchedulerModeMixed
-		}
-		// 简单模式下 groupID 统一归 0
-		bucketGroupID := derefGroupID(groupID)
-		if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-			bucketGroupID = 0
-		}
-		bucket := SchedulerBucket{
-			GroupID:  bucketGroupID,
-			Platform: platform,
-			Mode:     bucketMode,
-		}
-
-		// 构造候选集 map
-		candidateMap := make(map[int64]*Account, len(candidates))
-		for _, acc := range candidates {
-			candidateMap[acc.ID] = acc
-		}
-
-		// 生成 requestID 供 SlotPool 使用
-		requestID := generateRequestID()
-
-		accountID, acquired, err := s.slotPoolService.AcquireFromPool(ctx, bucket, candidateMap, requestID)
-		if err != nil {
-			// 根据配置决定是否降级
-			if !s.cfg.Gateway.Scheduling.SlotPool.FallbackOnError {
-				return nil, fmt.Errorf("slot pool error: %w", err)
-			}
-			// 降级到 load-batch，继续执行
-			slog.Warn("[SlotPool] failed, falling back to load-batch", "error", err)
-		} else if acquired {
-			account := candidateMap[accountID]
-			// 会话数量限制检查
-			if !s.checkAndRegisterSession(ctx, account, sessionHash) {
-				// 释放槽位，通知 SlotPool 可能需要回填
-				bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				_ = s.concurrencyService.cache.ReleaseAccountSlot(bgCtx, accountID, requestID)
-				_ = s.slotPoolService.OnSlotReleased(bgCtx, accountID)
-				// 继续到 load-batch 逻辑
-			} else {
-				if sessionHash != "" && s.cache != nil {
-					_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, accountID, stickySessionTTL)
-				}
-				hydrated, err := s.hydrateSelectedAccount(ctx, account)
-				if err != nil {
-					return nil, err
-				}
-				return &AccountSelectionResult{
-					Account:  hydrated,
-					Acquired: true,
-					ReleaseFunc: func() {
-						bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-						defer cancel()
-						_ = s.concurrencyService.cache.ReleaseAccountSlot(bgCtx, accountID, requestID)
-						_ = s.slotPoolService.OnSlotReleased(bgCtx, accountID)
-					},
-				}, nil
-			}
-		}
-		// 池空或重试耗尽，降级到 load-batch 逻辑
 	}
 
 	accountLoads := make([]AccountWithConcurrency, 0, len(candidates))
@@ -2092,66 +2019,39 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 	loadMap, err := s.concurrencyService.GetAccountsLoadBatch(ctx, accountLoads)
 	if err != nil {
-		if result, ok, legacyErr := s.tryAcquireByLegacyOrder(ctx, candidates, groupID, sessionHash, preferOAuth); legacyErr != nil {
+		if result, ok, legacyErr := s.tryAcquireByLegacyOrder(ctx, candidates, groupID, sessionHash, preferOAuth, requestedModel, schedulerEndpoint); legacyErr != nil {
 			return nil, legacyErr
 		} else if ok {
 			return result, nil
 		}
 	} else {
-		var available []accountWithLoad
-		for _, acc := range candidates {
-			loadInfo := loadMap[acc.ID]
-			if loadInfo == nil {
-				loadInfo = &AccountLoadInfo{AccountID: acc.ID}
-			}
-			if loadInfo.LoadRate < 100 {
-				available = append(available, accountWithLoad{
-					account:  acc,
-					loadInfo: loadInfo,
-				})
-			}
-		}
-
-		// 分层过滤选择：优先级 → 负载率 → LRU
-		for len(available) > 0 {
-			// 1. 取优先级最小的集合
-			candidates := filterByMinPriority(available)
-			// 2. 取负载率最低的集合
-			candidates = filterByMinLoadRate(candidates)
-			// 3. LRU 选择最久未用的账号
-			selected := selectByLRU(candidates, preferOAuth)
-			if selected == nil {
-				break
-			}
-
-			result, err := s.tryAcquireAccountSlot(ctx, selected.account.ID, selected.account.Concurrency)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
+		selectionOrder := buildRoleAwareSchedulerOrder(scores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash)
+		for _, item := range selectionOrder {
+			acc := item.Account
+			result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
 			if err == nil && result.Acquired {
 				// 会话数量限制检查
-				if !s.checkAndRegisterSession(ctx, selected.account, sessionHash) {
+				if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
 					result.ReleaseFunc() // 释放槽位，继续尝试下一个账号
 				} else {
 					if sessionHash != "" && s.cache != nil {
-						_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.account.ID, stickySessionTTL)
+						_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, acc.ID, stickySessionTTL)
 					}
-					return s.newSelectionResult(ctx, selected.account, true, result.ReleaseFunc, nil)
+					return s.newSelectionResult(ctx, acc, true, result.ReleaseFunc, nil)
 				}
 			}
-
-			// 移除已尝试的账号，重新进行分层过滤
-			selectedID := selected.account.ID
-			newAvailable := make([]accountWithLoad, 0, len(available)-1)
-			for _, acc := range available {
-				if acc.account.ID != selectedID {
-					newAvailable = append(newAvailable, acc)
-				}
-			}
-			available = newAvailable
 		}
 	}
 
 	// ============ Layer 3: 兜底排队 ============
-	s.sortCandidatesForFallback(candidates, preferOAuth, cfg.FallbackSelectionMode)
-	for _, acc := range candidates {
+	if loadMap == nil {
+		loadMap = make(map[int64]*AccountLoadInfo)
+	}
+	waitScores := buildSchedulerAccountWaitScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth)
+	waitOrder := buildRoleAwareSchedulerOrder(waitScores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, "wait")
+	for _, item := range waitOrder {
+		acc := item.Account
 		// 会话数量限制检查（等待计划也需要占用会话配额）
 		if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
 			continue // 会话限制已满，尝试下一个账号
@@ -2166,11 +2066,12 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	return nil, ErrNoAvailableAccounts
 }
 
-func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates []*Account, groupID *int64, sessionHash string, preferOAuth bool) (*AccountSelectionResult, bool, error) {
-	ordered := append([]*Account(nil), candidates...)
-	sortAccountsByPriorityAndLastUsed(ordered, preferOAuth)
+func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates []*Account, groupID *int64, sessionHash string, preferOAuth bool, requestedModel string, schedulerEndpoint string) (*AccountSelectionResult, bool, error) {
+	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, true)
+	ordered := buildRoleAwareSchedulerOrder(scores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "legacy")
 
-	for _, acc := range ordered {
+	for _, item := range ordered {
+		acc := item.Account
 		result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
 		if err == nil && result.Acquired {
 			// 会话数量限制检查
@@ -2477,6 +2378,107 @@ func (s *GatewayService) isAccountSchedulableForModelSelection(ctx context.Conte
 		return false
 	}
 	return account.IsSchedulableForModelWithContext(ctx, requestedModel)
+}
+
+func (s *GatewayService) isGatewayAccountSchedulerHealthAllowed(accountID int64, model, endpoint string) bool {
+	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
+		return true
+	}
+	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, false)
+	return snap.CircuitState == schedulerCircuitClosed
+}
+
+func (s *GatewayService) isGatewayAccountSchedulerHealthCandidateAllowed(accountID int64, model, endpoint string) bool {
+	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
+		return true
+	}
+	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, false)
+	return snap.CircuitState != schedulerCircuitOpen
+}
+
+func (s *GatewayService) isGatewayAccountStaticEligibleForSelection(
+	ctx context.Context,
+	account *Account,
+	groupID *int64,
+	requestedModel string,
+	platform string,
+	useMixed bool,
+	schedGroup *Group,
+	needsUpstreamCheck bool,
+	isSticky bool,
+	schedulerEndpoint string,
+) bool {
+	if !s.isAccountSchedulableForSelection(account) {
+		return false
+	}
+	if !s.isAccountAllowedForPlatform(account, platform, useMixed) {
+		return false
+	}
+	if schedGroup != nil && schedGroup.RequirePrivacySet && !account.IsPrivacySet() {
+		if s.accountRepo != nil {
+			_ = s.accountRepo.SetError(ctx, account.ID, fmt.Sprintf("Privacy not set, required by group [%s]", schedGroup.Name))
+		}
+		return false
+	}
+	if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, account, requestedModel) {
+		return false
+	}
+	if needsUpstreamCheck && groupID != nil && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel) {
+		return false
+	}
+	if !s.isAccountSchedulableForModelSelection(ctx, account, requestedModel) {
+		return false
+	}
+	if !s.isAccountSchedulableForQuota(account) {
+		return false
+	}
+	if !s.isAccountSchedulableForWindowCost(ctx, account, isSticky) {
+		return false
+	}
+	if !s.isAccountSchedulableForRPM(ctx, account, isSticky) {
+		return false
+	}
+	if isSticky && !s.isGatewayAccountSchedulerHealthAllowed(account.ID, requestedModel, schedulerEndpoint) {
+		return false
+	}
+	if !isSticky && !s.isGatewayAccountSchedulerHealthCandidateAllowed(account.ID, requestedModel, schedulerEndpoint) {
+		return false
+	}
+	return true
+}
+
+func (s *GatewayService) orderGatewaySchedulerCandidates(
+	accounts []*Account,
+	groupID *int64,
+	requestedModel string,
+	schedulerEndpoint string,
+	loadMap map[int64]*AccountLoadInfo,
+	preferOAuth bool,
+	seedParts ...string,
+) []schedulerAccountScore {
+	scores := buildSchedulerAccountScores(accounts, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
+	return buildRoleAwareSchedulerOrder(scores, preferOAuth, append([]string{
+		strconv.FormatInt(derefGroupID(groupID), 10),
+		requestedModel,
+		schedulerEndpoint,
+	}, seedParts...)...)
+}
+
+func (s *GatewayService) selectFirstGatewaySchedulerAccount(
+	accounts []*Account,
+	groupID *int64,
+	requestedModel string,
+	schedulerEndpoint string,
+	preferOAuth bool,
+	seedParts ...string,
+) *Account {
+	order := s.orderGatewaySchedulerCandidates(accounts, groupID, requestedModel, schedulerEndpoint, nil, preferOAuth, seedParts...)
+	for _, item := range order {
+		if item.Account != nil {
+			return item.Account
+		}
+	}
+	return nil
 }
 
 // isAccountInGroup checks if the account belongs to the specified group.
@@ -3114,6 +3116,8 @@ func shuffleWithinPriority(accounts []*Account) {
 // selectAccountForModelWithPlatform 选择单平台账户（完全隔离）
 func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, platform string) (*Account, error) {
 	preferOAuth := platform == PlatformGemini
+	schedulerEndpoint := schedulerEndpointFromContext(ctx, platform)
+	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	routingAccountIDs := s.routingAccountIDsForRequest(ctx, groupID, requestedModel, platform)
 
 	// require_privacy_set: 获取分组信息
@@ -3124,6 +3128,31 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 
 	var accounts []*Account
 	accountsLoaded := false
+	forcePlatform, hasForcePlatform := ctx.Value(ctxkey.ForcePlatform).(string)
+	if hasForcePlatform && forcePlatform == "" {
+		hasForcePlatform = false
+	}
+	loadAccounts := func() error {
+		if accountsLoaded {
+			return nil
+		}
+		var err error
+		accounts, _, err = s.listSchedulableAccounts(ctx, groupID, platform, hasForcePlatform)
+		if err != nil {
+			return fmt.Errorf("query accounts failed: %w", err)
+		}
+		accountsLoaded = true
+		ctx = s.withWindowCostPrefetch(ctx, accounts)
+		ctx = s.withRPMPrefetch(ctx, accounts)
+		return nil
+	}
+	isExcluded := func(accountID int64) bool {
+		if excludedIDs == nil {
+			return false
+		}
+		_, excluded := excludedIDs[accountID]
+		return excluded
+	}
 
 	// ============ Model Routing (legacy path): apply before sticky session ============
 	// When load-awareness is disabled (e.g. concurrency service not configured), we still honor model routing
@@ -3137,7 +3166,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 		if sessionHash != "" && s.cache != nil {
 			accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 			if err == nil && accountID > 0 && containsInt64(routingAccountIDs, accountID) {
-				if _, excluded := excludedIDs[accountID]; !excluded {
+				if !isExcluded(accountID) {
 					account, err := s.getSchedulableAccount(ctx, accountID)
 					// 检查账号分组归属和平台匹配（确保粘性会话不会跨分组或跨平台）
 					if err == nil {
@@ -3145,7 +3174,9 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 						if clearSticky {
 							_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 						}
-						if !clearSticky && s.isAccountInGroup(account, groupID) && account.Platform == platform && (requestedModel == "" || s.isModelSupportedByAccountWithContext(ctx, account, requestedModel)) && s.isAccountSchedulableForModelSelection(ctx, account, requestedModel) && s.isAccountSchedulableForQuota(account) && s.isAccountSchedulableForWindowCost(ctx, account, true) && s.isAccountSchedulableForRPM(ctx, account, true) && !s.isStickyAccountUpstreamRestricted(ctx, groupID, account, requestedModel) {
+						if !clearSticky &&
+							s.isAccountInGroup(account, groupID) &&
+							s.isGatewayAccountStaticEligibleForSelection(ctx, account, groupID, requestedModel, platform, false, schedGroup, needsUpstreamCheck, true, schedulerEndpoint) {
 							if s.debugModelRoutingEnabled() {
 								logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] legacy routed sticky hit: group_id=%v model=%s session=%s account=%d", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), accountID)
 							}
@@ -3157,20 +3188,9 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 		}
 
 		// 2) Select an account from the routed candidates.
-		forcePlatform, hasForcePlatform := ctx.Value(ctxkey.ForcePlatform).(string)
-		if hasForcePlatform && forcePlatform == "" {
-			hasForcePlatform = false
+		if err := loadAccounts(); err != nil {
+			return nil, err
 		}
-		var err error
-		accounts, _, err = s.listSchedulableAccounts(ctx, groupID, platform, hasForcePlatform)
-		if err != nil {
-			return nil, fmt.Errorf("query accounts failed: %w", err)
-		}
-		accountsLoaded = true
-
-		// 提前预取窗口费用+RPM 计数，确保 routing 段内的调度检查调用能命中缓存
-		ctx = s.withWindowCostPrefetch(ctx, accounts)
-		ctx = s.withRPMPrefetch(ctx, accounts)
 
 		routingSet := make(map[int64]struct{}, len(routingAccountIDs))
 		for _, id := range routingAccountIDs {
@@ -3179,64 +3199,21 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 			}
 		}
 
-		var selected *Account
+		routingCandidates := make([]*Account, 0, len(routingAccountIDs))
 		for _, acc := range accounts {
 			if _, ok := routingSet[acc.ID]; !ok {
 				continue
 			}
-			if _, excluded := excludedIDs[acc.ID]; excluded {
+			if isExcluded(acc.ID) {
 				continue
 			}
-			// Scheduler snapshots can be temporarily stale; re-check schedulability here to
-			// avoid selecting accounts that were recently rate-limited/overloaded.
-			if !s.isAccountSchedulableForSelection(acc) {
+			if !s.isGatewayAccountStaticEligibleForSelection(ctx, acc, groupID, requestedModel, platform, false, schedGroup, needsUpstreamCheck, false, schedulerEndpoint) {
 				continue
 			}
-			// require_privacy_set: 跳过 privacy 未设置的账号并标记异常
-			if schedGroup != nil && schedGroup.RequirePrivacySet && !acc.IsPrivacySet() {
-				_ = s.accountRepo.SetError(ctx, acc.ID,
-					fmt.Sprintf("Privacy not set, required by group [%s]", schedGroup.Name))
-				continue
-			}
-			if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
-				continue
-			}
-			if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
-				continue
-			}
-			if !s.isAccountSchedulableForQuota(acc) {
-				continue
-			}
-			if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
-				continue
-			}
-			if !s.isAccountSchedulableForRPM(ctx, acc, false) {
-				continue
-			}
-			if selected == nil {
-				selected = acc
-				continue
-			}
-			if acc.Priority < selected.Priority {
-				selected = acc
-			} else if acc.Priority == selected.Priority {
-				switch {
-				case acc.LastUsedAt == nil && selected.LastUsedAt != nil:
-					selected = acc
-				case acc.LastUsedAt != nil && selected.LastUsedAt == nil:
-					// keep selected (never used is preferred)
-				case acc.LastUsedAt == nil && selected.LastUsedAt == nil:
-					if preferOAuth && acc.Type != selected.Type && acc.Type == AccountTypeOAuth {
-						selected = acc
-					}
-				default:
-					if acc.LastUsedAt.Before(*selected.LastUsedAt) {
-						selected = acc
-					}
-				}
-			}
+			routingCandidates = append(routingCandidates, acc)
 		}
 
+		selected := s.selectFirstGatewaySchedulerAccount(routingCandidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_routing")
 		if selected != nil {
 			if sessionHash != "" && s.cache != nil {
 				if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
@@ -3255,7 +3232,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	if sessionHash != "" && s.cache != nil {
 		accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 		if err == nil && accountID > 0 {
-			if _, excluded := excludedIDs[accountID]; !excluded {
+			if !isExcluded(accountID) {
 				account, err := s.getSchedulableAccount(ctx, accountID)
 				// 检查账号分组归属和平台匹配（确保粘性会话不会跨分组或跨平台）
 				if err == nil {
@@ -3263,7 +3240,9 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 					if clearSticky {
 						_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 					}
-					if !clearSticky && s.isAccountInGroup(account, groupID) && account.Platform == platform && (requestedModel == "" || s.isModelSupportedByAccountWithContext(ctx, account, requestedModel)) && s.isAccountSchedulableForModelSelection(ctx, account, requestedModel) && s.isAccountSchedulableForQuota(account) && s.isAccountSchedulableForWindowCost(ctx, account, true) && s.isAccountSchedulableForRPM(ctx, account, true) {
+					if !clearSticky &&
+						s.isAccountInGroup(account, groupID) &&
+						s.isGatewayAccountStaticEligibleForSelection(ctx, account, groupID, requestedModel, platform, false, schedGroup, needsUpstreamCheck, true, schedulerEndpoint) {
 						return account, nil
 					}
 				}
@@ -3272,83 +3251,22 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	}
 
 	// 2. 获取可调度账号列表（单平台）
-	if !accountsLoaded {
-		forcePlatform, hasForcePlatform := ctx.Value(ctxkey.ForcePlatform).(string)
-		if hasForcePlatform && forcePlatform == "" {
-			hasForcePlatform = false
-		}
-		var err error
-		accounts, _, err = s.listSchedulableAccounts(ctx, groupID, platform, hasForcePlatform)
-		if err != nil {
-			return nil, fmt.Errorf("query accounts failed: %w", err)
-		}
+	if err := loadAccounts(); err != nil {
+		return nil, err
 	}
 
-	// 批量预取窗口费用+RPM 计数，避免逐个账号查询（N+1）
-	ctx = s.withWindowCostPrefetch(ctx, accounts)
-	ctx = s.withRPMPrefetch(ctx, accounts)
-
-	// 3. 按优先级+最久未用选择（考虑模型支持）
-	// needsUpstreamCheck 仅在主选择循环中使用；粘性会话命中时跳过此检查，
-	// 因为粘性会话优先保持连接一致性，且 upstream 计费基准极少使用。
-	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
-	var selected *Account
+	// 3. 使用主备/权重/健康度排序选择账号
+	candidates := make([]*Account, 0, len(accounts))
 	for _, acc := range accounts {
-		if _, excluded := excludedIDs[acc.ID]; excluded {
+		if isExcluded(acc.ID) {
 			continue
 		}
-		// Scheduler snapshots can be temporarily stale; re-check schedulability here to
-		// avoid selecting accounts that were recently rate-limited/overloaded.
-		if !s.isAccountSchedulableForSelection(acc) {
+		if !s.isGatewayAccountStaticEligibleForSelection(ctx, acc, groupID, requestedModel, platform, false, schedGroup, needsUpstreamCheck, false, schedulerEndpoint) {
 			continue
 		}
-		// require_privacy_set: 跳过 privacy 未设置的账号并标记异常
-		if schedGroup != nil && schedGroup.RequirePrivacySet && !acc.IsPrivacySet() {
-			_ = s.accountRepo.SetError(ctx, acc.ID,
-				fmt.Sprintf("Privacy not set, required by group [%s]", schedGroup.Name))
-			continue
-		}
-		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
-			continue
-		}
-		if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, acc, requestedModel) {
-			continue
-		}
-		if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
-			continue
-		}
-		if !s.isAccountSchedulableForQuota(acc) {
-			continue
-		}
-		if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
-			continue
-		}
-		if !s.isAccountSchedulableForRPM(ctx, acc, false) {
-			continue
-		}
-		if selected == nil {
-			selected = acc
-			continue
-		}
-		if acc.Priority < selected.Priority {
-			selected = acc
-		} else if acc.Priority == selected.Priority {
-			switch {
-			case acc.LastUsedAt == nil && selected.LastUsedAt != nil:
-				selected = acc
-			case acc.LastUsedAt != nil && selected.LastUsedAt == nil:
-				// keep selected (never used is preferred)
-			case acc.LastUsedAt == nil && selected.LastUsedAt == nil:
-				if preferOAuth && acc.Type != selected.Type && acc.Type == AccountTypeOAuth {
-					selected = acc
-				}
-			default:
-				if acc.LastUsedAt.Before(*selected.LastUsedAt) {
-					selected = acc
-				}
-			}
-		}
+		candidates = append(candidates, acc)
 	}
+	selected := s.selectFirstGatewaySchedulerAccount(candidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy")
 
 	if selected == nil {
 		stats := s.logDetailedSelectionFailure(ctx, groupID, sessionHash, requestedModel, platform, accounts, excludedIDs, false)
@@ -3372,6 +3290,8 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 // 查询原生平台账户 + 启用 mixed_scheduling 的 antigravity 账户
 func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, nativePlatform string) (*Account, error) {
 	preferOAuth := nativePlatform == PlatformGemini
+	schedulerEndpoint := schedulerEndpointFromContext(ctx, nativePlatform)
+	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	routingAccountIDs := s.routingAccountIDsForRequest(ctx, groupID, requestedModel, nativePlatform)
 
 	// require_privacy_set: 获取分组信息
@@ -3382,6 +3302,27 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 
 	var accounts []*Account
 	accountsLoaded := false
+	loadAccounts := func() error {
+		if accountsLoaded {
+			return nil
+		}
+		var err error
+		accounts, _, err = s.listSchedulableAccounts(ctx, groupID, nativePlatform, false)
+		if err != nil {
+			return fmt.Errorf("query accounts failed: %w", err)
+		}
+		accountsLoaded = true
+		ctx = s.withWindowCostPrefetch(ctx, accounts)
+		ctx = s.withRPMPrefetch(ctx, accounts)
+		return nil
+	}
+	isExcluded := func(accountID int64) bool {
+		if excludedIDs == nil {
+			return false
+		}
+		_, excluded := excludedIDs[accountID]
+		return excluded
+	}
 
 	// ============ Model Routing (legacy path): apply before sticky session ============
 	if len(routingAccountIDs) > 0 {
@@ -3393,7 +3334,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 		if sessionHash != "" && s.cache != nil {
 			accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 			if err == nil && accountID > 0 && containsInt64(routingAccountIDs, accountID) {
-				if _, excluded := excludedIDs[accountID]; !excluded {
+				if !isExcluded(accountID) {
 					account, err := s.getSchedulableAccount(ctx, accountID)
 					// 检查账号分组归属和有效性：原生平台直接匹配，antigravity 需要启用混合调度
 					if err == nil {
@@ -3401,13 +3342,13 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 						if clearSticky {
 							_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 						}
-						if !clearSticky && s.isAccountInGroup(account, groupID) && (requestedModel == "" || s.isModelSupportedByAccountWithContext(ctx, account, requestedModel)) && s.isAccountSchedulableForModelSelection(ctx, account, requestedModel) && s.isAccountSchedulableForQuota(account) && s.isAccountSchedulableForWindowCost(ctx, account, true) && s.isAccountSchedulableForRPM(ctx, account, true) {
-							if account.Platform == nativePlatform || (account.Platform == PlatformAntigravity && account.IsMixedSchedulingEnabled()) {
-								if s.debugModelRoutingEnabled() {
-									logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] legacy mixed routed sticky hit: group_id=%v model=%s session=%s account=%d", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), accountID)
-								}
-								return account, nil
+						if !clearSticky &&
+							s.isAccountInGroup(account, groupID) &&
+							s.isGatewayAccountStaticEligibleForSelection(ctx, account, groupID, requestedModel, nativePlatform, true, schedGroup, needsUpstreamCheck, true, schedulerEndpoint) {
+							if s.debugModelRoutingEnabled() {
+								logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] legacy mixed routed sticky hit: group_id=%v model=%s session=%s account=%d", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), accountID)
 							}
+							return account, nil
 						}
 					}
 				}
@@ -3415,16 +3356,9 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 		}
 
 		// 2) Select an account from the routed candidates.
-		var err error
-		accounts, _, err = s.listSchedulableAccounts(ctx, groupID, nativePlatform, false)
-		if err != nil {
-			return nil, fmt.Errorf("query accounts failed: %w", err)
+		if err := loadAccounts(); err != nil {
+			return nil, err
 		}
-		accountsLoaded = true
-
-		// 提前预取窗口费用+RPM 计数，确保 routing 段内的调度检查调用能命中缓存
-		ctx = s.withWindowCostPrefetch(ctx, accounts)
-		ctx = s.withRPMPrefetch(ctx, accounts)
 
 		routingSet := make(map[int64]struct{}, len(routingAccountIDs))
 		for _, id := range routingAccountIDs {
@@ -3433,68 +3367,21 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 			}
 		}
 
-		var selected *Account
+		routingCandidates := make([]*Account, 0, len(routingAccountIDs))
 		for _, acc := range accounts {
 			if _, ok := routingSet[acc.ID]; !ok {
 				continue
 			}
-			if _, excluded := excludedIDs[acc.ID]; excluded {
+			if isExcluded(acc.ID) {
 				continue
 			}
-			// Scheduler snapshots can be temporarily stale; re-check schedulability here to
-			// avoid selecting accounts that were recently rate-limited/overloaded.
-			if !s.isAccountSchedulableForSelection(acc) {
+			if !s.isGatewayAccountStaticEligibleForSelection(ctx, acc, groupID, requestedModel, nativePlatform, true, schedGroup, needsUpstreamCheck, false, schedulerEndpoint) {
 				continue
 			}
-			// require_privacy_set: 跳过 privacy 未设置的账号并标记异常
-			if schedGroup != nil && schedGroup.RequirePrivacySet && !acc.IsPrivacySet() {
-				_ = s.accountRepo.SetError(ctx, acc.ID,
-					fmt.Sprintf("Privacy not set, required by group [%s]", schedGroup.Name))
-				continue
-			}
-			// 过滤：原生平台直接通过，antigravity 需要启用混合调度
-			if acc.Platform == PlatformAntigravity && !acc.IsMixedSchedulingEnabled() {
-				continue
-			}
-			if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
-				continue
-			}
-			if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
-				continue
-			}
-			if !s.isAccountSchedulableForQuota(acc) {
-				continue
-			}
-			if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
-				continue
-			}
-			if !s.isAccountSchedulableForRPM(ctx, acc, false) {
-				continue
-			}
-			if selected == nil {
-				selected = acc
-				continue
-			}
-			if acc.Priority < selected.Priority {
-				selected = acc
-			} else if acc.Priority == selected.Priority {
-				switch {
-				case acc.LastUsedAt == nil && selected.LastUsedAt != nil:
-					selected = acc
-				case acc.LastUsedAt != nil && selected.LastUsedAt == nil:
-					// keep selected (never used is preferred)
-				case acc.LastUsedAt == nil && selected.LastUsedAt == nil:
-					if preferOAuth && acc.Platform == PlatformGemini && selected.Platform == PlatformGemini && acc.Type != selected.Type && acc.Type == AccountTypeOAuth {
-						selected = acc
-					}
-				default:
-					if acc.LastUsedAt.Before(*selected.LastUsedAt) {
-						selected = acc
-					}
-				}
-			}
+			routingCandidates = append(routingCandidates, acc)
 		}
 
+		selected := s.selectFirstGatewaySchedulerAccount(routingCandidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_mixed_routing")
 		if selected != nil {
 			if sessionHash != "" && s.cache != nil {
 				if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
@@ -3513,7 +3400,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	if sessionHash != "" && s.cache != nil {
 		accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 		if err == nil && accountID > 0 {
-			if _, excluded := excludedIDs[accountID]; !excluded {
+			if !isExcluded(accountID) {
 				account, err := s.getSchedulableAccount(ctx, accountID)
 				// 检查账号分组归属和有效性：原生平台直接匹配，antigravity 需要启用混合调度
 				if err == nil {
@@ -3521,10 +3408,10 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 					if clearSticky {
 						_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 					}
-					if !clearSticky && s.isAccountInGroup(account, groupID) && (requestedModel == "" || s.isModelSupportedByAccountWithContext(ctx, account, requestedModel)) && s.isAccountSchedulableForModelSelection(ctx, account, requestedModel) && s.isAccountSchedulableForQuota(account) && s.isAccountSchedulableForWindowCost(ctx, account, true) && s.isAccountSchedulableForRPM(ctx, account, true) && !s.isStickyAccountUpstreamRestricted(ctx, groupID, account, requestedModel) {
-						if account.Platform == nativePlatform || (account.Platform == PlatformAntigravity && account.IsMixedSchedulingEnabled()) {
-							return account, nil
-						}
+					if !clearSticky &&
+						s.isAccountInGroup(account, groupID) &&
+						s.isGatewayAccountStaticEligibleForSelection(ctx, account, groupID, requestedModel, nativePlatform, true, schedGroup, needsUpstreamCheck, true, schedulerEndpoint) {
+						return account, nil
 					}
 				}
 			}
@@ -3532,82 +3419,22 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	}
 
 	// 2. 获取可调度账号列表
-	if !accountsLoaded {
-		var err error
-		accounts, _, err = s.listSchedulableAccounts(ctx, groupID, nativePlatform, false)
-		if err != nil {
-			return nil, fmt.Errorf("query accounts failed: %w", err)
-		}
+	if err := loadAccounts(); err != nil {
+		return nil, err
 	}
 
-	// 批量预取窗口费用+RPM 计数，避免逐个账号查询（N+1）
-	ctx = s.withWindowCostPrefetch(ctx, accounts)
-	ctx = s.withRPMPrefetch(ctx, accounts)
-
-	// 3. 按优先级+最久未用选择（考虑模型支持和混合调度）
-	// needsUpstreamCheck 仅在主选择循环中使用；粘性会话命中时跳过此检查。
-	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
-	var selected *Account
+	// 3. 使用主备/权重/健康度排序选择账号
+	candidates := make([]*Account, 0, len(accounts))
 	for _, acc := range accounts {
-		if _, excluded := excludedIDs[acc.ID]; excluded {
+		if isExcluded(acc.ID) {
 			continue
 		}
-		// Scheduler snapshots can be temporarily stale; re-check schedulability here to
-		// avoid selecting accounts that were recently rate-limited/overloaded.
-		if !s.isAccountSchedulableForSelection(acc) {
+		if !s.isGatewayAccountStaticEligibleForSelection(ctx, acc, groupID, requestedModel, nativePlatform, true, schedGroup, needsUpstreamCheck, false, schedulerEndpoint) {
 			continue
 		}
-		// require_privacy_set: 跳过 privacy 未设置的账号并标记异常
-		if schedGroup != nil && schedGroup.RequirePrivacySet && !acc.IsPrivacySet() {
-			_ = s.accountRepo.SetError(ctx, acc.ID,
-				fmt.Sprintf("Privacy not set, required by group [%s]", schedGroup.Name))
-			continue
-		}
-		// 过滤：原生平台直接通过，antigravity 需要启用混合调度
-		if acc.Platform == PlatformAntigravity && !acc.IsMixedSchedulingEnabled() {
-			continue
-		}
-		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, acc, requestedModel) {
-			continue
-		}
-		if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, acc, requestedModel) {
-			continue
-		}
-		if !s.isAccountSchedulableForModelSelection(ctx, acc, requestedModel) {
-			continue
-		}
-		if !s.isAccountSchedulableForQuota(acc) {
-			continue
-		}
-		if !s.isAccountSchedulableForWindowCost(ctx, acc, false) {
-			continue
-		}
-		if !s.isAccountSchedulableForRPM(ctx, acc, false) {
-			continue
-		}
-		if selected == nil {
-			selected = acc
-			continue
-		}
-		if acc.Priority < selected.Priority {
-			selected = acc
-		} else if acc.Priority == selected.Priority {
-			switch {
-			case acc.LastUsedAt == nil && selected.LastUsedAt != nil:
-				selected = acc
-			case acc.LastUsedAt != nil && selected.LastUsedAt == nil:
-				// keep selected (never used is preferred)
-			case acc.LastUsedAt == nil && selected.LastUsedAt == nil:
-				if preferOAuth && acc.Platform == PlatformGemini && selected.Platform == PlatformGemini && acc.Type != selected.Type && acc.Type == AccountTypeOAuth {
-					selected = acc
-				}
-			default:
-				if acc.LastUsedAt.Before(*selected.LastUsedAt) {
-					selected = acc
-				}
-			}
-		}
+		candidates = append(candidates, acc)
 	}
+	selected := s.selectFirstGatewaySchedulerAccount(candidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_mixed")
 
 	if selected == nil {
 		stats := s.logDetailedSelectionFailure(ctx, groupID, sessionHash, requestedModel, nativePlatform, accounts, excludedIDs, true)
@@ -8774,10 +8601,19 @@ type recordUsageCoreInput struct {
 // - ParsedRequest != nil → 启用 Claude Max 缓存计费策略
 // - LongContextThreshold > 0 → Token 计费回退走 CalculateCostWithLongContext
 func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsageCoreInput, opts *recordUsageOpts) error {
+	if input == nil {
+		return errors.New("usage input is nil")
+	}
 	result := input.Result
+	if result == nil {
+		return errors.New("usage result is nil")
+	}
 	apiKey := input.APIKey
 	user := input.User
 	account := input.Account
+	if apiKey == nil || user == nil || account == nil {
+		return errors.New("usage input missing api key, user, or account")
+	}
 	subscription := input.Subscription
 	ApplyForwardImageBillingResolution(result)
 
@@ -8857,6 +8693,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
 		logger.LegacyPrintf("service.gateway", "[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
 		s.deferredService.ScheduleLastUsedUpdate(account.ID)
+		s.reportRecordUsageScheduleSuccess(ctx, input, result, account, requestedModel)
 		return nil
 	}
 
@@ -8885,8 +8722,41 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		return billingErr
 	}
 	writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
+	s.reportRecordUsageScheduleSuccess(ctx, input, result, account, requestedModel)
 
 	return nil
+}
+
+func (s *GatewayService) reportRecordUsageScheduleSuccess(ctx context.Context, input *recordUsageCoreInput, result *ForwardResult, account *Account, requestedModel string) {
+	if s == nil || input == nil || result == nil || account == nil {
+		return
+	}
+	model := strings.TrimSpace(requestedModel)
+	if model == "" {
+		model = strings.TrimSpace(result.Model)
+	}
+	firstTokenMs := result.FirstTokenMs
+	endpoints := []string{
+		input.UpstreamEndpoint,
+		input.InboundEndpoint,
+		schedulerEndpointFromContext(ctx, ""),
+	}
+	seen := make(map[string]struct{}, len(endpoints))
+	for _, endpoint := range endpoints {
+		endpoint = strings.TrimSpace(endpoint)
+		if endpoint == "" {
+			continue
+		}
+		key := strings.ToLower(endpoint)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		s.ReportAccountScheduleSuccess(account.ID, model, endpoint, firstTokenMs)
+	}
+	if len(seen) == 0 {
+		s.ReportAccountScheduleSuccess(account.ID, model, account.Platform, firstTokenMs)
+	}
 }
 
 // calculateRecordUsageCost 根据请求类型和选项计算费用。

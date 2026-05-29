@@ -18,6 +18,14 @@ const (
 	FieldGroupID = "group_id"
 	// FieldPriority holds the string denoting the priority field in the database.
 	FieldPriority = "priority"
+	// FieldRole holds the string denoting the role field in the database.
+	FieldRole = "role"
+	// FieldWeight holds the string denoting the weight field in the database.
+	FieldWeight = "weight"
+	// FieldSortOrder holds the string denoting the sort_order field in the database.
+	FieldSortOrder = "sort_order"
+	// FieldSchedulingConfigured holds the string denoting the scheduling_configured field in the database.
+	FieldSchedulingConfigured = "scheduling_configured"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeAccount holds the string denoting the account edge name in mutations.
@@ -51,6 +59,10 @@ var Columns = []string{
 	FieldAccountID,
 	FieldGroupID,
 	FieldPriority,
+	FieldRole,
+	FieldWeight,
+	FieldSortOrder,
+	FieldSchedulingConfigured,
 	FieldCreatedAt,
 }
 
@@ -67,6 +79,18 @@ func ValidColumn(column string) bool {
 var (
 	// DefaultPriority holds the default value on creation for the "priority" field.
 	DefaultPriority int
+	// DefaultRole holds the default value on creation for the "role" field.
+	DefaultRole string
+	// RoleValidator is a validator for the "role" field. It is called by the builders before save.
+	RoleValidator func(string) error
+	// DefaultWeight holds the default value on creation for the "weight" field.
+	DefaultWeight int
+	// WeightValidator is a validator for the "weight" field. It is called by the builders before save.
+	WeightValidator func(int) error
+	// DefaultSortOrder holds the default value on creation for the "sort_order" field.
+	DefaultSortOrder int
+	// DefaultSchedulingConfigured holds the default value on creation for the "scheduling_configured" field.
+	DefaultSchedulingConfigured bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -87,6 +111,26 @@ func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 // ByPriority orders the results by the priority field.
 func ByPriority(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPriority, opts...).ToFunc()
+}
+
+// ByRole orders the results by the role field.
+func ByRole(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRole, opts...).ToFunc()
+}
+
+// ByWeight orders the results by the weight field.
+func ByWeight(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWeight, opts...).ToFunc()
+}
+
+// BySortOrder orders the results by the sort_order field.
+func BySortOrder(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSortOrder, opts...).ToFunc()
+}
+
+// BySchedulingConfigured orders the results by the scheduling_configured field.
+func BySchedulingConfigured(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSchedulingConfigured, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

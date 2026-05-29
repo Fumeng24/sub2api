@@ -105,10 +105,12 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 		maxAccountSwitches = 3
 	}
 	routingStart := time.Now()
+	schedulerEndpoint := GetInboundEndpoint(c)
 
 	for {
+		scheduleCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
 		selection, _, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
-			c.Request.Context(),
+			scheduleCtx,
 			apiKey.GroupID,
 			"",
 			"",
@@ -180,7 +182,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 					h.handleFailoverExhausted(c, failoverErr, true)
 					return
 				}
-				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+				h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, reqModel, schedulerEndpoint, failoverErr)
 				h.gatewayService.RecordOpenAIAccountSwitch()
 				failedAccountIDs[account.ID] = struct{}{}
 				lastFailoverErr = failoverErr
@@ -197,7 +199,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 				)
 				continue
 			}
-			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+			h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, reqModel, schedulerEndpoint, false, nil)
 			if c.Writer.Size() == writerSizeBeforeForward {
 				h.errorResponse(c, http.StatusBadGateway, "upstream_error", "Upstream request failed")
 			}
@@ -208,10 +210,10 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 			return
 		}
 
-		h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, nil)
+		h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, reqModel, schedulerEndpoint, true, nil)
 		userAgent := c.GetHeader("User-Agent")
 		clientIP := ip.GetClientIP(c)
-		inboundEndpoint := GetInboundEndpoint(c)
+		inboundEndpoint := schedulerEndpoint
 		upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
 
 		h.submitOpenAIUsageRecordTask(result, func(ctx context.Context) {

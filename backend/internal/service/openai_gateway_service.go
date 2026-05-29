@@ -354,6 +354,7 @@ type OpenAIGatewayService struct {
 	openaiScheduler               OpenAIAccountScheduler
 	openaiWSPassthroughDialer     openAIWSClientDialer
 	openaiAccountStats            *openAIAccountRuntimeStats
+	schedulerHealth               *accountSchedulerHealthStats
 
 	openaiWSFallbackUntil               sync.Map // key: int64(accountID), value: time.Time
 	openaiAccountRuntimeBlockUntil      sync.Map // key: int64(accountID), value: time.Time
@@ -423,6 +424,7 @@ func NewOpenAIGatewayService(
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
 		responseHeaderFilter:  compileResponseHeaderFilter(cfg),
 		codexSnapshotThrottle: newAccountWriteThrottle(openAICodexSnapshotPersistMinInterval),
+		schedulerHealth:       newAccountSchedulerHealthStats(),
 	}
 	if rateLimitService != nil {
 		rateLimitService.SetAccountRuntimeBlocker(svc)
@@ -1366,6 +1368,59 @@ func prioritizeOpenAICompactAccounts(accounts []*Account) []*Account {
 	return out
 }
 
+func orderOpenAISchedulerScoresForCompact(scores []schedulerAccountScore, includeUnsupported bool) []schedulerAccountScore {
+	if len(scores) == 0 {
+		return nil
+	}
+	primarySupported := make([]schedulerAccountScore, 0, len(scores))
+	primaryUnknown := make([]schedulerAccountScore, 0, len(scores))
+	primaryUnsupported := make([]schedulerAccountScore, 0)
+	backupSupported := make([]schedulerAccountScore, 0, len(scores))
+	backupUnknown := make([]schedulerAccountScore, 0, len(scores))
+	backupUnsupported := make([]schedulerAccountScore, 0)
+	appendBucket := func(score schedulerAccountScore) {
+		if score.Account == nil {
+			return
+		}
+		backup := score.Role == AccountGroupRoleBackup
+		switch openAICompactSupportTier(score.Account) {
+		case 2:
+			if backup {
+				backupSupported = append(backupSupported, score)
+			} else {
+				primarySupported = append(primarySupported, score)
+			}
+		case 1:
+			if backup {
+				backupUnknown = append(backupUnknown, score)
+			} else {
+				primaryUnknown = append(primaryUnknown, score)
+			}
+		default:
+			if backup {
+				backupUnsupported = append(backupUnsupported, score)
+			} else {
+				primaryUnsupported = append(primaryUnsupported, score)
+			}
+		}
+	}
+	for _, score := range scores {
+		appendBucket(score)
+	}
+	out := make([]schedulerAccountScore, 0, len(scores))
+	out = append(out, primarySupported...)
+	out = append(out, primaryUnknown...)
+	if includeUnsupported {
+		out = append(out, primaryUnsupported...)
+	}
+	out = append(out, backupSupported...)
+	out = append(out, backupUnknown...)
+	if includeUnsupported {
+		out = append(out, backupUnsupported...)
+	}
+	return out
+}
+
 // resolveOpenAIAccountUpstreamModelForRequest resolves the upstream model that
 // would be sent for a given request, honouring compact-only mappings when the
 // caller is on the /responses/compact path.
@@ -1403,7 +1458,7 @@ func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.C
 
 	// 3. 按优先级 + LRU 选择最佳账号
 	// Select by priority + LRU
-	selected, compactBlocked := s.selectBestAccount(ctx, groupID, accounts, requestedModel, excludedIDs, requireCompact, requiredCapability)
+	selected, compactBlocked := s.selectBestAccount(ctx, groupID, accounts, requestedModel, excludedIDs, requireCompact, requiredCapability, sessionHash)
 
 	if selected == nil {
 		return nil, noAvailableOpenAISelectionError(requestedModel, compactBlocked)
@@ -1421,6 +1476,18 @@ func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.C
 	}
 
 	return hydrated, nil
+}
+
+func (s *OpenAIGatewayService) openAISchedulerEndpoint(ctx context.Context, requireCompact bool, requiredCapability OpenAIEndpointCapability) string {
+	return schedulerEndpointFromOpenAIContext(ctx, requireCompact, requiredCapability)
+}
+
+func (s *OpenAIGatewayService) isOpenAIAccountSchedulerHealthAllowed(accountID int64, model, endpoint string) bool {
+	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
+		return true
+	}
+	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, false)
+	return snap.CircuitState == schedulerCircuitClosed
 }
 
 // tryStickySessionHit 尝试从粘性会话获取账号。
@@ -1467,6 +1534,10 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
 	}
+	if !s.isOpenAIAccountSchedulerHealthAllowed(account.ID, requestedModel, s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)) {
+		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+		return nil
+	}
 	account = s.recheckSelectedOpenAIAccountFromDB(ctx, account, requestedModel, requireCompact, requiredCapability)
 	if account == nil {
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
@@ -1484,19 +1555,19 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 	return account
 }
 
-// selectBestAccount 从候选账号中选择最佳账号（优先级 + LRU）。
+// selectBestAccount 从候选账号中选择最佳账号（分组主备 + 权重 + 健康度）。
 // 返回 nil 表示无可用账号。
 //
-// selectBestAccount selects the best account from candidates (priority + LRU).
+// selectBestAccount selects the best account from candidates (role + weight + health).
 // Returns nil if no available account. The second return reports whether at
 // least one candidate was filtered out solely because it lacks compact support
 // (only meaningful when requireCompact=true).
-func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *int64, accounts []*Account, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability) (*Account, bool) {
-	var selected *Account
-	selectedCompactTier := -1
+func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *int64, accounts []*Account, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, sessionHash string) (*Account, bool) {
 	compactBlocked := false
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
+	schedulerEndpoint := s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)
 
+	candidates := make([]*Account, 0, len(accounts))
 	for _, acc := range accounts {
 		// 跳过被排除的账号
 		// Skip excluded accounts
@@ -1515,39 +1586,29 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 		if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, fresh, requestedModel, requireCompact) {
 			continue
 		}
-		compactTier := 0
 		if requireCompact {
-			compactTier = openAICompactSupportTier(fresh)
-			if compactTier == 0 {
+			if openAICompactSupportTier(fresh) == 0 {
 				compactBlocked = true
 				continue
 			}
 		}
-
-		// 选择优先级最高且最久未使用的账号
-		// Select highest priority and least recently used
-		if selected == nil {
-			selected = fresh
-			selectedCompactTier = compactTier
-			continue
-		}
-
-		// compact 模式下高 tier 优先；同 tier 内才比较 priority/LRU。
-		if requireCompact && compactTier != selectedCompactTier {
-			if compactTier > selectedCompactTier {
-				selected = fresh
-				selectedCompactTier = compactTier
-			}
-			continue
-		}
-
-		if s.isBetterAccount(fresh, selected) {
-			selected = fresh
-			selectedCompactTier = compactTier
-		}
+		candidates = append(candidates, fresh)
 	}
 
-	return selected, compactBlocked
+	if len(candidates) == 0 {
+		return nil, compactBlocked
+	}
+	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, true)
+	order := buildRoleAwareSchedulerOrder(scores, true, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "best")
+	if requireCompact {
+		order = orderOpenAISchedulerScoresForCompact(order, s.schedulerSnapshot != nil)
+	}
+	for _, item := range order {
+		if item.Account != nil {
+			return item.Account, compactBlocked
+		}
+	}
+	return nil, compactBlocked
 }
 
 // isBetterAccount 判断 candidate 是否比 current 更优。
@@ -1664,6 +1725,8 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else if s.isOpenAIAccountRuntimeBlocked(account) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+					} else if !s.isOpenAIAccountSchedulerHealthAllowed(account.ID, requestedModel, s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)) {
+						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel, requireCompact) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else {
@@ -1727,67 +1790,23 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		})
 	}
 
-	tryAcquireFromLoadMap := func(loadMap map[int64]*AccountLoadInfo) (*AccountSelectionResult, bool, error) {
-		var available []accountWithLoad
-		for _, acc := range candidates {
-			loadInfo := loadMap[acc.ID]
-			if loadInfo == nil {
-				loadInfo = &AccountLoadInfo{AccountID: acc.ID}
-			}
-			if loadInfo.LoadRate < 100 {
-				available = append(available, accountWithLoad{
-					account:  acc,
-					loadInfo: loadInfo,
-				})
-			}
+	schedulerEndpoint := s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)
+	orderScores := func(scores []schedulerAccountScore, seedSuffix string) []schedulerAccountScore {
+		order := buildRoleAwareSchedulerOrder(scores, true, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, seedSuffix)
+		if requireCompact {
+			order = orderOpenAISchedulerScoresForCompact(order, s.schedulerSnapshot != nil)
 		}
-
-		if len(available) == 0 {
+		return order
+	}
+	tryAcquireFromLoadMap := func(loadMap map[int64]*AccountLoadInfo) (*AccountSelectionResult, bool, error) {
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
+		selectionOrder := orderScores(scores, "load")
+		if len(selectionOrder) == 0 {
 			return nil, false, nil
 		}
 
-		sort.SliceStable(available, func(i, j int) bool {
-			a, b := available[i], available[j]
-			if a.account.Priority != b.account.Priority {
-				return a.account.Priority < b.account.Priority
-			}
-			if a.loadInfo.LoadRate != b.loadInfo.LoadRate {
-				return a.loadInfo.LoadRate < b.loadInfo.LoadRate
-			}
-			switch {
-			case a.account.LastUsedAt == nil && b.account.LastUsedAt != nil:
-				return true
-			case a.account.LastUsedAt != nil && b.account.LastUsedAt == nil:
-				return false
-			case a.account.LastUsedAt == nil && b.account.LastUsedAt == nil:
-				return false
-			default:
-				return a.account.LastUsedAt.Before(*b.account.LastUsedAt)
-			}
-		})
-		shuffleWithinSortGroups(available)
-
-		selectionOrder := make([]accountWithLoad, 0, len(available))
-		if requireCompact {
-			appendTier := func(out []accountWithLoad, tier int) []accountWithLoad {
-				for _, item := range available {
-					if openAICompactSupportTier(item.account) == tier {
-						out = append(out, item)
-					}
-				}
-				return out
-			}
-			selectionOrder = appendTier(selectionOrder, 2)
-			selectionOrder = appendTier(selectionOrder, 1)
-			// tier 0 候选作为兜底追加：DB recheck 时若发现 cache tier 0 实际
-			// 已升级为 1/2（探测刚跑完，cache 尚未刷新），仍可正常命中。
-			selectionOrder = appendTier(selectionOrder, 0)
-		} else {
-			selectionOrder = append(selectionOrder, available...)
-		}
-
 		for _, item := range selectionOrder {
-			fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, item.account, requestedModel, false, requiredCapability)
+			fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, item.Account, requestedModel, false, requiredCapability)
 			if fresh == nil {
 				continue
 			}
@@ -1815,13 +1834,10 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 
 	loadMap, err := s.concurrencyService.GetAccountsLoadBatch(ctx, accountLoads)
 	if err != nil {
-		ordered := append([]*Account(nil), candidates...)
-		sortAccountsByPriorityAndLastUsed(ordered, false)
-		if requireCompact {
-			ordered = prioritizeOpenAICompactAccounts(ordered)
-		}
-		for _, acc := range ordered {
-			fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, acc, requestedModel, false, requiredCapability)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, true)
+		selectionOrder := orderScores(scores, "load_error")
+		for _, item := range selectionOrder {
+			fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, item.Account, requestedModel, false, requiredCapability)
 			if fresh == nil {
 				continue
 			}
@@ -1861,12 +1877,13 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	}
 
 	// ============ Layer 3: Fallback wait ============
-	sortAccountsByPriorityAndLastUsed(candidates, false)
-	if requireCompact {
-		candidates = prioritizeOpenAICompactAccounts(candidates)
+	if loadMap == nil {
+		loadMap = make(map[int64]*AccountLoadInfo)
 	}
-	for _, acc := range candidates {
-		fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, acc, requestedModel, false, requiredCapability)
+	waitScores := buildSchedulerAccountWaitScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth)
+	waitOrder := orderScores(waitScores, "wait")
+	for _, item := range waitOrder {
+		fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, item.Account, requestedModel, false, requiredCapability)
 		if fresh == nil {
 			continue
 		}

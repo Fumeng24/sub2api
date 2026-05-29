@@ -809,6 +809,30 @@ export interface AdminGroup extends Group {
   sort_order: number
 }
 
+export type AccountSchedulingRole = 'primary' | 'backup'
+
+export interface AccountSchedulingEntry {
+  account_id: number
+  group_id: number
+  role: AccountSchedulingRole
+  weight: number
+  sort_order: number
+  account?: Account
+}
+
+export interface AccountSchedulingConfig {
+  accounts: AccountSchedulingEntry[]
+}
+
+export interface UpdateAccountSchedulingRequest {
+  accounts: Array<{
+    account_id: number
+    role: AccountSchedulingRole
+    weight: number
+    sort_order: number
+  }>
+}
+
 export interface ModelsListConfig {
   enabled: boolean
   models: string[]

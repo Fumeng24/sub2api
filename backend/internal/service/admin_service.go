@@ -1710,6 +1710,61 @@ func (s *adminServiceImpl) GetGroup(ctx context.Context, id int64) (*Group, erro
 	return s.groupRepo.GetByID(ctx, id)
 }
 
+func (s *adminServiceImpl) GetGroupAccountScheduling(ctx context.Context, groupID int64) ([]AccountSchedulingEntry, error) {
+	if groupID <= 0 {
+		return nil, ErrGroupNotFound
+	}
+	if _, err := s.groupRepo.GetByIDLite(ctx, groupID); err != nil {
+		return nil, err
+	}
+	repo, ok := s.groupRepo.(AccountSchedulingConfigRepository)
+	if !ok {
+		return nil, errors.New("account scheduling config repository not configured")
+	}
+	return repo.ListAccountSchedulingConfigs(ctx, groupID)
+}
+
+func (s *adminServiceImpl) UpdateGroupAccountScheduling(ctx context.Context, groupID int64, configs []AccountSchedulingConfig) error {
+	if groupID <= 0 {
+		return ErrGroupNotFound
+	}
+	if _, err := s.groupRepo.GetByIDLite(ctx, groupID); err != nil {
+		return err
+	}
+	repo, ok := s.groupRepo.(AccountSchedulingConfigRepository)
+	if !ok {
+		return errors.New("account scheduling config repository not configured")
+	}
+	normalized := make([]AccountSchedulingConfig, 0, len(configs))
+	for i, cfg := range configs {
+		if cfg.AccountID <= 0 {
+			return fmt.Errorf("account_id is required")
+		}
+		switch cfg.Role {
+		case "", AccountGroupRolePrimary:
+			cfg.Role = AccountGroupRolePrimary
+		case AccountGroupRoleBackup:
+			cfg.Role = AccountGroupRoleBackup
+		default:
+			return fmt.Errorf("invalid role %q", cfg.Role)
+		}
+		if cfg.Weight <= 0 {
+			return fmt.Errorf("weight must be > 0")
+		}
+		if cfg.SortOrder == 0 {
+			cfg.SortOrder = i + 1
+		}
+		normalized = append(normalized, cfg)
+	}
+	if err := repo.UpdateAccountSchedulingConfigs(ctx, groupID, normalized); err != nil {
+		return err
+	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, groupID)
+	}
+	return nil
+}
+
 func (s *adminServiceImpl) GetGroupModelsListCandidates(ctx context.Context, id int64, platform string) ([]string, error) {
 	platform = strings.TrimSpace(platform)
 	if id > 0 {

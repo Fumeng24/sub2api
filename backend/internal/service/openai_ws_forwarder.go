@@ -4014,7 +4014,8 @@ func (s *OpenAIGatewayService) SelectAccountByPreviousResponseID(
 	excludedIDs map[int64]struct{},
 	requireCompact bool,
 ) (*AccountSelectionResult, error) {
-	return s.selectAccountByPreviousResponseIDForCapability(ctx, groupID, previousResponseID, requestedModel, excludedIDs, "", requireCompact)
+	endpoint := schedulerEndpointFromOpenAIContext(ctx, requireCompact, "")
+	return s.selectAccountByPreviousResponseIDForCapability(ctx, groupID, previousResponseID, requestedModel, excludedIDs, "", requireCompact, endpoint)
 }
 
 func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
@@ -4025,6 +4026,7 @@ func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
 	excludedIDs map[int64]struct{},
 	requiredCapability OpenAIEndpointCapability,
 	requireCompact bool,
+	schedulerEndpoint string,
 ) (*AccountSelectionResult, error) {
 	if s == nil {
 		return nil, nil
@@ -4091,6 +4093,13 @@ func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
 		account = latest
 	}
 	if requireCompact && openAICompactSupportTier(account) == 0 {
+		_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
+		return nil, nil
+	}
+	if schedulerEndpoint == "" {
+		schedulerEndpoint = schedulerEndpointFromOpenAIContext(ctx, requireCompact, requiredCapability)
+	}
+	if !s.isOpenAIAccountSchedulerHealthAllowed(account.ID, requestedModel, schedulerEndpoint) {
 		_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 		return nil, nil
 	}

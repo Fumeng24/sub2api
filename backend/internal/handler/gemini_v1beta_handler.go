@@ -363,6 +363,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	// 判断是否真的绑定了粘性会话：有 sessionKey 且已经绑定到某个账号
 	hasBoundSession := sessionKey != "" && sessionBoundAccountID > 0
 	cleanedForUnknownBinding := false
+	schedulerEndpoint := GetInboundEndpoint(c)
 
 	fs := NewFailoverState(h.maxAccountSwitchesGemini, hasBoundSession)
 
@@ -374,7 +375,8 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	}
 
 	for {
-		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, modelName, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
+		scheduleCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
+		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(scheduleCtx, apiKey.GroupID, sessionKey, modelName, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
 		if err != nil {
 			if len(fs.FailedAccountIDs) == 0 {
 				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
@@ -491,7 +493,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
-				failoverAction := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, failoverErr)
+				failoverAction := fs.HandleFailoverErrorForRequest(scheduleCtx, h.gatewayService, account.ID, account.Platform, modelName, schedulerEndpoint, failoverErr)
 				switch failoverAction {
 				case FailoverContinue:
 					continue

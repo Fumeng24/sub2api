@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent"
@@ -13,7 +14,7 @@ import (
 )
 
 // AccountGroup holds the edge schema definition for the account_groups relationship.
-// It stores extra fields (priority, created_at) and uses a composite primary key.
+// It stores per-group scheduling config and uses a composite primary key.
 type AccountGroup struct {
 	ent.Schema
 }
@@ -32,6 +33,23 @@ func (AccountGroup) Fields() []ent.Field {
 		field.Int64("group_id"),
 		field.Int("priority").
 			Default(50),
+		field.String("role").
+			Default("primary").
+			Validate(func(v string) error {
+				switch v {
+				case "primary", "backup":
+					return nil
+				default:
+					return fmt.Errorf("invalid account group role %q", v)
+				}
+			}),
+		field.Int("weight").
+			Default(100).
+			Positive(),
+		field.Int("sort_order").
+			Default(50),
+		field.Bool("scheduling_configured").
+			Default(false),
 		field.Time("created_at").
 			Immutable().
 			Default(time.Now).
@@ -55,6 +73,7 @@ func (AccountGroup) Edges() []ent.Edge {
 func (AccountGroup) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("group_id"),
+		index.Fields("group_id", "role", "sort_order"),
 		index.Fields("priority"),
 	}
 }

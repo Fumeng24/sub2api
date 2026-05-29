@@ -16,6 +16,10 @@ type TempUnscheduler interface {
 	TempUnscheduleRetryableError(ctx context.Context, accountID int64, failoverErr *service.UpstreamFailoverError)
 }
 
+type AccountScheduleFailureReporter interface {
+	ReportAccountScheduleFailure(ctx context.Context, accountID int64, model, endpoint string, failoverErr *service.UpstreamFailoverError)
+}
+
 // FailoverAction 表示 failover 错误处理后的下一步动作
 type FailoverAction int
 
@@ -69,7 +73,22 @@ func (s *FailoverState) HandleFailoverError(
 	platform string,
 	failoverErr *service.UpstreamFailoverError,
 ) FailoverAction {
+	return s.HandleFailoverErrorForRequest(ctx, gatewayService, accountID, platform, "", "", failoverErr)
+}
+
+func (s *FailoverState) HandleFailoverErrorForRequest(
+	ctx context.Context,
+	gatewayService TempUnscheduler,
+	accountID int64,
+	platform string,
+	model string,
+	endpoint string,
+	failoverErr *service.UpstreamFailoverError,
+) FailoverAction {
 	s.LastFailoverErr = failoverErr
+	if reporter, ok := gatewayService.(AccountScheduleFailureReporter); ok {
+		reporter.ReportAccountScheduleFailure(ctx, accountID, model, endpoint, failoverErr)
+	}
 
 	// 缓存计费判断
 	if needForceCacheBilling(s.hasBoundSession, failoverErr) {

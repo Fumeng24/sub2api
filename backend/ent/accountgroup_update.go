@@ -78,6 +78,76 @@ func (_u *AccountGroupUpdate) AddPriority(v int) *AccountGroupUpdate {
 	return _u
 }
 
+// SetRole sets the "role" field.
+func (_u *AccountGroupUpdate) SetRole(v string) *AccountGroupUpdate {
+	_u.mutation.SetRole(v)
+	return _u
+}
+
+// SetNillableRole sets the "role" field if the given value is not nil.
+func (_u *AccountGroupUpdate) SetNillableRole(v *string) *AccountGroupUpdate {
+	if v != nil {
+		_u.SetRole(*v)
+	}
+	return _u
+}
+
+// SetWeight sets the "weight" field.
+func (_u *AccountGroupUpdate) SetWeight(v int) *AccountGroupUpdate {
+	_u.mutation.ResetWeight()
+	_u.mutation.SetWeight(v)
+	return _u
+}
+
+// SetNillableWeight sets the "weight" field if the given value is not nil.
+func (_u *AccountGroupUpdate) SetNillableWeight(v *int) *AccountGroupUpdate {
+	if v != nil {
+		_u.SetWeight(*v)
+	}
+	return _u
+}
+
+// AddWeight adds value to the "weight" field.
+func (_u *AccountGroupUpdate) AddWeight(v int) *AccountGroupUpdate {
+	_u.mutation.AddWeight(v)
+	return _u
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (_u *AccountGroupUpdate) SetSortOrder(v int) *AccountGroupUpdate {
+	_u.mutation.ResetSortOrder()
+	_u.mutation.SetSortOrder(v)
+	return _u
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_u *AccountGroupUpdate) SetNillableSortOrder(v *int) *AccountGroupUpdate {
+	if v != nil {
+		_u.SetSortOrder(*v)
+	}
+	return _u
+}
+
+// AddSortOrder adds value to the "sort_order" field.
+func (_u *AccountGroupUpdate) AddSortOrder(v int) *AccountGroupUpdate {
+	_u.mutation.AddSortOrder(v)
+	return _u
+}
+
+// SetSchedulingConfigured sets the "scheduling_configured" field.
+func (_u *AccountGroupUpdate) SetSchedulingConfigured(v bool) *AccountGroupUpdate {
+	_u.mutation.SetSchedulingConfigured(v)
+	return _u
+}
+
+// SetNillableSchedulingConfigured sets the "scheduling_configured" field if the given value is not nil.
+func (_u *AccountGroupUpdate) SetNillableSchedulingConfigured(v *bool) *AccountGroupUpdate {
+	if v != nil {
+		_u.SetSchedulingConfigured(*v)
+	}
+	return _u
+}
+
 // SetAccount sets the "account" edge to the Account entity.
 func (_u *AccountGroupUpdate) SetAccount(v *Account) *AccountGroupUpdate {
 	return _u.SetAccountID(v.ID)
@@ -134,6 +204,16 @@ func (_u *AccountGroupUpdate) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *AccountGroupUpdate) check() error {
+	if v, ok := _u.mutation.Role(); ok {
+		if err := accountgroup.RoleValidator(v); err != nil {
+			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "AccountGroup.role": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.Weight(); ok {
+		if err := accountgroup.WeightValidator(v); err != nil {
+			return &ValidationError{Name: "weight", err: fmt.Errorf(`ent: validator failed for field "AccountGroup.weight": %w`, err)}
+		}
+	}
 	if _u.mutation.AccountCleared() && len(_u.mutation.AccountIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "AccountGroup.account"`)
 	}
@@ -160,6 +240,24 @@ func (_u *AccountGroupUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if value, ok := _u.mutation.AddedPriority(); ok {
 		_spec.AddField(accountgroup.FieldPriority, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Role(); ok {
+		_spec.SetField(accountgroup.FieldRole, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Weight(); ok {
+		_spec.SetField(accountgroup.FieldWeight, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWeight(); ok {
+		_spec.AddField(accountgroup.FieldWeight, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SortOrder(); ok {
+		_spec.SetField(accountgroup.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSortOrder(); ok {
+		_spec.AddField(accountgroup.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SchedulingConfigured(); ok {
+		_spec.SetField(accountgroup.FieldSchedulingConfigured, field.TypeBool, value)
 	}
 	if _u.mutation.AccountCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -288,6 +386,76 @@ func (_u *AccountGroupUpdateOne) AddPriority(v int) *AccountGroupUpdateOne {
 	return _u
 }
 
+// SetRole sets the "role" field.
+func (_u *AccountGroupUpdateOne) SetRole(v string) *AccountGroupUpdateOne {
+	_u.mutation.SetRole(v)
+	return _u
+}
+
+// SetNillableRole sets the "role" field if the given value is not nil.
+func (_u *AccountGroupUpdateOne) SetNillableRole(v *string) *AccountGroupUpdateOne {
+	if v != nil {
+		_u.SetRole(*v)
+	}
+	return _u
+}
+
+// SetWeight sets the "weight" field.
+func (_u *AccountGroupUpdateOne) SetWeight(v int) *AccountGroupUpdateOne {
+	_u.mutation.ResetWeight()
+	_u.mutation.SetWeight(v)
+	return _u
+}
+
+// SetNillableWeight sets the "weight" field if the given value is not nil.
+func (_u *AccountGroupUpdateOne) SetNillableWeight(v *int) *AccountGroupUpdateOne {
+	if v != nil {
+		_u.SetWeight(*v)
+	}
+	return _u
+}
+
+// AddWeight adds value to the "weight" field.
+func (_u *AccountGroupUpdateOne) AddWeight(v int) *AccountGroupUpdateOne {
+	_u.mutation.AddWeight(v)
+	return _u
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (_u *AccountGroupUpdateOne) SetSortOrder(v int) *AccountGroupUpdateOne {
+	_u.mutation.ResetSortOrder()
+	_u.mutation.SetSortOrder(v)
+	return _u
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_u *AccountGroupUpdateOne) SetNillableSortOrder(v *int) *AccountGroupUpdateOne {
+	if v != nil {
+		_u.SetSortOrder(*v)
+	}
+	return _u
+}
+
+// AddSortOrder adds value to the "sort_order" field.
+func (_u *AccountGroupUpdateOne) AddSortOrder(v int) *AccountGroupUpdateOne {
+	_u.mutation.AddSortOrder(v)
+	return _u
+}
+
+// SetSchedulingConfigured sets the "scheduling_configured" field.
+func (_u *AccountGroupUpdateOne) SetSchedulingConfigured(v bool) *AccountGroupUpdateOne {
+	_u.mutation.SetSchedulingConfigured(v)
+	return _u
+}
+
+// SetNillableSchedulingConfigured sets the "scheduling_configured" field if the given value is not nil.
+func (_u *AccountGroupUpdateOne) SetNillableSchedulingConfigured(v *bool) *AccountGroupUpdateOne {
+	if v != nil {
+		_u.SetSchedulingConfigured(*v)
+	}
+	return _u
+}
+
 // SetAccount sets the "account" edge to the Account entity.
 func (_u *AccountGroupUpdateOne) SetAccount(v *Account) *AccountGroupUpdateOne {
 	return _u.SetAccountID(v.ID)
@@ -357,6 +525,16 @@ func (_u *AccountGroupUpdateOne) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *AccountGroupUpdateOne) check() error {
+	if v, ok := _u.mutation.Role(); ok {
+		if err := accountgroup.RoleValidator(v); err != nil {
+			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "AccountGroup.role": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.Weight(); ok {
+		if err := accountgroup.WeightValidator(v); err != nil {
+			return &ValidationError{Name: "weight", err: fmt.Errorf(`ent: validator failed for field "AccountGroup.weight": %w`, err)}
+		}
+	}
 	if _u.mutation.AccountCleared() && len(_u.mutation.AccountIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "AccountGroup.account"`)
 	}
@@ -402,6 +580,24 @@ func (_u *AccountGroupUpdateOne) sqlSave(ctx context.Context) (_node *AccountGro
 	}
 	if value, ok := _u.mutation.AddedPriority(); ok {
 		_spec.AddField(accountgroup.FieldPriority, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Role(); ok {
+		_spec.SetField(accountgroup.FieldRole, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Weight(); ok {
+		_spec.SetField(accountgroup.FieldWeight, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWeight(); ok {
+		_spec.AddField(accountgroup.FieldWeight, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SortOrder(); ok {
+		_spec.SetField(accountgroup.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSortOrder(); ok {
+		_spec.AddField(accountgroup.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SchedulingConfigured(); ok {
+		_spec.SetField(accountgroup.FieldSchedulingConfigured, field.TypeBool, value)
 	}
 	if _u.mutation.AccountCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -777,8 +777,9 @@ func (r *groupRepository) BindAccountsToGroup(ctx context.Context, groupID int64
 	// 使用 INSERT ... ON CONFLICT DO NOTHING 忽略已存在的绑定
 	_, err := r.sql.ExecContext(
 		ctx,
-		`INSERT INTO account_groups (account_id, group_id, priority, created_at)
-		 SELECT unnest($1::bigint[]), $2, 50, NOW()
+		`INSERT INTO account_groups (account_id, group_id, priority, role, weight, sort_order, scheduling_configured, created_at)
+		 SELECT account_id, $2, row_number() OVER (ORDER BY ord)::int, 'primary', 100, row_number() OVER (ORDER BY ord)::int, FALSE, NOW()
+		 FROM unnest($1::bigint[]) WITH ORDINALITY AS t(account_id, ord)
 		 ON CONFLICT (account_id, group_id) DO NOTHING`,
 		pq.Array(accountIDs),
 		groupID,
@@ -793,6 +794,153 @@ func (r *groupRepository) BindAccountsToGroup(ctx context.Context, groupID int64
 	}
 
 	return nil
+}
+
+func (r *groupRepository) ListAccountSchedulingConfigs(ctx context.Context, groupID int64) ([]service.AccountSchedulingEntry, error) {
+	entries, err := r.client.AccountGroup.Query().
+		Where(func(s *entsql.Selector) {
+			s.Where(entsql.EQ(s.C("group_id"), groupID))
+		}).
+		WithAccount().
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]service.AccountSchedulingEntry, 0, len(entries))
+	for _, entry := range entries {
+		item := service.AccountSchedulingEntry{
+			AccountSchedulingConfig: service.AccountSchedulingConfig{
+				AccountID: entry.AccountID,
+				Role:      entry.Role,
+				Weight:    entry.Weight,
+				SortOrder: entry.SortOrder,
+			},
+			GroupID: entry.GroupID,
+		}
+		if entry.Edges.Account != nil {
+			item.Account = accountEntityToService(entry.Edges.Account)
+		}
+		out = append(out, item)
+	}
+
+	sort.SliceStable(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if schedulerRoleRankForRepository(a.Role) != schedulerRoleRankForRepository(b.Role) {
+			return schedulerRoleRankForRepository(a.Role) < schedulerRoleRankForRepository(b.Role)
+		}
+		if a.SortOrder != b.SortOrder {
+			return a.SortOrder < b.SortOrder
+		}
+		return a.AccountID < b.AccountID
+	})
+
+	return out, nil
+}
+
+func (r *groupRepository) UpdateAccountSchedulingConfigs(ctx context.Context, groupID int64, configs []service.AccountSchedulingConfig) error {
+	if groupID <= 0 {
+		return service.ErrGroupNotFound
+	}
+	if len(configs) == 0 {
+		return nil
+	}
+
+	seen := make(map[int64]struct{}, len(configs))
+	updates := make([]service.AccountSchedulingConfig, 0, len(configs))
+	for _, cfg := range configs {
+		if cfg.AccountID <= 0 {
+			return fmt.Errorf("invalid account_id")
+		}
+		if _, exists := seen[cfg.AccountID]; exists {
+			return fmt.Errorf("duplicate account_id %d", cfg.AccountID)
+		}
+		seen[cfg.AccountID] = struct{}{}
+		switch cfg.Role {
+		case "", service.AccountGroupRolePrimary:
+			cfg.Role = service.AccountGroupRolePrimary
+		case service.AccountGroupRoleBackup:
+			cfg.Role = service.AccountGroupRoleBackup
+		default:
+			return fmt.Errorf("invalid role %q", cfg.Role)
+		}
+		if cfg.Weight <= 0 {
+			return fmt.Errorf("weight must be > 0")
+		}
+		if cfg.SortOrder == 0 {
+			cfg.SortOrder = len(updates) + 1
+		}
+		updates = append(updates, cfg)
+	}
+
+	accountIDs := make([]int64, 0, len(updates))
+	for _, cfg := range updates {
+		accountIDs = append(accountIDs, cfg.AccountID)
+	}
+
+	var existingCount int
+	if err := scanSingleRow(ctx, r.sql,
+		`SELECT COUNT(*)
+		 FROM account_groups
+		 WHERE group_id = $1 AND account_id = ANY($2)`,
+		[]any{groupID, pq.Array(accountIDs)},
+		&existingCount,
+	); err != nil {
+		return err
+	}
+	if existingCount != len(accountIDs) {
+		return fmt.Errorf("account scheduling config contains accounts not bound to group")
+	}
+
+	args := make([]any, 0, len(updates)*4+1)
+	roleCases := make([]string, 0, len(updates))
+	weightCases := make([]string, 0, len(updates))
+	sortCases := make([]string, 0, len(updates))
+	placeholder := 1
+	for _, cfg := range updates {
+		roleCases = append(roleCases, fmt.Sprintf("WHEN $%d THEN $%d", placeholder, placeholder+1))
+		weightCases = append(weightCases, fmt.Sprintf("WHEN $%d THEN $%d", placeholder, placeholder+2))
+		sortCases = append(sortCases, fmt.Sprintf("WHEN $%d THEN $%d", placeholder, placeholder+3))
+		args = append(args, cfg.AccountID, cfg.Role, cfg.Weight, cfg.SortOrder)
+		placeholder += 4
+	}
+	args = append(args, pq.Array(accountIDs), groupID)
+	idArrayPlaceholder := placeholder
+	groupPlaceholder := placeholder + 1
+
+	query := fmt.Sprintf(`
+		UPDATE account_groups
+		SET
+				role = CASE account_id %s ELSE role END,
+				weight = CASE account_id %s ELSE weight END,
+				sort_order = CASE account_id %s ELSE sort_order END,
+				scheduling_configured = TRUE
+		WHERE account_id = ANY($%d) AND group_id = $%d
+	`, strings.Join(roleCases, " "), strings.Join(weightCases, " "), strings.Join(sortCases, " "), idArrayPlaceholder, groupPlaceholder)
+
+	result, err := r.sql.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != int64(len(updates)) {
+		return fmt.Errorf("account scheduling config update affected %d rows, expected %d", affected, len(updates))
+	}
+
+	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &groupID, nil); err != nil {
+		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue account scheduling config update failed: group=%d err=%v", groupID, err)
+	}
+	return nil
+}
+
+func schedulerRoleRankForRepository(role string) int {
+	if role == service.AccountGroupRoleBackup {
+		return 1
+	}
+	return 0
 }
 
 // UpdateSortOrders 批量更新分组排序

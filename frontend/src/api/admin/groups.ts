@@ -9,6 +9,8 @@ import type {
   GroupPlatform,
   CreateGroupRequest,
   UpdateGroupRequest,
+  AccountSchedulingConfig,
+  UpdateAccountSchedulingRequest,
   GroupRateChangeNotificationPreview,
   GroupRateChangeNotificationRequest,
   GroupRateChangeNotificationSendResult,
@@ -114,6 +116,24 @@ export async function create(groupData: CreateGroupRequest): Promise<AdminGroup>
  */
 export async function update(id: number, updates: UpdateGroupRequest): Promise<AdminGroup> {
   const { data } = await apiClient.put<AdminGroup>(`/admin/groups/${id}`, updates)
+  return data
+}
+
+export async function getAccountScheduling(id: number): Promise<AccountSchedulingConfig> {
+  const { data } = await apiClient.get<AccountSchedulingConfig>(
+    `/admin/groups/${id}/account-scheduling`
+  )
+  return data
+}
+
+export async function updateAccountScheduling(
+  id: number,
+  payload: UpdateAccountSchedulingRequest
+): Promise<AccountSchedulingConfig> {
+  const { data } = await apiClient.put<AccountSchedulingConfig>(
+    `/admin/groups/${id}/account-scheduling`,
+    payload
+  )
   return data
 }
 
@@ -352,6 +372,8 @@ export const groupsAPI = {
   getModelsListCandidates,
   create,
   update,
+  getAccountScheduling,
+  updateAccountScheduling,
   previewRateChangeNotification,
   sendRateChangeNotification,
   delete: deleteGroup,

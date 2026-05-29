@@ -315,6 +315,13 @@
                 }}</span>
               </button>
               <button
+                @click="handleAccountScheduling(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-dark-700 dark:hover:text-blue-400"
+              >
+                <Icon name="swap" size="sm" />
+                <span class="text-xs">调度</span>
+              </button>
+              <button
                 @click="handleDelete(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
               >
@@ -3158,6 +3165,300 @@
       </template>
     </BaseDialog>
 
+    <!-- Account Scheduling Modal -->
+    <BaseDialog
+      :show="showAccountSchedulingModal"
+      :title="accountSchedulingTitle"
+      width="extra-wide"
+      @close="closeAccountSchedulingModal"
+    >
+      <div class="space-y-4">
+        <div
+          v-if="accountSchedulingGroup"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-dark-700 dark:bg-dark-800"
+        >
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                {{ accountSchedulingGroup.name }}
+              </span>
+              <span
+                :class="[
+                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                  accountSchedulingGroup.platform === 'anthropic'
+                    ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                    : accountSchedulingGroup.platform === 'openai'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      : accountSchedulingGroup.platform === 'antigravity'
+                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                ]"
+              >
+                <PlatformIcon :platform="accountSchedulingGroup.platform" size="xs" />
+                {{ t("admin.groups.platforms." + accountSchedulingGroup.platform) }}
+              </span>
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              主用优先调度；主用熔断、满载或不可调度时再进入备用池。
+            </p>
+          </div>
+          <div class="grid grid-cols-3 gap-3 text-center text-xs">
+            <div>
+              <div class="font-semibold text-gray-900 dark:text-white">
+                {{ accountSchedulingTotalCount }}
+              </div>
+              <div class="text-gray-500 dark:text-gray-400">账号</div>
+            </div>
+            <div>
+              <div class="font-semibold text-emerald-700 dark:text-emerald-300">
+                {{ primarySchedulingAccounts.length }}
+              </div>
+              <div class="text-gray-500 dark:text-gray-400">主用</div>
+            </div>
+            <div>
+              <div class="font-semibold text-amber-700 dark:text-amber-300">
+                {{ backupSchedulingAccounts.length }}
+              </div>
+              <div class="text-gray-500 dark:text-gray-400">备用</div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="accountSchedulingLoading" class="py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+          正在加载账号调度配置...
+        </div>
+        <div
+          v-else-if="accountSchedulingTotalCount === 0"
+          class="rounded-lg border border-dashed border-gray-300 py-12 text-center text-sm text-gray-500 dark:border-dark-600 dark:text-gray-400"
+        >
+          这个分组还没有绑定账号。
+        </div>
+        <div v-else class="grid gap-4 lg:grid-cols-2">
+          <section class="rounded-lg border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
+            <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-dark-700">
+              <div>
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">主用账号</h4>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  健康账号会按权重、延迟、失败率和并发负载均衡。
+                </p>
+              </div>
+              <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                {{ primarySchedulingWeightTotal }} 权重
+              </span>
+            </div>
+            <VueDraggable
+              v-model="primarySchedulingAccounts"
+              :animation="180"
+              :group="accountSchedulingDragGroup"
+              item-key="account_id"
+              class="min-h-40 space-y-2 p-3"
+              @change="normalizeSchedulingLists"
+            >
+              <div
+                v-for="(entry, index) in primarySchedulingAccounts"
+                :key="entry.account_id"
+                class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-600 dark:bg-dark-700/70"
+              >
+                <div class="flex items-start gap-3">
+                  <div class="mt-1 cursor-grab text-gray-400 active:cursor-grabbing">
+                    <Icon name="menu" size="sm" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                        {{ schedulingAccountName(entry) }}
+                      </span>
+                      <span class="text-xs text-gray-400">#{{ entry.account_id }}</span>
+                      <span :class="schedulingStatusBadgeClass(entry)">
+                        {{ schedulingAccountStatusLabel(entry) }}
+                      </span>
+                    </div>
+                    <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <span>{{ schedulingAccountPlatformLabel(entry) }}</span>
+                      <span>·</span>
+                      <span>{{ schedulingAccountTypeLabel(entry) }}</span>
+                      <span v-if="!schedulingAccountSchedulable(entry)" class="text-amber-600 dark:text-amber-300">
+                        不参与调度
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-dark-600 dark:hover:text-gray-200"
+                      :disabled="index === 0"
+                      @click="moveSchedulingEntry(primarySchedulingAccounts, index, index - 1)"
+                    >
+                      <Icon name="arrowUp" size="sm" />
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-dark-600 dark:hover:text-gray-200"
+                      :disabled="index === primarySchedulingAccounts.length - 1"
+                      @click="moveSchedulingEntry(primarySchedulingAccounts, index, index + 1)"
+                    >
+                      <Icon name="arrowDown" size="sm" />
+                    </button>
+                  </div>
+                </div>
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                    权重
+                    <input
+                      v-model.number="entry.weight"
+                      type="number"
+                      min="1"
+                      step="1"
+                      class="input h-8 w-24 py-1 text-sm"
+                      @blur="normalizeSchedulingLists"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="rounded px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-900/20"
+                    @click="moveSchedulingRole(entry, 'backup')"
+                  >
+                    设为备用
+                  </button>
+                </div>
+              </div>
+            </VueDraggable>
+          </section>
+
+          <section class="rounded-lg border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800">
+            <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-dark-700">
+              <div>
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">备用账号</h4>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  只在主用没有健康候选、全部满载或半开探测失败时接管。
+                </p>
+              </div>
+              <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                {{ backupSchedulingWeightTotal }} 权重
+              </span>
+            </div>
+            <VueDraggable
+              v-model="backupSchedulingAccounts"
+              :animation="180"
+              :group="accountSchedulingDragGroup"
+              item-key="account_id"
+              class="min-h-40 space-y-2 p-3"
+              @change="normalizeSchedulingLists"
+            >
+              <div
+                v-for="(entry, index) in backupSchedulingAccounts"
+                :key="entry.account_id"
+                class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-600 dark:bg-dark-700/70"
+              >
+                <div class="flex items-start gap-3">
+                  <div class="mt-1 cursor-grab text-gray-400 active:cursor-grabbing">
+                    <Icon name="menu" size="sm" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                        {{ schedulingAccountName(entry) }}
+                      </span>
+                      <span class="text-xs text-gray-400">#{{ entry.account_id }}</span>
+                      <span :class="schedulingStatusBadgeClass(entry)">
+                        {{ schedulingAccountStatusLabel(entry) }}
+                      </span>
+                    </div>
+                    <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <span>{{ schedulingAccountPlatformLabel(entry) }}</span>
+                      <span>·</span>
+                      <span>{{ schedulingAccountTypeLabel(entry) }}</span>
+                      <span v-if="!schedulingAccountSchedulable(entry)" class="text-amber-600 dark:text-amber-300">
+                        不参与调度
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-dark-600 dark:hover:text-gray-200"
+                      :disabled="index === 0"
+                      @click="moveSchedulingEntry(backupSchedulingAccounts, index, index - 1)"
+                    >
+                      <Icon name="arrowUp" size="sm" />
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-dark-600 dark:hover:text-gray-200"
+                      :disabled="index === backupSchedulingAccounts.length - 1"
+                      @click="moveSchedulingEntry(backupSchedulingAccounts, index, index + 1)"
+                    >
+                      <Icon name="arrowDown" size="sm" />
+                    </button>
+                  </div>
+                </div>
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                    权重
+                    <input
+                      v-model.number="entry.weight"
+                      type="number"
+                      min="1"
+                      step="1"
+                      class="input h-8 w-24 py-1 text-sm"
+                      @blur="normalizeSchedulingLists"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="rounded px-2.5 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                    @click="moveSchedulingRole(entry, 'primary')"
+                  >
+                    设为主用
+                  </button>
+                </div>
+              </div>
+            </VueDraggable>
+          </section>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3 pt-4">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            @click="closeAccountSchedulingModal"
+          >
+            {{ t("common.cancel") }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="accountSchedulingSaving || accountSchedulingLoading"
+            @click="saveAccountScheduling"
+          >
+            <svg
+              v-if="accountSchedulingSaving"
+              class="-ml-1 mr-2 h-4 w-4 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            {{ accountSchedulingSaving ? t("common.saving") : t("common.save") }}
+          </button>
+        </div>
+      </template>
+    </BaseDialog>
+
     <!-- Group Rate Multipliers Modal -->
     <GroupRateMultipliersModal
       :show="showRateMultipliersModal"
@@ -3184,6 +3485,8 @@ import { useOnboardingStore } from "@/stores/onboarding";
 import { adminAPI } from "@/api/admin";
 import type {
   AdminGroup,
+  AccountSchedulingEntry,
+  AccountSchedulingRole,
   GroupPlatform,
   GroupRateChangeNotificationPreview,
   GroupRateChangeNotificationSendResult,
@@ -3446,10 +3749,16 @@ const showCreateModal = ref(false);
 const showEditModal = ref(false);
 const showDeleteDialog = ref(false);
 const showSortModal = ref(false);
+const showAccountSchedulingModal = ref(false);
 const submitting = ref(false);
 const sortSubmitting = ref(false);
+const accountSchedulingLoading = ref(false);
+const accountSchedulingSaving = ref(false);
 const editingGroup = ref<AdminGroup | null>(null);
 const deletingGroup = ref<AdminGroup | null>(null);
+const accountSchedulingGroup = ref<AdminGroup | null>(null);
+const primarySchedulingAccounts = ref<AccountSchedulingEntry[]>([]);
+const backupSchedulingAccounts = ref<AccountSchedulingEntry[]>([]);
 const showRateMultipliersModal = ref(false);
 const rateMultipliersGroup = ref<AdminGroup | null>(null);
 const showRPMOverridesModal = ref(false);
@@ -3473,6 +3782,21 @@ const createModelsListSelectedCount = computed(
 );
 const editModelsListSelectedCount = computed(
   () => editModelsListState.items.filter((item) => item.selected).length,
+);
+const accountSchedulingDragGroup = { name: "account-scheduling", pull: true, put: true };
+const accountSchedulingTitle = computed(() =>
+  accountSchedulingGroup.value
+    ? `账号调度 - ${accountSchedulingGroup.value.name}`
+    : "账号调度",
+);
+const accountSchedulingTotalCount = computed(
+  () => primarySchedulingAccounts.value.length + backupSchedulingAccounts.value.length,
+);
+const primarySchedulingWeightTotal = computed(() =>
+  primarySchedulingAccounts.value.reduce((sum, entry) => sum + normalizeSchedulingWeight(entry.weight), 0),
+);
+const backupSchedulingWeightTotal = computed(() =>
+  backupSchedulingAccounts.value.reduce((sum, entry) => sum + normalizeSchedulingWeight(entry.weight), 0),
 );
 
 const createForm = reactive({
@@ -4128,6 +4452,187 @@ const loadCapacitySummary = async () => {
     capacityMap.value = map;
   } catch (error) {
     console.error("Error loading group capacity summary:", error);
+  }
+};
+
+const normalizeSchedulingWeight = (value: number | string | null | undefined): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return 1;
+  }
+  return Math.round(parsed);
+};
+
+const normalizeSchedulingEntry = (
+  entry: AccountSchedulingEntry,
+  role: AccountSchedulingRole,
+  index: number,
+): AccountSchedulingEntry => {
+  entry.role = role;
+  entry.weight = normalizeSchedulingWeight(entry.weight);
+  entry.sort_order = (index + 1) * 10;
+  return entry;
+};
+
+const normalizeSchedulingLists = () => {
+  primarySchedulingAccounts.value = primarySchedulingAccounts.value.map((entry, index) =>
+    normalizeSchedulingEntry(entry, "primary", index),
+  );
+  backupSchedulingAccounts.value = backupSchedulingAccounts.value.map((entry, index) =>
+    normalizeSchedulingEntry(entry, "backup", index),
+  );
+};
+
+const schedulingAccountName = (entry: AccountSchedulingEntry) => {
+  return entry.account?.name || `Account #${entry.account_id}`;
+};
+
+const schedulingAccountSchedulable = (entry: AccountSchedulingEntry) => {
+  return entry.account?.schedulable !== false;
+};
+
+const schedulingAccountStatusLabel = (entry: AccountSchedulingEntry) => {
+  const account = entry.account;
+  if (!account) return "未知";
+  if (!account.schedulable) return "停调度";
+  if (account.status === "active") return "正常";
+  if (account.status === "inactive") return "停用";
+  if (account.status === "error") return "异常";
+  return account.status;
+};
+
+const schedulingStatusBadgeClass = (entry: AccountSchedulingEntry) => {
+  const account = entry.account;
+  const base = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium";
+  if (!account || !account.schedulable) {
+    return `${base} bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300`;
+  }
+  if (account.status === "active") {
+    return `${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300`;
+  }
+  if (account.status === "inactive") {
+    return `${base} bg-gray-100 text-gray-600 dark:bg-dark-600 dark:text-gray-300`;
+  }
+  return `${base} bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300`;
+};
+
+const schedulingAccountPlatformLabel = (entry: AccountSchedulingEntry) => {
+  const platform = entry.account?.platform;
+  if (!platform) return "unknown";
+  const key = `admin.groups.platforms.${platform}`;
+  const translated = t(key);
+  return translated === key ? platform : translated;
+};
+
+const schedulingAccountTypeLabel = (entry: AccountSchedulingEntry) => {
+  const type = entry.account?.type || "unknown";
+  const key = `admin.accounts.types.${type}`;
+  const translated = t(key);
+  return translated === key ? type : translated;
+};
+
+const moveSchedulingEntry = (
+  list: AccountSchedulingEntry[],
+  fromIndex: number,
+  toIndex: number,
+) => {
+  if (fromIndex < 0 || toIndex < 0 || fromIndex >= list.length || toIndex >= list.length) {
+    return;
+  }
+  const [item] = list.splice(fromIndex, 1);
+  list.splice(toIndex, 0, item);
+  normalizeSchedulingLists();
+};
+
+const moveSchedulingRole = (
+  entry: AccountSchedulingEntry,
+  role: AccountSchedulingRole,
+) => {
+  const fromList = entry.role === "backup"
+    ? backupSchedulingAccounts.value
+    : primarySchedulingAccounts.value;
+  const toList = role === "backup"
+    ? backupSchedulingAccounts.value
+    : primarySchedulingAccounts.value;
+  const index = fromList.findIndex((item) => item.account_id === entry.account_id);
+  if (index !== -1) {
+    fromList.splice(index, 1);
+  }
+  entry.role = role;
+  toList.push(entry);
+  normalizeSchedulingLists();
+};
+
+const setAccountSchedulingEntries = (entries: AccountSchedulingEntry[]) => {
+  const normalized = entries.map((entry) => ({
+    ...entry,
+    role: entry.role === "backup" ? "backup" : "primary",
+    weight: normalizeSchedulingWeight(entry.weight),
+    sort_order: Number(entry.sort_order) || 0,
+  })) as AccountSchedulingEntry[];
+  primarySchedulingAccounts.value = normalized
+    .filter((entry) => entry.role !== "backup")
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.account_id - b.account_id);
+  backupSchedulingAccounts.value = normalized
+    .filter((entry) => entry.role === "backup")
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.account_id - b.account_id);
+  normalizeSchedulingLists();
+};
+
+const handleAccountScheduling = async (group: AdminGroup) => {
+  accountSchedulingGroup.value = group;
+  showAccountSchedulingModal.value = true;
+  accountSchedulingLoading.value = true;
+  primarySchedulingAccounts.value = [];
+  backupSchedulingAccounts.value = [];
+  try {
+    const data = await adminAPI.groups.getAccountScheduling(group.id);
+    setAccountSchedulingEntries(data.accounts || []);
+  } catch (error: any) {
+    appStore.showError(error?.message || "加载账号调度配置失败");
+    console.error("Error loading account scheduling:", error);
+  } finally {
+    accountSchedulingLoading.value = false;
+  }
+};
+
+const closeAccountSchedulingModal = () => {
+  if (accountSchedulingSaving.value) return;
+  showAccountSchedulingModal.value = false;
+  accountSchedulingGroup.value = null;
+  primarySchedulingAccounts.value = [];
+  backupSchedulingAccounts.value = [];
+};
+
+const saveAccountScheduling = async () => {
+  if (!accountSchedulingGroup.value) return;
+  normalizeSchedulingLists();
+  accountSchedulingSaving.value = true;
+  try {
+    const payload = {
+      accounts: [...primarySchedulingAccounts.value, ...backupSchedulingAccounts.value].map((entry) => ({
+        account_id: entry.account_id,
+        role: entry.role,
+        weight: normalizeSchedulingWeight(entry.weight),
+        sort_order: entry.sort_order,
+      })),
+    };
+    const data = await adminAPI.groups.updateAccountScheduling(
+      accountSchedulingGroup.value.id,
+      payload,
+    );
+    setAccountSchedulingEntries(data.accounts || []);
+    appStore.showSuccess("账号调度配置已保存");
+    showAccountSchedulingModal.value = false;
+    accountSchedulingGroup.value = null;
+    primarySchedulingAccounts.value = [];
+    backupSchedulingAccounts.value = [];
+    loadGroups();
+  } catch (error: any) {
+    appStore.showError(error?.message || "保存账号调度配置失败");
+    console.error("Error saving account scheduling:", error);
+  } finally {
+    accountSchedulingSaving.value = false;
   }
 };
 

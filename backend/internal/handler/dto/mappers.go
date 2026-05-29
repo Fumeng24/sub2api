@@ -401,9 +401,26 @@ func AccountGroupFromService(ag *service.AccountGroup) *AccountGroup {
 		AccountID: ag.AccountID,
 		GroupID:   ag.GroupID,
 		Priority:  ag.Priority,
+		Role:      ag.NormalizedRole(),
+		Weight:    ag.EffectiveWeight(),
+		SortOrder: ag.EffectiveSortOrder(),
 		CreatedAt: ag.CreatedAt,
 		Account:   AccountFromServiceShallow(ag.Account),
 		Group:     GroupFromServiceShallow(ag.Group),
+	}
+}
+
+func AccountSchedulingEntryFromService(entry *service.AccountSchedulingEntry) *AccountSchedulingEntry {
+	if entry == nil {
+		return nil
+	}
+	return &AccountSchedulingEntry{
+		AccountID: entry.AccountID,
+		GroupID:   entry.GroupID,
+		Role:      entry.Role,
+		Weight:    entry.Weight,
+		SortOrder: entry.SortOrder,
+		Account:   AccountFromServiceShallow(entry.Account),
 	}
 }
 

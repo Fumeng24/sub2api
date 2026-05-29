@@ -261,8 +261,28 @@ func init() {
 	accountgroupDescPriority := accountgroupFields[2].Descriptor()
 	// accountgroup.DefaultPriority holds the default value on creation for the priority field.
 	accountgroup.DefaultPriority = accountgroupDescPriority.Default.(int)
+	// accountgroupDescRole is the schema descriptor for role field.
+	accountgroupDescRole := accountgroupFields[3].Descriptor()
+	// accountgroup.DefaultRole holds the default value on creation for the role field.
+	accountgroup.DefaultRole = accountgroupDescRole.Default.(string)
+	// accountgroup.RoleValidator is a validator for the "role" field. It is called by the builders before save.
+	accountgroup.RoleValidator = accountgroupDescRole.Validators[0].(func(string) error)
+	// accountgroupDescWeight is the schema descriptor for weight field.
+	accountgroupDescWeight := accountgroupFields[4].Descriptor()
+	// accountgroup.DefaultWeight holds the default value on creation for the weight field.
+	accountgroup.DefaultWeight = accountgroupDescWeight.Default.(int)
+	// accountgroup.WeightValidator is a validator for the "weight" field. It is called by the builders before save.
+	accountgroup.WeightValidator = accountgroupDescWeight.Validators[0].(func(int) error)
+	// accountgroupDescSortOrder is the schema descriptor for sort_order field.
+	accountgroupDescSortOrder := accountgroupFields[5].Descriptor()
+	// accountgroup.DefaultSortOrder holds the default value on creation for the sort_order field.
+	accountgroup.DefaultSortOrder = accountgroupDescSortOrder.Default.(int)
+	// accountgroupDescSchedulingConfigured is the schema descriptor for scheduling_configured field.
+	accountgroupDescSchedulingConfigured := accountgroupFields[6].Descriptor()
+	// accountgroup.DefaultSchedulingConfigured holds the default value on creation for the scheduling_configured field.
+	accountgroup.DefaultSchedulingConfigured = accountgroupDescSchedulingConfigured.Default.(bool)
 	// accountgroupDescCreatedAt is the schema descriptor for created_at field.
-	accountgroupDescCreatedAt := accountgroupFields[3].Descriptor()
+	accountgroupDescCreatedAt := accountgroupFields[7].Descriptor()
 	// accountgroup.DefaultCreatedAt holds the default value on creation for the created_at field.
 	accountgroup.DefaultCreatedAt = accountgroupDescCreatedAt.Default.(func() time.Time)
 	announcementFields := schema.Announcement{}.Fields()

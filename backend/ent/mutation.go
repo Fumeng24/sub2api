@@ -4710,19 +4710,25 @@ func (m *AccountMutation) ResetEdge(name string) error {
 // AccountGroupMutation represents an operation that mutates the AccountGroup nodes in the graph.
 type AccountGroupMutation struct {
 	config
-	op             Op
-	typ            string
-	priority       *int
-	addpriority    *int
-	created_at     *time.Time
-	clearedFields  map[string]struct{}
-	account        *int64
-	clearedaccount bool
-	group          *int64
-	clearedgroup   bool
-	done           bool
-	oldValue       func(context.Context) (*AccountGroup, error)
-	predicates     []predicate.AccountGroup
+	op                    Op
+	typ                   string
+	priority              *int
+	addpriority           *int
+	role                  *string
+	weight                *int
+	addweight             *int
+	sort_order            *int
+	addsort_order         *int
+	scheduling_configured *bool
+	created_at            *time.Time
+	clearedFields         map[string]struct{}
+	account               *int64
+	clearedaccount        bool
+	group                 *int64
+	clearedgroup          bool
+	done                  bool
+	oldValue              func(context.Context) (*AccountGroup, error)
+	predicates            []predicate.AccountGroup
 }
 
 var _ ent.Mutation = (*AccountGroupMutation)(nil)
@@ -4840,6 +4846,122 @@ func (m *AccountGroupMutation) ResetPriority() {
 	m.addpriority = nil
 }
 
+// SetRole sets the "role" field.
+func (m *AccountGroupMutation) SetRole(s string) {
+	m.role = &s
+}
+
+// Role returns the value of the "role" field in the mutation.
+func (m *AccountGroupMutation) Role() (r string, exists bool) {
+	v := m.role
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRole resets all changes to the "role" field.
+func (m *AccountGroupMutation) ResetRole() {
+	m.role = nil
+}
+
+// SetWeight sets the "weight" field.
+func (m *AccountGroupMutation) SetWeight(i int) {
+	m.weight = &i
+	m.addweight = nil
+}
+
+// Weight returns the value of the "weight" field in the mutation.
+func (m *AccountGroupMutation) Weight() (r int, exists bool) {
+	v := m.weight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// AddWeight adds i to the "weight" field.
+func (m *AccountGroupMutation) AddWeight(i int) {
+	if m.addweight != nil {
+		*m.addweight += i
+	} else {
+		m.addweight = &i
+	}
+}
+
+// AddedWeight returns the value that was added to the "weight" field in this mutation.
+func (m *AccountGroupMutation) AddedWeight() (r int, exists bool) {
+	v := m.addweight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWeight resets all changes to the "weight" field.
+func (m *AccountGroupMutation) ResetWeight() {
+	m.weight = nil
+	m.addweight = nil
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (m *AccountGroupMutation) SetSortOrder(i int) {
+	m.sort_order = &i
+	m.addsort_order = nil
+}
+
+// SortOrder returns the value of the "sort_order" field in the mutation.
+func (m *AccountGroupMutation) SortOrder() (r int, exists bool) {
+	v := m.sort_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// AddSortOrder adds i to the "sort_order" field.
+func (m *AccountGroupMutation) AddSortOrder(i int) {
+	if m.addsort_order != nil {
+		*m.addsort_order += i
+	} else {
+		m.addsort_order = &i
+	}
+}
+
+// AddedSortOrder returns the value that was added to the "sort_order" field in this mutation.
+func (m *AccountGroupMutation) AddedSortOrder() (r int, exists bool) {
+	v := m.addsort_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSortOrder resets all changes to the "sort_order" field.
+func (m *AccountGroupMutation) ResetSortOrder() {
+	m.sort_order = nil
+	m.addsort_order = nil
+}
+
+// SetSchedulingConfigured sets the "scheduling_configured" field.
+func (m *AccountGroupMutation) SetSchedulingConfigured(b bool) {
+	m.scheduling_configured = &b
+}
+
+// SchedulingConfigured returns the value of the "scheduling_configured" field in the mutation.
+func (m *AccountGroupMutation) SchedulingConfigured() (r bool, exists bool) {
+	v := m.scheduling_configured
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSchedulingConfigured resets all changes to the "scheduling_configured" field.
+func (m *AccountGroupMutation) ResetSchedulingConfigured() {
+	m.scheduling_configured = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *AccountGroupMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -4947,7 +5069,7 @@ func (m *AccountGroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountGroupMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 8)
 	if m.account != nil {
 		fields = append(fields, accountgroup.FieldAccountID)
 	}
@@ -4956,6 +5078,18 @@ func (m *AccountGroupMutation) Fields() []string {
 	}
 	if m.priority != nil {
 		fields = append(fields, accountgroup.FieldPriority)
+	}
+	if m.role != nil {
+		fields = append(fields, accountgroup.FieldRole)
+	}
+	if m.weight != nil {
+		fields = append(fields, accountgroup.FieldWeight)
+	}
+	if m.sort_order != nil {
+		fields = append(fields, accountgroup.FieldSortOrder)
+	}
+	if m.scheduling_configured != nil {
+		fields = append(fields, accountgroup.FieldSchedulingConfigured)
 	}
 	if m.created_at != nil {
 		fields = append(fields, accountgroup.FieldCreatedAt)
@@ -4974,6 +5108,14 @@ func (m *AccountGroupMutation) Field(name string) (ent.Value, bool) {
 		return m.GroupID()
 	case accountgroup.FieldPriority:
 		return m.Priority()
+	case accountgroup.FieldRole:
+		return m.Role()
+	case accountgroup.FieldWeight:
+		return m.Weight()
+	case accountgroup.FieldSortOrder:
+		return m.SortOrder()
+	case accountgroup.FieldSchedulingConfigured:
+		return m.SchedulingConfigured()
 	case accountgroup.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -5013,6 +5155,34 @@ func (m *AccountGroupMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPriority(v)
 		return nil
+	case accountgroup.FieldRole:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRole(v)
+		return nil
+	case accountgroup.FieldWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWeight(v)
+		return nil
+	case accountgroup.FieldSortOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSortOrder(v)
+		return nil
+	case accountgroup.FieldSchedulingConfigured:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSchedulingConfigured(v)
+		return nil
 	case accountgroup.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -5031,6 +5201,12 @@ func (m *AccountGroupMutation) AddedFields() []string {
 	if m.addpriority != nil {
 		fields = append(fields, accountgroup.FieldPriority)
 	}
+	if m.addweight != nil {
+		fields = append(fields, accountgroup.FieldWeight)
+	}
+	if m.addsort_order != nil {
+		fields = append(fields, accountgroup.FieldSortOrder)
+	}
 	return fields
 }
 
@@ -5041,6 +5217,10 @@ func (m *AccountGroupMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case accountgroup.FieldPriority:
 		return m.AddedPriority()
+	case accountgroup.FieldWeight:
+		return m.AddedWeight()
+	case accountgroup.FieldSortOrder:
+		return m.AddedSortOrder()
 	}
 	return nil, false
 }
@@ -5056,6 +5236,20 @@ func (m *AccountGroupMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddPriority(v)
+		return nil
+	case accountgroup.FieldWeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWeight(v)
+		return nil
+	case accountgroup.FieldSortOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSortOrder(v)
 		return nil
 	}
 	return fmt.Errorf("unknown AccountGroup numeric field %s", name)
@@ -5092,6 +5286,18 @@ func (m *AccountGroupMutation) ResetField(name string) error {
 		return nil
 	case accountgroup.FieldPriority:
 		m.ResetPriority()
+		return nil
+	case accountgroup.FieldRole:
+		m.ResetRole()
+		return nil
+	case accountgroup.FieldWeight:
+		m.ResetWeight()
+		return nil
+	case accountgroup.FieldSortOrder:
+		m.ResetSortOrder()
+		return nil
+	case accountgroup.FieldSchedulingConfigured:
+		m.ResetSchedulingConfigured()
 		return nil
 	case accountgroup.FieldCreatedAt:
 		m.ResetCreatedAt()

@@ -264,10 +264,22 @@ type AccountGroup struct {
 	AccountID int64     `json:"account_id"`
 	GroupID   int64     `json:"group_id"`
 	Priority  int       `json:"priority"`
+	Role      string    `json:"role"`
+	Weight    int       `json:"weight"`
+	SortOrder int       `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
 
 	Account *Account `json:"account,omitempty"`
 	Group   *Group   `json:"group,omitempty"`
+}
+
+type AccountSchedulingEntry struct {
+	AccountID int64    `json:"account_id"`
+	GroupID   int64    `json:"group_id"`
+	Role      string   `json:"role"`
+	Weight    int      `json:"weight"`
+	SortOrder int      `json:"sort_order"`
+	Account   *Account `json:"account,omitempty"`
 }
 
 type Proxy struct {

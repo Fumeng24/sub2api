@@ -835,6 +835,10 @@ func (r *accountRepository) AddToGroup(ctx context.Context, accountID, groupID i
 		SetAccountID(accountID).
 		SetGroupID(groupID).
 		SetPriority(priority).
+		SetRole(service.AccountGroupRolePrimary).
+		SetWeight(100).
+		SetSortOrder(priority).
+		SetSchedulingConfigured(false).
 		Save(ctx)
 	if err != nil {
 		return err
@@ -913,10 +917,15 @@ func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, gro
 
 	builders := make([]*dbent.AccountGroupCreate, 0, len(groupIDs))
 	for i, groupID := range groupIDs {
+		sortOrder := i + 1
 		builders = append(builders, txClient.AccountGroup.Create().
 			SetAccountID(accountID).
 			SetGroupID(groupID).
-			SetPriority(i+1),
+			SetPriority(sortOrder).
+			SetRole(service.AccountGroupRolePrimary).
+			SetWeight(100).
+			SetSortOrder(sortOrder).
+			SetSchedulingConfigured(false),
 		)
 	}
 
@@ -1676,7 +1685,7 @@ func (r *accountRepository) loadAccountGroups(ctx context.Context, accountIDs []
 	entries, err := r.client.AccountGroup.Query().
 		Where(dbaccountgroup.AccountIDIn(accountIDs...)).
 		WithGroup().
-		Order(dbaccountgroup.ByAccountID(), dbaccountgroup.ByPriority()).
+		Order(dbaccountgroup.ByAccountID(), dbaccountgroup.BySortOrder(), dbaccountgroup.ByPriority()).
 		All(ctx)
 	if err != nil {
 		return nil, nil, nil, err
@@ -1685,11 +1694,15 @@ func (r *accountRepository) loadAccountGroups(ctx context.Context, accountIDs []
 	for _, ag := range entries {
 		groupSvc := groupEntityToService(ag.Edges.Group)
 		agSvc := service.AccountGroup{
-			AccountID: ag.AccountID,
-			GroupID:   ag.GroupID,
-			Priority:  ag.Priority,
-			CreatedAt: ag.CreatedAt,
-			Group:     groupSvc,
+			AccountID:            ag.AccountID,
+			GroupID:              ag.GroupID,
+			Priority:             ag.Priority,
+			Role:                 ag.Role,
+			Weight:               ag.Weight,
+			SortOrder:            ag.SortOrder,
+			SchedulingConfigured: ag.SchedulingConfigured,
+			CreatedAt:            ag.CreatedAt,
+			Group:                groupSvc,
 		}
 		accountGroupsByAccount[ag.AccountID] = append(accountGroupsByAccount[ag.AccountID], agSvc)
 		groupIDsByAccount[ag.AccountID] = append(groupIDsByAccount[ag.AccountID], ag.GroupID)

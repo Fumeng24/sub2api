@@ -23,6 +23,14 @@ type AccountGroup struct {
 	GroupID int64 `json:"group_id,omitempty"`
 	// Priority holds the value of the "priority" field.
 	Priority int `json:"priority,omitempty"`
+	// Role holds the value of the "role" field.
+	Role string `json:"role,omitempty"`
+	// Weight holds the value of the "weight" field.
+	Weight int `json:"weight,omitempty"`
+	// SortOrder holds the value of the "sort_order" field.
+	SortOrder int `json:"sort_order,omitempty"`
+	// SchedulingConfigured holds the value of the "scheduling_configured" field.
+	SchedulingConfigured bool `json:"scheduling_configured,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -69,8 +77,12 @@ func (*AccountGroup) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case accountgroup.FieldAccountID, accountgroup.FieldGroupID, accountgroup.FieldPriority:
+		case accountgroup.FieldSchedulingConfigured:
+			values[i] = new(sql.NullBool)
+		case accountgroup.FieldAccountID, accountgroup.FieldGroupID, accountgroup.FieldPriority, accountgroup.FieldWeight, accountgroup.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
+		case accountgroup.FieldRole:
+			values[i] = new(sql.NullString)
 		case accountgroup.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
 		default:
@@ -105,6 +117,30 @@ func (_m *AccountGroup) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field priority", values[i])
 			} else if value.Valid {
 				_m.Priority = int(value.Int64)
+			}
+		case accountgroup.FieldRole:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field role", values[i])
+			} else if value.Valid {
+				_m.Role = value.String
+			}
+		case accountgroup.FieldWeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field weight", values[i])
+			} else if value.Valid {
+				_m.Weight = int(value.Int64)
+			}
+		case accountgroup.FieldSortOrder:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field sort_order", values[i])
+			} else if value.Valid {
+				_m.SortOrder = int(value.Int64)
+			}
+		case accountgroup.FieldSchedulingConfigured:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field scheduling_configured", values[i])
+			} else if value.Valid {
+				_m.SchedulingConfigured = value.Bool
 			}
 		case accountgroup.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -165,6 +201,18 @@ func (_m *AccountGroup) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("priority=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Priority))
+	builder.WriteString(", ")
+	builder.WriteString("role=")
+	builder.WriteString(_m.Role)
+	builder.WriteString(", ")
+	builder.WriteString("weight=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Weight))
+	builder.WriteString(", ")
+	builder.WriteString("sort_order=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SortOrder))
+	builder.WriteString(", ")
+	builder.WriteString("scheduling_configured=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SchedulingConfigured))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

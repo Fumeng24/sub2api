@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -21,6 +22,11 @@ type GroupHandler struct {
 	adminService         service.AdminService
 	dashboardService     *service.DashboardService
 	groupCapacityService *service.GroupCapacityService
+}
+
+type groupAccountSchedulingService interface {
+	GetGroupAccountScheduling(ctx context.Context, groupID int64) ([]service.AccountSchedulingEntry, error)
+	UpdateGroupAccountScheduling(ctx context.Context, groupID int64, configs []service.AccountSchedulingConfig) error
 }
 
 type optionalLimitField struct {
@@ -169,6 +175,17 @@ type GroupRateChangeNotificationRequest struct {
 	Message           string     `json:"message"`
 }
 
+type AccountSchedulingConfigRequest struct {
+	AccountID int64  `json:"account_id" binding:"required"`
+	Role      string `json:"role" binding:"omitempty,oneof=primary backup"`
+	Weight    int    `json:"weight"`
+	SortOrder int    `json:"sort_order"`
+}
+
+type UpdateAccountSchedulingRequest struct {
+	Accounts []AccountSchedulingConfigRequest `json:"accounts" binding:"required"`
+}
+
 // List handles listing all groups with pagination
 // GET /api/v1/admin/groups
 func (h *GroupHandler) List(c *gin.Context) {
@@ -246,6 +263,81 @@ func (h *GroupHandler) GetByID(c *gin.Context) {
 	}
 
 	response.Success(c, dto.GroupFromServiceAdmin(group))
+}
+
+// GetAccountScheduling returns per-group account role/weight/sort configuration.
+// GET /api/v1/admin/groups/:id/account-scheduling
+func (h *GroupHandler) GetAccountScheduling(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+
+	schedulingSvc, ok := h.adminService.(groupAccountSchedulingService)
+	if !ok {
+		response.Error(c, 500, "Account scheduling service is not configured")
+		return
+	}
+
+	entries, err := schedulingSvc.GetGroupAccountScheduling(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	out := make([]dto.AccountSchedulingEntry, 0, len(entries))
+	for i := range entries {
+		out = append(out, *dto.AccountSchedulingEntryFromService(&entries[i]))
+	}
+	response.Success(c, gin.H{"accounts": out})
+}
+
+// UpdateAccountScheduling updates per-group account role/weight/sort configuration.
+// PUT /api/v1/admin/groups/:id/account-scheduling
+func (h *GroupHandler) UpdateAccountScheduling(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+
+	var req UpdateAccountSchedulingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	configs := make([]service.AccountSchedulingConfig, 0, len(req.Accounts))
+	for _, item := range req.Accounts {
+		configs = append(configs, service.AccountSchedulingConfig{
+			AccountID: item.AccountID,
+			Role:      item.Role,
+			Weight:    item.Weight,
+			SortOrder: item.SortOrder,
+		})
+	}
+
+	schedulingSvc, ok := h.adminService.(groupAccountSchedulingService)
+	if !ok {
+		response.Error(c, 500, "Account scheduling service is not configured")
+		return
+	}
+	if err := schedulingSvc.UpdateGroupAccountScheduling(c.Request.Context(), groupID, configs); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	entries, err := schedulingSvc.GetGroupAccountScheduling(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	out := make([]dto.AccountSchedulingEntry, 0, len(entries))
+	for i := range entries {
+		out = append(out, *dto.AccountSchedulingEntryFromService(&entries[i]))
+	}
+	response.Success(c, gin.H{"accounts": out})
 }
 
 // GetModelsListCandidates handles getting candidate model IDs for custom /v1/models list.
