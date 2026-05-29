@@ -128,19 +128,6 @@ type upstreamSub2APIUsage struct {
 	Unit      string   `json:"unit"`
 }
 
-type upstreamSub2APIEnvelope struct {
-	Code    *int            `json:"code"`
-	Message string          `json:"message"`
-	Data    json.RawMessage `json:"data"`
-}
-
-type upstreamNewAPIEnvelope struct {
-	Success *bool           `json:"success"`
-	Code    *bool           `json:"code"`
-	Message string          `json:"message"`
-	Data    json.RawMessage `json:"data"`
-}
-
 type upstreamNewAPILoginUser struct {
 	ID         int64 `json:"id"`
 	Require2FA bool  `json:"require_2fa"`
@@ -531,16 +518,31 @@ func (p *upstreamSub2APIStatusClient) fetchGroupRates(ctx context.Context, root,
 }
 
 func (p *upstreamSub2APIStatusClient) findAPIKey(ctx context.Context, root, email, password, apiKey string) (*upstreamSub2APIKey, error) {
+	for _, basePath := range []string{"/api/v1/keys", "/api/v1/api-keys"} {
+		matchedKey, status, err := p.findAPIKeyAtPath(ctx, root, email, password, apiKey, basePath)
+		if err == nil {
+			return matchedKey, nil
+		}
+		if status == http.StatusNotFound {
+			continue
+		}
+		return nil, err
+	}
+	return nil, errors.New("upstream api key list endpoint was not found")
+}
+
+func (p *upstreamSub2APIStatusClient) findAPIKeyAtPath(ctx context.Context, root, email, password, apiKey, basePath string) (*upstreamSub2APIKey, int, error) {
 	page := 1
 	for {
-		path := fmt.Sprintf("/api/v1/api-keys?page=%d&page_size=%d", page, upstreamSub2APIPageSize)
+		path := fmt.Sprintf("%s?page=%d&page_size=%d", basePath, page, upstreamSub2APIPageSize)
 		var keysPage upstreamSub2APIKeysPage
-		if err := p.getAuthenticatedJSON(ctx, root, email, password, path, &keysPage); err != nil {
-			return nil, err
+		status, err := p.getAuthenticatedJSONWithStatus(ctx, root, email, password, path, &keysPage)
+		if err != nil {
+			return nil, status, err
 		}
 		for i := range keysPage.Items {
 			if strings.TrimSpace(keysPage.Items[i].Key) == apiKey {
-				return &keysPage.Items[i], nil
+				return &keysPage.Items[i], status, nil
 			}
 		}
 		if keysPage.Pages > 0 {
@@ -556,7 +558,7 @@ func (p *upstreamSub2APIStatusClient) findAPIKey(ctx context.Context, root, emai
 		}
 		page++
 	}
-	return nil, nil
+	return nil, http.StatusOK, nil
 }
 
 func (p *upstreamSub2APIStatusClient) fetchUsage(ctx context.Context, root, apiKey string) (*upstreamSub2APIUsage, error) {
@@ -603,20 +605,25 @@ func (p *upstreamSub2APIStatusClient) findNewAPIKey(ctx context.Context, root, u
 }
 
 func (p *upstreamSub2APIStatusClient) getAuthenticatedJSON(ctx context.Context, root, email, password, path string, out any) error {
+	_, err := p.getAuthenticatedJSONWithStatus(ctx, root, email, password, path, out)
+	return err
+}
+
+func (p *upstreamSub2APIStatusClient) getAuthenticatedJSONWithStatus(ctx context.Context, root, email, password, path string, out any) (int, error) {
 	token, err := p.login(ctx, root, email, password, false)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	status, err := p.doJSON(ctx, http.MethodGet, joinUpstreamSub2APIURL(root, path), token, nil, out)
 	if status == http.StatusUnauthorized {
 		p.invalidateToken(root, email, password)
 		token, err = p.login(ctx, root, email, password, true)
 		if err != nil {
-			return err
+			return status, err
 		}
-		_, err = p.doJSON(ctx, http.MethodGet, joinUpstreamSub2APIURL(root, path), token, nil, out)
+		status, err = p.doJSON(ctx, http.MethodGet, joinUpstreamSub2APIURL(root, path), token, nil, out)
 	}
-	return err
+	return status, err
 }
 
 func (p *upstreamSub2APIStatusClient) getNewAPIAuthenticatedJSON(ctx context.Context, root, username, password, path string, out any) error {
@@ -833,53 +840,126 @@ func (p *upstreamSub2APIStatusClient) doNewAPIJSON(ctx context.Context, method, 
 }
 
 func unwrapUpstreamSub2APIEnvelope(data []byte) ([]byte, error) {
-	trimmed := bytes.TrimSpace(data)
-	if len(trimmed) == 0 {
-		return trimmed, nil
-	}
-	var env upstreamSub2APIEnvelope
-	if err := json.Unmarshal(trimmed, &env); err == nil && env.Code != nil {
-		if *env.Code != 0 {
-			msg := strings.TrimSpace(env.Message)
-			if msg == "" {
-				msg = "upstream api returned an error"
-			}
-			return nil, errors.New(msg)
-		}
-		return env.Data, nil
-	}
-	return trimmed, nil
+	return unwrapUpstreamAPIEnvelope(data, "upstream api returned an error")
 }
 
 func unwrapUpstreamNewAPIEnvelope(data []byte) ([]byte, error) {
+	return unwrapUpstreamAPIEnvelope(data, "upstream New API returned an error")
+}
+
+func unwrapUpstreamAPIEnvelope(data []byte, defaultError string) ([]byte, error) {
 	trimmed := bytes.TrimSpace(data)
 	if len(trimmed) == 0 {
 		return trimmed, nil
 	}
-	var env upstreamNewAPIEnvelope
-	if err := json.Unmarshal(trimmed, &env); err == nil {
-		if env.Success != nil {
-			if !*env.Success {
-				msg := strings.TrimSpace(env.Message)
-				if msg == "" {
-					msg = "upstream New API returned an error"
-				}
-				return nil, errors.New(msg)
-			}
-			return env.Data, nil
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(trimmed, &fields); err != nil {
+		return trimmed, nil
+	}
+
+	successRaw, hasSuccess := fields["success"]
+	codeRaw, hasCode := fields["code"]
+	if !hasSuccess && !hasCode {
+		return trimmed, nil
+	}
+
+	if hasSuccess {
+		success, ok := parseUpstreamEnvelopeSuccess(successRaw)
+		if !ok {
+			return trimmed, nil
 		}
-		if env.Code != nil {
-			if !*env.Code {
-				msg := strings.TrimSpace(env.Message)
-				if msg == "" {
-					msg = "upstream New API returned an error"
-				}
-				return nil, errors.New(msg)
+		if !success {
+			return nil, errors.New(upstreamEnvelopeMessage(fields, defaultError))
+		}
+		return fields["data"], nil
+	}
+
+	success, ok := parseUpstreamEnvelopeCodeSuccess(codeRaw)
+	if !ok {
+		return trimmed, nil
+	}
+	if !success {
+		return nil, errors.New(upstreamEnvelopeMessage(fields, defaultError))
+	}
+	return fields["data"], nil
+}
+
+func parseUpstreamEnvelopeSuccess(raw json.RawMessage) (bool, bool) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return false, false
+	}
+	var value bool
+	if err := json.Unmarshal(raw, &value); err == nil {
+		return value, true
+	}
+	var number float64
+	if err := json.Unmarshal(raw, &number); err == nil {
+		return number != 0, true
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		return parseUpstreamEnvelopeSuccessText(text)
+	}
+	return false, false
+}
+
+func parseUpstreamEnvelopeCodeSuccess(raw json.RawMessage) (bool, bool) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return false, false
+	}
+	var value bool
+	if err := json.Unmarshal(raw, &value); err == nil {
+		return value, true
+	}
+	var number float64
+	if err := json.Unmarshal(raw, &number); err == nil {
+		return number == 0 || number == http.StatusOK, true
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		text = strings.TrimSpace(strings.ToLower(text))
+		switch text {
+		case "0", "200", "ok", "success", "true":
+			return true, true
+		case "false", "error", "failed", "fail":
+			return false, true
+		default:
+			number, err := strconv.ParseFloat(text, 64)
+			if err == nil {
+				return number == 0 || number == http.StatusOK, true
 			}
-			return env.Data, nil
 		}
 	}
-	return trimmed, nil
+	return false, false
+}
+
+func parseUpstreamEnvelopeSuccessText(text string) (bool, bool) {
+	switch strings.TrimSpace(strings.ToLower(text)) {
+	case "1", "true", "ok", "success":
+		return true, true
+	case "0", "false", "error", "failed", "fail":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+func upstreamEnvelopeMessage(fields map[string]json.RawMessage, fallback string) string {
+	for _, key := range []string{"message", "msg", "error"} {
+		raw, ok := fields[key]
+		if !ok {
+			continue
+		}
+		var text string
+		if err := json.Unmarshal(raw, &text); err == nil {
+			if text = strings.TrimSpace(text); text != "" {
+				return text
+			}
+		}
+	}
+	return fallback
 }
 
 func (p *upstreamSub2APIStatusClient) getCachedStatus(key string, now time.Time) (UpstreamSub2APIAccountStatus, bool) {
