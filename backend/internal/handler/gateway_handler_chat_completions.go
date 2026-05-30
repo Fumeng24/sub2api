@@ -181,8 +181,9 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 	}
 
 	for {
-		scheduleCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
-		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(scheduleCtx, apiKey.GroupID, selectionSessionHash, reqModel, fs.FailedAccountIDs, "", int64(0))
+		selectionCtx, cancelSelection := failoverAccountSelectionContext(c.Request.Context(), schedulerEndpoint, fs.LastFailoverErr != nil || len(fs.FailedAccountIDs) > 0)
+		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(selectionCtx, apiKey.GroupID, selectionSessionHash, reqModel, fs.FailedAccountIDs, "", int64(0))
+		cancelSelection()
 		if err != nil {
 			if len(fs.FailedAccountIDs) == 0 {
 				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
@@ -270,7 +271,8 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 					h.handleCCFailoverExhausted(c, failoverErr, true)
 					return
 				}
-				action := fs.HandleFailoverErrorForRequest(scheduleCtx, h.gatewayService, account.ID, account.Platform, reqModel, schedulerEndpoint, failoverErr)
+				actionCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
+				action := fs.HandleFailoverErrorForRequest(actionCtx, h.gatewayService, account.ID, account.Platform, reqModel, schedulerEndpoint, failoverErr)
 				switch action {
 				case FailoverContinue:
 					continue

@@ -131,6 +131,9 @@ type OpsUpstreamErrorEvent struct {
 	// Kind: http_error | request_error | retry_exhausted | failover
 	Kind string `json:"kind,omitempty"`
 
+	CooldownApplied bool   `json:"cooldown_applied,omitempty"`
+	CooldownReason  string `json:"cooldown_reason,omitempty"`
+
 	Message string `json:"message,omitempty"`
 	Detail  string `json:"detail,omitempty"`
 }
@@ -147,6 +150,15 @@ func appendOpsUpstreamError(c *gin.Context, ev OpsUpstreamErrorEvent) {
 	ev.UpstreamRequestBody = strings.TrimSpace(ev.UpstreamRequestBody)
 	ev.UpstreamResponseBody = strings.TrimSpace(ev.UpstreamResponseBody)
 	ev.Kind = strings.TrimSpace(ev.Kind)
+	if !ev.CooldownApplied && ev.CooldownReason == "" &&
+		ev.Platform == PlatformOpenAI && ev.Kind == "failover" && isOpenAITransient5xxStatus(ev.UpstreamStatusCode) {
+		ev.CooldownApplied = true
+		ev.CooldownReason = "openai_transient_5xx"
+	}
+	ev.CooldownReason = strings.TrimSpace(ev.CooldownReason)
+	if ev.CooldownReason != "" {
+		ev.CooldownReason = truncateString(sanitizeUpstreamErrorMessage(ev.CooldownReason), 128)
+	}
 	ev.UpstreamURL = strings.TrimSpace(ev.UpstreamURL)
 	ev.Message = strings.TrimSpace(ev.Message)
 	ev.Detail = strings.TrimSpace(ev.Detail)

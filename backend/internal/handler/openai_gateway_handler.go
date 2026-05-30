@@ -270,7 +270,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	for {
 		// Select account supporting the requested model
 		reqLog.Debug("openai.account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
-		scheduleCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
+		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(c.Request.Context(), schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
 		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
 			scheduleCtx,
 			apiKey.GroupID,
@@ -282,6 +282,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			service.OpenAIEndpointCapabilityChatCompletions,
 			requireCompact,
 		)
+		cancelSchedule()
 		if err != nil {
 			reqLog.Warn("openai.account_select_failed",
 				zap.Error(err),
@@ -686,7 +687,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		}
 		scheduleModel := currentRoutingModel
 		reqLog.Debug("openai_messages.account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
-		scheduleCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
+		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(c.Request.Context(), schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
 		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
 			scheduleCtx,
 			apiKey.GroupID,
@@ -698,6 +699,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			service.OpenAIEndpointCapabilityChatCompletions,
 			false,
 		)
+		cancelSchedule()
 		if err != nil {
 			reqLog.Warn("openai_messages.account_select_failed",
 				zap.Error(err),
@@ -1287,7 +1289,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 
 	for {
 		reqLog.Debug("openai.websocket_account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
-		scheduleCtx := service.WithSchedulerEndpoint(ctx, schedulerEndpoint)
+		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(ctx, schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
 		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
 			scheduleCtx,
 			apiKey.GroupID,
@@ -1299,6 +1301,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			service.OpenAIEndpointCapabilityChatCompletions,
 			false,
 		)
+		cancelSchedule()
 		if err != nil {
 			reqLog.Warn("openai.websocket_account_select_failed",
 				zap.Error(err),

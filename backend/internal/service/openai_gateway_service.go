@@ -363,6 +363,7 @@ type OpenAIGatewayService struct {
 	openaiWSRetryMetrics                openAIWSRetryMetrics
 	responseHeaderFilter                *responseheaders.CompiledHeaderFilter
 	codexSnapshotThrottle               *accountWriteThrottle
+	openaiTransientCooldownThrottle     *accountWriteThrottle
 	openaiCompatSessionResponses        sync.Map
 	openaiCompatAnthropicDigestSessions sync.Map
 }
@@ -412,19 +413,20 @@ func NewOpenAIGatewayService(
 			nil,
 			"service.openai_gateway",
 		),
-		httpUpstream:          httpUpstream,
-		deferredService:       deferredService,
-		openAITokenProvider:   openAITokenProvider,
-		toolCorrector:         NewCodexToolCorrector(),
-		openaiWSResolver:      NewOpenAIWSProtocolResolver(cfg),
-		resolver:              resolver,
-		channelService:        channelService,
-		balanceNotifyService:  balanceNotifyService,
-		settingService:        settingService,
-		userPlatformQuotaRepo: userPlatformQuotaRepo,
-		responseHeaderFilter:  compileResponseHeaderFilter(cfg),
-		codexSnapshotThrottle: newAccountWriteThrottle(openAICodexSnapshotPersistMinInterval),
-		schedulerHealth:       newAccountSchedulerHealthStats(),
+		httpUpstream:                    httpUpstream,
+		deferredService:                 deferredService,
+		openAITokenProvider:             openAITokenProvider,
+		toolCorrector:                   NewCodexToolCorrector(),
+		openaiWSResolver:                NewOpenAIWSProtocolResolver(cfg),
+		resolver:                        resolver,
+		channelService:                  channelService,
+		balanceNotifyService:            balanceNotifyService,
+		settingService:                  settingService,
+		userPlatformQuotaRepo:           userPlatformQuotaRepo,
+		responseHeaderFilter:            compileResponseHeaderFilter(cfg),
+		codexSnapshotThrottle:           newAccountWriteThrottle(openAICodexSnapshotPersistMinInterval),
+		openaiTransientCooldownThrottle: newAccountWriteThrottle(openAITransientCooldownPersistMinInterval),
+		schedulerHealth:                 newAccountSchedulerHealthStats(),
 	}
 	if rateLimitService != nil {
 		rateLimitService.SetAccountRuntimeBlocker(svc)
@@ -524,6 +526,13 @@ func (s *OpenAIGatewayService) getCodexSnapshotThrottle() *accountWriteThrottle 
 		return s.codexSnapshotThrottle
 	}
 	return defaultOpenAICodexSnapshotPersistThrottle
+}
+
+func (s *OpenAIGatewayService) getOpenAITransientCooldownPersistThrottle() *accountWriteThrottle {
+	if s != nil && s.openaiTransientCooldownThrottle != nil {
+		return s.openaiTransientCooldownThrottle
+	}
+	return defaultOpenAITransientCooldownPersistThrottle
 }
 
 func (s *OpenAIGatewayService) billingDeps() *billingDeps {
@@ -3061,16 +3070,10 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 		if err != nil {
 			// Ensure the client receives an error response (handlers assume Forward writes on non-failover errors).
-			safeErr := sanitizeUpstreamErrorMessage(err.Error())
-			setOpsUpstreamError(c, 0, safeErr, "")
-			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-				Platform:           account.Platform,
-				AccountID:          account.ID,
-				AccountName:        account.Name,
-				UpstreamStatusCode: 0,
-				Kind:               "request_error",
-				Message:            safeErr,
-			})
+			safeErr, failoverErr := s.handleOpenAIUpstreamRequestError(ctx, c, account, err, "", false)
+			if failoverErr != nil {
+				return nil, failoverErr
+			}
 			c.JSON(http.StatusBadGateway, gin.H{
 				"error": gin.H{
 					"type":    "upstream_error",
@@ -3351,17 +3354,10 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 	if err != nil {
-		safeErr := sanitizeUpstreamErrorMessage(err.Error())
-		setOpsUpstreamError(c, 0, safeErr, "")
-		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-			Platform:           account.Platform,
-			AccountID:          account.ID,
-			AccountName:        account.Name,
-			UpstreamStatusCode: 0,
-			Passthrough:        true,
-			Kind:               "request_error",
-			Message:            safeErr,
-		})
+		safeErr, failoverErr := s.handleOpenAIUpstreamRequestError(ctx, c, account, err, "", true)
+		if failoverErr != nil {
+			return nil, failoverErr
+		}
 		c.JSON(http.StatusBadGateway, gin.H{
 			"error": gin.H{
 				"type":    "upstream_error",

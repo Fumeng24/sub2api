@@ -375,8 +375,9 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	}
 
 	for {
-		scheduleCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
-		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(scheduleCtx, apiKey.GroupID, sessionKey, modelName, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
+		selectionCtx, cancelSelection := failoverAccountSelectionContext(c.Request.Context(), schedulerEndpoint, fs.LastFailoverErr != nil || len(fs.FailedAccountIDs) > 0)
+		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(selectionCtx, apiKey.GroupID, sessionKey, modelName, fs.FailedAccountIDs, "", int64(0)) // Gemini 不使用会话限制
+		cancelSelection()
 		if err != nil {
 			if len(fs.FailedAccountIDs) == 0 {
 				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
@@ -493,7 +494,8 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
-				failoverAction := fs.HandleFailoverErrorForRequest(scheduleCtx, h.gatewayService, account.ID, account.Platform, modelName, schedulerEndpoint, failoverErr)
+				actionCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
+				failoverAction := fs.HandleFailoverErrorForRequest(actionCtx, h.gatewayService, account.ID, account.Platform, modelName, schedulerEndpoint, failoverErr)
 				switch failoverAction {
 				case FailoverContinue:
 					continue

@@ -2,18 +2,25 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
 const (
-	openAIAccountStateUpdateTimeout       = 5 * time.Second
-	openAIOAuth429FallbackCooldown        = 5 * time.Second
-	openAIStopSchedulingBridgeCooldown    = 2 * time.Minute
-	openAIOAuth429StormWindow             = 10 * time.Second
-	openAIOAuth429StormThreshold          = 20
-	openAIOAuth429StormMaxAccountSwitches = 1
+	openAIAccountStateUpdateTimeout           = 5 * time.Second
+	openAIOAuth429FallbackCooldown            = 5 * time.Second
+	openAIRequestErrorCooldown                = 30 * time.Second
+	openAITransientCooldownPersistMinInterval = 15 * time.Second
+	openAIStopSchedulingBridgeCooldown        = 2 * time.Minute
+	openAIOAuth429StormWindow                 = 10 * time.Second
+	openAIOAuth429StormThreshold              = 20
+	openAIOAuth429StormMaxAccountSwitches     = 1
 )
+
+var defaultOpenAITransientCooldownPersistThrottle = newAccountWriteThrottle(openAITransientCooldownPersistMinInterval)
 
 func openAIAccountStateContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	base := context.Background()
@@ -68,23 +75,114 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	stateCtx, cancel := openAIAccountStateContext(ctx)
 	defer cancel()
 
+	transientBlocked := s.markOpenAITransient5xxCoolingDown(stateCtx, account, statusCode, headers, responseBody)
 	if statusCode == http.StatusTooManyRequests {
 		s.markOpenAIOAuth429RateLimited(stateCtx, account, headers, responseBody)
 	}
 	if s == nil || account == nil || s.rateLimitService == nil {
-		return false
+		return transientBlocked
 	}
 	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
-		return s.shouldFailoverOpenAIUpstreamResponseForAccount(ctx, account, statusCode, extractUpstreamErrorMessage(responseBody), responseBody)
+		return transientBlocked || s.shouldFailoverOpenAIUpstreamResponseForAccount(ctx, account, statusCode, extractUpstreamErrorMessage(responseBody), responseBody)
 	}
 	if len(requestedModel) > 0 && s.rateLimitService.HandleUpstreamModelNotFound(stateCtx, account, requestedModel[0], statusCode, responseBody) {
+		return true
+	}
+	if transientBlocked && shouldSkipLegacyOpenAITransientErrorPolicy(account, statusCode) {
 		return true
 	}
 	shouldDisable := s.rateLimitService.HandleUpstreamError(stateCtx, account, statusCode, headers, responseBody)
 	if shouldDisable {
 		s.BlockAccountScheduling(account, time.Time{}, "upstream_disable")
 	}
-	return shouldDisable
+	return transientBlocked || shouldDisable
+}
+
+func (s *OpenAIGatewayService) markOpenAITransient5xxCoolingDown(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte) bool {
+	if s == nil || !isOpenAIAccount(account) || !isOpenAITransient5xxStatus(statusCode) {
+		return false
+	}
+
+	category := schedulerFailureCategory(statusCode, responseBody)
+	cooldown := schedulerCooldownForCategory(category, headers)
+	if cooldown <= 0 {
+		cooldown = schedulerCooldownForCategory("transient", nil)
+	}
+	return s.markOpenAIAccountTemporarilyUnschedulable(ctx, account, statusCode, "openai_transient_5xx", cooldown, responseBody)
+}
+
+func isOpenAITransient5xxStatus(statusCode int) bool {
+	return statusCode >= 500 && statusCode <= 599
+}
+
+func shouldSkipLegacyOpenAITransientErrorPolicy(account *Account, statusCode int) bool {
+	if account == nil {
+		return false
+	}
+	if account.IsPoolMode() && !account.IsCustomErrorCodesEnabled() {
+		return true
+	}
+	return account.IsCustomErrorCodesEnabled() && !account.ShouldHandleErrorCode(statusCode)
+}
+
+func (s *OpenAIGatewayService) markOpenAIAccountTemporarilyUnschedulable(ctx context.Context, account *Account, statusCode int, reason string, cooldown time.Duration, responseBody []byte) bool {
+	if s == nil || !isOpenAIAccount(account) || cooldown <= 0 {
+		return false
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "openai_temp_unschedulable"
+	}
+
+	now := time.Now()
+	until := now.Add(cooldown)
+
+	s.BlockAccountScheduling(account, until, reason)
+
+	state := &TempUnschedState{
+		UntilUnix:       until.Unix(),
+		TriggeredAtUnix: now.Unix(),
+		StatusCode:      statusCode,
+		MatchedKeyword:  reason,
+		RuleIndex:       -1,
+		ErrorMessage:    truncateTempUnschedMessage(responseBody, tempUnschedMessageMaxBytes),
+	}
+	if state.ErrorMessage == "" {
+		state.ErrorMessage = defaultOpenAIAccountCooldownMessage(reason)
+	}
+
+	persistReason := state.ErrorMessage
+	if raw, err := json.Marshal(state); err == nil {
+		persistReason = string(raw)
+	}
+
+	persisted := s.getOpenAITransientCooldownPersistThrottle().Allow(account.ID, now)
+	if persisted {
+		if s.accountRepo != nil {
+			if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, persistReason); err != nil {
+				slog.Warn("openai_temp_unsched_failed", "account_id", account.ID, "status_code", statusCode, "reason", reason, "error", err)
+			}
+		}
+		if s.rateLimitService != nil && s.rateLimitService.tempUnschedCache != nil {
+			if err := s.rateLimitService.tempUnschedCache.SetTempUnsched(ctx, account.ID, state); err != nil {
+				slog.Warn("openai_temp_unsched_cache_failed", "account_id", account.ID, "status_code", statusCode, "reason", reason, "error", err)
+			}
+		}
+	}
+
+	slog.Info("openai_temp_unschedulable", "account_id", account.ID, "status_code", statusCode, "reason", reason, "until", until, "persisted", persisted)
+	return true
+}
+
+func defaultOpenAIAccountCooldownMessage(reason string) string {
+	switch reason {
+	case "openai_transient_5xx":
+		return "OpenAI upstream transient 5xx"
+	case "openai_request_error":
+		return "OpenAI upstream request error"
+	default:
+		return "OpenAI account temporarily unschedulable"
+	}
 }
 
 func (s *OpenAIGatewayService) markOpenAIOAuth429RateLimited(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/stretchr/testify/require"
@@ -120,6 +121,44 @@ func TestSleepWithContext(t *testing.T) {
 		elapsed := time.Since(start)
 		require.False(t, ok)
 		require.Less(t, elapsed, 500*time.Millisecond)
+	})
+}
+
+func TestFailoverAccountSelectionContext(t *testing.T) {
+	t.Run("普通选号继承取消信号", func(t *testing.T) {
+		parent, cancelParent := context.WithCancel(context.Background())
+		cancelParent()
+
+		ctx, cancel := failoverAccountSelectionContext(parent, "/v1/responses", false)
+		defer cancel()
+
+		require.ErrorIs(t, ctx.Err(), context.Canceled)
+		require.Equal(t, "/v1/responses", ctx.Value(ctxkey.SchedulerEndpoint))
+	})
+
+	t.Run("failover选号脱离已取消请求ctx但保留超时", func(t *testing.T) {
+		parent, cancelParent := context.WithCancel(context.Background())
+		cancelParent()
+
+		ctx, cancel := failoverAccountSelectionContext(parent, "/v1/responses", true)
+		defer cancel()
+
+		require.NoError(t, ctx.Err())
+		deadline, ok := ctx.Deadline()
+		require.True(t, ok)
+		require.True(t, deadline.After(time.Now()))
+		require.Equal(t, "/v1/responses", ctx.Value(ctxkey.SchedulerEndpoint))
+	})
+
+	t.Run("openai包装沿用通用选号ctx", func(t *testing.T) {
+		parent, cancelParent := context.WithCancel(context.Background())
+		cancelParent()
+
+		ctx, cancel := openAIAccountSelectionContext(parent, "/v1/chat/completions", true)
+		defer cancel()
+
+		require.NoError(t, ctx.Err())
+		require.Equal(t, "/v1/chat/completions", ctx.Value(ctxkey.SchedulerEndpoint))
 	})
 }
 

@@ -105,7 +105,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 	schedulerEndpoint := GetInboundEndpoint(c)
 
 	for {
-		scheduleCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
+		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(c.Request.Context(), schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
 		selection, _, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
 			scheduleCtx,
 			apiKey.GroupID,
@@ -117,6 +117,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 			service.OpenAIEndpointCapabilityEmbeddings,
 			false,
 		)
+		cancelSchedule()
 		if err != nil {
 			reqLog.Warn("openai_embeddings.account_select_failed",
 				zap.Error(err),
