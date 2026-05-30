@@ -285,6 +285,47 @@ func TestOpenAIRequestErrorDoesNotFailoverWhenRequestCanceled(t *testing.T) {
 	require.Empty(t, events[0].CooldownReason)
 }
 
+func TestOpenAIRequestErrorFailoversWhenCanceledContextHasNetworkTimeout(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &rateLimitAccountRepoStub{}
+	svc := &OpenAIGatewayService{
+		accountRepo:                     repo,
+		openaiTransientCooldownThrottle: newAccountWriteThrottle(time.Hour),
+	}
+	account := &Account{ID: 109, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	safeErr, failoverErr := svc.handleOpenAIUpstreamRequestError(
+		ctx,
+		c,
+		account,
+		errors.New("dial tcp 10.0.0.1:443: i/o timeout"),
+		"",
+		false,
+	)
+
+	require.NotEmpty(t, safeErr)
+	require.NotNil(t, failoverErr)
+	require.Equal(t, 0, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "i/o timeout")
+	require.Equal(t, 0, w.Body.Len(), "failover path must not write the response")
+	require.Equal(t, 1, repo.tempCalls)
+	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+
+	rawEvents, ok := c.Get(OpsUpstreamErrorsKey)
+	require.True(t, ok)
+	events, ok := rawEvents.([]*OpsUpstreamErrorEvent)
+	require.True(t, ok)
+	require.Len(t, events, 1)
+	require.Equal(t, "failover", events[0].Kind)
+	require.True(t, events[0].CooldownApplied)
+	require.Equal(t, "openai_request_error", events[0].CooldownReason)
+}
+
 func TestOpsUpstreamErrorAnnotatesOpenAITransientFailoverCooldown(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()

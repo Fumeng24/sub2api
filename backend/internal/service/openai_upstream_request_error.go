@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
+	"net"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,7 +28,7 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamRequestError(ctx context.Cont
 	}
 
 	setOpsUpstreamError(c, 0, safeErr, "")
-	if ctx != nil && ctx.Err() != nil {
+	if !shouldFailoverOpenAIUpstreamRequestError(ctx, err, safeErr) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:           platform,
 			AccountID:          accountID,
@@ -67,8 +70,52 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamRequestError(ctx context.Cont
 		CooldownApplied:    cooldownApplied,
 		CooldownReason:     cooldownReason,
 	})
-	return safeErr, &UpstreamFailoverError{
-		StatusCode:   0,
-		ResponseBody: []byte(safeErr),
+	return safeErr, newNetworkUpstreamFailoverError(safeErr)
+}
+
+func shouldFailoverOpenAIUpstreamRequestError(ctx context.Context, err error, safeErr string) bool {
+	if ctx == nil || ctx.Err() == nil {
+		return true
 	}
+	return isOpenAIUpstreamNetworkFailoverError(err, safeErr)
+}
+
+func isOpenAIUpstreamNetworkFailoverError(err error, safeErr string) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+
+	msg := strings.ToLower(strings.TrimSpace(safeErr))
+	if msg == "" && err != nil {
+		msg = strings.ToLower(strings.TrimSpace(err.Error()))
+	}
+	if msg == "" {
+		return false
+	}
+
+	networkSignals := []string{
+		"context deadline exceeded",
+		"i/o timeout",
+		"dial tcp",
+		"dial udp",
+		"connect timeout",
+		"connection timeout",
+		"client.timeout exceeded",
+		"timeout awaiting response headers",
+		"tls handshake timeout",
+		"connection refused",
+		"network is unreachable",
+		"no such host",
+	}
+	for _, signal := range networkSignals {
+		if strings.Contains(msg, signal) {
+			return true
+		}
+	}
+	return false
 }

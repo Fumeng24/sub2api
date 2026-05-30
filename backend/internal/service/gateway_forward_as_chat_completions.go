@@ -138,11 +138,10 @@ func (s *GatewayService) ForwardAsChatCompletions(
 			AccountID:          account.ID,
 			AccountName:        account.Name,
 			UpstreamStatusCode: 0,
-			Kind:               "request_error",
+			Kind:               "failover",
 			Message:            safeErr,
 		})
-		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Upstream request failed")
-		return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+		return nil, newNetworkUpstreamFailoverError(safeErr)
 	}
 	defer func() { _ = resp.Body.Close() }()
 

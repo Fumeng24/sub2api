@@ -546,6 +546,14 @@ func (e *UpstreamFailoverError) Error() string {
 	return fmt.Sprintf("upstream error: %d (failover)", e.StatusCode)
 }
 
+func newNetworkUpstreamFailoverError(message string) *UpstreamFailoverError {
+	return &UpstreamFailoverError{
+		StatusCode:             0,
+		ResponseBody:           []byte(message),
+		RetryableOnSameAccount: false,
+	}
+}
+
 // TempUnscheduleRetryableError 对 RetryableOnSameAccount 类型的 failover 错误触发临时封禁。
 // 由 handler 层在同账号重试全部用尽、切换账号时调用。
 func (s *GatewayService) TempUnscheduleRetryableError(ctx context.Context, accountID int64, failoverErr *UpstreamFailoverError) {
@@ -4215,17 +4223,10 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				AccountName:        account.Name,
 				UpstreamStatusCode: 0,
 				UpstreamURL:        safeUpstreamURL(upstreamReq.URL.String()),
-				Kind:               "request_error",
+				Kind:               "failover",
 				Message:            safeErr,
 			})
-			c.JSON(http.StatusBadGateway, gin.H{
-				"type": "error",
-				"error": gin.H{
-					"type":    "upstream_error",
-					"message": "Upstream request failed",
-				},
-			})
-			return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+			return nil, newNetworkUpstreamFailoverError(safeErr)
 		}
 
 		// 优先检测thinking block签名错误（400）并重试一次
@@ -4702,17 +4703,10 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 				UpstreamStatusCode: 0,
 				UpstreamURL:        safeUpstreamURL(upstreamReq.URL.String()),
 				Passthrough:        true,
-				Kind:               "request_error",
+				Kind:               "failover",
 				Message:            safeErr,
 			})
-			c.JSON(http.StatusBadGateway, gin.H{
-				"type": "error",
-				"error": gin.H{
-					"type":    "upstream_error",
-					"message": "Upstream request failed",
-				},
-			})
-			return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+			return nil, newNetworkUpstreamFailoverError(safeErr)
 		}
 
 		// 透传分支禁止 400 请求体降级重试（该重试会改写请求体）
@@ -5488,17 +5482,10 @@ func (s *GatewayService) executeBedrockUpstream(
 				AccountName:        account.Name,
 				UpstreamStatusCode: 0,
 				UpstreamURL:        safeUpstreamURL(upstreamReq.URL.String()),
-				Kind:               "request_error",
+				Kind:               "failover",
 				Message:            safeErr,
 			})
-			c.JSON(http.StatusBadGateway, gin.H{
-				"type": "error",
-				"error": gin.H{
-					"type":    "upstream_error",
-					"message": "Upstream request failed",
-				},
-			})
-			return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+			return nil, newNetworkUpstreamFailoverError(safeErr)
 		}
 
 		if resp.StatusCode >= 400 && resp.StatusCode != 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) {
