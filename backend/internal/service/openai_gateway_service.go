@@ -1341,6 +1341,29 @@ func isOpenAIAccountEligibleForRequest(ctx context.Context, account *Account, re
 	return true
 }
 
+func isOpenAIAccountEligibleForRequestIgnoringCooldown(account *Account, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) bool {
+	if account == nil || !account.IsOpenAI() || account.Status != StatusActive || !account.Schedulable {
+		return false
+	}
+	now := time.Now()
+	if account.AutoPauseOnExpired && account.ExpiresAt != nil && !now.Before(*account.ExpiresAt) {
+		return false
+	}
+	if account.IsAPIKeyOrBedrock() && account.IsQuotaExceeded() {
+		return false
+	}
+	if requestedModel != "" && !account.IsModelSupported(requestedModel) {
+		return false
+	}
+	if !account.SupportsOpenAIEndpointCapability(requiredCapability) {
+		return false
+	}
+	if requireCompact && openAICompactSupportTier(account) == 0 {
+		return false
+	}
+	return true
+}
+
 func orderOpenAISchedulerScoresForCompact(scores []schedulerAccountScore, includeUnsupported bool) []schedulerAccountScore {
 	if len(scores) == 0 {
 		return nil
@@ -1528,10 +1551,10 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 	return account
 }
 
-// selectBestAccount 从候选账号中选择最佳账号（分组主备 + 权重 + 健康度）。
+// selectBestAccount 从候选账号中选择最佳账号（分组配置 + 健康度）。
 // 返回 nil 表示无可用账号。
 //
-// selectBestAccount selects the best account from candidates (role + weight + health).
+// selectBestAccount selects the best account from candidates (group config + health).
 // Returns nil if no available account. The second return reports whether at
 // least one candidate was filtered out solely because it lacks compact support
 // (only meaningful when requireCompact=true).
@@ -1868,6 +1891,57 @@ func (s *OpenAIGatewayService) listSchedulableAccounts(ctx context.Context, grou
 	return accountsToPointers(accounts), nil
 }
 
+func (s *OpenAIGatewayService) listOpenAICooldownFallbackAccounts(ctx context.Context, groupID *int64) ([]*Account, error) {
+	if s == nil || s.accountRepo == nil {
+		return nil, nil
+	}
+
+	var accounts []Account
+	var err error
+	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+		accounts, err = s.accountRepo.ListByPlatform(ctx, PlatformOpenAI)
+	} else if groupID != nil {
+		accounts, err = s.accountRepo.ListByGroup(ctx, *groupID)
+	} else {
+		accounts, err = s.accountRepo.ListByPlatform(ctx, PlatformOpenAI)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query openai cooldown fallback accounts failed: %w", err)
+	}
+
+	filtered := make([]Account, 0, len(accounts))
+	for _, account := range accounts {
+		if !account.IsOpenAI() {
+			continue
+		}
+		if s.cfg == nil || s.cfg.RunMode != config.RunModeSimple {
+			if groupID != nil {
+				if !openAIAccountBelongsToGroup(account, *groupID) {
+					continue
+				}
+			} else if len(account.GroupIDs) > 0 || len(account.AccountGroups) > 0 {
+				continue
+			}
+		}
+		filtered = append(filtered, account)
+	}
+	return accountsToPointers(filtered), nil
+}
+
+func openAIAccountBelongsToGroup(account Account, groupID int64) bool {
+	for _, id := range account.GroupIDs {
+		if id == groupID {
+			return true
+		}
+	}
+	for _, ag := range account.AccountGroups {
+		if ag.GroupID == groupID {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *OpenAIGatewayService) tryAcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int) (*AcquireResult, error) {
 	if s.concurrencyService == nil {
 		return &AcquireResult{Acquired: true, ReleaseFunc: func() {}}, nil
@@ -1898,6 +1972,26 @@ func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccount(ctx context.
 	return fresh
 }
 
+func (s *OpenAIGatewayService) resolveFreshOpenAIAccountIgnoringCooldown(ctx context.Context, account *Account, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) *Account {
+	if account == nil {
+		return nil
+	}
+
+	fresh := account
+	if s.schedulerSnapshot != nil && s.accountRepo != nil {
+		current, err := s.accountRepo.GetByID(ctx, account.ID)
+		if err != nil || current == nil {
+			return nil
+		}
+		fresh = current
+	}
+
+	if !isOpenAIAccountEligibleForRequestIgnoringCooldown(fresh, requestedModel, requireCompact, requiredCapability) {
+		return nil
+	}
+	return fresh
+}
+
 func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDB(ctx context.Context, account *Account, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) *Account {
 	if account == nil {
 		return nil
@@ -1917,6 +2011,27 @@ func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDB(ctx context.Co
 		return nil
 	}
 	if s.isOpenAIAccountRuntimeBlocked(latest) {
+		return nil
+	}
+	return latest
+}
+
+func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDBIgnoringCooldown(ctx context.Context, account *Account, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) *Account {
+	if account == nil {
+		return nil
+	}
+	if s.schedulerSnapshot == nil || s.accountRepo == nil {
+		if !isOpenAIAccountEligibleForRequestIgnoringCooldown(account, requestedModel, requireCompact, requiredCapability) {
+			return nil
+		}
+		return account
+	}
+
+	latest, err := s.accountRepo.GetByID(ctx, account.ID)
+	if err != nil || latest == nil {
+		return nil
+	}
+	if !isOpenAIAccountEligibleForRequestIgnoringCooldown(latest, requestedModel, requireCompact, requiredCapability) {
 		return nil
 	}
 	return latest
@@ -2803,7 +2918,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 				}
 				logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Skip non-WSv2 invalid_encrypted_content retry because encrypted reasoning items are missing (account: %s)", account.Name)
 			}
-			if s.shouldFailoverOpenAIUpstreamResponse(resp.StatusCode, upstreamMsg, respBody) {
+			if s.shouldFailoverOpenAIUpstreamResponseForAccount(ctx, account, resp.StatusCode, upstreamMsg, respBody) {
 				upstreamDetail := ""
 				if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
 					maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
@@ -2827,7 +2942,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 				return nil, &UpstreamFailoverError{
 					StatusCode:             resp.StatusCode,
 					ResponseBody:           respBody,
-					RetryableOnSameAccount: account.IsPoolMode() && (account.IsPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
+					RetryableOnSameAccount: s.retryableOnSameOpenAIAccount(ctx, account, resp.StatusCode, upstreamMsg, respBody),
 				}
 			}
 			return s.handleErrorResponse(ctx, resp, c, account, body, billingModel)
@@ -4087,7 +4202,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	}
 
 	// Check custom error codes
-	if !account.ShouldHandleErrorCode(resp.StatusCode) {
+	if !s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) && !account.ShouldHandleErrorCode(resp.StatusCode) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:           account.Platform,
 			AccountID:          account.ID,
@@ -4137,7 +4252,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		return nil, &UpstreamFailoverError{
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,
-			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+			RetryableOnSameAccount: s.retryableOnSameOpenAIAccountStatus(c.Request.Context(), account, resp.StatusCode),
 		}
 	}
 
@@ -4232,7 +4347,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 
 	// Check custom error codes — if the account does not handle this status,
 	// return a generic error without exposing upstream details.
-	if !account.ShouldHandleErrorCode(resp.StatusCode) {
+	if !s.usesOpenAIAdvancedSchedulerPolicy(c.Request.Context(), account) && !account.ShouldHandleErrorCode(resp.StatusCode) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:           account.Platform,
 			AccountID:          account.ID,
@@ -4276,7 +4391,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		return nil, &UpstreamFailoverError{
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,
-			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+			RetryableOnSameAccount: s.retryableOnSameOpenAIAccountStatus(c.Request.Context(), account, resp.StatusCode),
 		}
 	}
 

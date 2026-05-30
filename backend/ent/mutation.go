@@ -8989,6 +8989,8 @@ type ChannelMonitorMutation struct {
 	daily_rollups           map[int64]struct{}
 	removeddaily_rollups    map[int64]struct{}
 	cleareddaily_rollups    bool
+	api_key                 *int64
+	clearedapi_key          bool
 	request_template        *int64
 	clearedrequest_template bool
 	done                    bool
@@ -9344,6 +9346,55 @@ func (m *ChannelMonitorMutation) OldAPIKeyEncrypted(ctx context.Context) (v stri
 // ResetAPIKeyEncrypted resets all changes to the "api_key_encrypted" field.
 func (m *ChannelMonitorMutation) ResetAPIKeyEncrypted() {
 	m.api_key_encrypted = nil
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (m *ChannelMonitorMutation) SetAPIKeyID(i int64) {
+	m.api_key = &i
+}
+
+// APIKeyID returns the value of the "api_key_id" field in the mutation.
+func (m *ChannelMonitorMutation) APIKeyID() (r int64, exists bool) {
+	v := m.api_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAPIKeyID returns the old "api_key_id" field's value of the ChannelMonitor entity.
+// If the ChannelMonitor object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelMonitorMutation) OldAPIKeyID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAPIKeyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAPIKeyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAPIKeyID: %w", err)
+	}
+	return oldValue.APIKeyID, nil
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (m *ChannelMonitorMutation) ClearAPIKeyID() {
+	m.api_key = nil
+	m.clearedFields[channelmonitor.FieldAPIKeyID] = struct{}{}
+}
+
+// APIKeyIDCleared returns if the "api_key_id" field was cleared in this mutation.
+func (m *ChannelMonitorMutation) APIKeyIDCleared() bool {
+	_, ok := m.clearedFields[channelmonitor.FieldAPIKeyID]
+	return ok
+}
+
+// ResetAPIKeyID resets all changes to the "api_key_id" field.
+func (m *ChannelMonitorMutation) ResetAPIKeyID() {
+	m.api_key = nil
+	delete(m.clearedFields, channelmonitor.FieldAPIKeyID)
 }
 
 // SetPrimaryModel sets the "primary_model" field.
@@ -9957,6 +10008,33 @@ func (m *ChannelMonitorMutation) ResetDailyRollups() {
 	m.removeddaily_rollups = nil
 }
 
+// ClearAPIKey clears the "api_key" edge to the APIKey entity.
+func (m *ChannelMonitorMutation) ClearAPIKey() {
+	m.clearedapi_key = true
+	m.clearedFields[channelmonitor.FieldAPIKeyID] = struct{}{}
+}
+
+// APIKeyCleared reports if the "api_key" edge to the APIKey entity was cleared.
+func (m *ChannelMonitorMutation) APIKeyCleared() bool {
+	return m.APIKeyIDCleared() || m.clearedapi_key
+}
+
+// APIKeyIDs returns the "api_key" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// APIKeyID instead. It exists only for internal usage by the builders.
+func (m *ChannelMonitorMutation) APIKeyIDs() (ids []int64) {
+	if id := m.api_key; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetAPIKey resets all changes to the "api_key" edge.
+func (m *ChannelMonitorMutation) ResetAPIKey() {
+	m.api_key = nil
+	m.clearedapi_key = false
+}
+
 // SetRequestTemplateID sets the "request_template" edge to the ChannelMonitorRequestTemplate entity by id.
 func (m *ChannelMonitorMutation) SetRequestTemplateID(id int64) {
 	m.request_template = &id
@@ -10031,7 +10109,7 @@ func (m *ChannelMonitorMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelMonitorMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.created_at != nil {
 		fields = append(fields, channelmonitor.FieldCreatedAt)
 	}
@@ -10052,6 +10130,9 @@ func (m *ChannelMonitorMutation) Fields() []string {
 	}
 	if m.api_key_encrypted != nil {
 		fields = append(fields, channelmonitor.FieldAPIKeyEncrypted)
+	}
+	if m.api_key != nil {
+		fields = append(fields, channelmonitor.FieldAPIKeyID)
 	}
 	if m.primary_model != nil {
 		fields = append(fields, channelmonitor.FieldPrimaryModel)
@@ -10108,6 +10189,8 @@ func (m *ChannelMonitorMutation) Field(name string) (ent.Value, bool) {
 		return m.Endpoint()
 	case channelmonitor.FieldAPIKeyEncrypted:
 		return m.APIKeyEncrypted()
+	case channelmonitor.FieldAPIKeyID:
+		return m.APIKeyID()
 	case channelmonitor.FieldPrimaryModel:
 		return m.PrimaryModel()
 	case channelmonitor.FieldExtraModels:
@@ -10153,6 +10236,8 @@ func (m *ChannelMonitorMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldEndpoint(ctx)
 	case channelmonitor.FieldAPIKeyEncrypted:
 		return m.OldAPIKeyEncrypted(ctx)
+	case channelmonitor.FieldAPIKeyID:
+		return m.OldAPIKeyID(ctx)
 	case channelmonitor.FieldPrimaryModel:
 		return m.OldPrimaryModel(ctx)
 	case channelmonitor.FieldExtraModels:
@@ -10232,6 +10317,13 @@ func (m *ChannelMonitorMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAPIKeyEncrypted(v)
+		return nil
+	case channelmonitor.FieldAPIKeyID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAPIKeyID(v)
 		return nil
 	case channelmonitor.FieldPrimaryModel:
 		v, ok := value.(string)
@@ -10367,6 +10459,9 @@ func (m *ChannelMonitorMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *ChannelMonitorMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(channelmonitor.FieldAPIKeyID) {
+		fields = append(fields, channelmonitor.FieldAPIKeyID)
+	}
 	if m.FieldCleared(channelmonitor.FieldGroupName) {
 		fields = append(fields, channelmonitor.FieldGroupName)
 	}
@@ -10393,6 +10488,9 @@ func (m *ChannelMonitorMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *ChannelMonitorMutation) ClearField(name string) error {
 	switch name {
+	case channelmonitor.FieldAPIKeyID:
+		m.ClearAPIKeyID()
+		return nil
 	case channelmonitor.FieldGroupName:
 		m.ClearGroupName()
 		return nil
@@ -10434,6 +10532,9 @@ func (m *ChannelMonitorMutation) ResetField(name string) error {
 	case channelmonitor.FieldAPIKeyEncrypted:
 		m.ResetAPIKeyEncrypted()
 		return nil
+	case channelmonitor.FieldAPIKeyID:
+		m.ResetAPIKeyID()
+		return nil
 	case channelmonitor.FieldPrimaryModel:
 		m.ResetPrimaryModel()
 		return nil
@@ -10473,12 +10574,15 @@ func (m *ChannelMonitorMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ChannelMonitorMutation) AddedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.history != nil {
 		edges = append(edges, channelmonitor.EdgeHistory)
 	}
 	if m.daily_rollups != nil {
 		edges = append(edges, channelmonitor.EdgeDailyRollups)
+	}
+	if m.api_key != nil {
+		edges = append(edges, channelmonitor.EdgeAPIKey)
 	}
 	if m.request_template != nil {
 		edges = append(edges, channelmonitor.EdgeRequestTemplate)
@@ -10502,6 +10606,10 @@ func (m *ChannelMonitorMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case channelmonitor.EdgeAPIKey:
+		if id := m.api_key; id != nil {
+			return []ent.Value{*id}
+		}
 	case channelmonitor.EdgeRequestTemplate:
 		if id := m.request_template; id != nil {
 			return []ent.Value{*id}
@@ -10512,7 +10620,7 @@ func (m *ChannelMonitorMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ChannelMonitorMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.removedhistory != nil {
 		edges = append(edges, channelmonitor.EdgeHistory)
 	}
@@ -10544,12 +10652,15 @@ func (m *ChannelMonitorMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ChannelMonitorMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.clearedhistory {
 		edges = append(edges, channelmonitor.EdgeHistory)
 	}
 	if m.cleareddaily_rollups {
 		edges = append(edges, channelmonitor.EdgeDailyRollups)
+	}
+	if m.clearedapi_key {
+		edges = append(edges, channelmonitor.EdgeAPIKey)
 	}
 	if m.clearedrequest_template {
 		edges = append(edges, channelmonitor.EdgeRequestTemplate)
@@ -10565,6 +10676,8 @@ func (m *ChannelMonitorMutation) EdgeCleared(name string) bool {
 		return m.clearedhistory
 	case channelmonitor.EdgeDailyRollups:
 		return m.cleareddaily_rollups
+	case channelmonitor.EdgeAPIKey:
+		return m.clearedapi_key
 	case channelmonitor.EdgeRequestTemplate:
 		return m.clearedrequest_template
 	}
@@ -10575,6 +10688,9 @@ func (m *ChannelMonitorMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *ChannelMonitorMutation) ClearEdge(name string) error {
 	switch name {
+	case channelmonitor.EdgeAPIKey:
+		m.ClearAPIKey()
+		return nil
 	case channelmonitor.EdgeRequestTemplate:
 		m.ClearRequestTemplate()
 		return nil
@@ -10591,6 +10707,9 @@ func (m *ChannelMonitorMutation) ResetEdge(name string) error {
 		return nil
 	case channelmonitor.EdgeDailyRollups:
 		m.ResetDailyRollups()
+		return nil
+	case channelmonitor.EdgeAPIKey:
+		m.ResetAPIKey()
 		return nil
 	case channelmonitor.EdgeRequestTemplate:
 		m.ResetRequestTemplate()

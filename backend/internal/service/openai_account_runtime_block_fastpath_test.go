@@ -79,6 +79,81 @@ func TestOpenAIModelNotFound_DoesNotRuntimeBlockWholeAccount(t *testing.T) {
 	require.Len(t, repo.modelRateLimitCalls, 1)
 }
 
+func TestOpenAIAdvancedSchedulerPolicy_IgnoresLegacyCustomErrorCodes(t *testing.T) {
+	t.Cleanup(resetOpenAIAdvancedSchedulerSettingCacheForTest)
+
+	account := &Account{
+		ID:       102,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"custom_error_codes_enabled": true,
+			"custom_error_codes":         []any{float64(599)},
+		},
+	}
+
+	t.Run("advanced_scheduler_handles_error_even_when_custom_code_misses", func(t *testing.T) {
+		svc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("true")}
+
+		shouldDisable := svc.handleOpenAIAccountUpstreamError(
+			context.Background(),
+			account,
+			http.StatusBadGateway,
+			http.Header{},
+			[]byte(`{"error":{"message":"upstream failed"}}`),
+		)
+
+		require.True(t, shouldDisable)
+	})
+
+	t.Run("legacy_scheduler_keeps_custom_code_skip_semantics", func(t *testing.T) {
+		svc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("false")}
+
+		shouldDisable := svc.handleOpenAIAccountUpstreamError(
+			context.Background(),
+			account,
+			http.StatusBadGateway,
+			http.Header{},
+			[]byte(`{"error":{"message":"upstream failed"}}`),
+		)
+
+		require.False(t, shouldDisable)
+	})
+}
+
+func TestOpenAIAdvancedSchedulerPolicy_DisablesLegacySameAccountRetry(t *testing.T) {
+	t.Cleanup(resetOpenAIAdvancedSchedulerSettingCacheForTest)
+
+	account := &Account{
+		ID:       103,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"pool_mode":                    true,
+			"pool_mode_retry_status_codes": []any{float64(http.StatusTooManyRequests)},
+		},
+	}
+
+	legacySvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("false")}
+	require.True(t, legacySvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusTooManyRequests))
+
+	advancedSvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("true")}
+	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusTooManyRequests))
+}
+
+func TestOpenAIAdvancedSchedulerPolicy_FailoversModelNotFound(t *testing.T) {
+	t.Cleanup(resetOpenAIAdvancedSchedulerSettingCacheForTest)
+
+	account := &Account{ID: 104, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	body := []byte(`{"error":{"code":"model_not_found","message":"model not found"}}`)
+
+	legacySvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("false")}
+	require.False(t, legacySvc.shouldFailoverOpenAIUpstreamResponseForAccount(context.Background(), account, http.StatusNotFound, "model not found", body))
+
+	advancedSvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("true")}
+	require.True(t, advancedSvc.shouldFailoverOpenAIUpstreamResponseForAccount(context.Background(), account, http.StatusNotFound, "model not found", body))
+}
+
 func TestOpenAIRuntimeBlock_DoesNotShortenExistingBlock(t *testing.T) {
 	svc := &OpenAIGatewayService{}
 	account := &Account{ID: 46, Platform: PlatformOpenAI, Type: AccountTypeOAuth}

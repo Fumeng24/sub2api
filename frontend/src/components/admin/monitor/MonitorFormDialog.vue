@@ -65,9 +65,10 @@
           <input
             v-model="form.api_key"
             type="password"
-            :required="!editing"
+            :required="!editing && form.api_key_id == null"
             class="input flex-1"
             :placeholder="editing ? t('admin.channelMonitor.form.apiKeyEditPlaceholder') : t('admin.channelMonitor.form.apiKeyPlaceholder')"
+            @input="onManualAPIKeyInput"
           />
           <button type="button" @click="openMyKeyPicker" class="btn btn-secondary whitespace-nowrap">
             {{ t('admin.channelMonitor.form.useMyKey') }}
@@ -250,6 +251,7 @@ interface MonitorForm {
   api_mode: APIMode
   endpoint: string
   api_key: string
+  api_key_id: number | null
   primary_model: string
   extra_models: string[]
   group_name: string
@@ -268,6 +270,7 @@ const form = reactive<MonitorForm>({
   api_mode: API_MODE_CHAT_COMPLETIONS,
   endpoint: '',
   api_key: '',
+  api_key_id: null,
   primary_model: '',
   extra_models: [],
   group_name: '',
@@ -395,6 +398,7 @@ const providerOptions = computed<ProviderOption[]>(() => [
 watch(() => form.provider, () => {
   if (suppressFormWatchers) return
   form.api_key = ''
+  form.api_key_id = null
   if (form.provider !== PROVIDER_OPENAI) {
     form.api_mode = API_MODE_CHAT_COMPLETIONS
   }
@@ -415,6 +419,7 @@ function resetForm() {
   form.api_mode = API_MODE_CHAT_COMPLETIONS
   form.endpoint = ''
   form.api_key = ''
+  form.api_key_id = null
   form.primary_model = ''
   form.extra_models = []
   form.group_name = ''
@@ -434,6 +439,7 @@ function loadFromMonitor(m: ChannelMonitor) {
   form.api_mode = normalizeAPIMode(m.api_mode)
   form.endpoint = m.endpoint
   form.api_key = ''
+  form.api_key_id = m.api_key_id ?? null
   form.primary_model = m.primary_model
   form.extra_models = [...(m.extra_models || [])]
   form.group_name = m.group_name || ''
@@ -489,7 +495,12 @@ async function openMyKeyPicker() {
 
 function pickMyKey(k: ApiKey) {
   form.api_key = k.key
+  form.api_key_id = k.id
   showKeyPicker.value = false
+}
+
+function onManualAPIKeyInput() {
+  form.api_key_id = null
 }
 
 function buildPayload(): CreateParams {
@@ -499,6 +510,7 @@ function buildPayload(): CreateParams {
     api_mode: form.provider === PROVIDER_OPENAI ? form.api_mode : API_MODE_CHAT_COMPLETIONS,
     endpoint: form.endpoint.trim(),
     api_key: form.api_key.trim(),
+    api_key_id: form.api_key_id,
     primary_model: form.primary_model.trim(),
     extra_models: form.extra_models,
     group_name: form.group_name.trim(),
@@ -530,6 +542,10 @@ async function handleSubmit() {
       const req: UpdateParams = { ...rest }
       // Only send api_key if user typed a new value
       if (api_key) req.api_key = api_key
+      if (form.api_key_id == null) {
+        req.clear_api_key_id = true
+        delete req.api_key_id
+      }
       // template_id=null 用 clear_template=true 明确告诉后端清空（pointer 语义）
       if (form.template_id == null) {
         req.clear_template = true

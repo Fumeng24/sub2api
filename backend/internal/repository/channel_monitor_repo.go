@@ -48,6 +48,9 @@ func (r *channelMonitorRepository) Create(ctx context.Context, m *service.Channe
 		SetCreatedBy(m.CreatedBy).
 		SetExtraHeaders(emptyHeadersIfNilRepo(m.ExtraHeaders)).
 		SetBodyOverrideMode(defaultBodyModeRepo(m.BodyOverrideMode))
+	if m.APIKeyID != nil {
+		builder = builder.SetAPIKeyID(*m.APIKeyID)
+	}
 	if m.TemplateID != nil {
 		builder = builder.SetTemplateID(*m.TemplateID)
 	}
@@ -90,6 +93,11 @@ func (r *channelMonitorRepository) Update(ctx context.Context, m *service.Channe
 		SetIntervalSeconds(m.IntervalSeconds).
 		SetExtraHeaders(emptyHeadersIfNilRepo(m.ExtraHeaders)).
 		SetBodyOverrideMode(defaultBodyModeRepo(m.BodyOverrideMode))
+	if m.APIKeyID != nil {
+		updater = updater.SetAPIKeyID(*m.APIKeyID)
+	} else {
+		updater = updater.ClearAPIKeyID()
+	}
 	if m.TemplateID != nil {
 		updater = updater.SetTemplateID(*m.TemplateID)
 	} else {
@@ -713,6 +721,7 @@ func entToServiceMonitor(row *dbent.ChannelMonitor) *service.ChannelMonitor {
 		APIMode:          defaultAPIModeRepo(row.APIMode),
 		Endpoint:         row.Endpoint,
 		APIKey:           row.APIKeyEncrypted, // 仍为密文，service 层负责解密
+		APIKeyID:         cloneInt64PtrRepo(row.APIKeyID),
 		PrimaryModel:     row.PrimaryModel,
 		ExtraModels:      extras,
 		GroupName:        row.GroupName,
@@ -762,4 +771,12 @@ func emptySliceIfNil(in []string) []string {
 		return []string{}
 	}
 	return in
+}
+
+func cloneInt64PtrRepo(in *int64) *int64 {
+	if in == nil {
+		return nil
+	}
+	v := *in
+	return &v
 }

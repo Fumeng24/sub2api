@@ -1805,6 +1805,22 @@ func (c *ChannelMonitorClient) QueryDailyRollups(_m *ChannelMonitor) *ChannelMon
 	return query
 }
 
+// QueryAPIKey queries the api_key edge of a ChannelMonitor.
+func (c *ChannelMonitorClient) QueryAPIKey(_m *ChannelMonitor) *APIKeyQuery {
+	query := (&APIKeyClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(channelmonitor.Table, channelmonitor.FieldID, id),
+			sqlgraph.To(apikey.Table, apikey.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, channelmonitor.APIKeyTable, channelmonitor.APIKeyColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryRequestTemplate queries the request_template edge of a ChannelMonitor.
 func (c *ChannelMonitorClient) QueryRequestTemplate(_m *ChannelMonitor) *ChannelMonitorRequestTemplateQuery {
 	query := (&ChannelMonitorRequestTemplateClient{config: c.config}).Query()

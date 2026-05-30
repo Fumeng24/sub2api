@@ -100,10 +100,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 	failedAccountIDs := make(map[int64]struct{})
 	var lastFailoverErr *service.UpstreamFailoverError
 	switchCount := 0
-	maxAccountSwitches := h.maxAccountSwitches
-	if maxAccountSwitches <= 0 {
-		maxAccountSwitches = 3
-	}
+	maxAccountSwitches := h.gatewayService.MaxOpenAIAccountSwitches(c.Request.Context(), h.maxAccountSwitches, apiKey.GroupID)
 	routingStart := time.Now()
 	schedulerEndpoint := GetInboundEndpoint(c)
 

@@ -31,6 +31,39 @@ func isOpenAIAccount(account *Account) bool {
 	return account != nil && account.Platform == PlatformOpenAI
 }
 
+func (s *OpenAIGatewayService) usesOpenAIAdvancedSchedulerPolicy(ctx context.Context, account *Account) bool {
+	if s == nil ||
+		account == nil ||
+		account.Platform != PlatformOpenAI ||
+		account.Type != AccountTypeAPIKey ||
+		s.openAIAdvancedSchedulerSettingRepo() == nil {
+		return false
+	}
+	return s.isOpenAIAdvancedSchedulerEnabled(ctx)
+}
+
+func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponseForAccount(ctx context.Context, account *Account, statusCode int, upstreamMsg string, upstreamBody []byte) bool {
+	if s.shouldFailoverOpenAIUpstreamResponse(statusCode, upstreamMsg, upstreamBody) {
+		return true
+	}
+	return s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) && isUpstreamModelNotFoundError(statusCode, upstreamBody)
+}
+
+func (s *OpenAIGatewayService) retryableOnSameOpenAIAccount(ctx context.Context, account *Account, statusCode int, upstreamMsg string, upstreamBody []byte) bool {
+	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
+		return false
+	}
+	return account.IsPoolMode() &&
+		(account.IsPoolModeRetryableStatus(statusCode) || isOpenAITransientProcessingError(statusCode, upstreamMsg, upstreamBody))
+}
+
+func (s *OpenAIGatewayService) retryableOnSameOpenAIAccountStatus(ctx context.Context, account *Account, statusCode int) bool {
+	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
+		return false
+	}
+	return account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode)
+}
+
 func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte, requestedModel ...string) bool {
 	stateCtx, cancel := openAIAccountStateContext(ctx)
 	defer cancel()
@@ -40,6 +73,9 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	}
 	if s == nil || account == nil || s.rateLimitService == nil {
 		return false
+	}
+	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
+		return s.shouldFailoverOpenAIUpstreamResponseForAccount(ctx, account, statusCode, extractUpstreamErrorMessage(responseBody), responseBody)
 	}
 	if len(requestedModel) > 0 && s.rateLimitService.HandleUpstreamModelNotFound(stateCtx, account, requestedModel[0], statusCode, responseBody) {
 		return true
@@ -119,20 +155,31 @@ func (s *OpenAIGatewayService) isOpenAIAccountRuntimeBlocked(account *Account) b
 	if s == nil || !isOpenAIAccount(account) {
 		return false
 	}
-	value, ok := s.openaiAccountRuntimeBlockUntil.Load(account.ID)
+	cooldownUntil, ok := s.openAIAccountRuntimeBlockUntil(account.ID)
 	if !ok {
 		return false
 	}
+	return time.Now().Before(cooldownUntil)
+}
+
+func (s *OpenAIGatewayService) openAIAccountRuntimeBlockUntil(accountID int64) (time.Time, bool) {
+	if s == nil || accountID <= 0 {
+		return time.Time{}, false
+	}
+	value, ok := s.openaiAccountRuntimeBlockUntil.Load(accountID)
+	if !ok {
+		return time.Time{}, false
+	}
 	cooldownUntil, ok := value.(time.Time)
 	if !ok || cooldownUntil.IsZero() {
-		s.openaiAccountRuntimeBlockUntil.Delete(account.ID)
-		return false
+		s.openaiAccountRuntimeBlockUntil.Delete(accountID)
+		return time.Time{}, false
 	}
 	if time.Now().Before(cooldownUntil) {
-		return true
+		return cooldownUntil, true
 	}
-	s.openaiAccountRuntimeBlockUntil.Delete(account.ID)
-	return false
+	s.openaiAccountRuntimeBlockUntil.Delete(accountID)
+	return time.Time{}, false
 }
 
 func (s *OpenAIGatewayService) recordOpenAIOAuth429() {

@@ -48,6 +48,10 @@ func (ChannelMonitor) Fields() []ent.Field {
 			NotEmpty().
 			Sensitive().
 			Comment("AES-256-GCM encrypted API key"),
+		field.Int64("api_key_id").
+			Optional().
+			Nillable().
+			Comment("Linked user API key ID; runtime prefers the current api_keys.key when present"),
 		field.String("primary_model").
 			NotEmpty().
 			MaxLen(200),
@@ -95,6 +99,10 @@ func (ChannelMonitor) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 		edge.To("daily_rollups", ChannelMonitorDailyRollup.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
+		edge.To("api_key", APIKey.Type).
+			Field("api_key_id").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.SetNull)),
 		// 关联请求模板：模板被删除时 template_id 自动置空，
 		// 监控本身保留（继续用快照字段跑）。
 		edge.To("request_template", ChannelMonitorRequestTemplate.Type).
@@ -111,5 +119,6 @@ func (ChannelMonitor) Indexes() []ent.Index {
 		index.Fields("provider", "api_mode"),
 		index.Fields("group_name"),
 		index.Fields("template_id"),
+		index.Fields("api_key_id"),
 	}
 }

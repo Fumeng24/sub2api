@@ -29,6 +29,8 @@ const (
 	FieldEndpoint = "endpoint"
 	// FieldAPIKeyEncrypted holds the string denoting the api_key_encrypted field in the database.
 	FieldAPIKeyEncrypted = "api_key_encrypted"
+	// FieldAPIKeyID holds the string denoting the api_key_id field in the database.
+	FieldAPIKeyID = "api_key_id"
 	// FieldPrimaryModel holds the string denoting the primary_model field in the database.
 	FieldPrimaryModel = "primary_model"
 	// FieldExtraModels holds the string denoting the extra_models field in the database.
@@ -55,6 +57,8 @@ const (
 	EdgeHistory = "history"
 	// EdgeDailyRollups holds the string denoting the daily_rollups edge name in mutations.
 	EdgeDailyRollups = "daily_rollups"
+	// EdgeAPIKey holds the string denoting the api_key edge name in mutations.
+	EdgeAPIKey = "api_key"
 	// EdgeRequestTemplate holds the string denoting the request_template edge name in mutations.
 	EdgeRequestTemplate = "request_template"
 	// Table holds the table name of the channelmonitor in the database.
@@ -73,6 +77,13 @@ const (
 	DailyRollupsInverseTable = "channel_monitor_daily_rollups"
 	// DailyRollupsColumn is the table column denoting the daily_rollups relation/edge.
 	DailyRollupsColumn = "monitor_id"
+	// APIKeyTable is the table that holds the api_key relation/edge.
+	APIKeyTable = "channel_monitors"
+	// APIKeyInverseTable is the table name for the APIKey entity.
+	// It exists in this package in order to avoid circular dependency with the "apikey" package.
+	APIKeyInverseTable = "api_keys"
+	// APIKeyColumn is the table column denoting the api_key relation/edge.
+	APIKeyColumn = "api_key_id"
 	// RequestTemplateTable is the table that holds the request_template relation/edge.
 	RequestTemplateTable = "channel_monitors"
 	// RequestTemplateInverseTable is the table name for the ChannelMonitorRequestTemplate entity.
@@ -92,6 +103,7 @@ var Columns = []string{
 	FieldAPIMode,
 	FieldEndpoint,
 	FieldAPIKeyEncrypted,
+	FieldAPIKeyID,
 	FieldPrimaryModel,
 	FieldExtraModels,
 	FieldGroupName,
@@ -219,6 +231,11 @@ func ByAPIKeyEncrypted(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAPIKeyEncrypted, opts...).ToFunc()
 }
 
+// ByAPIKeyID orders the results by the api_key_id field.
+func ByAPIKeyID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAPIKeyID, opts...).ToFunc()
+}
+
 // ByPrimaryModel orders the results by the primary_model field.
 func ByPrimaryModel(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPrimaryModel, opts...).ToFunc()
@@ -287,6 +304,13 @@ func ByDailyRollups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByAPIKeyField orders the results by api_key field.
+func ByAPIKeyField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newAPIKeyStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByRequestTemplateField orders the results by request_template field.
 func ByRequestTemplateField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -305,6 +329,13 @@ func newDailyRollupsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(DailyRollupsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, DailyRollupsTable, DailyRollupsColumn),
+	)
+}
+func newAPIKeyStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(APIKeyInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, APIKeyTable, APIKeyColumn),
 	)
 }
 func newRequestTemplateStep() *sqlgraph.Step {

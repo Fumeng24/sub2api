@@ -261,7 +261,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	requireCompact := isOpenAIRemoteCompactPath(c)
 	schedulerEndpoint := GetUpstreamEndpoint(c, service.PlatformOpenAI)
 
-	maxAccountSwitches := h.maxAccountSwitches
+	maxAccountSwitches := h.gatewayService.MaxOpenAIAccountSwitches(c.Request.Context(), h.maxAccountSwitches, apiKey.GroupID)
 	switchCount := 0
 	failedAccountIDs := make(map[int64]struct{})
 	sameAccountRetryCount := make(map[int64]int)
@@ -672,7 +672,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	sessionHash, promptCacheKey = resolveOpenAIMessagesMetadataSession(sessionHash, promptCacheKey, reqModel, body)
 	schedulerEndpoint := GetInboundEndpoint(c)
 
-	maxAccountSwitches := h.maxAccountSwitches
+	maxAccountSwitches := h.gatewayService.MaxOpenAIAccountSwitches(c.Request.Context(), h.maxAccountSwitches, apiKey.GroupID)
 	switchCount := 0
 	failedAccountIDs := make(map[int64]struct{})
 	sameAccountRetryCount := make(map[int64]int)
@@ -1280,7 +1280,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		openAIWSIngressFallbackSessionSeed(subject.UserID, apiKey.ID, apiKey.GroupID),
 	)
 	schedulerEndpoint := "/v1/responses/ws"
-	maxAccountSwitches := h.maxAccountSwitches
+	maxAccountSwitches := h.gatewayService.MaxOpenAIAccountSwitches(ctx, h.maxAccountSwitches, apiKey.GroupID)
 	switchCount := 0
 	failedAccountIDs := make(map[int64]struct{})
 	var lastFailoverErr *service.UpstreamFailoverError

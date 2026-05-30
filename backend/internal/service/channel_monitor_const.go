@@ -139,7 +139,10 @@ var (
 		"CHANNEL_MONITOR_ENDPOINT_UNREACHABLE", "endpoint hostname could not be resolved",
 	)
 	ErrChannelMonitorMissingAPIKey = infraerrors.BadRequest(
-		"CHANNEL_MONITOR_MISSING_API_KEY", "api_key is required when creating a monitor",
+		"CHANNEL_MONITOR_MISSING_API_KEY", "api_key or api_key_id is required when creating a monitor",
+	)
+	ErrChannelMonitorInvalidAPIKeyID = infraerrors.BadRequest(
+		"CHANNEL_MONITOR_INVALID_API_KEY_ID", "api_key_id must be a positive integer",
 	)
 	ErrChannelMonitorMissingPrimaryModel = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_MISSING_PRIMARY_MODEL", "primary_model is required",

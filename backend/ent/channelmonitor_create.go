@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -88,6 +89,20 @@ func (_c *ChannelMonitorCreate) SetEndpoint(v string) *ChannelMonitorCreate {
 // SetAPIKeyEncrypted sets the "api_key_encrypted" field.
 func (_c *ChannelMonitorCreate) SetAPIKeyEncrypted(v string) *ChannelMonitorCreate {
 	_c.mutation.SetAPIKeyEncrypted(v)
+	return _c
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (_c *ChannelMonitorCreate) SetAPIKeyID(v int64) *ChannelMonitorCreate {
+	_c.mutation.SetAPIKeyID(v)
+	return _c
+}
+
+// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
+func (_c *ChannelMonitorCreate) SetNillableAPIKeyID(v *int64) *ChannelMonitorCreate {
+	if v != nil {
+		_c.SetAPIKeyID(*v)
+	}
 	return _c
 }
 
@@ -225,6 +240,11 @@ func (_c *ChannelMonitorCreate) AddDailyRollups(v ...*ChannelMonitorDailyRollup)
 		ids[i] = v[i].ID
 	}
 	return _c.AddDailyRollupIDs(ids...)
+}
+
+// SetAPIKey sets the "api_key" edge to the APIKey entity.
+func (_c *ChannelMonitorCreate) SetAPIKey(v *APIKey) *ChannelMonitorCreate {
+	return _c.SetAPIKeyID(v.ID)
 }
 
 // SetRequestTemplateID sets the "request_template" edge to the ChannelMonitorRequestTemplate entity by ID.
@@ -531,6 +551,23 @@ func (_c *ChannelMonitorCreate) createSpec() (*ChannelMonitor, *sqlgraph.CreateS
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
+	if nodes := _c.mutation.APIKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   channelmonitor.APIKeyTable,
+			Columns: []string{channelmonitor.APIKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.APIKeyID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	if nodes := _c.mutation.RequestTemplateIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -669,6 +706,24 @@ func (u *ChannelMonitorUpsert) SetAPIKeyEncrypted(v string) *ChannelMonitorUpser
 // UpdateAPIKeyEncrypted sets the "api_key_encrypted" field to the value that was provided on create.
 func (u *ChannelMonitorUpsert) UpdateAPIKeyEncrypted() *ChannelMonitorUpsert {
 	u.SetExcluded(channelmonitor.FieldAPIKeyEncrypted)
+	return u
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *ChannelMonitorUpsert) SetAPIKeyID(v int64) *ChannelMonitorUpsert {
+	u.Set(channelmonitor.FieldAPIKeyID, v)
+	return u
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsert) UpdateAPIKeyID() *ChannelMonitorUpsert {
+	u.SetExcluded(channelmonitor.FieldAPIKeyID)
+	return u
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (u *ChannelMonitorUpsert) ClearAPIKeyID() *ChannelMonitorUpsert {
+	u.SetNull(channelmonitor.FieldAPIKeyID)
 	return u
 }
 
@@ -966,6 +1021,27 @@ func (u *ChannelMonitorUpsertOne) SetAPIKeyEncrypted(v string) *ChannelMonitorUp
 func (u *ChannelMonitorUpsertOne) UpdateAPIKeyEncrypted() *ChannelMonitorUpsertOne {
 	return u.Update(func(s *ChannelMonitorUpsert) {
 		s.UpdateAPIKeyEncrypted()
+	})
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *ChannelMonitorUpsertOne) SetAPIKeyID(v int64) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetAPIKeyID(v)
+	})
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertOne) UpdateAPIKeyID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateAPIKeyID()
+	})
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (u *ChannelMonitorUpsertOne) ClearAPIKeyID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearAPIKeyID()
 	})
 }
 
@@ -1457,6 +1533,27 @@ func (u *ChannelMonitorUpsertBulk) SetAPIKeyEncrypted(v string) *ChannelMonitorU
 func (u *ChannelMonitorUpsertBulk) UpdateAPIKeyEncrypted() *ChannelMonitorUpsertBulk {
 	return u.Update(func(s *ChannelMonitorUpsert) {
 		s.UpdateAPIKeyEncrypted()
+	})
+}
+
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *ChannelMonitorUpsertBulk) SetAPIKeyID(v int64) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetAPIKeyID(v)
+	})
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertBulk) UpdateAPIKeyID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateAPIKeyID()
+	})
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (u *ChannelMonitorUpsertBulk) ClearAPIKeyID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearAPIKeyID()
 	})
 }
 

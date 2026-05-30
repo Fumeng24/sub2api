@@ -450,6 +450,7 @@ var (
 		{Name: "extra_headers", Type: field.TypeJSON},
 		{Name: "body_override_mode", Type: field.TypeString, Size: 10, Default: "off"},
 		{Name: "body_override", Type: field.TypeJSON, Nullable: true},
+		{Name: "api_key_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "template_id", Type: field.TypeInt64, Nullable: true},
 	}
 	// ChannelMonitorsTable holds the schema information for the "channel_monitors" table.
@@ -459,8 +460,14 @@ var (
 		PrimaryKey: []*schema.Column{ChannelMonitorsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "channel_monitors_channel_monitor_request_templates_request_template",
+				Symbol:     "channel_monitors_api_keys_api_key",
 				Columns:    []*schema.Column{ChannelMonitorsColumns[18]},
+				RefColumns: []*schema.Column{APIKeysColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "channel_monitors_channel_monitor_request_templates_request_template",
+				Columns:    []*schema.Column{ChannelMonitorsColumns[19]},
 				RefColumns: []*schema.Column{ChannelMonitorRequestTemplatesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -488,6 +495,11 @@ var (
 			},
 			{
 				Name:    "channelmonitor_template_id",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelMonitorsColumns[19]},
+			},
+			{
+				Name:    "channelmonitor_api_key_id",
 				Unique:  false,
 				Columns: []*schema.Column{ChannelMonitorsColumns[18]},
 			},
@@ -2028,7 +2040,8 @@ func init() {
 	AuthIdentityChannelsTable.Annotation = &entsql.Annotation{
 		Table: "auth_identity_channels",
 	}
-	ChannelMonitorsTable.ForeignKeys[0].RefTable = ChannelMonitorRequestTemplatesTable
+	ChannelMonitorsTable.ForeignKeys[0].RefTable = APIKeysTable
+	ChannelMonitorsTable.ForeignKeys[1].RefTable = ChannelMonitorRequestTemplatesTable
 	ChannelMonitorsTable.Annotation = &entsql.Annotation{
 		Table: "channel_monitors",
 	}

@@ -16,6 +16,7 @@ export interface ChannelMonitor {
   provider: Provider
   api_mode: APIMode
   endpoint: string
+  api_key_id: number | null
   api_key_masked: string
   /**
    * True when the stored encrypted API key cannot be decrypted (e.g. the
@@ -74,7 +75,8 @@ export interface CreateParams {
   provider: Provider
   api_mode?: APIMode
   endpoint: string
-  api_key: string
+  api_key?: string
+  api_key_id?: number | null
   primary_model: string
   extra_models?: string[]
   group_name?: string
@@ -89,6 +91,7 @@ export interface CreateParams {
 // Update request: api_key 空串 = 不修改；clear_template=true 时把 template_id 置空
 export type UpdateParams = Partial<CreateParams> & {
   clear_template?: boolean
+  clear_api_key_id?: boolean
 }
 
 export interface CheckResult {

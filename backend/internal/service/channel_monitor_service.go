@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -59,8 +60,9 @@ type ChannelMonitorRepository interface {
 
 // ChannelMonitorService 渠道监控管理服务。
 type ChannelMonitorService struct {
-	repo      ChannelMonitorRepository
-	encryptor SecretEncryptor
+	repo       ChannelMonitorRepository
+	encryptor  SecretEncryptor
+	apiKeyRepo APIKeyRepository
 	// scheduler 由 wire 通过 SetScheduler 注入；CRUD 后调用对应钩子即时同步任务。
 	// 测试或未注入场景下保持 nil，所有钩子调用变为 no-op。
 	scheduler MonitorScheduler
@@ -87,18 +89,18 @@ func (s *ChannelMonitorService) List(ctx context.Context, params ChannelMonitorL
 		return nil, 0, fmt.Errorf("list channel monitors: %w", err)
 	}
 	for _, it := range items {
-		s.decryptInPlace(it)
+		s.resolveDisplayAPIKeyInPlace(ctx, it)
 	}
 	return items, total, nil
 }
 
-// Get 查询单个监控（解密 API Key）。
+// Get 查询单个监控（解析 API Key 用于脱敏展示）。
 func (s *ChannelMonitorService) Get(ctx context.Context, id int64) (*ChannelMonitor, error) {
 	m, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	s.decryptInPlace(m)
+	s.resolveDisplayAPIKeyInPlace(ctx, m)
 	return m, nil
 }
 
@@ -113,7 +115,11 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 	if err := validateExtraHeaders(p.ExtraHeaders); err != nil {
 		return nil, err
 	}
-	encrypted, err := s.encryptor.Encrypt(p.APIKey)
+	plainAPIKey, err := s.resolveCreateAPIKey(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	encrypted, err := s.encryptor.Encrypt(plainAPIKey)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt api key: %w", err)
 	}
@@ -123,6 +129,7 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		APIMode:          defaultAPIMode(p.APIMode),
 		Endpoint:         normalizeEndpoint(p.Endpoint),
 		APIKey:           encrypted, // 注意：传入 repository 时该字段为密文
+		APIKeyID:         cloneInt64Ptr(p.APIKeyID),
 		PrimaryModel:     strings.TrimSpace(p.PrimaryModel),
 		ExtraModels:      normalizeModels(p.ExtraModels),
 		GroupName:        strings.TrimSpace(p.GroupName),
@@ -139,11 +146,22 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 	}
 	// 不再调 s.Get 重走解密链：已知刚加密的明文，直接构造响应。
 	// 这样可避免 SecretEncryptor 解密失败时 APIKey 被静默清空的问题（见 Fix 4）。
-	m.APIKey = strings.TrimSpace(p.APIKey)
+	m.APIKey = plainAPIKey
 	if s.scheduler != nil {
 		s.scheduler.Schedule(m)
 	}
 	return m, nil
+}
+
+func (s *ChannelMonitorService) resolveCreateAPIKey(ctx context.Context, p ChannelMonitorCreateParams) (string, error) {
+	if p.APIKeyID != nil {
+		return s.resolveLinkedAPIKey(ctx, *p.APIKeyID)
+	}
+	plain := strings.TrimSpace(p.APIKey)
+	if plain == "" {
+		return "", ErrChannelMonitorMissingAPIKey
+	}
+	return plain, nil
 }
 
 // validateCreateParams 把 Create 入参的所有校验聚拢为一个函数，避免 Create 主体超过 30 行。
@@ -160,7 +178,10 @@ func validateCreateParams(p ChannelMonitorCreateParams) error {
 	if err := validateEndpoint(p.Endpoint); err != nil {
 		return err
 	}
-	if strings.TrimSpace(p.APIKey) == "" {
+	if p.APIKeyID != nil && *p.APIKeyID <= 0 {
+		return ErrChannelMonitorInvalidAPIKeyID
+	}
+	if p.APIKeyID == nil && strings.TrimSpace(p.APIKey) == "" {
 		return ErrChannelMonitorMissingAPIKey
 	}
 	if strings.TrimSpace(p.PrimaryModel) == "" {
@@ -179,7 +200,7 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 		return nil, err
 	}
 
-	newPlainAPIKey, apiKeyUpdated, err := s.applyAPIKeyUpdate(existing, p.APIKey)
+	newPlainAPIKey, apiKeyUpdated, err := s.applyAPIKeyUpdate(ctx, existing, p)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +213,7 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 	if apiKeyUpdated {
 		existing.APIKey = newPlainAPIKey
 	} else {
-		s.decryptInPlace(existing)
+		s.resolveDisplayAPIKeyInPlace(ctx, existing)
 	}
 	if s.scheduler != nil {
 		// Schedule 内部根据 Enabled 自动选择 Unschedule 或重建任务，
@@ -203,14 +224,26 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 }
 
 // applyAPIKeyUpdate 处理 Update 中的 APIKey 字段：
+//   - 入参 APIKeyID 非空：读取当前用户 API Key，加密后写入快照，同时绑定 ID
 //   - 入参 raw 为 nil 或空白：不修改 existing.APIKey（仍为密文），返回 updated=false
 //   - 非空：加密后写入 existing.APIKey；同时把明文返回给调用方，
 //     供写库成功后塞回 existing 避免把密文吐回客户端
-func (s *ChannelMonitorService) applyAPIKeyUpdate(existing *ChannelMonitor, raw *string) (plain string, updated bool, err error) {
+func (s *ChannelMonitorService) applyAPIKeyUpdate(ctx context.Context, existing *ChannelMonitor, p ChannelMonitorUpdateParams) (plain string, updated bool, err error) {
+	if !p.ClearAPIKeyID && p.APIKeyID != nil {
+		plain, err = s.resolveLinkedAPIKey(ctx, *p.APIKeyID)
+		if err != nil {
+			return "", false, err
+		}
+		return s.encryptMonitorAPIKey(existing, plain)
+	}
+	raw := p.APIKey
 	if raw == nil || strings.TrimSpace(*raw) == "" {
 		return "", false, nil
 	}
-	plain = strings.TrimSpace(*raw)
+	return s.encryptMonitorAPIKey(existing, strings.TrimSpace(*raw))
+}
+
+func (s *ChannelMonitorService) encryptMonitorAPIKey(existing *ChannelMonitor, plain string) (string, bool, error) {
 	encrypted, encErr := s.encryptor.Encrypt(plain)
 	if encErr != nil {
 		return "", false, fmt.Errorf("encrypt api key: %w", encErr)
@@ -254,12 +287,12 @@ func (s *ChannelMonitorService) ListHistory(ctx context.Context, id int64, model
 // RunCheck 同步触发对一个监控的检测：并发跑 primary + extra 模型，
 // 写历史记录并更新 last_checked_at。返回每个模型的检测结果。
 func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*CheckResult, error) {
-	m, err := s.Get(ctx, id) // 已解密 APIKey
+	m, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if m.APIKeyDecryptFailed {
-		return nil, ErrChannelMonitorAPIKeyDecryptFailed
+	if err := s.resolveRuntimeAPIKeyInPlace(ctx, m); err != nil {
+		return nil, err
 	}
 	results := s.runChecksConcurrent(ctx, m)
 	s.persistCheckResults(ctx, m, results)
@@ -333,6 +366,11 @@ func (s *ChannelMonitorService) SetScheduler(sched MonitorScheduler) {
 	s.scheduler = sched
 }
 
+// SetAPIKeyRepository 由 wire 注入，用于监控绑定"我的 key"后运行时读取当前 key。
+func (s *ChannelMonitorService) SetAPIKeyRepository(repo APIKeyRepository) {
+	s.apiKeyRepo = repo
+}
+
 // ListEnabledMonitors 返回所有 enabled=true 的监控（解密后），供 runner 启动时建立任务表。
 func (s *ChannelMonitorService) ListEnabledMonitors(ctx context.Context) ([]*ChannelMonitor, error) {
 	all, err := s.repo.ListEnabled(ctx)
@@ -340,7 +378,7 @@ func (s *ChannelMonitorService) ListEnabledMonitors(ctx context.Context) ([]*Cha
 		return nil, err
 	}
 	for _, m := range all {
-		s.decryptInPlace(m)
+		s.resolveDisplayAPIKeyInPlace(ctx, m)
 	}
 	return all, nil
 }
@@ -468,6 +506,74 @@ func (s *ChannelMonitorService) decryptInPlace(m *ChannelMonitor) {
 	m.APIKey = plain
 }
 
+func (s *ChannelMonitorService) resolveDisplayAPIKeyInPlace(ctx context.Context, m *ChannelMonitor) {
+	if m == nil {
+		return
+	}
+	m.APIKeyDecryptFailed = false
+	if m.APIKeyID != nil && *m.APIKeyID > 0 && s.apiKeyRepo != nil {
+		apiKey, err := s.apiKeyRepo.GetByID(ctx, *m.APIKeyID)
+		if err == nil && apiKey != nil {
+			m.APIKey = apiKey.Key
+			return
+		}
+		slog.Warn("channel_monitor: linked api key unavailable",
+			"monitor_id", m.ID, "api_key_id", *m.APIKeyID, "error", err)
+		m.APIKey = ""
+		m.APIKeyDecryptFailed = true
+		return
+	}
+	s.decryptInPlace(m)
+}
+
+func (s *ChannelMonitorService) resolveRuntimeAPIKeyInPlace(ctx context.Context, m *ChannelMonitor) error {
+	if m == nil {
+		return ErrChannelMonitorNotFound
+	}
+	m.APIKeyDecryptFailed = false
+	if m.APIKeyID != nil && *m.APIKeyID > 0 && s.apiKeyRepo != nil {
+		plain, err := s.resolveLinkedAPIKey(ctx, *m.APIKeyID)
+		if err != nil {
+			return err
+		}
+		m.APIKey = plain
+		return nil
+	}
+
+	s.decryptInPlace(m)
+	if m.APIKeyDecryptFailed {
+		return ErrChannelMonitorAPIKeyDecryptFailed
+	}
+	return nil
+}
+
+func (s *ChannelMonitorService) resolveLinkedAPIKey(ctx context.Context, id int64) (string, error) {
+	if id <= 0 {
+		return "", ErrChannelMonitorInvalidAPIKeyID
+	}
+	if s.apiKeyRepo == nil {
+		return "", infraerrors.InternalServer("CHANNEL_MONITOR_API_KEY_REPO_UNAVAILABLE", "api key repository is unavailable")
+	}
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, id)
+	if err != nil {
+		return "", fmt.Errorf("get linked api key: %w", err)
+	}
+	if !apiKey.IsActive() {
+		return "", infraerrors.Unauthorized("API_KEY_INACTIVE", "api key is not active")
+	}
+	if apiKey.IsExpired() {
+		return "", ErrAPIKeyExpired
+	}
+	if apiKey.IsQuotaExhausted() {
+		return "", ErrAPIKeyQuotaExhausted
+	}
+	plain := strings.TrimSpace(apiKey.Key)
+	if plain == "" {
+		return "", ErrChannelMonitorMissingAPIKey
+	}
+	return plain, nil
+}
+
 // applyMonitorUpdate 把 update params 中非 nil 的字段应用到 existing 上。
 // APIKey 字段在调用方单独处理（涉及加密）。
 //
@@ -490,6 +596,11 @@ func applyMonitorUpdate(existing *ChannelMonitor, p ChannelMonitorUpdateParams) 
 			return err
 		}
 		existing.Endpoint = normalizeEndpoint(*p.Endpoint)
+	}
+	if p.ClearAPIKeyID {
+		existing.APIKeyID = nil
+	} else if p.APIKeyID != nil {
+		existing.APIKeyID = cloneInt64Ptr(p.APIKeyID)
 	}
 	if p.PrimaryModel != nil {
 		existing.PrimaryModel = strings.TrimSpace(*p.PrimaryModel)
