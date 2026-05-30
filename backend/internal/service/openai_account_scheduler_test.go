@@ -871,6 +871,58 @@ func TestOpenAIGatewayService_SelectAccountForModelWithExclusions_DBRuntimeReche
 	require.Equal(t, int64(34002), account.ID)
 }
 
+func TestOpenAIGatewayService_SelectAccountForModelWithExclusions_RetriesFreshDBWhenSnapshotPoolEmpty(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10110)
+	rateLimitedUntil := time.Now().Add(30 * time.Minute)
+	staleCooling := &Account{ID: 37001, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 0, RateLimitResetAt: &rateLimitedUntil}
+	dbCooling := Account{ID: 37001, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 0, RateLimitResetAt: &rateLimitedUntil}
+	dbAvailable := Account{ID: 37002, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 5}
+	snapshotCache := &openAISnapshotCacheStub{
+		snapshotAccounts: []*Account{staleCooling},
+		accountsByID:     map[int64]*Account{37001: staleCooling},
+	}
+	snapshotService := &SchedulerSnapshotService{cache: snapshotCache}
+	svc := &OpenAIGatewayService{
+		accountRepo:       schedulerTestOpenAIAccountRepo{accounts: []Account{dbCooling, dbAvailable}},
+		cfg:               &config.Config{},
+		rateLimitService:  newOpenAIAdvancedSchedulerRateLimitService(""),
+		schedulerSnapshot: snapshotService,
+	}
+
+	account, err := svc.SelectAccountForModelWithExclusions(ctx, &groupID, "", "gpt-5.1", nil)
+	require.NoError(t, err)
+	require.NotNil(t, account)
+	require.Equal(t, int64(37002), account.ID)
+}
+
+func TestOpenAIGatewayService_SelectAccountWithLoadAwareness_LegacyUsesCooldownFallback(t *testing.T) {
+	ctx := context.Background()
+	rateLimitedUntil := time.Now().Add(30 * time.Minute)
+	account := Account{
+		ID:               37011,
+		Platform:         PlatformOpenAI,
+		Type:             AccountTypeAPIKey,
+		Status:           StatusActive,
+		Schedulable:      true,
+		Concurrency:      1,
+		Priority:         0,
+		RateLimitResetAt: &rateLimitedUntil,
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "", "gpt-5.1", nil)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, int64(37011), selection.Account.ID)
+}
+
 func TestOpenAIGatewayService_SelectAccountWithScheduler_PreviousResponseSticky(t *testing.T) {
 	ctx := context.Background()
 	groupID := int64(9)

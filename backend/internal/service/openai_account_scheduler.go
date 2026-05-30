@@ -700,7 +700,7 @@ func (s *defaultOpenAIAccountScheduler) trySelectOpenAICooldownFallback(
 		return nil, 0, false, nil
 	}
 
-	result, compactBlocked, acquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, order, true)
+	result, compactBlocked, acquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, order, true, false)
 	if acquireErr != nil || result != nil || !allowWaitPlan || s.service.concurrencyService == nil {
 		return result, count, compactBlocked, acquireErr
 	}
@@ -731,6 +731,146 @@ func (s *defaultOpenAIAccountScheduler) trySelectOpenAICooldownFallback(
 	}
 
 	return nil, count, compactBlocked, nil
+}
+
+func (s *defaultOpenAIAccountScheduler) filterOpenAIAccountsForSchedule(
+	ctx context.Context,
+	req OpenAIAccountScheduleRequest,
+	schedGroup *Group,
+	accounts []*Account,
+) ([]*Account, []AccountWithConcurrency) {
+	filtered := make([]*Account, 0, len(accounts))
+	loadReq := make([]AccountWithConcurrency, 0, len(accounts))
+	for _, account := range accounts {
+		if account == nil {
+			continue
+		}
+		if req.ExcludedIDs != nil {
+			if _, excluded := req.ExcludedIDs[account.ID]; excluded {
+				continue
+			}
+		}
+		if !account.IsSchedulable() || !account.IsOpenAI() {
+			continue
+		}
+		if s.service.isOpenAIAccountRuntimeBlocked(account) {
+			continue
+		}
+		if schedGroup != nil && schedGroup.RequirePrivacySet && !account.IsPrivacySet() {
+			s.service.BlockAccountScheduling(account, time.Time{}, "privacy_not_set")
+			_ = s.service.accountRepo.SetError(ctx, account.ID,
+				fmt.Sprintf("Privacy not set, required by group [%s]", schedGroup.Name))
+			continue
+		}
+		if !s.isAccountRequestCompatible(ctx, account, req) {
+			continue
+		}
+		if !s.isAccountTransportCompatible(account, req.RequiredTransport) {
+			continue
+		}
+		filtered = append(filtered, account)
+		loadReq = append(loadReq, AccountWithConcurrency{
+			ID:             account.ID,
+			MaxConcurrency: account.EffectiveLoadFactor(),
+		})
+	}
+	return filtered, loadReq
+}
+
+func (s *defaultOpenAIAccountScheduler) trySelectOpenAIFreshLoadBalance(
+	ctx context.Context,
+	req OpenAIAccountScheduleRequest,
+	schedGroup *Group,
+	allowWaitPlan bool,
+) (*AccountSelectionResult, int, int, float64, bool, error) {
+	if s == nil || s.service == nil {
+		return nil, 0, 0, 0, false, nil
+	}
+	accounts, err := s.service.listFreshSchedulableAccounts(ctx, req.GroupID)
+	if err != nil {
+		return nil, 0, 0, 0, false, err
+	}
+	filtered, loadReq := s.filterOpenAIAccountsForSchedule(ctx, req, schedGroup, accounts)
+	if len(filtered) == 0 {
+		return nil, 0, 0, 0, false, nil
+	}
+
+	loadMap := map[int64]*AccountLoadInfo{}
+	if s.service.concurrencyService != nil {
+		if batchLoad, loadErr := s.service.concurrencyService.GetAccountsLoadBatch(ctx, loadReq); loadErr == nil {
+			loadMap = batchLoad
+		}
+	}
+
+	plan := s.buildOpenAIAccountLoadPlan(req, filtered, loadMap)
+	activePlan := plan
+	candidateCount := plan.candidateCount
+	topK := plan.topK
+	loadSkew := plan.loadSkew
+	compactBlocked := req.RequireCompact && len(plan.allCandidates) > 0 && len(plan.candidates) == 0
+
+	if len(plan.selectionOrder) > 0 {
+		result, orderCompactBlocked, acquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, plan.selectionOrder, false, true)
+		if acquireErr != nil {
+			return nil, candidateCount, topK, loadSkew, compactBlocked || orderCompactBlocked, acquireErr
+		}
+		compactBlocked = compactBlocked || orderCompactBlocked
+		if result != nil {
+			return result, candidateCount, topK, loadSkew, compactBlocked, nil
+		}
+	}
+
+	if s.service.concurrencyService != nil {
+		if freshLoadMap, loadErr := s.service.concurrencyService.GetAccountsLoadBatchFresh(ctx, loadReq); loadErr == nil {
+			freshPlan := s.buildOpenAIAccountLoadPlan(req, filtered, freshLoadMap)
+			activePlan = freshPlan
+			candidateCount = freshPlan.candidateCount
+			topK = freshPlan.topK
+			loadSkew = freshPlan.loadSkew
+			compactBlocked = compactBlocked || (req.RequireCompact && len(freshPlan.allCandidates) > 0 && len(freshPlan.candidates) == 0)
+			if len(freshPlan.selectionOrder) > 0 {
+				result, orderCompactBlocked, acquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, freshPlan.selectionOrder, false, true)
+				if acquireErr != nil {
+					return nil, candidateCount, topK, loadSkew, compactBlocked || orderCompactBlocked, acquireErr
+				}
+				compactBlocked = compactBlocked || orderCompactBlocked
+				if result != nil {
+					return result, candidateCount, topK, loadSkew, compactBlocked, nil
+				}
+			}
+		}
+	}
+
+	if !allowWaitPlan || s.service.concurrencyService == nil {
+		return nil, candidateCount, topK, loadSkew, compactBlocked, nil
+	}
+
+	cfg := s.service.schedulingConfig()
+	waitOrder := activePlan.waitOrder
+	if len(waitOrder) == 0 {
+		waitOrder = activePlan.selectionOrder
+	}
+	for _, candidate := range waitOrder {
+		fresh := s.service.recheckSelectedOpenAIAccountFromDB(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
+		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatible(ctx, fresh, req) {
+			continue
+		}
+		if req.RequireCompact && openAICompactSupportTier(fresh) == 0 {
+			compactBlocked = true
+			continue
+		}
+		return &AccountSelectionResult{
+			Account: fresh,
+			WaitPlan: &AccountWaitPlan{
+				AccountID:      fresh.ID,
+				MaxConcurrency: fresh.Concurrency,
+				Timeout:        cfg.FallbackWaitTimeout,
+				MaxWaiting:     cfg.FallbackMaxWaiting,
+			},
+		}, candidateCount, topK, loadSkew, compactBlocked, nil
+	}
+
+	return nil, candidateCount, topK, loadSkew, compactBlocked, nil
 }
 
 func (s *defaultOpenAIAccountScheduler) isCooldownFallbackCandidate(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest) bool {
@@ -853,6 +993,7 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 	req OpenAIAccountScheduleRequest,
 	selectionOrder []openAIAccountCandidateScore,
 	allowCooldownFallback bool,
+	bypassSnapshot bool,
 ) (*AccountSelectionResult, bool, error) {
 	compactBlocked := false
 	for i := 0; i < len(selectionOrder); i++ {
@@ -862,6 +1003,8 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 		if allowCooldownFallback {
 			compatible = s.isAccountRequestCompatibleIgnoringCooldown
 			fresh = s.service.resolveFreshOpenAIAccountIgnoringCooldown(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
+		} else if bypassSnapshot {
+			fresh = s.service.recheckSelectedOpenAIAccountFromDB(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
 		} else {
 			fresh = s.service.resolveFreshSchedulableOpenAIAccount(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
 		}
@@ -913,6 +1056,23 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		return nil, 0, 0, 0, err
 	}
 	if len(accounts) == 0 {
+		if s.service.schedulerSnapshot != nil {
+			fresh, freshCount, freshTopK, freshSkew, freshCompactBlocked, freshErr := s.trySelectOpenAIFreshLoadBalance(ctx, req, schedGroup, true)
+			if freshErr != nil {
+				return nil, freshCount, freshTopK, freshSkew, freshErr
+			}
+			if fresh != nil {
+				return fresh, freshCount, freshTopK, freshSkew, nil
+			}
+			if freshCompactBlocked {
+				if fallback, fallbackCount, _, fallbackErr := s.trySelectOpenAICooldownFallback(ctx, req, schedGroup, true); fallbackErr != nil {
+					return nil, fallbackCount, fallbackCount, freshSkew, fallbackErr
+				} else if fallback != nil {
+					return fallback, fallbackCount, fallbackCount, freshSkew, nil
+				}
+				return nil, freshCount, freshTopK, freshSkew, ErrNoAvailableCompactAccounts
+			}
+		}
 		if fallback, fallbackCount, _, fallbackErr := s.trySelectOpenAICooldownFallback(ctx, req, schedGroup, true); fallbackErr != nil {
 			return nil, fallbackCount, fallbackCount, 0, fallbackErr
 		} else if fallback != nil {
@@ -921,40 +1081,25 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false)
 	}
 
-	filtered := make([]*Account, 0, len(accounts))
-	loadReq := make([]AccountWithConcurrency, 0, len(accounts))
-	for _, account := range accounts {
-		if req.ExcludedIDs != nil {
-			if _, excluded := req.ExcludedIDs[account.ID]; excluded {
-				continue
+	filtered, loadReq := s.filterOpenAIAccountsForSchedule(ctx, req, schedGroup, accounts)
+	if len(filtered) == 0 {
+		if s.service.schedulerSnapshot != nil {
+			fresh, freshCount, freshTopK, freshSkew, freshCompactBlocked, freshErr := s.trySelectOpenAIFreshLoadBalance(ctx, req, schedGroup, true)
+			if freshErr != nil {
+				return nil, freshCount, freshTopK, freshSkew, freshErr
+			}
+			if fresh != nil {
+				return fresh, freshCount, freshTopK, freshSkew, nil
+			}
+			if freshCompactBlocked {
+				if fallback, fallbackCount, _, fallbackErr := s.trySelectOpenAICooldownFallback(ctx, req, schedGroup, true); fallbackErr != nil {
+					return nil, fallbackCount, fallbackCount, freshSkew, fallbackErr
+				} else if fallback != nil {
+					return fallback, fallbackCount, fallbackCount, freshSkew, nil
+				}
+				return nil, freshCount, freshTopK, freshSkew, ErrNoAvailableCompactAccounts
 			}
 		}
-		if !account.IsSchedulable() || !account.IsOpenAI() {
-			continue
-		}
-		if s.service.isOpenAIAccountRuntimeBlocked(account) {
-			continue
-		}
-		// require_privacy_set: 跳过 privacy 未设置的账号并标记异常
-		if schedGroup != nil && schedGroup.RequirePrivacySet && !account.IsPrivacySet() {
-			s.service.BlockAccountScheduling(account, time.Time{}, "privacy_not_set")
-			_ = s.service.accountRepo.SetError(ctx, account.ID,
-				fmt.Sprintf("Privacy not set, required by group [%s]", schedGroup.Name))
-			continue
-		}
-		if !s.isAccountRequestCompatible(ctx, account, req) {
-			continue
-		}
-		if !s.isAccountTransportCompatible(account, req.RequiredTransport) {
-			continue
-		}
-		filtered = append(filtered, account)
-		loadReq = append(loadReq, AccountWithConcurrency{
-			ID:             account.ID,
-			MaxConcurrency: account.EffectiveLoadFactor(),
-		})
-	}
-	if len(filtered) == 0 {
 		if fallback, fallbackCount, _, fallbackErr := s.trySelectOpenAICooldownFallback(ctx, req, schedGroup, true); fallbackErr != nil {
 			return nil, fallbackCount, fallbackCount, 0, fallbackErr
 		} else if fallback != nil {
@@ -976,10 +1121,29 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 	loadSkew := plan.loadSkew
 	selectionOrder := plan.selectionOrder
 	if req.RequireCompact && len(plan.candidates) == 0 && len(plan.staleSnapshotCompactRetry) == 0 {
+		freshCompactBlocked := false
+		freshCount := 0
+		freshTopK := 0
+		freshSkew := loadSkew
+		if s.service.schedulerSnapshot != nil {
+			if fresh, count, topK, skew, compactOnly, freshErr := s.trySelectOpenAIFreshLoadBalance(ctx, req, schedGroup, true); freshErr != nil {
+				return nil, freshCount, freshTopK, freshSkew, freshErr
+			} else if fresh != nil {
+				return fresh, count, topK, skew, nil
+			} else {
+				freshCompactBlocked = compactOnly
+				freshCount = count
+				freshTopK = topK
+				freshSkew = skew
+			}
+		}
 		if fallback, fallbackCount, _, fallbackErr := s.trySelectOpenAICooldownFallback(ctx, req, schedGroup, true); fallbackErr != nil {
 			return nil, fallbackCount, fallbackCount, loadSkew, fallbackErr
 		} else if fallback != nil {
 			return fallback, fallbackCount, fallbackCount, loadSkew, nil
+		}
+		if freshCompactBlocked {
+			return nil, freshCount, freshTopK, freshSkew, ErrNoAvailableCompactAccounts
 		}
 		return nil, 0, 0, 0, ErrNoAvailableCompactAccounts
 	}
@@ -992,15 +1156,34 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		return nil, candidateCount, topK, loadSkew, ErrNoAvailableCompactAccounts
 	}
 	if len(selectionOrder) == 0 {
+		freshCompactBlocked := false
+		freshCount := candidateCount
+		freshTopK := topK
+		freshSkew := loadSkew
+		if s.service.schedulerSnapshot != nil {
+			if fresh, count, freshTopKValue, skew, compactOnly, freshErr := s.trySelectOpenAIFreshLoadBalance(ctx, req, schedGroup, true); freshErr != nil {
+				return nil, freshCount, freshTopK, freshSkew, freshErr
+			} else if fresh != nil {
+				return fresh, count, freshTopKValue, skew, nil
+			} else {
+				freshCompactBlocked = compactOnly
+				freshCount = count
+				freshTopK = freshTopKValue
+				freshSkew = skew
+			}
+		}
 		if fallback, fallbackCount, _, fallbackErr := s.trySelectOpenAICooldownFallback(ctx, req, schedGroup, true); fallbackErr != nil {
 			return nil, fallbackCount, fallbackCount, loadSkew, fallbackErr
 		} else if fallback != nil {
 			return fallback, fallbackCount, fallbackCount, loadSkew, nil
 		}
+		if freshCompactBlocked {
+			return nil, freshCount, freshTopK, freshSkew, ErrNoAvailableCompactAccounts
+		}
 		return nil, candidateCount, topK, loadSkew, noAvailableOpenAISelectionError(req.RequestedModel, req.RequireCompact && len(plan.allCandidates) > 0)
 	}
 
-	result, compactBlocked, acquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, selectionOrder, false)
+	result, compactBlocked, acquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, selectionOrder, false, false)
 	if acquireErr != nil {
 		return nil, candidateCount, topK, loadSkew, acquireErr
 	}
@@ -1012,7 +1195,7 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		if freshLoadMap, loadErr := s.service.concurrencyService.GetAccountsLoadBatchFresh(ctx, loadReq); loadErr == nil {
 			freshPlan := s.buildOpenAIAccountLoadPlan(req, filtered, freshLoadMap)
 			if len(freshPlan.selectionOrder) > 0 {
-				freshResult, freshCompactBlocked, freshAcquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, freshPlan.selectionOrder, false)
+				freshResult, freshCompactBlocked, freshAcquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, freshPlan.selectionOrder, false, false)
 				if freshAcquireErr != nil {
 					return nil, candidateCount, topK, loadSkew, freshAcquireErr
 				}
@@ -1025,6 +1208,16 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 				topK = freshPlan.topK
 				loadSkew = freshPlan.loadSkew
 			}
+		}
+	}
+
+	if s.service.schedulerSnapshot != nil {
+		if fresh, freshCount, freshTopK, freshSkew, freshCompactBlocked, freshErr := s.trySelectOpenAIFreshLoadBalance(ctx, req, schedGroup, true); freshErr != nil {
+			return nil, candidateCount, topK, loadSkew, freshErr
+		} else if fresh != nil {
+			return fresh, freshCount, freshTopK, freshSkew, nil
+		} else {
+			compactBlocked = compactBlocked || freshCompactBlocked
 		}
 	}
 

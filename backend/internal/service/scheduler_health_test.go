@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestSchedulerRoleAwareOrderPrefersPrimaryBeforeBackup(t *testing.T) {
+func TestSchedulerOrderFollowsConfiguredSortOrderAcrossRoles(t *testing.T) {
 	groupID := int64(100)
 	primary := &Account{
 		ID:       1,
@@ -46,11 +46,79 @@ func TestSchedulerRoleAwareOrderPrefersPrimaryBeforeBackup(t *testing.T) {
 	if len(order) != 2 {
 		t.Fatalf("expected 2 scheduler candidates, got %d", len(order))
 	}
-	if order[0].Account.ID != primary.ID {
-		t.Fatalf("expected primary account first, got account %d", order[0].Account.ID)
+	if order[0].Account.ID != backup.ID {
+		t.Fatalf("expected lower sort_order account first, got account %d", order[0].Account.ID)
 	}
-	if order[1].Account.ID != backup.ID {
-		t.Fatalf("expected backup account second, got account %d", order[1].Account.ID)
+	if order[1].Account.ID != primary.ID {
+		t.Fatalf("expected higher sort_order account second, got account %d", order[1].Account.ID)
+	}
+}
+
+func TestSchedulerTransientFailuresRequireMinimumSamplesBeforeRateCircuit(t *testing.T) {
+	groupID := int64(100)
+	account := &Account{
+		ID: 1,
+		AccountGroups: []AccountGroup{{
+			AccountID:            1,
+			GroupID:              groupID,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               100,
+			SortOrder:            10,
+			SchedulingConfigured: true,
+		}},
+	}
+	health := newAccountSchedulerHealthStats()
+
+	health.reportFailure(account.ID, "gpt-5.5", "/v1/responses", "transient", 0)
+	health.reportSuccess(account.ID, "gpt-5.5", "/v1/responses", nil)
+	health.reportFailure(account.ID, "gpt-5.5", "/v1/responses", "transient", 0)
+	health.reportSuccess(account.ID, "gpt-5.5", "/v1/responses", nil)
+
+	scores := buildSchedulerAccountScores(
+		[]*Account{account},
+		&groupID,
+		"gpt-5.5",
+		"/v1/responses",
+		nil,
+		health,
+		true,
+	)
+	if len(scores) != 1 {
+		t.Fatalf("expected transient failures below sample floor to stay schedulable, got %d candidates", len(scores))
+	}
+}
+
+func TestSchedulerFailureRateCircuitOpensAfterMinimumSamples(t *testing.T) {
+	groupID := int64(100)
+	account := &Account{
+		ID: 1,
+		AccountGroups: []AccountGroup{{
+			AccountID:            1,
+			GroupID:              groupID,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               100,
+			SortOrder:            10,
+			SchedulingConfigured: true,
+		}},
+	}
+	health := newAccountSchedulerHealthStats()
+	health.reportFailure(account.ID, "gpt-5.5", "/v1/responses", "transient", 0)
+	health.reportSuccess(account.ID, "gpt-5.5", "/v1/responses", nil)
+	health.reportSuccess(account.ID, "gpt-5.5", "/v1/responses", nil)
+	health.reportSuccess(account.ID, "gpt-5.5", "/v1/responses", nil)
+	health.reportFailure(account.ID, "gpt-5.5", "/v1/responses", "transient", 0)
+
+	scores := buildSchedulerAccountScores(
+		[]*Account{account},
+		&groupID,
+		"gpt-5.5",
+		"/v1/responses",
+		nil,
+		health,
+		true,
+	)
+	if len(scores) != 0 {
+		t.Fatalf("expected failure-rate circuit to open after enough samples, got %d candidates", len(scores))
 	}
 }
 

@@ -1,9 +1,7 @@
 package service
 
 import (
-	"hash/fnv"
 	"math"
-	mathrand "math/rand"
 	"net/http"
 	"sort"
 	"strconv"
@@ -20,6 +18,8 @@ const (
 
 	defaultSchedulerEndpoint = "default"
 	defaultSchedulerModel    = "default"
+
+	schedulerFailureRateMinSamples = 5
 )
 
 type accountSchedulerHealthStats struct {
@@ -246,7 +246,9 @@ func (s *accountSchedulerHealthStats) reportFailure(accountID int64, model, endp
 	entry.updatedAt = time.Now()
 
 	recentFailureRate := entry.recentFailureRate()
-	shouldOpen := entry.consecutiveFailure >= 3 || recentFailureRate > 0.20
+	recentSampleCount := entry.recentSampleCount()
+	shouldOpen := entry.consecutiveFailure >= 3 ||
+		(recentSampleCount >= schedulerFailureRateMinSamples && recentFailureRate > 0.20)
 	if category == "auth" || category == "forbidden" || category == "balance" {
 		shouldOpen = true
 	}
@@ -272,13 +274,7 @@ func (e *accountSchedulerHealthEntry) recordRecent(failed bool) {
 }
 
 func (e *accountSchedulerHealthEntry) recentFailureRate() float64 {
-	if e == nil || len(e.recent) == 0 {
-		return 0
-	}
-	count := len(e.recent)
-	if !e.recentFilled {
-		count = e.recentPos
-	}
+	count := e.recentSampleCount()
 	if count == 0 {
 		return 0
 	}
@@ -289,6 +285,17 @@ func (e *accountSchedulerHealthEntry) recentFailureRate() float64 {
 		}
 	}
 	return float64(failures) / float64(count)
+}
+
+func (e *accountSchedulerHealthEntry) recentSampleCount() int {
+	if e == nil || len(e.recent) == 0 {
+		return 0
+	}
+	count := len(e.recent)
+	if !e.recentFilled {
+		count = e.recentPos
+	}
+	return count
 }
 
 func ewma(oldValue, sample, alpha float64) float64 {
@@ -419,24 +426,6 @@ func normalizeAccountGroupConfig(ag AccountGroup, account *Account) AccountGroup
 	return ag
 }
 
-func schedulerRoleRank(role string) int {
-	if role == AccountGroupRoleBackup {
-		return 1
-	}
-	return 0
-}
-
-func splitSchedulerScoresByRole(scores []schedulerAccountScore) (primary []schedulerAccountScore, backup []schedulerAccountScore) {
-	for _, score := range scores {
-		if score.Role == AccountGroupRoleBackup {
-			backup = append(backup, score)
-		} else {
-			primary = append(primary, score)
-		}
-	}
-	return primary, backup
-}
-
 func buildSchedulerAccountScores(
 	accounts []*Account,
 	groupID *int64,
@@ -527,16 +516,7 @@ func buildRoleAwareSchedulerOrder(scores []schedulerAccountScore, preferOAuth bo
 	}
 	orderedScores := append([]schedulerAccountScore(nil), scores...)
 	sortSchedulerScores(orderedScores, preferOAuth)
-	primary, backup := splitSchedulerScoresByRole(orderedScores)
-	order := make([]schedulerAccountScore, 0, len(orderedScores))
-	if !hasExplicitSchedulerGroupConfig(orderedScores) {
-		order = append(order, primary...)
-		order = append(order, backup...)
-		return order
-	}
-	order = append(order, buildWeightedSchedulerOrder(primary, append(seedParts, AccountGroupRolePrimary)...)...)
-	order = append(order, buildWeightedSchedulerOrder(backup, append(seedParts, AccountGroupRoleBackup)...)...)
-	return order
+	return orderedScores
 }
 
 func hasExplicitSchedulerGroupConfig(scores []schedulerAccountScore) bool {
@@ -551,12 +531,6 @@ func hasExplicitSchedulerGroupConfig(scores []schedulerAccountScore) bool {
 func sortSchedulerScores(scores []schedulerAccountScore, preferOAuth bool) {
 	sort.SliceStable(scores, func(i, j int) bool {
 		a, b := scores[i], scores[j]
-		if schedulerRoleRank(a.Role) != schedulerRoleRank(b.Role) {
-			return schedulerRoleRank(a.Role) < schedulerRoleRank(b.Role)
-		}
-		if a.Score != b.Score {
-			return a.Score > b.Score
-		}
 		if a.SortOrder != b.SortOrder {
 			return a.SortOrder < b.SortOrder
 		}
@@ -565,6 +539,9 @@ func sortSchedulerScores(scores []schedulerAccountScore, preferOAuth bool) {
 		}
 		if preferOAuth && a.Account.Type != b.Account.Type {
 			return a.Account.Type == AccountTypeOAuth
+		}
+		if a.Score != b.Score {
+			return a.Score > b.Score
 		}
 		switch {
 		case a.Account.LastUsedAt == nil && b.Account.LastUsedAt != nil:
@@ -580,51 +557,4 @@ func sortSchedulerScores(scores []schedulerAccountScore, preferOAuth bool) {
 			return a.Account.ID < b.Account.ID
 		}
 	})
-}
-
-func buildWeightedSchedulerOrder(scores []schedulerAccountScore, seedParts ...string) []schedulerAccountScore {
-	if len(scores) <= 1 {
-		return append([]schedulerAccountScore(nil), scores...)
-	}
-	pool := append([]schedulerAccountScore(nil), scores...)
-	order := make([]schedulerAccountScore, 0, len(pool))
-	rng := mathrand.New(mathrand.NewSource(int64(schedulerSelectionSeed(seedParts...))))
-	for len(pool) > 0 {
-		total := 0.0
-		for _, item := range pool {
-			total += math.Max(item.Score, 0.01)
-		}
-		idx := 0
-		if total > 0 {
-			r := rng.Float64() * total
-			accum := 0.0
-			for i, item := range pool {
-				accum += math.Max(item.Score, 0.01)
-				if r <= accum {
-					idx = i
-					break
-				}
-			}
-		}
-		order = append(order, pool[idx])
-		pool = append(pool[:idx], pool[idx+1:]...)
-	}
-	return order
-}
-
-func schedulerSelectionSeed(parts ...string) uint64 {
-	h := fnv.New64a()
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		_, _ = h.Write([]byte(part))
-		_, _ = h.Write([]byte{0})
-	}
-	seed := h.Sum64() ^ uint64(time.Now().UnixNano())
-	if seed == 0 {
-		seed = uint64(time.Now().UnixNano())
-	}
-	return seed
 }
