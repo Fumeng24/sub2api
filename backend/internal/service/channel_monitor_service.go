@@ -115,7 +115,7 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 	if err := validateExtraHeaders(p.ExtraHeaders); err != nil {
 		return nil, err
 	}
-	plainAPIKey, err := s.resolveCreateAPIKey(ctx, p)
+	plainAPIKey, linkedAPIKeyID, err := s.resolveCreateAPIKey(ctx, p)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		APIMode:          defaultAPIMode(p.APIMode),
 		Endpoint:         normalizeEndpoint(p.Endpoint),
 		APIKey:           encrypted, // 注意：传入 repository 时该字段为密文
-		APIKeyID:         cloneInt64Ptr(p.APIKeyID),
+		APIKeyID:         cloneInt64Ptr(linkedAPIKeyID),
 		PrimaryModel:     strings.TrimSpace(p.PrimaryModel),
 		ExtraModels:      normalizeModels(p.ExtraModels),
 		GroupName:        strings.TrimSpace(p.GroupName),
@@ -153,15 +153,16 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 	return m, nil
 }
 
-func (s *ChannelMonitorService) resolveCreateAPIKey(ctx context.Context, p ChannelMonitorCreateParams) (string, error) {
+func (s *ChannelMonitorService) resolveCreateAPIKey(ctx context.Context, p ChannelMonitorCreateParams) (string, *int64, error) {
 	if p.APIKeyID != nil {
-		return s.resolveLinkedAPIKey(ctx, *p.APIKeyID)
+		plain, err := s.resolveLinkedAPIKey(ctx, *p.APIKeyID)
+		return plain, cloneInt64Ptr(p.APIKeyID), err
 	}
 	plain := strings.TrimSpace(p.APIKey)
 	if plain == "" {
-		return "", ErrChannelMonitorMissingAPIKey
+		return "", nil, ErrChannelMonitorMissingAPIKey
 	}
-	return plain, nil
+	return plain, s.lookupAPIKeyIDByPlain(ctx, plain), nil
 }
 
 // validateCreateParams 把 Create 入参的所有校验聚拢为一个函数，避免 Create 主体超过 30 行。
@@ -240,7 +241,21 @@ func (s *ChannelMonitorService) applyAPIKeyUpdate(ctx context.Context, existing 
 	if raw == nil || strings.TrimSpace(*raw) == "" {
 		return "", false, nil
 	}
-	return s.encryptMonitorAPIKey(existing, strings.TrimSpace(*raw))
+	plain = strings.TrimSpace(*raw)
+	existing.APIKeyID = s.lookupAPIKeyIDByPlain(ctx, plain)
+	return s.encryptMonitorAPIKey(existing, plain)
+}
+
+func (s *ChannelMonitorService) lookupAPIKeyIDByPlain(ctx context.Context, plain string) *int64 {
+	if s.apiKeyRepo == nil || strings.TrimSpace(plain) == "" {
+		return nil
+	}
+	apiKey, err := s.apiKeyRepo.GetByKey(ctx, strings.TrimSpace(plain))
+	if err != nil || apiKey == nil || !apiKey.IsActive() {
+		return nil
+	}
+	id := apiKey.ID
+	return &id
 }
 
 func (s *ChannelMonitorService) encryptMonitorAPIKey(existing *ChannelMonitor, plain string) (string, bool, error) {

@@ -35,7 +35,7 @@
             <div class="card p-5">
               <p class="text-xs font-medium text-gray-400 dark:text-gray-500">{{ t('payment.rechargeAccount') }}</p>
               <p class="mt-1 text-base font-semibold text-gray-900 dark:text-white">{{ user?.username || '' }}</p>
-              <p class="mt-0.5 text-sm font-medium text-green-600 dark:text-green-400">{{ t('payment.currentBalance') }}: {{ user?.balance?.toFixed(2) || '0.00' }}</p>
+              <p class="mt-0.5 text-sm font-medium text-green-600 dark:text-green-400">{{ t('payment.currentBalance') }}: {{ formatCreditedBalance(user?.balance || 0) }}</p>
             </div>
             <div v-if="enabledMethods.length === 0" class="card py-16 text-center">
               <p class="text-gray-500 dark:text-gray-400">{{ t('payment.notAvailable') }}</p>
@@ -44,9 +44,13 @@
             <div class="card p-6">
               <AmountInput
                 v-model="amount"
-                :amounts="[10, 20, 50, 100, 200, 500, 1000, 2000, 5000]"
+                :amounts="quickRechargeAmounts"
+                :amount-label="formatQuickRechargeAmountLabel"
+                :amount-description="formatQuickRechargeAmountDescription"
+                :disabled-reason="quickRechargeDisabledReason"
                 :min="globalMinAmount"
                 :max="globalMaxAmount"
+                :prefix="selectedPaymentInputPrefix"
               />
               <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{ amountError }}</p>
             </div>
@@ -71,12 +75,12 @@
                   <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
                   <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatSelectedPaymentAmount(totalAmount) }}</span>
                 </div>
-                <div v-if="balanceRechargeMultiplier !== 1" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
+                <div v-if="showBalanceRechargeRate" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.creditedBalance') }}</span>
-                  <span class="text-gray-900 dark:text-white">${{ creditedAmount.toFixed(2) }}</span>
+                  <span class="text-gray-900 dark:text-white">{{ formatCreditedBalance(creditedAmount) }}</span>
                 </div>
-                <p v-if="balanceRechargeMultiplier !== 1" class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
-                  {{ t('payment.rechargeRatePreview', { usd: balanceRechargeMultiplier.toFixed(2) }) }}
+                <p v-if="showBalanceRechargeRate" class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
+                  {{ t('payment.rechargeRatePreview', { cny: balanceRechargeCnyPerCredit.toFixed(2) }) }}
                 </p>
               </div>
             </div>
@@ -275,9 +279,10 @@ import { platformAccentBarClass, platformBadgeLightClass, platformBadgeClass, pl
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
+import { DEFAULT_PAYMENT_CURRENCY, formatPaymentAmount, normalizePaymentCurrency, paymentAmountPrefix } from '@/components/payment/currency'
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
+import { formatCreditedBalance } from '@/components/payment/orderAmounts'
 import { hasWechatResumeQuery, parseWechatResumeRoute, stripWechatResumeQuery } from './paymentWechatResume'
 
 const i18n = useI18n()
@@ -478,7 +483,7 @@ function onPaymentSettled() {
 // All checkout data from single API call
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
-  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  plans: [], balance_disabled: false, balance_recharge_multiplier: 6.8, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
 })
 
 const tabs = computed(() => {
@@ -491,11 +496,11 @@ const tabs = computed(() => {
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
 const validAmount = computed(() => amount.value ?? 0)
-const balanceRechargeMultiplier = computed(() => {
+const quickRechargeBalanceCredits = [0.5, 1, 2, 5, 10, 20, 50, 100, 140] as const
+const balanceRechargeCnyPerCredit = computed(() => {
   const multiplier = checkout.value.balance_recharge_multiplier
-  return multiplier > 0 ? multiplier : 1
+  return multiplier > 0 ? multiplier : 6.8
 })
-const creditedAmount = computed(() => Math.round((validAmount.value * balanceRechargeMultiplier.value) * 100) / 100)
 
 // Adaptive grid: center single card, 2-col for 2 plans, 3-col for 3+
 const planGridClass = computed(() => {
@@ -531,6 +536,23 @@ const globalMaxAmount = computed(() => {
 // Selected method's limits (for validation and error messages)
 const selectedLimit = computed(() => visibleMethods.value[selectedMethod.value])
 const selectedCurrency = computed(() => normalizePaymentCurrency(selectedLimit.value?.currency))
+const appliesBalanceRechargeRate = computed(() => selectedCurrency.value === DEFAULT_PAYMENT_CURRENCY)
+const quickRechargeAmounts = computed(() =>
+  quickRechargeBalanceCredits.map((credit) => {
+    const paymentAmount = appliesBalanceRechargeRate.value
+      ? credit * balanceRechargeCnyPerCredit.value
+      : credit
+    return Math.round(paymentAmount * 100) / 100
+  })
+)
+const showBalanceRechargeRate = computed(() => appliesBalanceRechargeRate.value && balanceRechargeCnyPerCredit.value !== 1)
+const creditedAmount = computed(() => {
+  const amount = appliesBalanceRechargeRate.value
+    ? validAmount.value / balanceRechargeCnyPerCredit.value
+    : validAmount.value
+  return Math.round(amount * 100) / 100
+})
+const selectedPaymentInputPrefix = computed(() => paymentAmountPrefix(selectedCurrency.value))
 const localeCode = computed(() => {
   const raw = i18n.locale as unknown
   if (typeof raw === 'string') return raw
@@ -542,6 +564,41 @@ const localeCode = computed(() => {
 
 function formatSelectedPaymentAmount(value: number): string {
   return formatPaymentAmount(value, selectedCurrency.value, localeCode.value)
+}
+
+function formatQuickRechargeAmountLabel(value: number): string {
+  const credit = quickRechargeTargetCredit(value)
+  const rounded = Math.round(credit * 100) / 100
+  const formatted = rounded.toFixed(2).replace(/\.?0+$/, '')
+  return `$${formatted}`
+}
+
+function formatQuickRechargeAmountDescription(value: number): string {
+  return t('payment.quickAmountPayDescription', {
+    amount: formatSelectedPaymentAmount(value),
+  })
+}
+
+function quickRechargeDisabledReason(value: number): string {
+  if (!selectedMethod.value || amountFitsMethod(value, selectedMethod.value)) return ''
+  const limit = selectedLimit.value
+  if (limit?.single_min && limit.single_min > 0 && value < limit.single_min) {
+    return t('payment.quickAmountBelowLimit')
+  }
+  if (limit?.single_max && limit.single_max > 0 && value > limit.single_max) {
+    return t('payment.quickAmountAboveLimit')
+  }
+  return t('payment.quickAmountUnavailable')
+}
+
+function quickRechargeTargetCredit(value: number): number {
+  const index = quickRechargeAmounts.value.findIndex((amount) => amount === value)
+  if (index >= 0) {
+    return quickRechargeBalanceCredits[index]
+  }
+  return appliesBalanceRechargeRate.value
+    ? value / balanceRechargeCnyPerCredit.value
+    : value
 }
 
 const methodOptions = computed<PaymentMethodOption[]>(() =>
@@ -634,6 +691,7 @@ const paymentButtonClass = computed(() => {
   if (m.includes('wxpay')) return 'btn-wxpay'
   if (m === 'stripe') return 'btn-stripe'
   if (m === 'airwallex') return 'btn-airwallex'
+  if (m === 'usdt') return 'btn-usdt'
   return 'btn-primary'
 })
 

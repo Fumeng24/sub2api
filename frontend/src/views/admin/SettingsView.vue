@@ -6307,7 +6307,7 @@
                         form.payment_balance_recharge_multiplier =
                           parseFloat(
                             ($event.target as HTMLInputElement).value,
-                          ) || 1
+                          ) || 6.8
                       "
                       type="number"
                       step="0.01"
@@ -6326,11 +6326,18 @@
                     >
                       {{
                         t("admin.settings.payment.balanceRechargePreview", {
-                          usd: (
+                          cny: (
                             Number(form.payment_balance_recharge_multiplier) ||
-                            1
+                            6.8
                           ).toFixed(2),
                         })
+                      }}
+                    </p>
+                    <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                      {{
+                        t(
+                          "admin.settings.payment.balanceRechargeChangeHint",
+                        )
                       }}
                     </p>
                   </div>
@@ -7744,7 +7751,7 @@ const form = reactive<SettingsForm>({
   payment_max_pending_orders: 3,
   payment_order_timeout_minutes: 30,
   payment_balance_disabled: false,
-  payment_balance_recharge_multiplier: 1,
+  payment_balance_recharge_multiplier: 6.8,
   payment_recharge_fee_rate: 0,
   payment_enabled_types: [],
   payment_help_image_url: "",
@@ -9562,7 +9569,7 @@ async function saveSettings() {
         Number(form.payment_order_timeout_minutes) || 0,
       payment_balance_disabled: form.payment_balance_disabled,
       payment_balance_recharge_multiplier:
-        Number(form.payment_balance_recharge_multiplier) || 1,
+        Number(form.payment_balance_recharge_multiplier) || 6.8,
       payment_recharge_fee_rate: Number(form.payment_recharge_fee_rate) || 0,
       payment_enabled_types: form.payment_enabled_types,
       payment_load_balance_strategy: form.payment_load_balance_strategy,
@@ -10177,6 +10184,7 @@ const allPaymentTypes = computed(() => [
   { value: "wxpay", label: t("payment.methods.wxpay") },
   { value: "stripe", label: t("payment.methods.stripe") },
   { value: "airwallex", label: t("payment.methods.airwallex") },
+  { value: "usdt", label: t("payment.methods.usdt") },
 ]);
 
 function isPaymentTypeEnabled(type: string): boolean {
@@ -10201,7 +10209,7 @@ function togglePaymentType(type: string) {
 
 async function disableProvidersByType(type: string) {
   const matching = providers.value.filter(
-    (p) => p.provider_key === type && p.enabled,
+    (p) => providerEnablementType(p.provider_key) === type && p.enabled,
   );
   for (const p of matching) {
     try {
@@ -10234,12 +10242,17 @@ const providerKeyOptions = computed(() => [
   { value: "wxpay", label: t("admin.settings.payment.providerWxpay") },
   { value: "stripe", label: t("admin.settings.payment.providerStripe") },
   { value: "airwallex", label: t("admin.settings.payment.providerAirwallex") },
+  { value: "gmpay", label: t("admin.settings.payment.providerGmpay") },
 ]);
 
 const enabledProviderKeyOptions = computed(() => {
   const enabled = form.payment_enabled_types;
-  return providerKeyOptions.value.filter((opt) => enabled.includes(opt.value));
+  return providerKeyOptions.value.filter((opt) => enabled.includes(providerEnablementType(opt.value)));
 });
+
+function providerEnablementType(providerKey: string): string {
+  return providerKey === "gmpay" ? "usdt" : providerKey;
+}
 
 const loadBalanceOptions = computed(() => [
   {

@@ -137,7 +137,7 @@ function onDragEnd() {
 }
 
 function isEnabled(providerKey: string): boolean {
-  return props.enabledPaymentTypes.includes(providerKey)
+  return props.enabledPaymentTypes.includes(providerEnablementType(providerKey))
 }
 
 function getTypes(providerKey: string): TypeOption[] {
@@ -146,5 +146,9 @@ function getTypes(providerKey: string): TypeOption[] {
       ? { ...opt, label: t(`payment.methods.${opt.value}`, opt.value) }
       : opt,
     )
+}
+
+function providerEnablementType(providerKey: string): string {
+  return providerKey === 'gmpay' ? 'usdt' : providerKey
 }
 </script>

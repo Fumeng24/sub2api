@@ -7,18 +7,29 @@
       </label>
       <div class="grid grid-cols-3 gap-2">
         <button
-          v-for="amt in filteredAmounts"
+          v-for="amt in displayAmounts"
           :key="amt"
           type="button"
+          :disabled="isAmountDisabled(amt)"
+          :title="isAmountDisabled(amt) ? disabledReasonText(amt) : undefined"
           :class="[
-            'rounded-lg border-2 px-4 py-3 text-center font-medium transition-colors',
-            modelValue === amt
+            'min-h-[68px] rounded-lg border-2 px-3 py-2.5 text-center font-medium transition-colors',
+            isAmountDisabled(amt)
+              ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300 dark:border-dark-700 dark:bg-dark-800/50 dark:text-dark-500'
+              : modelValue === amt
               ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/40 dark:text-primary-300'
               : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:border-dark-500',
           ]"
           @click="selectAmount(amt)"
         >
-          {{ amt }}
+          <span class="block text-sm leading-5">{{ amountLabel ? amountLabel(amt) : amt }}</span>
+          <span
+            v-if="amountDescription || isAmountDisabled(amt)"
+            class="mt-0.5 block text-[11px] leading-4"
+            :class="isAmountDisabled(amt) ? 'text-gray-300 dark:text-dark-500' : 'text-gray-500 dark:text-gray-400'"
+          >
+            {{ isAmountDisabled(amt) ? disabledReasonText(amt) : amountDescriptionText(amt) }}
+          </span>
         </button>
       </div>
     </div>
@@ -30,7 +41,7 @@
       </label>
       <div class="relative">
         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-dark-500">
-          $
+          {{ prefix }}
         </span>
         <input
           type="text"
@@ -54,10 +65,15 @@ const props = withDefaults(defineProps<{
   modelValue: number | null
   min?: number
   max?: number
+  prefix?: string
+  amountLabel?: (amount: number) => string
+  amountDescription?: (amount: number) => string
+  disabledReason?: (amount: number) => string
 }>(), {
   amounts: () => [10, 20, 50, 100, 200, 500, 1000, 2000, 5000],
   min: 0,
   max: 0,
+  prefix: '$',
 })
 
 const emit = defineEmits<{
@@ -68,11 +84,6 @@ const { t } = useI18n()
 
 const customText = ref('')
 
-// 0 = no limit
-const filteredAmounts = computed(() =>
-  props.amounts.filter((a) => (props.min <= 0 || a >= props.min) && (props.max <= 0 || a <= props.max))
-)
-
 const placeholderText = computed(() => {
   if (props.min > 0 && props.max > 0) return `${props.min} - ${props.max}`
   if (props.min > 0) return `≥ ${props.min}`
@@ -80,11 +91,33 @@ const placeholderText = computed(() => {
   return t('payment.enterAmount')
 })
 
+const displayAmounts = computed(() => props.amounts)
+
 const AMOUNT_PATTERN = /^\d*(\.\d{0,2})?$/
 
 function selectAmount(amt: number) {
+  if (isAmountDisabled(amt)) return
   customText.value = String(amt)
   emit('update:modelValue', amt)
+}
+
+function isAmountDisabled(amt: number): boolean {
+  if (props.disabledReason?.(amt)) return true
+  if (props.min > 0 && amt < props.min) return true
+  if (props.max > 0 && amt > props.max) return true
+  return false
+}
+
+function disabledReasonText(amt: number): string {
+  const reason = props.disabledReason?.(amt)
+  if (reason) return reason
+  if (props.min > 0 && amt < props.min) return t('payment.quickAmountBelowLimit')
+  if (props.max > 0 && amt > props.max) return t('payment.quickAmountAboveLimit')
+  return t('payment.quickAmountUnavailable')
+}
+
+function amountDescriptionText(amt: number): string {
+  return props.amountDescription?.(amt) || ''
 }
 
 function handleInput(e: Event) {

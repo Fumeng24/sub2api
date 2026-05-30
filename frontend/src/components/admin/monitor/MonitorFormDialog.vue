@@ -75,6 +75,11 @@
           </button>
         </div>
         <p v-if="editing && editing.api_key_masked" class="mt-1 text-xs text-gray-400">{{ editing.api_key_masked }}</p>
+        <p class="mt-1 text-xs text-gray-400">
+          {{ form.api_key_id != null
+            ? t('admin.channelMonitor.form.linkedKeyHint', { id: form.api_key_id })
+            : t('admin.channelMonitor.form.manualKeyHint') }}
+        </p>
       </div>
 
       <div>

@@ -25,6 +25,7 @@ Sub2API has a built-in payment system that enables user self-service top-up with
 | **Alipay (Direct)** | Desktop QR code, mobile Alipay redirect | Direct integration with Alipay Open Platform, returning desktop QR codes and mobile WAP/app launch links |
 | **WeChat Pay (Direct)** | Native QR, H5, MP/JSAPI Pay | Direct integration with WeChat Pay APIv3 with environment-aware routing |
 | **Stripe** | Card, Alipay, WeChat Pay, Link, etc. | International payments, multi-currency support |
+| **GM Pay / Epusdt** | USDT hosted checkout | Self-hosted crypto checkout via the Epusdt GM Pay API |
 
 > Alipay/WeChat Pay direct and EasyPay can both exist as backend provider instances, but the frontend always exposes only two visible buttons: `Alipay` and `WeChat Pay`. Admins choose exactly one source for each visible method: direct or EasyPay. Direct channels connect to payment APIs directly with lower fees; EasyPay aggregates through third-party platforms with easier setup.
 
@@ -154,6 +155,19 @@ International payment platform supporting multiple payment methods and currencie
 | **Publishable Key** | Stripe publishable key (`pk_live_...` or `pk_test_...`) | Yes |
 | **Webhook Secret** | Stripe Webhook signing secret (`whsec_...`) | Yes |
 
+### GM Pay / Epusdt
+
+Hosted USDT checkout through a GM Pay-compatible Epusdt instance.
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| **API Base URL** | Base URL of your Epusdt/GM Pay instance, for example `https://pay.example.com` | Yes |
+| **PID** | GM Pay merchant ID | Yes |
+| **Secret Key** | GM Pay merchant signing key | Yes |
+| **Currency** | Fiat amount currency submitted to GM Pay, default `CNY` | Yes |
+| **Token** | Crypto token, default `USDT` | Yes |
+| **Network** | Chain/network key, default `tron` | Yes |
+
 ---
 
 ## Provider Instance Management
@@ -195,8 +209,9 @@ When adding a provider, the system auto-generates callback URLs from your site d
 | **Alipay (Direct)** | `https://your-domain.com/api/v1/payment/webhook/alipay` |
 | **WeChat Pay (Direct)** | `https://your-domain.com/api/v1/payment/webhook/wxpay` |
 | **Stripe** | `https://your-domain.com/api/v1/payment/webhook/stripe` |
+| **GM Pay / Epusdt** | `https://your-domain.com/api/v1/payment/webhook/gmpay` |
 
-> Replace `your-domain.com` with your actual domain. For EasyPay / Alipay / WeChat Pay, the callback URL is auto-filled when adding the provider — no manual configuration needed.
+> Replace `your-domain.com` with your actual domain. For EasyPay / Alipay / WeChat Pay / GM Pay, the callback URL is auto-filled when adding the provider — no manual configuration needed.
 
 ### Stripe Webhook Setup
 
@@ -231,7 +246,8 @@ User selects amount and payment method
   ├─ EasyPay     → QR code / H5 redirect
   ├─ Alipay      → Desktop QR payload (Face-to-Face preferred, Website Pay fallback) / mobile Alipay redirect
   ├─ WeChat Pay  → Desktop Native QR / non-WeChat H5 / in-WeChat JSAPI
-  └─ Stripe      → Payment Element (card/Alipay/WeChat/etc.)
+  ├─ Stripe      → Payment Element (card/Alipay/WeChat/etc.)
+  └─ USDT        → GM Pay hosted crypto checkout
        │
        ▼
   Webhook callback verified → Order PAID
@@ -271,7 +287,7 @@ If you previously used [Sub2ApiPay](https://github.com/touwaeriol/sub2apipay) as
 | Aspect | Sub2ApiPay | Built-in Payment |
 |--------|-----------|-----------------|
 | Deployment | Separate service (Next.js + PostgreSQL) | Built into Sub2API, no extra deployment |
-| Payment Methods | EasyPay, Alipay, WeChat, Stripe | Same |
+| Payment Methods | EasyPay, Alipay, WeChat, Stripe | Same, plus USDT via GM Pay / Epusdt |
 | Configuration | Environment variables + separate admin UI | Unified in Sub2API admin dashboard |
 | Top-up Integration | Via Admin API callback | Internal processing, more reliable |
 | Subscription Plans | Supported | Not yet (planned) |

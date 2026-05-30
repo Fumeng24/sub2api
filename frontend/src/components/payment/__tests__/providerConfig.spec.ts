@@ -50,3 +50,12 @@ describe('PROVIDER_CONFIG_FIELDS.stripe', () => {
     expect(currency?.options).toBe(PAYMENT_CURRENCY_OPTIONS)
   })
 })
+
+describe('PROVIDER_CONFIG_FIELDS.gmpay', () => {
+  it('configures USDT checkout defaults', () => {
+    expect(findField('gmpay', 'currency')?.defaultValue).toBe('CNY')
+    expect(findField('gmpay', 'token')?.defaultValue).toBe('USDT')
+    expect(findField('gmpay', 'network')?.defaultValue).toBe('tron')
+    expect(findField('gmpay', 'secretKey')?.sensitive).toBe(true)
+  })
+})

@@ -65,8 +65,8 @@
             <span class="font-mono text-gray-900 dark:text-white">#{{ refundTarget.id }}</span>
           </div>
           <div class="mt-2 flex justify-between text-sm">
-            <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
-            <span class="text-gray-900 dark:text-white">${{ refundTarget.amount.toFixed(2) }}</span>
+            <span class="text-gray-500 dark:text-gray-400">{{ refundTarget.order_type === 'balance' ? t('payment.orders.creditedBalance') : t('payment.orders.amount') }}</span>
+            <span class="text-gray-900 dark:text-white">{{ formatRefundTargetAmount(refundTarget) }}</span>
           </div>
         </div>
         <div>
@@ -98,8 +98,10 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import OrderTable from '@/components/payment/OrderTable.vue'
+import { formatCreditedBalance, formatOrderPaymentAmount, shouldShowCreditedBalance } from '@/components/payment/orderAmounts'
 
-const { t } = useI18n()
+const i18n = useI18n()
+const { t } = i18n
 const router = useRouter()
 const appStore = useAppStore()
 
@@ -189,9 +191,25 @@ async function confirmRefund() {
 }
 
 function canRequestRefund(order: PaymentOrder): boolean {
+  if (order.order_type !== 'balance') return false
   if (order.status !== 'COMPLETED') return false
   if (!order.provider_instance_id) return false
   return refundEligibleProviders.value.has(order.provider_instance_id)
+}
+
+function localeCode(): string | undefined {
+  const raw = i18n.locale as unknown
+  if (typeof raw === 'string') return raw
+  if (raw && typeof raw === 'object' && 'value' in raw) {
+    return String((raw as { value?: string }).value || '')
+  }
+  return undefined
+}
+
+function formatRefundTargetAmount(order: PaymentOrder): string {
+  return shouldShowCreditedBalance(order)
+    ? formatCreditedBalance(order.amount)
+    : formatOrderPaymentAmount(order, order.amount, localeCode())
 }
 
 async function loadRefundEligibility() {

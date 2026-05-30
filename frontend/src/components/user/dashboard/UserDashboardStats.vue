@@ -12,6 +12,9 @@
         <div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.balance') }}</p>
           <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">${{ formatBalance(balance) }}</p>
+          <p class="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+            {{ t('dashboard.balanceApproxCny', { amount: formatCny(approximateBalanceCny) }) }}
+          </p>
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('common.available') }}</p>
         </div>
       </div>
@@ -244,6 +247,7 @@ const props = defineProps<{
   balance: number
   isSimple: boolean
   platformQuotas?: PlatformQuotaItem[] | null
+  balanceCnyPerCredit?: number
 }>()
 const { t } = useI18n()
 
@@ -379,6 +383,22 @@ const formatBalance = (b: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(b)
+
+const cnyFormatter = new Intl.NumberFormat('zh-CN', {
+  style: 'currency',
+  currency: 'CNY',
+  currencyDisplay: 'narrowSymbol',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+const balanceCnyPerCredit = computed(() => {
+  const value = props.balanceCnyPerCredit ?? 6.8
+  return Number.isFinite(value) && value > 0 ? value : 6.8
+})
+const approximateBalanceCny = computed(() => props.balance * balanceCnyPerCredit.value)
+function formatCny(n: number): string {
+  return cnyFormatter.format(Number.isFinite(n) ? n : 0)
+}
 
 const formatNumber = (n: number) => n.toLocaleString()
 const formatCost = (c: number) => c.toFixed(4)

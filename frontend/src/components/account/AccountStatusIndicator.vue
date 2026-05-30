@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center gap-2">
+  <div class="flex items-center gap-2" :title="schedulingTitle">
     <!-- Rate Limit Display (429) - Two-line layout -->
     <div v-if="isRateLimited" class="flex flex-col items-center gap-1">
       <span class="badge text-xs badge-warning">{{ t('admin.accounts.status.rateLimited') }}</span>
@@ -351,6 +351,34 @@ const statusText = computed(() => {
     return t('admin.accounts.status.paused')
   }
   return t(`admin.accounts.status.${props.account.status}`)
+})
+
+const schedulingTitle = computed(() => {
+  const lines = [
+    t('admin.accounts.status.schedulingPriority', { priority: props.account.priority }),
+    props.account.schedulable
+      ? t('admin.accounts.status.schedulingEnabled')
+      : t('admin.accounts.status.schedulingDisabled'),
+  ]
+  if (props.account.last_used_at) {
+    lines.push(t('admin.accounts.status.lastUsedAt', { time: formatDateTime(props.account.last_used_at) }))
+  }
+  if (props.account.rate_limit_reset_at && new Date(props.account.rate_limit_reset_at) > new Date()) {
+    lines.push(t('admin.accounts.status.nextAvailableAt', { time: formatDateTime(props.account.rate_limit_reset_at) }))
+  }
+  if (props.account.overload_until && new Date(props.account.overload_until) > new Date()) {
+    lines.push(t('admin.accounts.status.nextAvailableAt', { time: formatDateTime(props.account.overload_until) }))
+  }
+  if (props.account.temp_unschedulable_until && new Date(props.account.temp_unschedulable_until) > new Date()) {
+    lines.push(t('admin.accounts.status.nextAvailableAt', { time: formatDateTime(props.account.temp_unschedulable_until) }))
+    if (props.account.temp_unschedulable_reason) {
+      lines.push(t('admin.accounts.status.schedulingReason', { reason: props.account.temp_unschedulable_reason }))
+    }
+  }
+  if (props.account.error_message) {
+    lines.push(t('admin.accounts.status.lastError', { error: props.account.error_message }))
+  }
+  return lines.join('\n')
 })
 
 const handleTempUnschedClick = () => {
