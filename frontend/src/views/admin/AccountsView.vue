@@ -1196,13 +1196,6 @@ function formatUpstreamSub2APIMoney(value?: number, unit?: string): string {
   return `$${formatted}`
 }
 
-function upstreamSub2APIPlatformLabel(platform?: string): string {
-  if (!platform) return '-'
-  const key = `admin.accounts.platforms.${platform}`
-  const translated = t(key)
-  return translated === key ? platform : translated
-}
-
 function upstreamPanelKindLabel(kind?: string): string {
   switch (kind) {
     case 'sub2api':
@@ -1220,10 +1213,9 @@ function getUpstreamSub2APILabel(row: Account): string {
   if (status.status !== 'ok') {
     return t('admin.accounts.upstreamSub2API.statusError')
   }
-  const platform = upstreamSub2APIPlatformLabel(status.upstream_group_platform)
-  const group = status.upstream_group_name || `#${status.upstream_group_id || '-'}`
   const rate = formatUpstreamSub2APIRate(status.upstream_group_effective_rate_multiplier)
-  return t('admin.accounts.upstreamSub2API.statusOk', { platform, group, rate })
+  const balance = formatUpstreamSub2APIMoney(status.user_balance, status.balance_unit)
+  return t('admin.accounts.upstreamSub2API.statusOk', { rate, balance })
 }
 
 function getUpstreamSub2APITitle(row: Account): string {
@@ -1236,14 +1228,6 @@ function getUpstreamSub2APITitle(row: Account): string {
   ]
   if (status.upstream_key_name) {
     lines.push(`${t('admin.accounts.upstreamSub2API.key')}: ${status.upstream_key_name}`)
-  }
-  if (status.upstream_group_name || status.upstream_group_id) {
-    lines.push(
-      `${t('admin.accounts.upstreamSub2API.group')}: ${status.upstream_group_name || ''}${status.upstream_group_id ? ` (#${status.upstream_group_id})` : ''}`
-    )
-  }
-  if (status.upstream_group_platform) {
-    lines.push(`${t('admin.accounts.upstreamSub2API.platform')}: ${upstreamSub2APIPlatformLabel(status.upstream_group_platform)}`)
   }
   if (typeof status.upstream_group_default_rate_multiplier === 'number') {
     lines.push(`${t('admin.accounts.upstreamSub2API.defaultRate')}: ${formatUpstreamSub2APIRate(status.upstream_group_default_rate_multiplier)}`)

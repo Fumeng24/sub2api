@@ -3865,7 +3865,7 @@ export default {
         password: '上游登录密码',
         passwordPlaceholder: '留空保持当前密码',
         passwordCreatePlaceholder: '上游账号密码',
-        statusOk: '上游 {platform} · {group} · {rate}',
+        statusOk: '{rate} · 当前余额 {balance}',
         statusError: '上游信息异常',
         status: '状态',
         key: 'API Key',

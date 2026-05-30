@@ -3727,7 +3727,7 @@ export default {
         password: 'Upstream login password',
         passwordPlaceholder: 'Leave empty to keep current password',
         passwordCreatePlaceholder: 'Upstream account password',
-        statusOk: 'Upstream {platform} · {group} · {rate}',
+        statusOk: '{rate} · Balance {balance}',
         statusError: 'Upstream info error',
         status: 'Status',
         key: 'API Key',
