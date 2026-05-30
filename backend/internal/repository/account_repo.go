@@ -885,10 +885,33 @@ func (r *accountRepository) GetGroups(ctx context.Context, accountID int64) ([]s
 }
 
 func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, groupIDs []int64) error {
-	existingGroupIDs, err := r.loadAccountGroupIDs(ctx, accountID)
+	existingRows, err := r.client.AccountGroup.Query().
+		Where(dbaccountgroup.AccountIDEQ(accountID)).
+		All(ctx)
 	if err != nil {
 		return err
 	}
+
+	existingByGroupID := make(map[int64]*dbent.AccountGroup, len(existingRows))
+	existingGroupIDs := make([]int64, 0, len(existingRows))
+	for _, row := range existingRows {
+		existingByGroupID[row.GroupID] = row
+		existingGroupIDs = append(existingGroupIDs, row.GroupID)
+	}
+
+	desiredGroupIDs := make([]int64, 0, len(groupIDs))
+	desiredSet := make(map[int64]int, len(groupIDs))
+	for _, groupID := range groupIDs {
+		if groupID <= 0 {
+			continue
+		}
+		if _, exists := desiredSet[groupID]; exists {
+			continue
+		}
+		desiredGroupIDs = append(desiredGroupIDs, groupID)
+		desiredSet[groupID] = len(desiredGroupIDs)
+	}
+
 	// 使用事务保证删除旧绑定与创建新绑定的原子性
 	tx, err := r.client.Tx(ctx)
 	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
@@ -904,20 +927,39 @@ func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, gro
 		txClient = r.client
 	}
 
-	if _, err := txClient.AccountGroup.Delete().Where(dbaccountgroup.AccountIDEQ(accountID)).Exec(ctx); err != nil {
+	deleteQuery := txClient.AccountGroup.Delete().Where(dbaccountgroup.AccountIDEQ(accountID))
+	if len(desiredGroupIDs) > 0 {
+		deleteQuery = deleteQuery.Where(dbaccountgroup.GroupIDNotIn(desiredGroupIDs...))
+	}
+	if _, err := deleteQuery.Exec(ctx); err != nil {
 		return err
 	}
 
-	if len(groupIDs) == 0 {
+	if len(desiredGroupIDs) == 0 {
 		if tx != nil {
 			return tx.Commit()
 		}
 		return nil
 	}
 
-	builders := make([]*dbent.AccountGroupCreate, 0, len(groupIDs))
-	for i, groupID := range groupIDs {
-		sortOrder := i + 1
+	builders := make([]*dbent.AccountGroupCreate, 0, len(desiredGroupIDs))
+	for _, groupID := range desiredGroupIDs {
+		sortOrder := desiredSet[groupID]
+		if existing, ok := existingByGroupID[groupID]; ok {
+			update := txClient.AccountGroup.Update().
+				Where(
+					dbaccountgroup.AccountIDEQ(accountID),
+					dbaccountgroup.GroupIDEQ(groupID),
+				).
+				SetPriority(sortOrder)
+			if !existing.SchedulingConfigured {
+				update.SetSortOrder(sortOrder)
+			}
+			if _, err := update.Save(ctx); err != nil {
+				return err
+			}
+			continue
+		}
 		builders = append(builders, txClient.AccountGroup.Create().
 			SetAccountID(accountID).
 			SetGroupID(groupID).
@@ -929,8 +971,10 @@ func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, gro
 		)
 	}
 
-	if _, err := txClient.AccountGroup.CreateBulk(builders...).Save(ctx); err != nil {
-		return err
+	if len(builders) > 0 {
+		if _, err := txClient.AccountGroup.CreateBulk(builders...).Save(ctx); err != nil {
+			return err
+		}
 	}
 
 	if tx != nil {
@@ -938,7 +982,7 @@ func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, gro
 			return err
 		}
 	}
-	payload := buildSchedulerGroupPayload(mergeGroupIDs(existingGroupIDs, groupIDs))
+	payload := buildSchedulerGroupPayload(mergeGroupIDs(existingGroupIDs, desiredGroupIDs))
 	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountGroupsChanged, &accountID, nil, payload); err != nil {
 		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue bind groups failed: account=%d err=%v", accountID, err)
 	}

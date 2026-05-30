@@ -554,6 +554,66 @@ func (s *AccountRepoSuite) TestGroupBinding_And_BindGroups() {
 	s.Require().Len(groups, 2, "expected 2 groups after bind")
 }
 
+func (s *AccountRepoSuite) TestBindGroups_PreservesSchedulingConfigForRetainedGroups() {
+	g1 := mustCreateGroup(s.T(), s.client, &service.Group{Name: "g-preserve-1"})
+	g2 := mustCreateGroup(s.T(), s.client, &service.Group{Name: "g-preserve-2"})
+	g3 := mustCreateGroup(s.T(), s.client, &service.Group{Name: "g-preserve-3"})
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-preserve"})
+
+	s.Require().NoError(s.repo.BindGroups(s.ctx, account.ID, []int64{g1.ID, g2.ID}))
+
+	_, err := s.client.AccountGroup.Update().
+		Where(
+			accountgroup.AccountIDEQ(account.ID),
+			accountgroup.GroupIDEQ(g1.ID),
+		).
+		SetRole(service.AccountGroupRoleBackup).
+		SetWeight(7).
+		SetSortOrder(90).
+		SetSchedulingConfigured(true).
+		Save(s.ctx)
+	s.Require().NoError(err)
+
+	s.Require().NoError(s.repo.BindGroups(s.ctx, account.ID, []int64{g2.ID, g1.ID, g3.ID}))
+
+	preserved, err := s.client.AccountGroup.Query().
+		Where(
+			accountgroup.AccountIDEQ(account.ID),
+			accountgroup.GroupIDEQ(g1.ID),
+		).
+		Only(s.ctx)
+	s.Require().NoError(err)
+	s.Require().Equal(service.AccountGroupRoleBackup, preserved.Role)
+	s.Require().Equal(7, preserved.Weight)
+	s.Require().Equal(90, preserved.SortOrder)
+	s.Require().True(preserved.SchedulingConfigured)
+	s.Require().Equal(2, preserved.Priority)
+
+	retainedDefault, err := s.client.AccountGroup.Query().
+		Where(
+			accountgroup.AccountIDEQ(account.ID),
+			accountgroup.GroupIDEQ(g2.ID),
+		).
+		Only(s.ctx)
+	s.Require().NoError(err)
+	s.Require().Equal(1, retainedDefault.Priority)
+	s.Require().Equal(1, retainedDefault.SortOrder)
+	s.Require().False(retainedDefault.SchedulingConfigured)
+
+	addedDefault, err := s.client.AccountGroup.Query().
+		Where(
+			accountgroup.AccountIDEQ(account.ID),
+			accountgroup.GroupIDEQ(g3.ID),
+		).
+		Only(s.ctx)
+	s.Require().NoError(err)
+	s.Require().Equal(service.AccountGroupRolePrimary, addedDefault.Role)
+	s.Require().Equal(100, addedDefault.Weight)
+	s.Require().Equal(3, addedDefault.Priority)
+	s.Require().Equal(3, addedDefault.SortOrder)
+	s.Require().False(addedDefault.SchedulingConfigured)
+}
+
 func (s *AccountRepoSuite) TestBindGroups_EmptyList() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-empty"})
 	group := mustCreateGroup(s.T(), s.client, &service.Group{Name: "g-empty"})
