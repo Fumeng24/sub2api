@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/suite"
@@ -157,6 +158,32 @@ func (s *GroupRepoSuite) TestDelete() {
 	_, err = s.repo.GetByID(s.ctx, group.ID)
 	s.Require().Error(err, "expected error after delete")
 	s.Require().ErrorIs(err, service.ErrGroupNotFound)
+}
+
+func (s *GroupRepoSuite) TestListAccountSchedulingConfigs_IgnoresDeletedAccounts() {
+	group := mustCreateGroup(s.T(), s.tx.Client(), &service.Group{
+		Name:             "scheduling-group",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	})
+	active := mustCreateAccount(s.T(), s.tx.Client(), &service.Account{Name: "active-account", Status: service.StatusActive, Schedulable: true})
+	deleted := mustCreateAccount(s.T(), s.tx.Client(), &service.Account{Name: "deleted-account", Status: service.StatusActive, Schedulable: true})
+
+	mustBindAccountToGroup(s.T(), s.tx.Client(), active.ID, group.ID, 1)
+	mustBindAccountToGroup(s.T(), s.tx.Client(), deleted.ID, group.ID, 2)
+
+	_, delErr := s.tx.Client().Account.Delete().Where(dbaccount.IDEQ(deleted.ID)).Exec(s.ctx)
+	s.Require().NoError(delErr)
+
+	entries, err := s.repo.ListAccountSchedulingConfigs(s.ctx, group.ID)
+	s.Require().NoError(err, "ListAccountSchedulingConfigs")
+	s.Require().Len(entries, 1)
+	s.Require().Equal(active.ID, entries[0].AccountID)
+	s.Require().NotNil(entries[0].Account)
+	s.Require().Equal("active-account", entries[0].Account.Name)
 }
 
 // --- List / ListWithFilters ---

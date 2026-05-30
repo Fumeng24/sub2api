@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
+	dbaccountgroup "github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -798,9 +800,12 @@ func (r *groupRepository) BindAccountsToGroup(ctx context.Context, groupID int64
 
 func (r *groupRepository) ListAccountSchedulingConfigs(ctx context.Context, groupID int64) ([]service.AccountSchedulingEntry, error) {
 	entries, err := r.client.AccountGroup.Query().
-		Where(func(s *entsql.Selector) {
-			s.Where(entsql.EQ(s.C("group_id"), groupID))
-		}).
+		Where(
+			func(s *entsql.Selector) {
+				s.Where(entsql.EQ(s.C("group_id"), groupID))
+			},
+			dbaccountgroup.HasAccountWith(dbaccount.DeletedAtIsNil()),
+		).
 		WithAccount().
 		All(ctx)
 	if err != nil {
@@ -820,6 +825,8 @@ func (r *groupRepository) ListAccountSchedulingConfigs(ctx context.Context, grou
 		}
 		if entry.Edges.Account != nil {
 			item.Account = accountEntityToService(entry.Edges.Account)
+		} else {
+			continue
 		}
 		out = append(out, item)
 	}
