@@ -362,6 +362,11 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		// Client wants JSON: buffer the streaming response and assemble a JSON reply.
 		result, handleErr = s.handleAnthropicBufferedStreamingResponse(resp, c, originalModel, billingModel, upstreamModel, startTime)
 	}
+	if handleErr != nil {
+		if failoverErr := s.handleOpenAIUpstreamStreamError(ctx, c, account, handleErr, "", false); failoverErr != nil {
+			return nil, failoverErr
+		}
+	}
 
 	// Propagate ServiceTier and ReasoningEffort to result for billing
 	if handleErr == nil && result != nil {
@@ -437,7 +442,6 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 	}
 
 	if finalResponse == nil {
-		writeAnthropicError(c, http.StatusBadGateway, "api_error", "Upstream stream ended without a terminal response event")
 		return nil, fmt.Errorf("upstream stream ended without terminal event")
 	}
 

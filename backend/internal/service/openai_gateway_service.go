@@ -358,6 +358,7 @@ type OpenAIGatewayService struct {
 
 	openaiWSFallbackUntil               sync.Map // key: int64(accountID), value: time.Time
 	openaiAccountRuntimeBlockUntil      sync.Map // key: int64(accountID), value: time.Time
+	openaiAccountCircuitHalfOpen        sync.Map // key: int64(accountID), value: time.Time
 	openaiOAuth429WindowStartUnixNano   atomic.Int64
 	openaiOAuth429WindowCount           atomic.Int64
 	openaiWSRetryMetrics                openAIWSRetryMetrics
@@ -1681,6 +1682,9 @@ func (s *OpenAIGatewayService) selectOpenAICooldownFallbackAccount(ctx context.C
 		if fresh == nil || !scheduler.isAccountRequestCompatibleIgnoringCooldown(ctx, fresh, req) {
 			continue
 		}
+		if s.isOpenAIAccountRuntimeBlocked(fresh) {
+			continue
+		}
 		if requireCompact && openAICompactSupportTier(fresh) == 0 {
 			compactBlocked = true
 			continue
@@ -1733,6 +1737,14 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
 		if err == nil && result != nil && result.Acquired {
 			return s.newAcquiredSelectionResult(ctx, account, result.ReleaseFunc)
+		}
+		if err == nil && result == nil && s.isOpenAIAccountRuntimeBlocked(account) {
+			retryExcluded := cloneExcludedAccountIDs(excludedIDs)
+			if retryExcluded == nil {
+				retryExcluded = make(map[int64]struct{}, 1)
+			}
+			retryExcluded[account.ID] = struct{}{}
+			return s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, retryExcluded, requireCompact, requiredCapability)
 		}
 		if stickyAccountID > 0 && stickyAccountID == account.ID && s.concurrencyService != nil {
 			waitingCount, _ := s.concurrencyService.GetAccountWaitingCount(ctx, account.ID)
@@ -1812,15 +1824,18 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 							_ = s.refreshStickySessionTTL(ctx, groupID, sessionHash, openaiStickySessionTTL)
 							return selection, nil
 						}
-
-						waitingCount, _ := s.concurrencyService.GetAccountWaitingCount(ctx, accountID)
-						if waitingCount < cfg.StickySessionMaxWaiting {
-							return s.newSelectionResult(ctx, account, false, nil, &AccountWaitPlan{
-								AccountID:      accountID,
-								MaxConcurrency: account.Concurrency,
-								Timeout:        cfg.StickySessionWaitTimeout,
-								MaxWaiting:     cfg.StickySessionMaxWaiting,
-							})
+						if err == nil && result == nil && s.isOpenAIAccountRuntimeBlocked(account) {
+							_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+						} else {
+							waitingCount, _ := s.concurrencyService.GetAccountWaitingCount(ctx, accountID)
+							if waitingCount < cfg.StickySessionMaxWaiting {
+								return s.newSelectionResult(ctx, account, false, nil, &AccountWaitPlan{
+									AccountID:      accountID,
+									MaxConcurrency: account.Concurrency,
+									Timeout:        cfg.StickySessionWaitTimeout,
+									MaxWaiting:     cfg.StickySessionMaxWaiting,
+								})
+							}
 						}
 					}
 				}
@@ -2123,10 +2138,23 @@ func openAIAccountBelongsToGroup(account Account, groupID int64) bool {
 }
 
 func (s *OpenAIGatewayService) tryAcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int) (*AcquireResult, error) {
+	var result *AcquireResult
+	var err error
 	if s.concurrencyService == nil {
-		return &AcquireResult{Acquired: true, ReleaseFunc: func() {}}, nil
+		result = &AcquireResult{Acquired: true, ReleaseFunc: func() {}}
+	} else {
+		result, err = s.concurrencyService.AcquireAccountSlot(ctx, accountID, maxConcurrency)
 	}
-	return s.concurrencyService.AcquireAccountSlot(ctx, accountID, maxConcurrency)
+	if err != nil || result == nil || !result.Acquired {
+		return result, err
+	}
+	if !s.tryEnterOpenAIAccountCircuitHalfOpenByID(accountID) {
+		if result.ReleaseFunc != nil {
+			result.ReleaseFunc()
+		}
+		return nil, nil
+	}
+	return result, nil
 }
 
 func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccount(ctx context.Context, account *Account, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) *Account {
@@ -3147,6 +3175,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		if reqStream {
 			streamResult, err := s.handleStreamingResponse(ctx, resp, c, account, startTime, originalModel, upstreamModel)
 			if err != nil {
+				if failoverErr := s.handleOpenAIUpstreamStreamError(ctx, c, account, err, "", false); failoverErr != nil {
+					return nil, failoverErr
+				}
 				return nil, err
 			}
 			usage = streamResult.usage
@@ -3156,6 +3187,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		} else {
 			nonStreamResult, err := s.handleNonStreamingResponse(ctx, resp, c, account, originalModel, upstreamModel)
 			if err != nil {
+				if failoverErr := s.handleOpenAIUpstreamStreamError(ctx, c, account, err, "", false); failoverErr != nil {
+					return nil, failoverErr
+				}
 				return nil, err
 			}
 			usage = nonStreamResult.usage
@@ -3386,6 +3420,9 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	if reqStream {
 		result, err := s.handleStreamingResponsePassthrough(ctx, resp, c, account, startTime, reqModel, upstreamPassthroughModel)
 		if err != nil {
+			if failoverErr := s.handleOpenAIUpstreamStreamError(ctx, c, account, err, "", true); failoverErr != nil {
+				return nil, failoverErr
+			}
 			return nil, err
 		}
 		usage = result.usage
@@ -3395,6 +3432,9 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	} else {
 		result, err := s.handleNonStreamingResponsePassthrough(ctx, resp, c, reqModel, upstreamPassthroughModel)
 		if err != nil {
+			if failoverErr := s.handleOpenAIUpstreamStreamError(ctx, c, account, err, "", true); failoverErr != nil {
+				return nil, failoverErr
+			}
 			return nil, err
 		}
 		usage = result.usage
@@ -3808,6 +3848,11 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 	message = sanitizeUpstreamErrorMessage(strings.TrimSpace(message))
 	if message == "" {
 		message = "OpenAI stream disconnected before completion"
+	}
+	if account != nil {
+		stateCtx, cancel := openAIAccountStateContext(context.Background())
+		s.markOpenAIAccountTemporarilyUnschedulable(stateCtx, account, 0, "openai_stream_error", openAIRequestErrorCooldown, []byte(message))
+		cancel()
 	}
 	detail := ""
 	if len(payload) > 0 && s != nil && s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {

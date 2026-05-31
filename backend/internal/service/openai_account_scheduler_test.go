@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -68,6 +71,10 @@ func (r schedulerTestOpenAIAccountRepo) ListSchedulableByPlatform(ctx context.Co
 
 func (r schedulerTestOpenAIAccountRepo) ListSchedulableUngroupedByPlatform(ctx context.Context, platform string) ([]Account, error) {
 	return r.ListSchedulableByPlatform(ctx, platform)
+}
+
+func (r schedulerTestOpenAIAccountRepo) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
+	return nil
 }
 
 type schedulerTestConcurrencyCache struct {
@@ -1628,6 +1635,163 @@ func TestBuildOpenAIOrderedSelectionOrder_HandlesInvalidScores(t *testing.T) {
 		seen[item.account.ID] = struct{}{}
 	}
 	require.Len(t, seen, len(candidates))
+}
+
+func TestOpenAICodexAccountCircuit_GlobalAcrossGroupsAndHalfOpenRecovery(t *testing.T) {
+	ctx := context.Background()
+	groups := []int64{2, 10, 12}
+	primary := Account{
+		ID:          38797,
+		Name:        "codex-primary",
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeOAuth,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 3,
+		Priority:    0,
+		GroupIDs:    groups,
+	}
+	backup := Account{
+		ID:          38801,
+		Name:        "codex-backup",
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeOAuth,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 3,
+		Priority:    0,
+		GroupIDs:    groups,
+	}
+	for _, groupID := range groups {
+		primary.AccountGroups = append(primary.AccountGroups, AccountGroup{
+			AccountID:            primary.ID,
+			GroupID:              groupID,
+			SortOrder:            10,
+			Priority:             1,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               100,
+			SchedulingConfigured: true,
+		})
+		backup.AccountGroups = append(backup.AccountGroups, AccountGroup{
+			AccountID:            backup.ID,
+			GroupID:              groupID,
+			SortOrder:            20,
+			Priority:             1,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               100,
+			SchedulingConfigured: true,
+		})
+	}
+
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: []Account{primary, backup}},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+	selectID := func(groupID int64) int64 {
+		t.Helper()
+		selection, decision, err := svc.SelectAccountWithScheduler(
+			ctx,
+			&groupID,
+			"",
+			"",
+			"gpt-5.1",
+			nil,
+			OpenAIUpstreamTransportAny,
+			false,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, selection)
+		require.NotNil(t, selection.Account)
+		require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+		if selection.ReleaseFunc != nil {
+			selection.ReleaseFunc()
+		}
+		return selection.Account.ID
+	}
+
+	for _, groupID := range groups {
+		require.Equal(t, int64(38797), selectID(groupID), "healthy primary should stay first for group %d", groupID)
+	}
+
+	svc.markOpenAIAccountTemporarilyUnschedulable(
+		ctx,
+		&primary,
+		0,
+		"openai_request_error",
+		openAIRequestErrorCooldown,
+		[]byte("read tcp: connection reset by peer"),
+	)
+	for _, groupID := range groups {
+		require.Equal(t, int64(38801), selectID(groupID), "open global circuit should skip primary for group %d", groupID)
+	}
+	selection, _, err := svc.SelectAccountWithScheduler(
+		ctx,
+		&groups[0],
+		"",
+		"",
+		"gpt-5.1",
+		map[int64]struct{}{backup.ID: struct{}{}},
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no available OpenAI accounts")
+	require.Nil(t, selection, "active global circuit should not be returned by cooldown fallback")
+
+	svc.openaiAccountRuntimeBlockUntil.Store(primary.ID, time.Now().Add(-time.Second))
+	require.Equal(t, int64(38797), selectID(2), "expired circuit should allow one half-open probe")
+	require.Equal(t, int64(38801), selectID(10), "other groups should skip while half-open probe is in flight")
+
+	svc.ReportOpenAIAccountScheduleResultForRequest(primary.ID, "gpt-5.1", "/v1/responses", true, nil)
+	require.Equal(t, int64(38797), selectID(12), "successful half-open probe should restore primary order")
+
+	svc.markOpenAIAccountTemporarilyUnschedulable(
+		ctx,
+		&primary,
+		0,
+		"openai_request_error",
+		openAIRequestErrorCooldown,
+		[]byte("read tcp: connection reset by peer"),
+	)
+	svc.openaiAccountRuntimeBlockUntil.Store(primary.ID, time.Now().Add(-time.Second))
+	require.Equal(t, int64(38797), selectID(2), "expired circuit should allow a later half-open probe")
+	svc.ReportOpenAIAccountScheduleResultForRequest(primary.ID, "gpt-5.1", "/v1/responses", false, nil)
+	require.Equal(t, int64(38797), selectID(10), "non-failover half-open result should recover the primary")
+}
+
+func TestOpenAIStreamInterruptionCircuit_DoesNotReplayAfterClientOutput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	account := &Account{
+		ID:          38797,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeOAuth,
+		Status:      StatusActive,
+		Schedulable: true,
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:                     schedulerTestOpenAIAccountRepo{accounts: []Account{*account}},
+		openaiTransientCooldownThrottle: newAccountWriteThrottle(time.Hour),
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	_, _ = c.Writer.Write([]byte("data: prelude\n\n"))
+
+	failoverErr := svc.handleOpenAIUpstreamStreamError(
+		context.Background(),
+		c,
+		account,
+		errors.New("stream data interval timeout"),
+		"",
+		false,
+	)
+
+	require.Nil(t, failoverErr, "stream already committed, handler must not replay on another account")
+	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 
 func TestClamp01_AllBranches(t *testing.T) {

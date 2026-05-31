@@ -12,9 +12,26 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+type closeIdleHTTPUpstreamStub struct {
+	closed []int64
+}
+
+func (s *closeIdleHTTPUpstreamStub) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
+	return nil, errors.New("unexpected Do")
+}
+
+func (s *closeIdleHTTPUpstreamStub) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*http.Response, error) {
+	return nil, errors.New("unexpected DoWithTLS")
+}
+
+func (s *closeIdleHTTPUpstreamStub) CloseIdleConnectionsForAccount(accountID int64) {
+	s.closed = append(s.closed, accountID)
+}
 
 func TestOpenAI429FastPath_MarksOAuthAccountCoolingDown(t *testing.T) {
 	svc := &OpenAIGatewayService{}
@@ -324,6 +341,34 @@ func TestOpenAIRequestErrorFailoversWhenCanceledContextHasNetworkTimeout(t *test
 	require.Equal(t, "failover", events[0].Kind)
 	require.True(t, events[0].CooldownApplied)
 	require.Equal(t, "openai_request_error", events[0].CooldownReason)
+}
+
+func TestOpenAIRequestErrorClosesIdleConnectionsOnConnectionReset(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &rateLimitAccountRepoStub{}
+	upstream := &closeIdleHTTPUpstreamStub{}
+	svc := &OpenAIGatewayService{
+		accountRepo:                     repo,
+		httpUpstream:                    upstream,
+		openaiTransientCooldownThrottle: newAccountWriteThrottle(time.Hour),
+	}
+	account := &Account{ID: 110, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	_, failoverErr := svc.handleOpenAIUpstreamRequestError(
+		context.Background(),
+		c,
+		account,
+		errors.New("read tcp 10.0.0.2:443: connection reset by peer"),
+		"",
+		false,
+	)
+
+	require.NotNil(t, failoverErr)
+	require.Equal(t, []int64{account.ID}, upstream.closed)
+	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 
 func TestOpsUpstreamErrorAnnotatesOpenAITransientFailoverCooldown(t *testing.T) {

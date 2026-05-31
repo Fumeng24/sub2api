@@ -759,6 +759,9 @@ func (s *defaultOpenAIAccountScheduler) trySelectOpenAICooldownFallback(
 		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatibleIgnoringCooldown(ctx, fresh, req) {
 			continue
 		}
+		if s.service.isOpenAIAccountRuntimeBlocked(fresh) {
+			continue
+		}
 		if req.RequireCompact && openAICompactSupportTier(fresh) == 0 {
 			compactBlocked = true
 			continue
@@ -935,6 +938,9 @@ func (s *defaultOpenAIAccountScheduler) isCooldownFallbackCandidate(ctx context.
 		return false
 	}
 	if !s.isAccountTransportCompatible(account, req.RequiredTransport) {
+		return false
+	}
+	if s.service.isOpenAIAccountRuntimeBlocked(account) {
 		return false
 	}
 	if req.GroupID != nil && s.service.needsUpstreamChannelRestrictionCheck(ctx, req.GroupID) &&
@@ -1648,6 +1654,17 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResultForRequest(accou
 	if s == nil || accountID <= 0 {
 		return
 	}
+	if success {
+		s.recoverOpenAIAccountCircuit(accountID)
+	} else {
+		if s.isOpenAIAccountCircuitHalfOpenInFlight(accountID, time.Now()) {
+			// Non-failover errors (for example a user 400) still prove the
+			// upstream account is reachable. Network/5xx probe failures are
+			// reported through ReportOpenAIAccountScheduleFailure and reopen
+			// the circuit there.
+			s.recoverOpenAIAccountCircuit(accountID)
+		}
+	}
 	if s.schedulerHealth != nil {
 		if success {
 			s.schedulerHealth.reportSuccess(accountID, model, endpoint, firstTokenMs)
@@ -1676,6 +1693,13 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleFailure(accountID int6
 	}
 	category := schedulerFailureCategory(statusCode, body)
 	cooldown := schedulerCooldownForCategory(category, headers)
+	if statusCode == 0 || isOpenAITransient5xxStatus(statusCode) {
+		reason := "openai_request_error"
+		if isOpenAITransient5xxStatus(statusCode) {
+			reason = "openai_transient_5xx"
+		}
+		s.reopenOpenAIAccountCircuit(accountID, reason, cooldown)
+	}
 	if s.schedulerHealth != nil {
 		s.schedulerHealth.reportFailure(accountID, model, endpoint, category, cooldown)
 	}

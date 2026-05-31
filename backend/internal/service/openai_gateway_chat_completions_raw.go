@@ -214,7 +214,13 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 
 	// 8. Forward response
 	if clientStream {
-		return s.streamRawChatCompletions(c, resp, account, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime, len(body))
+		result, streamErr := s.streamRawChatCompletions(c, resp, account, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime, len(body))
+		if streamErr != nil {
+			if failoverErr := s.handleOpenAIUpstreamStreamError(ctx, c, account, streamErr, "", false); failoverErr != nil {
+				return nil, failoverErr
+			}
+		}
+		return result, streamErr
 	}
 	return s.bufferRawChatCompletions(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 }
@@ -337,6 +343,18 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 				zap.String("request_id", requestID),
 			)
 		}
+		return &OpenAIForwardResult{
+			RequestID:       requestID,
+			Usage:           usage,
+			Model:           originalModel,
+			BillingModel:    billingModel,
+			UpstreamModel:   upstreamModel,
+			ReasoningEffort: reasoningEffort,
+			ServiceTier:     serviceTier,
+			Stream:          true,
+			Duration:        time.Since(startTime),
+			FirstTokenMs:    firstTokenMs,
+		}, fmt.Errorf("stream usage incomplete: %w", err)
 	} else if !clientDisconnected && !clientOutputStarted {
 		if refusalDetector.IsSilentRefusal() {
 			return nil, newOpenAISilentRefusalFailoverError(c, account, requestID)

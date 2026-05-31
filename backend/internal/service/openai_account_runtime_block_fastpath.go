@@ -15,6 +15,7 @@ const (
 	openAIRequestErrorCooldown                = 30 * time.Second
 	openAITransientCooldownPersistMinInterval = 15 * time.Second
 	openAIStopSchedulingBridgeCooldown        = 2 * time.Minute
+	openAIAccountCircuitHalfOpenProbeTTL      = 30 * time.Second
 	openAIOAuth429StormWindow                 = 10 * time.Second
 	openAIOAuth429StormThreshold              = 20
 	openAIOAuth429StormMaxAccountSwitches     = 1
@@ -138,6 +139,7 @@ func (s *OpenAIGatewayService) markOpenAIAccountTemporarilyUnschedulable(ctx con
 	until := now.Add(cooldown)
 
 	s.BlockAccountScheduling(account, until, reason)
+	s.closeOpenAIAccountIdleConnectionsForCircuit(account.ID, statusCode, reason, responseBody)
 
 	state := &TempUnschedState{
 		UntilUnix:       until.Unix(),
@@ -171,6 +173,7 @@ func (s *OpenAIGatewayService) markOpenAIAccountTemporarilyUnschedulable(ctx con
 	}
 
 	slog.Info("openai_temp_unschedulable", "account_id", account.ID, "status_code", statusCode, "reason", reason, "until", until, "persisted", persisted)
+	slog.Info("account_circuit_open", "account_id", account.ID, "status_code", statusCode, "reason", reason, "until", until, "persisted", persisted)
 	return true
 }
 
@@ -180,6 +183,8 @@ func defaultOpenAIAccountCooldownMessage(reason string) string {
 		return "OpenAI upstream transient 5xx"
 	case "openai_request_error":
 		return "OpenAI upstream request error"
+	case "openai_stream_error":
+		return "OpenAI upstream stream error"
 	default:
 		return "OpenAI account temporarily unschedulable"
 	}
@@ -216,6 +221,8 @@ func (s *OpenAIGatewayService) BlockAccountScheduling(account *Account, until ti
 		blockUntil = now.Add(openAIStopSchedulingBridgeCooldown)
 	}
 
+	s.openaiAccountCircuitHalfOpen.Delete(account.ID)
+
 	for {
 		current, loaded := s.openaiAccountRuntimeBlockUntil.Load(account.ID)
 		if !loaded {
@@ -247,17 +254,28 @@ func (s *OpenAIGatewayService) ClearAccountSchedulingBlock(accountID int64) {
 		return
 	}
 	s.openaiAccountRuntimeBlockUntil.Delete(accountID)
+	s.openaiAccountCircuitHalfOpen.Delete(accountID)
 }
 
 func (s *OpenAIGatewayService) isOpenAIAccountRuntimeBlocked(account *Account) bool {
 	if s == nil || !isOpenAIAccount(account) {
 		return false
 	}
-	cooldownUntil, ok := s.openAIAccountRuntimeBlockUntil(account.ID)
+	value, ok := s.openaiAccountRuntimeBlockUntil.Load(account.ID)
 	if !ok {
 		return false
 	}
-	return time.Now().Before(cooldownUntil)
+	cooldownUntil, ok := value.(time.Time)
+	if !ok || cooldownUntil.IsZero() {
+		s.openaiAccountRuntimeBlockUntil.Delete(account.ID)
+		s.openaiAccountCircuitHalfOpen.Delete(account.ID)
+		return false
+	}
+	now := time.Now()
+	if now.Before(cooldownUntil) {
+		return true
+	}
+	return s.isOpenAIAccountCircuitHalfOpenInFlight(account.ID, now)
 }
 
 func (s *OpenAIGatewayService) openAIAccountRuntimeBlockUntil(accountID int64) (time.Time, bool) {
@@ -276,8 +294,140 @@ func (s *OpenAIGatewayService) openAIAccountRuntimeBlockUntil(accountID int64) (
 	if time.Now().Before(cooldownUntil) {
 		return cooldownUntil, true
 	}
-	s.openaiAccountRuntimeBlockUntil.Delete(accountID)
 	return time.Time{}, false
+}
+
+func (s *OpenAIGatewayService) tryEnterOpenAIAccountCircuitHalfOpenByID(accountID int64) bool {
+	if s == nil || accountID <= 0 {
+		return true
+	}
+	value, ok := s.openaiAccountRuntimeBlockUntil.Load(accountID)
+	if !ok {
+		return true
+	}
+	cooldownUntil, ok := value.(time.Time)
+	if !ok || cooldownUntil.IsZero() {
+		s.openaiAccountRuntimeBlockUntil.Delete(accountID)
+		s.openaiAccountCircuitHalfOpen.Delete(accountID)
+		return true
+	}
+	now := time.Now()
+	if now.Before(cooldownUntil) {
+		return false
+	}
+	if s.isOpenAIAccountCircuitHalfOpenInFlight(accountID, now) {
+		return false
+	}
+	probeStartedAt := now
+	if _, loaded := s.openaiAccountCircuitHalfOpen.LoadOrStore(accountID, probeStartedAt); loaded {
+		return false
+	}
+	slog.Info("account_circuit_half_open", "account_id", accountID, "previous_until", cooldownUntil)
+	return true
+}
+
+func (s *OpenAIGatewayService) isOpenAIAccountCircuitHalfOpenInFlight(accountID int64, now time.Time) bool {
+	if s == nil || accountID <= 0 {
+		return false
+	}
+	value, ok := s.openaiAccountCircuitHalfOpen.Load(accountID)
+	if !ok {
+		return false
+	}
+	startedAt, ok := value.(time.Time)
+	if !ok || startedAt.IsZero() || now.Sub(startedAt) > openAIAccountCircuitHalfOpenProbeTTL {
+		s.openaiAccountCircuitHalfOpen.Delete(accountID)
+		return false
+	}
+	return true
+}
+
+func (s *OpenAIGatewayService) recoverOpenAIAccountCircuit(accountID int64) {
+	if s == nil || accountID <= 0 {
+		return
+	}
+	now := time.Now()
+	value, blocked := s.openaiAccountRuntimeBlockUntil.Load(accountID)
+	_, halfOpen := s.openaiAccountCircuitHalfOpen.Load(accountID)
+	if !blocked && !halfOpen {
+		return
+	}
+	cooldownUntil, _ := value.(time.Time)
+	if blocked && now.Before(cooldownUntil) && !halfOpen {
+		return
+	}
+	s.openaiAccountRuntimeBlockUntil.Delete(accountID)
+	s.openaiAccountCircuitHalfOpen.Delete(accountID)
+	slog.Info("account_circuit_recovered", "account_id", accountID)
+}
+
+func (s *OpenAIGatewayService) reopenOpenAIAccountCircuit(accountID int64, reason string, cooldown time.Duration) {
+	if s == nil || accountID <= 0 || cooldown <= 0 {
+		return
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "openai_circuit_failure"
+	}
+	until := time.Now().Add(cooldown)
+	for {
+		current, loaded := s.openaiAccountRuntimeBlockUntil.Load(accountID)
+		if !loaded {
+			actual, stored := s.openaiAccountRuntimeBlockUntil.LoadOrStore(accountID, until)
+			if !stored {
+				break
+			}
+			current = actual
+		}
+		currentUntil, ok := current.(time.Time)
+		if ok && currentUntil.After(until) {
+			break
+		}
+		if s.openaiAccountRuntimeBlockUntil.CompareAndSwap(accountID, current, until) {
+			break
+		}
+	}
+	s.openaiAccountCircuitHalfOpen.Delete(accountID)
+	slog.Info("account_circuit_open", "account_id", accountID, "status_code", 0, "reason", reason, "until", until, "persisted", false)
+}
+
+func (s *OpenAIGatewayService) closeOpenAIAccountIdleConnectionsForCircuit(accountID int64, statusCode int, reason string, responseBody []byte) {
+	if s == nil || accountID <= 0 || !shouldCloseOpenAIIdleConnectionsForCircuit(statusCode, reason, responseBody) {
+		return
+	}
+	closer, ok := s.httpUpstream.(HTTPUpstreamAccountIdleCloser)
+	if !ok || closer == nil {
+		return
+	}
+	closer.CloseIdleConnectionsForAccount(accountID)
+	slog.Info("account_circuit_transport_closed", "account_id", accountID, "status_code", statusCode, "reason", reason)
+}
+
+func shouldCloseOpenAIIdleConnectionsForCircuit(statusCode int, reason string, responseBody []byte) bool {
+	if statusCode != 0 {
+		return false
+	}
+	text := strings.ToLower(strings.TrimSpace(reason + " " + string(responseBody)))
+	if text == "" {
+		return false
+	}
+	markers := []string{
+		"connection reset by peer",
+		"http2:",
+		"client connection force closed",
+		"clientconn.close",
+		"use of closed network connection",
+		"stream data interval timeout",
+		"stream usage incomplete",
+		"missing terminal event",
+		"upstream stream ended without terminal event",
+	}
+	for _, marker := range markers {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *OpenAIGatewayService) recordOpenAIOAuth429() {

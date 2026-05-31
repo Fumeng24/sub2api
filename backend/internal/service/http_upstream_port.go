@@ -22,3 +22,7 @@ type HTTPUpstream interface {
 	// 支持按账号绑定的数据库 profile 或内置默认 profile。
 	DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*http.Response, error)
 }
+
+type HTTPUpstreamAccountIdleCloser interface {
+	CloseIdleConnectionsForAccount(accountID int64)
+}

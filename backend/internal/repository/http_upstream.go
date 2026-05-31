@@ -527,6 +527,46 @@ func (s *httpUpstreamService) removeClientLocked(key string, entry *upstreamClie
 	}
 }
 
+func (s *httpUpstreamService) CloseIdleConnectionsForAccount(accountID int64) {
+	if s == nil || accountID <= 0 {
+		return
+	}
+	isolation := s.getIsolationMode()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	matched := false
+	for key, entry := range s.clients {
+		if cacheKeyMatchesAccount(key, accountID) {
+			s.removeClientLocked(key, entry)
+			matched = true
+		}
+	}
+	if matched || isolation != config.ConnectionPoolIsolationProxy {
+		return
+	}
+
+	// In proxy-only isolation the cache key has no account component. Close
+	// shared idle transports so a connection-level account failure cannot keep
+	// reusing the same broken HTTP/2 connection.
+	for key, entry := range s.clients {
+		s.removeClientLocked(key, entry)
+	}
+}
+
+func cacheKeyMatchesAccount(key string, accountID int64) bool {
+	if accountID <= 0 {
+		return false
+	}
+	accountKey := fmt.Sprintf("account:%d", accountID)
+	tlsAccountKey := "tls:" + accountKey
+	return key == accountKey ||
+		strings.HasPrefix(key, accountKey+"|") ||
+		key == tlsAccountKey ||
+		strings.HasPrefix(key, tlsAccountKey+"|")
+}
+
 // evictIdleLocked 淘汰空闲超时的客户端（需持有锁）
 // 遍历所有客户端，移除超过 TTL 且无活跃请求的条目
 //

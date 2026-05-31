@@ -109,6 +109,13 @@ func isOpenAIUpstreamNetworkFailoverError(err error, safeErr string) bool {
 		"timeout awaiting response headers",
 		"tls handshake timeout",
 		"connection refused",
+		"connection reset by peer",
+		"use of closed network connection",
+		"http2: client connection force closed",
+		"client connection force closed",
+		"clientconn.close",
+		"stream error",
+		"goaway",
 		"network is unreachable",
 		"no such host",
 	}
@@ -118,4 +125,103 @@ func isOpenAIUpstreamNetworkFailoverError(err error, safeErr string) bool {
 		}
 	}
 	return false
+}
+
+func (s *OpenAIGatewayService) handleOpenAIUpstreamStreamError(ctx context.Context, c *gin.Context, account *Account, err error, upstreamURL string, passthrough bool) *UpstreamFailoverError {
+	if err == nil || !isOpenAIUpstreamStreamCircuitError(err) {
+		return nil
+	}
+	safeErr := sanitizeUpstreamErrorMessage(err.Error())
+	if safeErr == "" {
+		safeErr = "upstream stream failed"
+	}
+	responseCommitted := c != nil && c.Writer.Written()
+
+	stateCtx, cancel := openAIAccountStateContext(ctx)
+	defer cancel()
+	cooldownApplied := s.markOpenAIAccountTemporarilyUnschedulable(
+		stateCtx,
+		account,
+		0,
+		"openai_stream_error",
+		openAIRequestErrorCooldown,
+		[]byte(safeErr),
+	)
+
+	kind := "failover"
+	if responseCommitted {
+		kind = "stream_error"
+	}
+	if c != nil {
+		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			Platform:           accountPlatform(account),
+			AccountID:          accountID(account),
+			AccountName:        accountName(account),
+			UpstreamStatusCode: 0,
+			UpstreamURL:        upstreamURL,
+			Passthrough:        passthrough,
+			Kind:               kind,
+			Message:            safeErr,
+			CooldownApplied:    cooldownApplied,
+			CooldownReason:     "openai_stream_error",
+		})
+	}
+	if responseCommitted {
+		return nil
+	}
+	return newNetworkUpstreamFailoverError(safeErr)
+}
+
+func isOpenAIUpstreamStreamCircuitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		msg := strings.ToLower(err.Error())
+		return strings.Contains(msg, "connection reset") ||
+			strings.Contains(msg, "client connection force closed") ||
+			strings.Contains(msg, "clientconn.close")
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	if msg == "" {
+		return false
+	}
+	markers := []string{
+		"connection reset by peer",
+		"http2: client connection force closed",
+		"client connection force closed",
+		"clientconn.close",
+		"stream data interval timeout",
+		"missing terminal event",
+		"upstream stream ended without terminal event",
+		"stream usage incomplete",
+		"stream read error",
+	}
+	for _, marker := range markers {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func accountPlatform(account *Account) string {
+	if account == nil {
+		return PlatformOpenAI
+	}
+	return account.Platform
+}
+
+func accountID(account *Account) int64 {
+	if account == nil {
+		return 0
+	}
+	return account.ID
+}
+
+func accountName(account *Account) string {
+	if account == nil {
+		return ""
+	}
+	return account.Name
 }

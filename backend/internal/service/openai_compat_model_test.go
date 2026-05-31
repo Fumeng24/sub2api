@@ -1663,7 +1663,7 @@ func TestForwardAsAnthropic_BufferedEventNamedTerminalWithoutUpstreamCloseReturn
 	}
 }
 
-func TestForwardAsAnthropic_DoneSentinelWithoutTerminalReturnsError(t *testing.T) {
+func TestForwardAsAnthropic_DoneSentinelWithoutTerminalTriggersFailover(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	rec := httptest.NewRecorder()
@@ -1694,10 +1694,12 @@ func TestForwardAsAnthropic_DoneSentinelWithoutTerminalReturnsError(t *testing.T
 
 	result, err := svc.ForwardAsAnthropic(context.Background(), c, account, body, "", "gpt-5.1")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "missing terminal event")
-	require.NotNil(t, result)
-	require.Zero(t, result.Usage.InputTokens)
-	require.Zero(t, result.Usage.OutputTokens)
+	var failoverErr *UpstreamFailoverError
+	require.True(t, errors.As(err, &failoverErr), "expected failover error, got %T", err)
+	require.Equal(t, 0, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "missing terminal event")
+	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.Nil(t, result)
 }
 
 func TestForwardAsAnthropic_UpstreamRequestIgnoresClientCancel(t *testing.T) {

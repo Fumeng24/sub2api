@@ -325,6 +325,23 @@ func (s *HTTPUpstreamSuite) TestAccountProxyIsolation_DifferentProxy() {
 	require.Equal(s.T(), 2, len(svc.clients), "账号+代理隔离应缓存两个客户端")
 }
 
+func (s *HTTPUpstreamSuite) TestCloseIdleConnectionsForAccount_ExactAccountMatch() {
+	s.cfg.Gateway = config.GatewayConfig{ConnectionPoolIsolation: config.ConnectionPoolIsolationAccountProxy}
+	svc := s.newService()
+	entry12 := mustGetOrCreateClient(s.T(), svc, "http://proxy-a:8080", 12, 3)
+	entry123 := mustGetOrCreateClient(s.T(), svc, "http://proxy-b:8080", 123, 3)
+	require.True(s.T(), cacheKeyMatchesAccount("account:12", 12))
+	require.True(s.T(), cacheKeyMatchesAccount("account:12|proxy:http://proxy-a:8080", 12))
+	require.True(s.T(), cacheKeyMatchesAccount("tls:account:12|proxy:http://proxy-a:8080", 12))
+	require.False(s.T(), cacheKeyMatchesAccount("account:123|proxy:http://proxy-b:8080", 12))
+	require.False(s.T(), cacheKeyMatchesAccount("tls:account:123|proxy:http://proxy-b:8080", 12))
+
+	svc.CloseIdleConnectionsForAccount(12)
+
+	require.False(s.T(), hasEntry(svc, entry12), "target account connection pool should be removed")
+	require.True(s.T(), hasEntry(svc, entry123), "similar account id must not be removed")
+}
+
 // TestAccountModeProxyChangeClearsPool 测试账户模式下代理变更
 // 验证账户切换代理时清理旧连接池，避免复用错误代理
 func (s *HTTPUpstreamSuite) TestAccountModeProxyChangeClearsPool() {
