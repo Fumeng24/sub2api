@@ -117,7 +117,7 @@ func (s *SchedulerSnapshotService) ListSchedulableAccounts(ctx context.Context, 
 		if err != nil {
 			logger.LegacyPrintf("service.scheduler_snapshot", "[Scheduler] cache read failed: bucket=%s err=%v", bucket.String(), err)
 		} else if hit {
-			return cached, useMixed, nil
+			return filterCurrentlySchedulableAccountPointers(cached), useMixed, nil
 		}
 	}
 
@@ -133,18 +133,13 @@ func (s *SchedulerSnapshotService) ListSchedulableAccounts(ctx context.Context, 
 		return nil, useMixed, err
 	}
 
-	result := make([]*Account, len(accounts))
-	for i := range accounts {
-		result[i] = &accounts[i]
-	}
-
 	if s.cache != nil {
 		if err := s.cache.SetSnapshot(fallbackCtx, bucket, accounts); err != nil {
 			logger.LegacyPrintf("service.scheduler_snapshot", "[Scheduler] cache write failed: bucket=%s err=%v", bucket.String(), err)
 		}
 	}
 
-	return result, useMixed, nil
+	return accountsToPointers(filterCurrentlySchedulableAccounts(accounts)), useMixed, nil
 }
 
 func (s *SchedulerSnapshotService) GetAccount(ctx context.Context, accountID int64) (*Account, error) {
@@ -666,37 +661,99 @@ func (s *SchedulerSnapshotService) loadAccountsFromDB(ctx context.Context, bucke
 		groupID = 0
 	}
 
+	platforms := []string{bucket.Platform}
 	if useMixed {
-		platforms := []string{bucket.Platform, PlatformAntigravity}
-		var accounts []Account
-		var err error
-		if groupID > 0 {
-			accounts, err = s.accountRepo.ListSchedulableByGroupIDAndPlatforms(ctx, groupID, platforms)
-		} else if s.isRunModeSimple() {
-			accounts, err = s.accountRepo.ListSchedulableByPlatforms(ctx, platforms)
-		} else {
-			accounts, err = s.accountRepo.ListSchedulableUngroupedByPlatforms(ctx, platforms)
+		platforms = []string{bucket.Platform, PlatformAntigravity}
+	}
+
+	accounts, err := s.loadSchedulerBucketMemberCandidates(ctx, groupID, platforms)
+	if err != nil {
+		return nil, err
+	}
+	return s.filterSchedulerBucketMembers(accounts, groupID, platforms, useMixed), nil
+}
+
+func (s *SchedulerSnapshotService) loadSchedulerBucketMemberCandidates(ctx context.Context, groupID int64, platforms []string) ([]Account, error) {
+	if groupID > 0 {
+		return s.accountRepo.ListByGroup(ctx, groupID)
+	}
+
+	seenPlatforms := make(map[string]struct{}, len(platforms))
+	accounts := make([]Account, 0)
+	for _, platform := range platforms {
+		if platform == "" {
+			continue
 		}
+		if _, ok := seenPlatforms[platform]; ok {
+			continue
+		}
+		seenPlatforms[platform] = struct{}{}
+		platformAccounts, err := s.accountRepo.ListByPlatform(ctx, platform)
 		if err != nil {
 			return nil, err
 		}
-		filtered := make([]Account, 0, len(accounts))
-		for _, acc := range accounts {
-			if acc.Platform == PlatformAntigravity && !acc.IsMixedSchedulingEnabled() {
-				continue
-			}
-			filtered = append(filtered, acc)
-		}
-		return filtered, nil
+		accounts = append(accounts, platformAccounts...)
 	}
+	return accounts, nil
+}
 
-	if groupID > 0 {
-		return s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, groupID, bucket.Platform)
+func (s *SchedulerSnapshotService) filterSchedulerBucketMembers(accounts []Account, groupID int64, platforms []string, useMixed bool) []Account {
+	if len(accounts) == 0 {
+		return []Account{}
 	}
-	if s.isRunModeSimple() {
-		return s.accountRepo.ListSchedulableByPlatform(ctx, bucket.Platform)
+	allowedPlatforms := make(map[string]struct{}, len(platforms))
+	for _, platform := range platforms {
+		if platform != "" {
+			allowedPlatforms[platform] = struct{}{}
+		}
 	}
-	return s.accountRepo.ListSchedulableUngroupedByPlatform(ctx, bucket.Platform)
+	filtered := make([]Account, 0, len(accounts))
+	for _, acc := range accounts {
+		if _, ok := allowedPlatforms[acc.Platform]; !ok {
+			continue
+		}
+		if !acc.IsSchedulerBucketMember() {
+			continue
+		}
+		if useMixed && acc.Platform == PlatformAntigravity && !acc.IsMixedSchedulingEnabled() {
+			continue
+		}
+		if groupID == 0 && !s.isRunModeSimple() && accountHasGroupBinding(acc) {
+			continue
+		}
+		filtered = append(filtered, acc)
+	}
+	return filtered
+}
+
+func accountHasGroupBinding(account Account) bool {
+	return len(account.GroupIDs) > 0 || len(account.AccountGroups) > 0
+}
+
+func filterCurrentlySchedulableAccounts(accounts []Account) []Account {
+	if len(accounts) == 0 {
+		return []Account{}
+	}
+	filtered := make([]Account, 0, len(accounts))
+	for _, account := range accounts {
+		if account.IsSchedulable() {
+			filtered = append(filtered, account)
+		}
+	}
+	return filtered
+}
+
+func filterCurrentlySchedulableAccountPointers(accounts []*Account) []*Account {
+	if len(accounts) == 0 {
+		return []*Account{}
+	}
+	filtered := make([]*Account, 0, len(accounts))
+	for _, account := range accounts {
+		if account != nil && account.IsSchedulable() {
+			filtered = append(filtered, account)
+		}
+	}
+	return filtered
 }
 
 func (s *SchedulerSnapshotService) bucketFor(groupID *int64, platform string, mode string) SchedulerBucket {

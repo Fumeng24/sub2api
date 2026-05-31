@@ -9,15 +9,25 @@ import (
 )
 
 type snapshotHydrationCache struct {
-	snapshot []*Account
-	accounts map[int64]*Account
+	snapshot     []*Account
+	accounts     map[int64]*Account
+	setSnapshots [][]Account
 }
 
 func (c *snapshotHydrationCache) GetSnapshot(ctx context.Context, bucket SchedulerBucket) ([]*Account, bool, error) {
+	if c.snapshot == nil {
+		return nil, false, nil
+	}
 	return c.snapshot, true, nil
 }
 
 func (c *snapshotHydrationCache) SetSnapshot(ctx context.Context, bucket SchedulerBucket, accounts []Account) error {
+	copied := append([]Account(nil), accounts...)
+	c.setSnapshots = append(c.setSnapshots, copied)
+	c.snapshot = make([]*Account, 0, len(copied))
+	for i := range copied {
+		c.snapshot = append(c.snapshot, &copied[i])
+	}
 	return nil
 }
 
@@ -66,6 +76,58 @@ func (c *snapshotHydrationCache) SetBucketMembers(ctx context.Context, bucket Sc
 
 func (c *snapshotHydrationCache) RemoveAccountFromBuckets(ctx context.Context, accountID int64) error {
 	return nil
+}
+
+func TestSchedulerSnapshot_ListSchedulableAccounts_KeepsRuntimeBlockedAccountForAutoReturn(t *testing.T) {
+	blockedUntil := time.Now().Add(30 * time.Minute)
+	groupID := int64(7)
+	cache := &snapshotHydrationCache{}
+	repo := stubOpenAIAccountRepo{accounts: []Account{
+		{
+			ID:                      1,
+			Platform:                PlatformOpenAI,
+			Type:                    AccountTypeAPIKey,
+			Status:                  StatusActive,
+			Schedulable:             true,
+			Concurrency:             1,
+			TempUnschedulableUntil:  &blockedUntil,
+			TempUnschedulableReason: "upstream_502",
+			AccountGroups:           []AccountGroup{{GroupID: groupID, SortOrder: 10}},
+			GroupIDs:                []int64{groupID},
+		},
+		{
+			ID:            2,
+			Platform:      PlatformOpenAI,
+			Type:          AccountTypeAPIKey,
+			Status:        StatusActive,
+			Schedulable:   true,
+			Concurrency:   1,
+			AccountGroups: []AccountGroup{{GroupID: groupID, SortOrder: 20}},
+			GroupIDs:      []int64{groupID},
+		},
+	}}
+	schedulerSnapshot := NewSchedulerSnapshotService(cache, nil, repo, nil, nil, nil)
+
+	accounts, _, err := schedulerSnapshot.ListSchedulableAccounts(context.Background(), &groupID, PlatformOpenAI, false)
+	if err != nil {
+		t.Fatalf("ListSchedulableAccounts error: %v", err)
+	}
+	if len(accounts) != 1 || accounts[0].ID != 2 {
+		t.Fatalf("expected only available account 2, got %#v", accounts)
+	}
+	if len(cache.setSnapshots) != 1 || len(cache.setSnapshots[0]) != 2 {
+		t.Fatalf("expected blocked account to remain in snapshot bucket, got %#v", cache.setSnapshots)
+	}
+
+	expired := time.Now().Add(-time.Minute)
+	cache.snapshot[0].TempUnschedulableUntil = &expired
+	accounts, _, err = schedulerSnapshot.ListSchedulableAccounts(context.Background(), &groupID, PlatformOpenAI, false)
+	if err != nil {
+		t.Fatalf("ListSchedulableAccounts cache hit error: %v", err)
+	}
+	if len(accounts) != 2 || accounts[0].ID != 1 || accounts[1].ID != 2 {
+		t.Fatalf("expected expired account to return from same snapshot, got %#v", accounts)
+	}
 }
 
 func TestOpenAISelectAccountWithLoadAwareness_HydratesSelectedAccountFromSchedulerSnapshot(t *testing.T) {

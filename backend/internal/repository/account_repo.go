@@ -753,9 +753,9 @@ func (r *accountRepository) syncSchedulerAccountSnapshot(ctx context.Context, ac
 	if err := r.schedulerCache.SetAccount(ctx, account); err != nil {
 		logger.LegacyPrintf("repository.account", "[Scheduler] sync account snapshot write failed: id=%d err=%v", accountID, err)
 	}
-	// Immediately remove unschedulable accounts from bucket ZSETs to prevent selection
-	// by other instances before the next full bucket rebuild.
-	if !account.IsSchedulable() {
+	// Runtime windows (temporary unschedulable / overload / rate-limit) stay in
+	// bucket membership so they can recover as soon as the timestamp expires.
+	if !account.IsSchedulerBucketMember() {
 		if err := r.schedulerCache.RemoveAccountFromBuckets(ctx, accountID); err != nil {
 			logger.LegacyPrintf("repository.account", "[Scheduler] remove account from buckets failed: id=%d err=%v", accountID, err)
 		}
@@ -805,8 +805,7 @@ func (r *accountRepository) syncSchedulerAccountSnapshots(ctx context.Context, a
 		if err := r.schedulerCache.SetAccount(ctx, account); err != nil {
 			logger.LegacyPrintf("repository.account", "[Scheduler] batch sync account snapshot write failed: id=%d err=%v", account.ID, err)
 		}
-		// Immediately remove unschedulable accounts from bucket ZSETs
-		if !account.IsSchedulable() {
+		if !account.IsSchedulerBucketMember() {
 			if err := r.schedulerCache.RemoveAccountFromBuckets(ctx, account.ID); err != nil {
 				logger.LegacyPrintf("repository.account", "[Scheduler] batch remove account from buckets failed: id=%d err=%v", account.ID, err)
 			}

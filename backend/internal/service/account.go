@@ -136,6 +136,19 @@ func (a *Account) IsSchedulable() bool {
 	return true
 }
 
+// IsSchedulerBucketMember reports whether an account should remain in scheduler
+// bucket membership. Runtime windows are checked by IsSchedulable at selection time.
+func (a *Account) IsSchedulerBucketMember() bool {
+	if a == nil || !a.IsActive() || !a.Schedulable {
+		return false
+	}
+	now := time.Now()
+	if a.AutoPauseOnExpired && a.ExpiresAt != nil && !now.Before(*a.ExpiresAt) {
+		return false
+	}
+	return true
+}
+
 func (a *Account) IsRateLimited() bool {
 	if a.RateLimitResetAt == nil {
 		return false

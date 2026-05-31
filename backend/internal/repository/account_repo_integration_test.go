@@ -24,6 +24,7 @@ type AccountRepoSuite struct {
 type schedulerCacheRecorder struct {
 	setAccounts []*service.Account
 	deleteIDs   []int64
+	removedIDs  []int64
 	accounts    map[int64]*service.Account
 }
 
@@ -90,6 +91,7 @@ func (s *schedulerCacheRecorder) SetBucketMembers(ctx context.Context, bucket se
 }
 
 func (s *schedulerCacheRecorder) RemoveAccountFromBuckets(ctx context.Context, accountID int64) error {
+	s.removedIDs = append(s.removedIDs, accountID)
 	return nil
 }
 
@@ -745,6 +747,39 @@ func (s *AccountRepoSuite) TestSetOverloaded() {
 	s.Require().NoError(err)
 	s.Require().NotNil(got.OverloadUntil)
 	s.Require().WithinDuration(until, *got.OverloadUntil, time.Second)
+}
+
+func (s *AccountRepoSuite) TestRuntimeBlocksSyncSnapshotButKeepSchedulerBucketMembership() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:        "acc-runtime-block",
+		Status:      service.StatusActive,
+		Schedulable: true,
+	})
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+
+	future := time.Now().Add(15 * time.Minute)
+	s.Require().NoError(s.repo.SetTempUnschedulable(s.ctx, account.ID, future, "upstream_502"))
+	s.Require().NoError(s.repo.SetOverloaded(s.ctx, account.ID, future))
+	s.Require().NoError(s.repo.SetRateLimited(s.ctx, account.ID, future))
+
+	s.Require().Len(cacheRecorder.setAccounts, 3)
+	s.Require().Empty(cacheRecorder.removedIDs)
+}
+
+func (s *AccountRepoSuite) TestPermanentUnschedulableRemovesSchedulerBucketMembership() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:        "acc-permanent-block",
+		Status:      service.StatusActive,
+		Schedulable: true,
+	})
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+
+	s.Require().NoError(s.repo.SetSchedulable(s.ctx, account.ID, false))
+
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().Equal([]int64{account.ID}, cacheRecorder.removedIDs)
 }
 
 func (s *AccountRepoSuite) TestSetRateLimited() {
