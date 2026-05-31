@@ -426,6 +426,60 @@ func normalizeAccountGroupConfig(ag AccountGroup, account *Account) AccountGroup
 	return ag
 }
 
+func isAccountBetterByCurrentGroupOrder(candidate, current *Account, groupID *int64) bool {
+	candidateKey, candidateOK := accountCurrentGroupOrderKey(candidate, groupID)
+	currentKey, currentOK := accountCurrentGroupOrderKey(current, groupID)
+	if candidateOK != currentOK {
+		return candidateOK
+	}
+	if candidateOK && currentOK {
+		if candidateKey.sortOrder != currentKey.sortOrder {
+			return candidateKey.sortOrder < currentKey.sortOrder
+		}
+		if candidateKey.priority != currentKey.priority {
+			return candidateKey.priority < currentKey.priority
+		}
+		return candidateKey.accountID < currentKey.accountID
+	}
+	if candidate == nil || current == nil {
+		return candidate != nil
+	}
+	return candidate.ID < current.ID
+}
+
+type accountGroupOrderKey struct {
+	sortOrder int
+	priority  int
+	accountID int64
+}
+
+func accountCurrentGroupOrderKey(account *Account, groupID *int64) (accountGroupOrderKey, bool) {
+	if account == nil || groupID == nil {
+		return accountGroupOrderKey{}, false
+	}
+	cfg := accountGroupConfigFor(account, groupID)
+	if cfg.GroupID != *groupID {
+		return accountGroupOrderKey{}, false
+	}
+	return accountGroupOrderKey{
+		sortOrder: cfg.SortOrder,
+		priority:  cfg.Priority,
+		accountID: account.ID,
+	}, true
+}
+
+func accountsContainCurrentGroupBinding(accounts []*Account, groupID *int64) bool {
+	if groupID == nil {
+		return false
+	}
+	for _, account := range accounts {
+		if _, ok := accountCurrentGroupOrderKey(account, groupID); ok {
+			return true
+		}
+	}
+	return false
+}
+
 func buildSchedulerAccountScores(
 	accounts []*Account,
 	groupID *int64,
@@ -529,6 +583,10 @@ func hasExplicitSchedulerGroupConfig(scores []schedulerAccountScore) bool {
 }
 
 func sortSchedulerScores(scores []schedulerAccountScore, preferOAuth bool) {
+	if schedulerScoresUseGroupOrder(scores) {
+		sortSchedulerScoresByGroupOrder(scores)
+		return
+	}
 	sort.SliceStable(scores, func(i, j int) bool {
 		a, b := scores[i], scores[j]
 		if a.SortOrder != b.SortOrder {
@@ -557,4 +615,42 @@ func sortSchedulerScores(scores []schedulerAccountScore, preferOAuth bool) {
 			return a.Account.ID < b.Account.ID
 		}
 	})
+}
+
+func schedulerScoresUseGroupOrder(scores []schedulerAccountScore) bool {
+	for _, score := range scores {
+		if score.Config.GroupID > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func sortSchedulerScoresByGroupOrder(scores []schedulerAccountScore) {
+	sort.SliceStable(scores, func(i, j int) bool {
+		return schedulerScoreGroupOrderLess(scores[i], scores[j])
+	})
+}
+
+func schedulerScoreGroupOrderLess(a, b schedulerAccountScore) bool {
+	if a.Config.GroupID > 0 && b.Config.GroupID == 0 {
+		return true
+	}
+	if a.Config.GroupID == 0 && b.Config.GroupID > 0 {
+		return false
+	}
+	if a.SortOrder != b.SortOrder {
+		return a.SortOrder < b.SortOrder
+	}
+	if a.Config.Priority != b.Config.Priority {
+		return a.Config.Priority < b.Config.Priority
+	}
+	return accountIDForSchedulerScore(a) < accountIDForSchedulerScore(b)
+}
+
+func accountIDForSchedulerScore(score schedulerAccountScore) int64 {
+	if score.Account == nil {
+		return 0
+	}
+	return score.Account.ID
 }

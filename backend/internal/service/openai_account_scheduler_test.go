@@ -1469,6 +1469,32 @@ func TestBuildOpenAIOrderedSelectionOrder_RanksFullQueue(t *testing.T) {
 	require.Equal(t, int64(11), order[3].account.ID)
 }
 
+func TestBuildOpenAIOrderedSelectionOrder_GroupOrderOverridesPriorityScoreAndLoad(t *testing.T) {
+	candidates := []openAIAccountCandidateScore{
+		{
+			account:    &Account{ID: 21, Priority: 99},
+			loadInfo:   &AccountLoadInfo{LoadRate: 90, WaitingCount: 5},
+			score:      1.0,
+			sortOrder:  10,
+			groupOrder: true,
+			groupPrio:  50,
+		},
+		{
+			account:    &Account{ID: 22, Priority: 1},
+			loadInfo:   &AccountLoadInfo{LoadRate: 0, WaitingCount: 0},
+			score:      1000.0,
+			sortOrder:  20,
+			groupOrder: true,
+			groupPrio:  1,
+		},
+	}
+
+	order := buildOpenAIOrderedSelectionOrder(candidates)
+	require.Len(t, order, len(candidates))
+	require.Equal(t, int64(21), order[0].account.ID)
+	require.Equal(t, int64(22), order[1].account.ID)
+}
+
 func TestBuildOpenAIOrderedSelectionOrder_Deterministic(t *testing.T) {
 	candidates := []openAIAccountCandidateScore{
 		{

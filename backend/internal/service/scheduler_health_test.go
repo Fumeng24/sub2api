@@ -421,6 +421,92 @@ func TestSchedulerDefaultMigratedGroupConfigIsNotExplicit(t *testing.T) {
 	}
 }
 
+func TestSchedulerGroupOrderOverridesGlobalPriorityWeightLoadAndLRU(t *testing.T) {
+	groupID := int64(100)
+	now := time.Now()
+	old := now.Add(-2 * time.Hour)
+	first := &Account{
+		ID:         1,
+		Priority:   99,
+		LastUsedAt: &now,
+		AccountGroups: []AccountGroup{{
+			AccountID:            1,
+			GroupID:              groupID,
+			Priority:             50,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               1,
+			SortOrder:            10,
+			SchedulingConfigured: true,
+		}},
+	}
+	second := &Account{
+		ID:         2,
+		Priority:   1,
+		LastUsedAt: &old,
+		AccountGroups: []AccountGroup{{
+			AccountID:            2,
+			GroupID:              groupID,
+			Priority:             1,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               1000,
+			SortOrder:            20,
+			SchedulingConfigured: true,
+		}},
+	}
+
+	scores := buildSchedulerAccountScores(
+		[]*Account{second, first},
+		&groupID,
+		"gpt-5.5",
+		"/v1/responses",
+		map[int64]*AccountLoadInfo{
+			first.ID:  {AccountID: first.ID, LoadRate: 90, WaitingCount: 5},
+			second.ID: {AccountID: second.ID, LoadRate: 0, WaitingCount: 0},
+		},
+		nil,
+		true,
+	)
+	order := buildRoleAwareSchedulerOrder(scores, true, "group-order")
+
+	if len(order) != 2 {
+		t.Fatalf("expected 2 candidates, got %d", len(order))
+	}
+	if order[0].Account.ID != first.ID {
+		t.Fatalf("expected current group sort_order to win, got %#v", accountIDsFromSchedulerScores(order))
+	}
+}
+
+func TestSchedulerGroupOrderIsIndependentPerGroup(t *testing.T) {
+	groupA := int64(100)
+	groupB := int64(200)
+	a := &Account{
+		ID:       1,
+		Priority: 99,
+		AccountGroups: []AccountGroup{
+			{AccountID: 1, GroupID: groupA, Priority: 50, SortOrder: 10, Weight: 1, SchedulingConfigured: true},
+			{AccountID: 1, GroupID: groupB, Priority: 50, SortOrder: 30, Weight: 1, SchedulingConfigured: true},
+		},
+	}
+	b := &Account{
+		ID:       2,
+		Priority: 1,
+		AccountGroups: []AccountGroup{
+			{AccountID: 2, GroupID: groupA, Priority: 50, SortOrder: 30, Weight: 1000, SchedulingConfigured: true},
+			{AccountID: 2, GroupID: groupB, Priority: 50, SortOrder: 10, Weight: 1000, SchedulingConfigured: true},
+		},
+	}
+
+	orderA := buildRoleAwareSchedulerOrder(buildSchedulerAccountScores([]*Account{b, a}, &groupA, "gpt-5.5", "/v1/responses", nil, nil, true), true, "group-a")
+	orderB := buildRoleAwareSchedulerOrder(buildSchedulerAccountScores([]*Account{a, b}, &groupB, "gpt-5.5", "/v1/responses", nil, nil, true), true, "group-b")
+
+	if len(orderA) != 2 || orderA[0].Account.ID != a.ID {
+		t.Fatalf("expected account 1 first in group A, got %#v", accountIDsFromSchedulerScores(orderA))
+	}
+	if len(orderB) != 2 || orderB[0].Account.ID != b.ID {
+		t.Fatalf("expected account 2 first in group B, got %#v", accountIDsFromSchedulerScores(orderB))
+	}
+}
+
 func accountIDsFromSchedulerScores(scores []schedulerAccountScore) []int64 {
 	ids := make([]int64, 0, len(scores))
 	for _, score := range scores {

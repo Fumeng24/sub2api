@@ -120,9 +120,9 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 		}
 	}
 
-	// 4. 按优先级 + LRU 选择最佳账号
-	// Select best account by priority + LRU
-	selected := s.selectBestGeminiAccount(ctx, accounts, requestedModel, excludedIDs, platform, useMixedScheduling)
+	// 4. 有分组时按当前分组绑定顺序选择；无分组时保留全局优先级 + LRU。
+	// With a group, select by the current group binding order; otherwise keep global priority + LRU.
+	selected := s.selectBestGeminiAccount(ctx, groupID, accounts, requestedModel, excludedIDs, platform, useMixedScheduling)
 
 	if selected == nil {
 		if requestedModel != "" {
@@ -302,13 +302,14 @@ func (s *GeminiMessagesCompatService) passesRateLimitPreCheckWithCache(ctx conte
 	return ok
 }
 
-// selectBestGeminiAccount 从候选账号中选择最佳账号（优先级 + LRU + OAuth 优先）。
+// selectBestGeminiAccount 从候选账号中选择最佳账号。
 // 返回 nil 表示无可用账号。
 //
-// selectBestGeminiAccount selects best account from candidates (priority + LRU + OAuth preferred).
+// selectBestGeminiAccount selects best account from candidates.
 // Returns nil if no available account.
 func (s *GeminiMessagesCompatService) selectBestGeminiAccount(
 	ctx context.Context,
+	groupID *int64,
 	accounts []*Account,
 	requestedModel string,
 	excludedIDs map[int64]struct{},
@@ -317,6 +318,7 @@ func (s *GeminiMessagesCompatService) selectBestGeminiAccount(
 ) *Account {
 	var selected *Account
 	precheckResult := s.buildPreCheckUsageResultMap(ctx, accounts, requestedModel)
+	useGroupOrder := accountsContainCurrentGroupBinding(accounts, groupID)
 
 	for _, acc := range accounts {
 		// 跳过被排除的账号
@@ -332,6 +334,13 @@ func (s *GeminiMessagesCompatService) selectBestGeminiAccount(
 		// 选择最佳账号
 		if selected == nil {
 			selected = acc
+			continue
+		}
+
+		if useGroupOrder {
+			if isAccountBetterByCurrentGroupOrder(acc, selected, groupID) {
+				selected = acc
+			}
 			continue
 		}
 

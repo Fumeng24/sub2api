@@ -410,6 +410,8 @@ type openAIAccountCandidateScore struct {
 	ttft       float64
 	hasTTFT    bool
 	sortOrder  int
+	groupOrder bool
+	groupPrio  int
 	health     schedulerHealthSnapshot
 	halfOpen   bool
 	cooldown   bool
@@ -417,6 +419,9 @@ type openAIAccountCandidateScore struct {
 }
 
 func isOpenAIAccountCandidateBetter(left openAIAccountCandidateScore, right openAIAccountCandidateScore) bool {
+	if left.groupOrder || right.groupOrder {
+		return isOpenAIAccountGroupOrderCandidateBetter(left, right)
+	}
 	if left.cooldown != right.cooldown {
 		return !left.cooldown
 	}
@@ -450,6 +455,41 @@ func isOpenAIAccountCandidateBetter(left openAIAccountCandidateScore, right open
 		return leftLoad.WaitingCount < rightLoad.WaitingCount
 	}
 	return left.account.ID < right.account.ID
+}
+
+func isOpenAIAccountGroupOrderCandidateBetter(left openAIAccountCandidateScore, right openAIAccountCandidateScore) bool {
+	if left.cooldown != right.cooldown {
+		return !left.cooldown
+	}
+	if left.groupOrder != right.groupOrder {
+		return left.groupOrder
+	}
+	if left.sortOrder != right.sortOrder {
+		return left.sortOrder < right.sortOrder
+	}
+	if left.groupPrio != right.groupPrio {
+		return left.groupPrio < right.groupPrio
+	}
+	if left.halfOpen != right.halfOpen {
+		return !left.halfOpen
+	}
+	if left.cooldown && right.cooldown && !left.cooldownAt.Equal(right.cooldownAt) {
+		if left.cooldownAt.IsZero() {
+			return false
+		}
+		if right.cooldownAt.IsZero() {
+			return true
+		}
+		return left.cooldownAt.Before(right.cooldownAt)
+	}
+	return openAIAccountCandidateID(left) < openAIAccountCandidateID(right)
+}
+
+func openAIAccountCandidateID(candidate openAIAccountCandidateScore) int64 {
+	if candidate.account == nil {
+		return 0
+	}
+	return candidate.account.ID
 }
 
 func openAIAccountCandidateLoadInfo(candidate openAIAccountCandidateScore) *AccountLoadInfo {
@@ -501,15 +541,17 @@ func schedulerEndpointFromOpenAIContext(ctx context.Context, requireCompact bool
 
 func openAIAccountCandidateFromSchedulerScore(score schedulerAccountScore) openAIAccountCandidateScore {
 	return openAIAccountCandidateScore{
-		account:   score.Account,
-		loadInfo:  score.LoadInfo,
-		score:     score.Score,
-		errorRate: score.Health.ErrorRate,
-		ttft:      score.Health.TTFTEWMA,
-		hasTTFT:   score.Health.HasTTFT,
-		sortOrder: score.SortOrder,
-		health:    score.Health,
-		halfOpen:  score.HalfOpen,
+		account:    score.Account,
+		loadInfo:   score.LoadInfo,
+		score:      score.Score,
+		errorRate:  score.Health.ErrorRate,
+		ttft:       score.Health.TTFTEWMA,
+		hasTTFT:    score.Health.HasTTFT,
+		sortOrder:  score.SortOrder,
+		groupOrder: score.Config.GroupID > 0,
+		groupPrio:  score.Config.Priority,
+		health:     score.Health,
+		halfOpen:   score.HalfOpen,
 	}
 }
 
@@ -661,6 +703,8 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAICooldownFallbackOrder(
 			loadInfo:   &AccountLoadInfo{AccountID: account.ID},
 			score:      0.01,
 			sortOrder:  cfg.SortOrder,
+			groupOrder: cfg.GroupID > 0,
+			groupPrio:  cfg.Priority,
 			cooldown:   true,
 			cooldownAt: cooldownUntil,
 		})
