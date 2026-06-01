@@ -1469,7 +1469,9 @@ func TestOpenAISelectionDiagnostics_RecordsStageAccountIDs(t *testing.T) {
 		}),
 	}
 	svc.openaiAccountRuntimeBlockUntil.Store(int64(38795), time.Now().Add(time.Minute))
-	scheduler := newDefaultOpenAIAccountScheduler(svc, nil).(*defaultOpenAIAccountScheduler)
+	schedulerAny := newDefaultOpenAIAccountScheduler(svc, nil)
+	scheduler, ok := schedulerAny.(*defaultOpenAIAccountScheduler)
+	require.True(t, ok)
 
 	diag := scheduler.buildOpenAISelectionDiagnostics(ctx, OpenAIAccountScheduleRequest{
 		GroupID:            &groupID,
