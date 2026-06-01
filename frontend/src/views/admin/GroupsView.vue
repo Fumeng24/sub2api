@@ -181,7 +181,7 @@
 
           <template #cell-rate_multiplier="{ value }">
             <span class="text-sm text-gray-700 dark:text-gray-300"
-              >{{ value }}x</span
+              >{{ formatRateMultiplier(value) }}x</span
             >
           </template>
 
@@ -496,8 +496,8 @@
           <input
             v-model.number="createForm.rate_multiplier"
             type="number"
-            step="0.001"
-            min="0.001"
+            step="0.0001"
+            min="0.0001"
             required
             class="input"
             data-tour="group-form-multiplier"
@@ -1783,8 +1783,8 @@
           <input
             v-model.number="editForm.rate_multiplier"
             type="number"
-            step="0.001"
-            min="0.001"
+            step="0.0001"
+            min="0.0001"
             required
             class="input"
             data-tour="group-form-multiplier"
@@ -3421,6 +3421,7 @@ import {
 } from "./groupsModelsList";
 import { createModelsListCandidatesTracker } from "./groupsModelsListCandidates";
 import { normalizeSupportedModelScopesForPlatform } from "./groupsSupportedModelScopes";
+import { formatRateMultiplier } from "@/utils/groupRateDiscount";
 
 const { t } = useI18n();
 const appStore = useAppStore();

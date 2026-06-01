@@ -38,6 +38,27 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 	if len(diag.ExcludedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_excluded_account_ids", diag.ExcludedAccountIDs))
 	}
+	if len(diag.GroupBindingAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_group_binding_account_ids", diag.GroupBindingAccountIDs))
+	}
+	if len(diag.AfterExcludedAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_after_excluded_account_ids", diag.AfterExcludedAccountIDs))
+	}
+	if len(diag.ModelSupportedAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_model_supported_account_ids", diag.ModelSupportedAccountIDs))
+	}
+	if len(diag.EndpointSupportedAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_endpoint_supported_account_ids", diag.EndpointSupportedAccountIDs))
+	}
+	if len(diag.CompactSupportedAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_compact_supported_account_ids", diag.CompactSupportedAccountIDs))
+	}
+	if len(diag.StateAllowedAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_state_allowed_account_ids", diag.StateAllowedAccountIDs))
+	}
+	if len(diag.CircuitAllowedAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_circuit_allowed_account_ids", diag.CircuitAllowedAccountIDs))
+	}
 	if len(diag.CandidateAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_candidate_account_ids", diag.CandidateAccountIDs))
 	}

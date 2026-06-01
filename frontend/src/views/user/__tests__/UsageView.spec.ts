@@ -58,6 +58,9 @@ const messages: Record<string, string> = {
   'usage.imageSizeUnknown': 'unknown',
   'usage.imageUnitPrice': 'Per-image price',
   'usage.imageTotalPrice': 'Image total price',
+  'settlementCurrency.label': 'Settlement Currency',
+  'settlementCurrency.cny': 'CNY',
+  'settlementCurrency.usd': 'USD',
   'admin.usage.billingModeToken': 'Token',
   'admin.usage.billingModePerRequest': 'Per request',
   'admin.usage.billingModeImage': 'Image',
@@ -211,9 +214,9 @@ describe('user UsageView tooltip', () => {
     expect(text).toContain('Rate')
     expect(text).toContain('1.00x')
     expect(text).toContain('Billed')
-    expect(text).toContain('$0.092883')
-    expect(text).toContain('$5.0000 / 1M tokens')
-    expect(text).toContain('$30.0000 / 1M tokens')
+    expect(text).toContain('¥0.631604')
+    expect(text).toContain('¥34.0000 / 1M tokens')
+    expect(text).toContain('¥204.0000 / 1M tokens')
   })
 
   it('exports csv with input and output unit price columns', async () => {

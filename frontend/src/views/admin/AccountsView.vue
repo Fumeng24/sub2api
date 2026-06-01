@@ -309,7 +309,7 @@
           </template>
           <template #cell-rate_multiplier="{ row }">
             <span class="text-sm font-mono text-gray-700 dark:text-gray-300">
-              {{ (row.rate_multiplier ?? 1).toFixed(2) }}x
+              {{ formatRateMultiplier(row.rate_multiplier ?? 1) }}x
             </span>
           </template>
           <template #cell-priority="{ value }">
@@ -434,6 +434,7 @@ import TLSFingerprintProfilesModal from '@/components/admin/TLSFingerprintProfil
 import AccountBulkVerifyModal from '@/components/admin/AccountBulkVerifyModal.vue'
 import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
+import { formatRateMultiplier } from '@/utils/groupRateDiscount'
 import type { Account, AccountPlatform, AccountType, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel } from '@/types'
 
 const { t } = useI18n()

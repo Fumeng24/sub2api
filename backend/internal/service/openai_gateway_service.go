@@ -344,6 +344,7 @@ type OpenAIGatewayService struct {
 	balanceNotifyService  *BalanceNotifyService
 	settingService        *SettingService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	opsRuntimeAlerts      *OpsRuntimeAlertService
 
 	openaiWSPoolOnce              sync.Once
 	openaiWSStateStoreOnce        sync.Once
@@ -367,6 +368,13 @@ type OpenAIGatewayService struct {
 	openaiTransientCooldownThrottle     *accountWriteThrottle
 	openaiCompatSessionResponses        sync.Map
 	openaiCompatAnthropicDigestSessions sync.Map
+}
+
+func (s *OpenAIGatewayService) SetOpsRuntimeAlertService(alerts *OpsRuntimeAlertService) {
+	if s == nil {
+		return
+	}
+	s.opsRuntimeAlerts = alerts
 }
 
 // NewOpenAIGatewayService creates a new OpenAIGatewayService

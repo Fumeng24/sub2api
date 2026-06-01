@@ -66,6 +66,9 @@ const messages: Record<string, string> = {
   'keyUsage.querySuccess': 'Query successful',
   'keyUsage.queryFailed': 'Query failed',
   'keyUsage.queryFailedRetry': 'Query failed, please try again later',
+  'settlementCurrency.label': 'Settlement Currency',
+  'settlementCurrency.cny': 'CNY',
+  'settlementCurrency.usd': 'USD',
   'home.viewDocs': 'Docs',
   'home.switchToLight': 'Light',
   'home.switchToDark': 'Dark',
@@ -201,7 +204,7 @@ describe('KeyUsageView daily detail', () => {
     expect(text).toContain('200')
     expect(text).toContain('30')
     expect(text).toContain('10')
-    expect(text).toContain('$0.12')
+    expect(text).toContain('¥0.82')
 
     wrapper.unmount()
   })

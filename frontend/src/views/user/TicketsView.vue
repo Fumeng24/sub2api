@@ -205,7 +205,7 @@
                       {{ formatDateTime(order.created_at) }}
                     </div>
                     <div class="mt-2 text-xs text-gray-600 dark:text-gray-300">
-                      {{ t('tickets.form.orderAmount', { amount: formatAmount(order.amount), pay: formatAmount(order.pay_amount ?? order.amount) }) }}
+                      {{ t('tickets.form.orderAmount', { amount: formatAmount(order.amount), pay: formatAmount(order.pay_amount ?? order.amount, order.currency) }) }}
                     </div>
                   </div>
                 </label>
@@ -456,6 +456,8 @@ import Icon from '@/components/icons/Icon.vue'
 import TicketAttachmentFields from '@/components/tickets/TicketAttachmentFields.vue'
 import TicketAttachments from '@/components/tickets/TicketAttachments.vue'
 import TicketContextLink from '@/components/tickets/TicketContextLink.vue'
+import { formatCreditedBalance } from '@/components/payment/orderAmounts'
+import { formatPaymentAmount } from '@/components/payment/currency'
 
 const MAX_TICKET_IMAGE_BYTES = 2 * 1024 * 1024
 const { t } = useI18n()
@@ -950,8 +952,11 @@ function isAllowedInlineImageType(value: string) {
   return ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(value.toLowerCase())
 }
 
-function formatAmount(value: number) {
-  return `$${Number(value || 0).toFixed(2)}`
+function formatAmount(value: number, currency?: string) {
+  if (currency) {
+    return formatPaymentAmount(Number(value || 0), currency)
+  }
+  return formatCreditedBalance(Number(value || 0))
 }
 
 async function openDetail(ticket: Ticket) {

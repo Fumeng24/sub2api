@@ -149,13 +149,15 @@ import type { UserAffiliateDetail } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { useClipboard } from '@/composables/useClipboard'
-import { formatCurrency, formatDateTime } from '@/utils/format'
+import { useSettlementCurrency } from '@/composables/useSettlementCurrency'
+import { formatDateTime } from '@/utils/format'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const { copyToClipboard } = useClipboard()
+const { formatSettlementAmount } = useSettlementCurrency()
 
 const loading = ref(true)
 const transferring = ref(false)
@@ -177,6 +179,10 @@ const formattedRebateRate = computed(() => {
 
 function formatCount(value: number): string {
   return value.toLocaleString()
+}
+
+function formatCurrency(value: number): string {
+  return formatSettlementAmount(value, 2)
 }
 
 async function loadAffiliateDetail(silent = false): Promise<void> {

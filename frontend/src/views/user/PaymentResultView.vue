@@ -108,9 +108,11 @@ import {
 } from '@/components/payment/paymentFlow'
 import { usePaymentStore } from '@/stores/payment'
 import { paymentAPI } from '@/api/payment'
+import { authAPI } from '@/api/auth'
 import type { PaymentOrder } from '@/types/payment'
 import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
 import { formatCreditedBalance, shouldShowCreditedBalance } from '@/components/payment/orderAmounts'
+import { setSettlementCnyPerCredit } from '@/composables/useSettlementCurrency'
 import { normalizePaymentMethodForDisplay, paymentMethodI18nKey } from './paymentUx'
 
 const i18n = useI18n()
@@ -320,6 +322,12 @@ function scheduleStatusRefresh(refreshOrder: (() => Promise<PaymentOrder | null>
 }
 
 onMounted(async () => {
+  authAPI.getPublicSettings()
+    .then((settings) => {
+      setSettlementCnyPerCredit(settings?.payment_balance_recharge_multiplier)
+    })
+    .catch(() => {})
+
   const resumeToken = readRouteQueryString('resume_token')
   const routeOrderId = Number(readRouteQueryString('order_id')) || 0
   let outTradeNo = readRouteQueryString('out_trade_no')

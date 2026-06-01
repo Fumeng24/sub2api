@@ -37,6 +37,7 @@ type OpsService struct {
 	geminiCompatService       *GeminiMessagesCompatService
 	antigravityGatewayService *AntigravityGatewayService
 	systemLogSink             *OpsSystemLogSink
+	runtimeAlertService       *OpsRuntimeAlertService
 
 	// cleanupReloader 由 wire 在 OpsCleanupService 构造完成后通过 SetCleanupReloader 注入。
 	// 解耦避免 OpsService -> OpsCleanupService 的硬依赖（cleanup 也读 settings，会循环）。
@@ -69,6 +70,7 @@ func NewOpsService(
 	geminiCompatService *GeminiMessagesCompatService,
 	antigravityGatewayService *AntigravityGatewayService,
 	systemLogSink *OpsSystemLogSink,
+	runtimeAlertService ...*OpsRuntimeAlertService,
 ) *OpsService {
 	svc := &OpsService{
 		opsRepo:     opsRepo,
@@ -85,8 +87,24 @@ func NewOpsService(
 		antigravityGatewayService: antigravityGatewayService,
 		systemLogSink:             systemLogSink,
 	}
+	if len(runtimeAlertService) > 0 {
+		svc.runtimeAlertService = runtimeAlertService[0]
+	}
+	if svc.runtimeAlertService != nil {
+		svc.runtimeAlertService.opsService = svc
+	}
 	svc.applyRuntimeLogConfigOnStartup(context.Background())
 	return svc
+}
+
+func (s *OpsService) SetRuntimeAlertService(runtimeAlertService *OpsRuntimeAlertService) {
+	if s == nil {
+		return
+	}
+	s.runtimeAlertService = runtimeAlertService
+	if runtimeAlertService != nil {
+		runtimeAlertService.opsService = s
+	}
 }
 
 func (s *OpsService) RequireMonitoringEnabled(ctx context.Context) error {

@@ -55,11 +55,11 @@
                 {{ t('usage.totalCost') }}
               </p>
               <p class="text-xl font-bold text-green-600 dark:text-green-400">
-                ${{ (usageStats?.total_actual_cost || 0).toFixed(4) }}
+                {{ formatSettlementAmount(usageStats?.total_actual_cost || 0, 4) }}
               </p>
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 {{ t('usage.actualCost') }} /
-                <span class="line-through">${{ (usageStats?.total_cost || 0).toFixed(4) }}</span>
+                <span class="line-through">{{ formatSettlementAmount(usageStats?.total_cost || 0, 4) }}</span>
                 {{ t('usage.standardCost') }}
               </p>
             </div>
@@ -108,6 +108,15 @@
                 v-model:start-date="startDate"
                 v-model:end-date="endDate"
                 @change="onDateRangeChange"
+              />
+            </div>
+
+            <div class="min-w-[150px]">
+              <label class="input-label">{{ t('settlementCurrency.label') }}</label>
+              <Select
+                :model-value="settlementCurrency"
+                :options="settlementCurrencyOptions"
+                @update:model-value="setSettlementCurrency"
               />
             </div>
 
@@ -280,7 +289,7 @@
           <template #cell-cost="{ row }">
             <div class="flex items-center gap-1.5 text-sm">
               <span class="font-medium text-green-600 dark:text-green-400">
-                ${{ row.actual_cost.toFixed(6) }}
+                {{ formatSettlementAmount(row.actual_cost, 6) }}
               </span>
               <!-- Cost Detail Tooltip -->
               <div
@@ -451,11 +460,11 @@
             <div class="text-xs font-semibold text-gray-300 mb-1">{{ t('usage.costDetails') }}</div>
             <div v-if="tooltipData && tooltipData.input_cost > 0" class="flex items-center justify-between gap-4">
               <span class="text-gray-400">{{ t('admin.usage.inputCost') }}</span>
-              <span class="font-medium text-white">${{ tooltipData.input_cost.toFixed(6) }}</span>
+              <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.input_cost, 6) }}</span>
             </div>
             <div v-if="tooltipData && tooltipData.output_cost > 0" class="flex items-center justify-between gap-4">
               <span class="text-gray-400">{{ t('admin.usage.outputCost') }}</span>
-              <span class="font-medium text-white">${{ tooltipData.output_cost.toFixed(6) }}</span>
+              <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.output_cost, 6) }}</span>
             </div>
             <!-- Per-image billing: show image metadata and unit price -->
             <template v-if="tooltipData && isImageUsage(tooltipData)">
@@ -485,35 +494,35 @@
               </div>
               <div class="flex items-center justify-between gap-4">
                 <span class="text-gray-400">{{ t('usage.imageUnitPrice') }}</span>
-                <span class="font-medium text-sky-300">${{ imageUnitPrice(tooltipData).toFixed(6) }}</span>
+                <span class="font-medium text-sky-300">{{ formatSettlementAmount(imageUnitPrice(tooltipData), 6) }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">
                 <span class="text-gray-400">{{ t('usage.imageTotalPrice') }}</span>
-                <span class="font-medium text-white">${{ tooltipData.total_cost?.toFixed(6) || '0.000000' }}</span>
+                <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.total_cost || 0, 6) }}</span>
               </div>
             </template>
             <!-- Token billing: show unit prices per 1M tokens -->
             <template v-else-if="!getDisplayBillingMode(tooltipData) || getDisplayBillingMode(tooltipData) === BILLING_MODE_TOKEN">
               <div v-if="tooltipData && tooltipData.input_tokens > 0" class="flex items-center justify-between gap-4">
                 <span class="text-gray-400">{{ t('usage.inputTokenPrice') }}</span>
-                <span class="font-medium text-sky-300">{{ formatTokenPricePerMillion(tooltipData.input_cost, tooltipData.input_tokens) }} {{ t('usage.perMillionTokens') }}</span>
+                <span class="font-medium text-sky-300">{{ formatSettlementTokenPricePerMillion(tooltipData.input_cost, tooltipData.input_tokens) }} {{ t('usage.perMillionTokens') }}</span>
               </div>
               <div v-if="tooltipData && tooltipData.output_tokens > 0" class="flex items-center justify-between gap-4">
                 <span class="text-gray-400">{{ t('usage.outputTokenPrice') }}</span>
-                <span class="font-medium text-violet-300">{{ formatTokenPricePerMillion(tooltipData.output_cost, tooltipData.output_tokens) }} {{ t('usage.perMillionTokens') }}</span>
+                <span class="font-medium text-violet-300">{{ formatSettlementTokenPricePerMillion(tooltipData.output_cost, tooltipData.output_tokens) }} {{ t('usage.perMillionTokens') }}</span>
               </div>
             </template>
             <div v-else class="flex items-center justify-between gap-4">
               <span class="text-gray-400">{{ t('usage.unitPrice') }}</span>
-              <span class="font-medium text-sky-300">${{ tooltipData?.total_cost?.toFixed(6) || '0.000000' }}</span>
+              <span class="font-medium text-sky-300">{{ formatSettlementAmount(tooltipData?.total_cost || 0, 6) }}</span>
             </div>
             <div v-if="tooltipData && tooltipData.cache_creation_cost > 0" class="flex items-center justify-between gap-4">
               <span class="text-gray-400">{{ t('admin.usage.cacheCreationCost') }}</span>
-              <span class="font-medium text-white">${{ tooltipData.cache_creation_cost.toFixed(6) }}</span>
+              <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.cache_creation_cost, 6) }}</span>
             </div>
             <div v-if="tooltipData && tooltipData.cache_read_cost > 0" class="flex items-center justify-between gap-4">
               <span class="text-gray-400">{{ t('admin.usage.cacheReadCost') }}</span>
-              <span class="font-medium text-white">${{ tooltipData.cache_read_cost.toFixed(6) }}</span>
+              <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.cache_read_cost, 6) }}</span>
             </div>
           </div>
           <!-- Rate and Summary -->
@@ -529,12 +538,12 @@
           </div>
           <div class="flex items-center justify-between gap-6">
             <span class="text-gray-400">{{ t('usage.original') }}</span>
-            <span class="font-medium text-white">${{ tooltipData?.total_cost.toFixed(6) }}</span>
+            <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData?.total_cost || 0, 6) }}</span>
           </div>
           <div class="flex items-center justify-between gap-6 border-t border-gray-700 pt-1.5">
             <span class="text-gray-400">{{ t('usage.billed') }}</span>
             <span class="font-semibold text-green-400"
-              >${{ tooltipData?.actual_cost.toFixed(6) }}</span
+              >{{ formatSettlementAmount(tooltipData?.actual_cost || 0, 6) }}</span
             >
           </div>
         </div>
@@ -565,8 +574,9 @@ import type { UsageLog, ApiKey, UsageQueryParams, UsageStatsResponse } from '@/t
 import type { Column } from '@/components/common/types'
 import { formatDateTime, formatReasoningEffort } from '@/utils/format'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { useSettlementCurrency } from '@/composables/useSettlementCurrency'
 import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
-import { formatTokenPricePerMillion } from '@/utils/usagePricing'
+import { calculateTokenPricePerMillion } from '@/utils/usagePricing'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { resolveUsageRequestType } from '@/utils/usageRequestType'
 import {
@@ -586,6 +596,12 @@ import {
 const { t } = useI18n()
 const router = useRouter()
 const appStore = useAppStore()
+const {
+  settlementCurrency,
+  settlementCurrencyOptions,
+  setSettlementCurrency,
+  formatSettlementAmount,
+} = useSettlementCurrency()
 
 let abortController: AbortController | null = null
 
@@ -689,6 +705,14 @@ const imageUnitPrice = (row: UsageLog | null): number => {
   const total = row.total_cost ?? 0
   const price = total / row.image_count
   return Number.isFinite(price) ? price : 0
+}
+
+const formatSettlementTokenPricePerMillion = (
+  cost: number | null | undefined,
+  tokens: number | null | undefined,
+): string => {
+  const price = calculateTokenPricePerMillion(cost, tokens)
+  return price == null ? '-' : formatSettlementAmount(price, 4)
 }
 
 const isImageUsage = (row: Pick<UsageLog, 'image_count'> | null | undefined): boolean => {
@@ -919,6 +943,7 @@ const exportToCSV = async () => {
       return
     }
 
+    const costCurrency = settlementCurrency.value
     const headers = [
       'Time',
       'API Key Name',
@@ -932,8 +957,8 @@ const exportToCSV = async () => {
       'Cache Read Tokens',
       'Cache Creation Tokens',
       'Rate Multiplier',
-      'Billed Cost',
-      'Original Cost',
+      `Billed Cost (${costCurrency})`,
+      `Original Cost (${costCurrency})`,
       'First Token (ms)',
       'Duration (ms)'
     ]
@@ -951,8 +976,8 @@ const exportToCSV = async () => {
         log.cache_read_tokens,
         log.cache_creation_tokens,
         log.rate_multiplier,
-        log.actual_cost.toFixed(8),
-        log.total_cost.toFixed(8),
+        formatSettlementAmount(log.actual_cost, 8),
+        formatSettlementAmount(log.total_cost, 8),
         log.first_token_ms ?? '',
         log.duration_ms
       ].map(escapeCSVValue)

@@ -60,6 +60,7 @@ import ProfileTotpCard from '@/components/user/profile/ProfileTotpCard.vue'
 import { isWeChatWebOAuthEnabled } from '@/api/auth'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
+import { setSettlementCnyPerCredit } from '@/composables/useSettlementCurrency'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -88,6 +89,7 @@ onMounted(async () => {
         return
       }
       contactInfo.value = settings.contact_info || ''
+      setSettlementCnyPerCredit(settings.payment_balance_recharge_multiplier)
       balanceLowNotifyEnabled.value = settings.balance_low_notify_enabled ?? false
       systemDefaultThreshold.value = settings.balance_low_notify_threshold ?? 0
       linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled ?? false

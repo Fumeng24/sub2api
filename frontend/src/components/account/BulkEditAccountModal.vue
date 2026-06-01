@@ -624,7 +624,7 @@
             id="bulk-edit-rate-multiplier"
             type="number"
             min="0"
-            step="0.01"
+            step="0.0001"
             :disabled="!enableRateMultiplier"
             class="input"
             :class="!enableRateMultiplier && 'cursor-not-allowed opacity-50'"

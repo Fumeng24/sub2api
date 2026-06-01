@@ -26,7 +26,7 @@
             <span class="text-xs text-gray-400 ml-2">{{ t('profile.balanceNotify.thresholdHint') }}</span>
           </label>
           <div class="flex items-center gap-2">
-            <span class="text-gray-500">$</span>
+            <span class="text-gray-500">{{ settlementAmountPrefix }}</span>
             <input
               v-model.number="customThreshold"
               type="number"
@@ -165,6 +165,12 @@ import { userAPI } from '@/api'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import type { NotifyEmailEntry } from '@/types'
 import { formatCreditedBalance } from '@/components/payment/orderAmounts'
+import {
+  convertSettlementAmount,
+  convertSettlementAmountToCredits,
+  useSettlementCurrency,
+  type SettlementCurrency,
+} from '@/composables/useSettlementCurrency'
 
 const maxTotalEmails = 3
 
@@ -189,9 +195,14 @@ const props = defineProps<{
 const { t } = useI18n()
 const authStore = useAuthStore()
 const appStore = useAppStore()
+const {
+  settlementCurrency,
+  settlementAmountPrefix,
+  cnyPerCredit,
+  toBalanceCreditAmount,
+} = useSettlementCurrency()
 
 const notifyEnabled = ref(props.enabled)
-const customThreshold = ref<number | null>(props.threshold)
 const emailEntries = ref<NotifyEmailEntry[]>([...props.extraEmails])
 const pendingEmails = ref<PendingEmail[]>([])
 const newEmail = ref('')
@@ -209,10 +220,43 @@ const canAddMore = computed(() => {
   return emailEntries.value.length + pendingEmails.value.length < maxTotalEmails
 })
 
-watch(() => props.enabled, (val) => { notifyEnabled.value = val })
-watch(() => props.threshold, (val) => { customThreshold.value = val })
-watch(() => props.extraEmails, (val) => { emailEntries.value = [...val] })
+const toSettlementInputAmount = (
+  amount: number | null | undefined,
+  currency: SettlementCurrency = settlementCurrency.value,
+): number | null => {
+  const value = Number(amount)
+  if (!Number.isFinite(value) || value <= 0) return null
+  return Number(convertSettlementAmount(value, currency, cnyPerCredit.value).toFixed(4))
+}
 
+const toStoredBalanceAmount = (amount: number | null | undefined): number => {
+  const value = Number(amount)
+  if (!Number.isFinite(value) || value <= 0) return 0
+  return Number(toBalanceCreditAmount(value).toFixed(4))
+}
+
+const customThreshold = ref<number | null>(toSettlementInputAmount(props.threshold))
+
+const convertDisplayedThreshold = (
+  amount: number | null | undefined,
+  fromCurrency: SettlementCurrency,
+  toCurrency: SettlementCurrency,
+): number | null => {
+  const value = Number(amount)
+  if (!Number.isFinite(value) || value <= 0) return null
+  const credits = convertSettlementAmountToCredits(value, fromCurrency, cnyPerCredit.value)
+  return toSettlementInputAmount(credits, toCurrency)
+}
+
+watch(() => props.enabled, (val) => { notifyEnabled.value = val })
+watch(() => props.threshold, (val) => { customThreshold.value = toSettlementInputAmount(val) })
+watch(() => props.extraEmails, (val) => { emailEntries.value = [...val] })
+watch(settlementCurrency, (nextCurrency, previousCurrency) => {
+  customThreshold.value = convertDisplayedThreshold(customThreshold.value, previousCurrency, nextCurrency)
+})
+watch(cnyPerCredit, () => {
+  customThreshold.value = toSettlementInputAmount(props.threshold)
+})
 // When list is empty on mount, pre-fill the add input with user's email
 onMounted(() => {
   if (emailEntries.value.length === 0 && props.userEmail) {
@@ -240,7 +284,7 @@ const handleToggle = async () => {
 const handleThresholdUpdate = async () => {
   savingThreshold.value = true
   try {
-    const threshold = customThreshold.value && customThreshold.value > 0 ? customThreshold.value : 0
+    const threshold = toStoredBalanceAmount(customThreshold.value)
     const updated = await userAPI.updateProfile({ balance_notify_threshold: threshold })
     authStore.user = updated
     appStore.showSuccess(t('common.saved'))

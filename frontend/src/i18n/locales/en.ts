@@ -110,6 +110,13 @@ export default {
     }
   },
 
+  settlementCurrency: {
+    label: 'Settlement Currency',
+    cny: 'CNY',
+    usd: 'USD',
+    baseCredit: 'Balance credit',
+  },
+
   // Key Usage Query Page
   keyUsage: {
     title: 'API Key Usage',
@@ -807,7 +814,7 @@ export default {
     reset: 'Reset',
     resetQuotaUsed: 'Reset used quota to 0',
     resetQuotaTitle: 'Confirm Reset Quota',
-    resetQuotaConfirmMessage: 'Are you sure you want to reset the used quota (${used}) for key "{name}" to 0? This action cannot be undone.',
+    resetQuotaConfirmMessage: 'Are you sure you want to reset the used quota ({used}) for key "{name}" to 0? This action cannot be undone.',
     quotaResetSuccess: 'Quota reset successfully',
     failedToResetQuota: 'Failed to reset quota',
     rateLimitColumn: 'Rate Limit',
@@ -4949,6 +4956,44 @@ export default {
           totalOutputTokens: 'Total Output Tokens',
           avgDurationMs: 'Avg Duration (ms)',
           requestsWithFirstToken: 'Requests With First Token'
+        }
+      },
+      openAIScheduler: {
+        title: 'OpenAI Scheduler Status',
+        model: 'Model',
+        endpoint: 'Endpoint',
+        accounts: 'Accounts',
+        available: 'Available',
+        blocked: 'Skipped',
+        circuit: 'Circuit',
+        halfOpen: 'Probe',
+        full: 'Full',
+        switchRate: 'Switch rate',
+        stickyRate: 'Sticky rate',
+        latency: 'Scheduler latency',
+        disabled: 'OpenAI scheduler status unavailable',
+        empty: 'No OpenAI scheduler accounts',
+        loadFailed: 'Failed to load OpenAI scheduler status',
+        reason: {
+          model_unsupported: 'Model unsupported',
+          endpoint_unsupported: 'Endpoint unsupported',
+          compact_unsupported: 'Compact unsupported',
+          inactive: 'Inactive',
+          manual_unschedulable: 'Manual off',
+          expired: 'Expired',
+          overloaded: 'Overloaded',
+          rate_limited: 'Rate limited',
+          temp_unschedulable: 'Temporarily skipped',
+          quota_exceeded: 'Quota exhausted',
+          model_rate_limited: 'Model limited',
+          privacy_not_set: 'Privacy unset',
+          runtime_circuit_open: 'Runtime circuit',
+          runtime_half_open_in_flight: 'Runtime probe',
+          scheduler_circuit_open: 'Scheduler circuit',
+          scheduler_half_open: 'Scheduler probe',
+          scheduler_half_open_in_flight: 'Scheduler probe',
+          concurrency_full: 'Concurrency full',
+          unavailable: 'Unavailable'
         }
       },
       fullscreen: {

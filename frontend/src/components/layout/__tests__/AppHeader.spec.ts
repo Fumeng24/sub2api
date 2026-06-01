@@ -23,16 +23,23 @@ vi.mock('vue-router', () => ({
   },
 }))
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key: string, params?: Record<string, string>) => {
-      if (key === 'dashboard.balanceApproxCny') {
-        return `≈ ${params?.amount ?? ''} CNY`
-      }
-      return key
-    },
-  }),
-}))
+vi.mock('vue-i18n', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-i18n')>()
+  return {
+    ...actual,
+    useI18n: () => ({
+      t: (key: string, params?: Record<string, string>) => {
+        if (key === 'dashboard.balanceApproxCny') {
+          return `≈ ${params?.amount ?? ''} CNY`
+        }
+        if (key === 'settlementCurrency.baseCredit') return 'balance credit'
+        if (key === 'settlementCurrency.cny') return 'CNY'
+        if (key === 'settlementCurrency.usd') return 'USD'
+        return key
+      },
+    }),
+  }
+})
 
 vi.mock('@/stores', () => ({
   useAppStore: () => ({
@@ -108,7 +115,7 @@ describe('AppHeader balance display', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('$12.50')
-    expect(wrapper.text()).toContain('≈ ¥85.00 CNY')
+    expect(wrapper.text()).toContain('¥85.00')
+    expect(wrapper.text()).toContain('$12.50 balance credit')
   })
 })

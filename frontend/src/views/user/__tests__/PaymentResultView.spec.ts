@@ -10,6 +10,7 @@ const pollOrderStatus = vi.hoisted(() => vi.fn())
 const verifyOrder = vi.hoisted(() => vi.fn())
 const verifyOrderPublic = vi.hoisted(() => vi.fn())
 const resolveOrderPublicByResumeToken = vi.hoisted(() => vi.fn())
+const getPublicSettings = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -41,6 +42,12 @@ vi.mock('@/api/payment', () => ({
     verifyOrder,
     verifyOrderPublic,
     resolveOrderPublicByResumeToken,
+  },
+}))
+
+vi.mock('@/api/auth', () => ({
+  authAPI: {
+    getPublicSettings,
   },
 }))
 
@@ -91,6 +98,7 @@ describe('PaymentResultView', () => {
     verifyOrder.mockReset()
     verifyOrderPublic.mockReset()
     resolveOrderPublicByResumeToken.mockReset()
+    getPublicSettings.mockResolvedValue({ payment_balance_recharge_multiplier: 6.8 })
     window.localStorage.clear()
   })
 

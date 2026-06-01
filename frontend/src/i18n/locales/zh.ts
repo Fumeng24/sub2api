@@ -110,6 +110,13 @@ export default {
     }
   },
 
+  settlementCurrency: {
+    label: '结算币种',
+    cny: '人民币',
+    usd: '美元',
+    baseCredit: '站内余额',
+  },
+
   // Key Usage Query Page
   keyUsage: {
     title: 'API Key 用量查询',
@@ -811,7 +818,7 @@ export default {
     reset: '重置',
     resetQuotaUsed: '将已用额度重置为 0',
     resetQuotaTitle: '确认重置额度',
-    resetQuotaConfirmMessage: '确定要将密钥 "{name}" 的已用额度（${used}）重置为 0 吗？此操作不可撤销。',
+    resetQuotaConfirmMessage: '确定要将密钥 "{name}" 的已用额度（{used}）重置为 0 吗？此操作不可撤销。',
     quotaResetSuccess: '额度重置成功',
     failedToResetQuota: '重置额度失败',
     rateLimitColumn: '速率限制',
@@ -5104,6 +5111,44 @@ export default {
           totalOutputTokens: '输出 Token 总数',
           avgDurationMs: '平均时长(ms)',
           requestsWithFirstToken: '首 Token 样本数'
+        }
+      },
+      openAIScheduler: {
+        title: 'OpenAI 调度状态',
+        model: '模型',
+        endpoint: '接口',
+        accounts: '账号',
+        available: '可用',
+        blocked: '跳过',
+        circuit: '熔断',
+        halfOpen: '探测',
+        full: '满载',
+        switchRate: '切号率',
+        stickyRate: '粘连率',
+        latency: '调度耗时',
+        disabled: 'OpenAI 调度状态不可用',
+        empty: '暂无 OpenAI 调度账号',
+        loadFailed: '加载 OpenAI 调度状态失败',
+        reason: {
+          model_unsupported: '模型不支持',
+          endpoint_unsupported: '接口不支持',
+          compact_unsupported: 'compact 不支持',
+          inactive: '未启用',
+          manual_unschedulable: '手动停用',
+          expired: '已过期',
+          overloaded: '过载',
+          rate_limited: '限流',
+          temp_unschedulable: '临时摘除',
+          quota_exceeded: '额度用尽',
+          model_rate_limited: '模型限流',
+          privacy_not_set: '隐私未设置',
+          runtime_circuit_open: '运行时熔断',
+          runtime_half_open_in_flight: '运行时探测中',
+          scheduler_circuit_open: '调度熔断',
+          scheduler_half_open: '调度探测',
+          scheduler_half_open_in_flight: '调度探测中',
+          concurrency_full: '并发满',
+          unavailable: '不可用'
         }
       },
       customTimeRange: {

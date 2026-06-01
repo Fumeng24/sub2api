@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -174,6 +175,7 @@ func (s *OpenAIGatewayService) markOpenAIAccountTemporarilyUnschedulable(ctx con
 
 	slog.Info("openai_temp_unschedulable", "account_id", account.ID, "status_code", statusCode, "reason", reason, "until", until, "persisted", persisted)
 	slog.Info("account_circuit_open", "account_id", account.ID, "status_code", statusCode, "reason", reason, "until", until, "persisted", persisted)
+	s.emitOpenAIAccountCircuitOpenAlert(ctx, account.ID, statusCode, reason, until, persisted)
 	return true
 }
 
@@ -412,6 +414,34 @@ func (s *OpenAIGatewayService) reopenOpenAIAccountCircuit(accountID int64, reaso
 	}
 	s.openaiAccountCircuitHalfOpen.Delete(accountID)
 	slog.Info("account_circuit_open", "account_id", accountID, "status_code", 0, "reason", reason, "until", until, "persisted", false)
+	s.emitOpenAIAccountCircuitOpenAlert(context.Background(), accountID, 0, reason, until, false)
+}
+
+func (s *OpenAIGatewayService) emitOpenAIAccountCircuitOpenAlert(ctx context.Context, accountID int64, statusCode int, reason string, until time.Time, persisted bool) {
+	if s == nil || s.opsRuntimeAlerts == nil || accountID <= 0 {
+		return
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "openai_circuit_open"
+	}
+	dimensions := map[string]any{
+		"platform":    PlatformOpenAI,
+		"account_id":  accountID,
+		"status_code": statusCode,
+		"reason":      reason,
+		"until":       until.UTC().Format(time.RFC3339),
+		"persisted":   persisted,
+	}
+	s.opsRuntimeAlerts.Emit(ctx, OpsRuntimeAlertInput{
+		Type:        OpsRuntimeAlertTypeOpenAIAccountCircuitOpen,
+		Severity:    "P1",
+		Title:       fmt.Sprintf("OpenAI account %d circuit open", accountID),
+		Description: fmt.Sprintf("OpenAI account %d is temporarily skipped: %s, until %s", accountID, reason, until.UTC().Format(time.RFC3339)),
+		Dimensions:  dimensions,
+		DedupKey:    fmt.Sprintf("%s:%d:%s", OpsRuntimeAlertTypeOpenAIAccountCircuitOpen, accountID, reason),
+		DedupWindow: time.Minute,
+	})
 }
 
 func (s *OpenAIGatewayService) closeOpenAIAccountIdleConnectionsForCircuit(accountID int64, statusCode int, reason string, responseBody []byte) {

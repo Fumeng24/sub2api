@@ -123,6 +123,7 @@ type ticketPrefillPaymentOrder struct {
 	OrderNo     string    `json:"order_no"`
 	Amount      float64   `json:"amount"`
 	PayAmount   float64   `json:"pay_amount"`
+	Currency    string    `json:"currency"`
 	Status      string    `json:"status"`
 	OrderType   string    `json:"order_type"`
 	PaymentType string    `json:"payment_type"`
@@ -145,6 +146,7 @@ func safeTicketPaymentOrders(orders []*dbent.PaymentOrder) []ticketPrefillPaymen
 			OrderNo:     orderNo,
 			Amount:      order.Amount,
 			PayAmount:   order.PayAmount,
+			Currency:    service.PaymentOrderCurrency(order),
 			Status:      order.Status,
 			OrderType:   order.OrderType,
 			PaymentType: order.PaymentType,

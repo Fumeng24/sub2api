@@ -294,9 +294,17 @@ func ProvideOpsAlertEvaluatorService(
 	opsService *OpsService,
 	opsRepo OpsRepository,
 	emailService *EmailService,
+	openAIGatewayService *OpenAIGatewayService,
 	redisClient *redis.Client,
 	cfg *config.Config,
 ) *OpsAlertEvaluatorService {
+	runtimeAlerts := NewOpsRuntimeAlertService(opsRepo, opsService, emailService)
+	if opsService != nil {
+		opsService.SetRuntimeAlertService(runtimeAlerts)
+	}
+	if openAIGatewayService != nil {
+		openAIGatewayService.SetOpsRuntimeAlertService(runtimeAlerts)
+	}
 	svc := NewOpsAlertEvaluatorService(opsService, opsRepo, emailService, redisClient, cfg)
 	svc.Start()
 	return svc

@@ -186,7 +186,7 @@ import Icon from '@/components/icons/Icon.vue'
 import ProfileAvatarCard from '@/components/user/profile/ProfileAvatarCard.vue'
 import ProfileEditForm from '@/components/user/profile/ProfileEditForm.vue'
 import ProfileIdentityBindingsSection from '@/components/user/profile/ProfileIdentityBindingsSection.vue'
-import { formatCreditedBalance } from '@/components/payment/orderAmounts'
+import { useSettlementCurrency } from '@/composables/useSettlementCurrency'
 import type { User, UserAuthBindingStatus, UserAuthProvider, UserProfileSourceContext } from '@/types'
 
 const props = withDefaults(defineProps<{
@@ -209,6 +209,7 @@ const props = withDefaults(defineProps<{
 })
 
 const { t } = useI18n()
+const { formatSettlementAmount } = useSettlementCurrency()
 
 function normalizeBindingStatus(binding: boolean | UserAuthBindingStatus | undefined): boolean | null {
   if (typeof binding === 'boolean') {
@@ -274,7 +275,7 @@ const providerLabels = computed<Record<UserAuthProvider, string>>(() => ({
 }))
 
 function formatCurrency(value: number): string {
-  return formatCreditedBalance(value)
+  return formatSettlementAmount(value, 2)
 }
 
 function normalizeProvider(value: string): UserAuthProvider | null {

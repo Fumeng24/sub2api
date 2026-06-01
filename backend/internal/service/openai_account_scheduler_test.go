@@ -1391,6 +1391,117 @@ func TestOpenAIGatewayService_OpenAIAccountSchedulerMetrics(t *testing.T) {
 	require.GreaterOrEqual(t, snapshot.RuntimeStatsAccountCount, 1)
 }
 
+func TestOpenAISelectionDiagnostics_RecordsStageAccountIDs(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(12)
+	tempUntil := time.Now().Add(time.Minute)
+	accounts := []Account{
+		{
+			ID:          38795,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+		},
+		{
+			ID:          38796,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+		},
+		{
+			ID:          38797,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Credentials: map[string]any{
+				"model_mapping": map[string]any{"gpt-4": "gpt-4"},
+			},
+		},
+		{
+			ID:          38798,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Credentials: map[string]any{
+				openAIEndpointCapabilitiesCredentialKey: []any{string(OpenAIEndpointCapabilityEmbeddings)},
+			},
+		},
+		{
+			ID:                      38801,
+			Platform:                PlatformOpenAI,
+			Type:                    AccountTypeAPIKey,
+			Status:                  StatusActive,
+			Schedulable:             true,
+			Concurrency:             1,
+			GroupIDs:                []int64{groupID},
+			TempUnschedulableUntil:  &tempUntil,
+			TempUnschedulableReason: "upstream_502",
+		},
+		{
+			ID:          38802,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+		},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo: schedulerTestOpenAIAccountRepo{accounts: accounts},
+		cfg:         &config.Config{},
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{
+			loadMap: map[int64]*AccountLoadInfo{
+				38802: {AccountID: 38802, LoadRate: 100},
+			},
+		}),
+	}
+	svc.openaiAccountRuntimeBlockUntil.Store(int64(38795), time.Now().Add(time.Minute))
+	scheduler := newDefaultOpenAIAccountScheduler(svc, nil).(*defaultOpenAIAccountScheduler)
+
+	diag := scheduler.buildOpenAISelectionDiagnostics(ctx, OpenAIAccountScheduleRequest{
+		GroupID:            &groupID,
+		RequestedModel:     "gpt-5.5",
+		RequiredCapability: OpenAIEndpointCapabilityChatCompletions,
+		SchedulerEndpoint:  "/v1/responses",
+		ExcludedIDs:        map[int64]struct{}{38796: {}},
+	}, nil)
+
+	require.True(t, diag.Collected)
+	require.Equal(t, []int64{38795, 38796, 38797, 38798, 38801, 38802}, diag.GroupBindingAccountIDs)
+	require.Equal(t, []int64{38795, 38797, 38798, 38801, 38802}, diag.AfterExcludedAccountIDs)
+	require.Equal(t, []int64{38795, 38798, 38801, 38802}, diag.ModelSupportedAccountIDs)
+	require.Equal(t, []int64{38795, 38801, 38802}, diag.EndpointSupportedAccountIDs)
+	require.Equal(t, []int64{38795, 38801, 38802}, diag.CompactSupportedAccountIDs)
+	require.Equal(t, []int64{38795, 38802}, diag.StateAllowedAccountIDs)
+	require.Equal(t, []int64{38802}, diag.CircuitAllowedAccountIDs)
+	require.Empty(t, diag.CandidateAccountIDs)
+	require.Equal(t, []int64{38797}, diag.ModelUnsupportedAccountIDs)
+	require.Equal(t, []int64{38798}, diag.EndpointUnsupportedAccountIDs)
+	require.Equal(t, []int64{38801}, diag.StateFilteredAccountIDs)
+	require.Equal(t, []int64{38795}, diag.CircuitFilteredAccountIDs)
+	require.Equal(t, []int64{38802}, diag.ConcurrencySlotFilteredAccountIDs)
+	require.Equal(t, 0, diag.FinalCandidateCount)
+	require.Equal(t, 1, diag.FilterReasonCounts["excluded"])
+	require.Equal(t, 1, diag.FilterReasonCounts["model_unsupported"])
+	require.Equal(t, 1, diag.FilterReasonCounts["endpoint_unsupported"])
+	require.Equal(t, 1, diag.FilterReasonCounts["temp_unschedulable"])
+	require.Equal(t, 1, diag.FilterReasonCounts["runtime_circuit_open"])
+	require.Equal(t, 1, diag.FilterReasonCounts["concurrency_full"])
+}
+
 func intPtrForTest(v int) *int {
 	return &v
 }

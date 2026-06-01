@@ -22,6 +22,7 @@ import UserDashboardRecentUsage from '@/components/user/dashboard/UserDashboardR
 import type { UsageLog, TrendDataPoint, ModelStat, PlatformQuotaItem } from '@/types'
 import { getMyPlatformQuotas } from '@/api/user'
 import { paymentAPI } from '@/api/payment'
+import { setSettlementCnyPerCredit } from '@/composables/useSettlementCurrency'
 
 const authStore = useAuthStore(); const user = computed(() => authStore.user)
 const stats = ref<UserStatsType | null>(null); const loading = ref(false); const loadingUsage = ref(false); const loadingCharts = ref(false)
@@ -36,7 +37,7 @@ const loadStats = async () => { loading.value = true; try { await authStore.refr
 const loadCharts = async () => { loadingCharts.value = true; try { const res = await Promise.all([usageAPI.getDashboardTrend({ start_date: startDate.value, end_date: endDate.value, granularity: granularity.value as any }), usageAPI.getDashboardModels({ start_date: startDate.value, end_date: endDate.value })]); trendData.value = res[0].trend || []; modelStats.value = res[1].models || [] } catch (error) { console.error('Failed to load charts:', error) } finally { loadingCharts.value = false } }
 const loadRecent = async () => { loadingUsage.value = true; try { const res = await usageAPI.getByDateRange(startDate.value, endDate.value); recentUsage.value = res.items.slice(0, 5) } catch (error) { console.error('Failed to load recent usage:', error) } finally { loadingUsage.value = false } }
 const loadPlatformQuotas = async () => { try { const data = await getMyPlatformQuotas(); platformQuotas.value = data.platform_quotas ?? [] } catch (error) { console.warn('Failed to load platform quotas:', error); platformQuotas.value = [] } }
-const loadPaymentConfig = async () => { try { const res = await paymentAPI.getConfig(); const value = res.data.balance_recharge_multiplier; balanceCnyPerCredit.value = Number.isFinite(value) && value > 0 ? value : 6.8 } catch (error) { console.warn('Failed to load payment config:', error); balanceCnyPerCredit.value = 6.8 } }
+const loadPaymentConfig = async () => { try { const res = await paymentAPI.getConfig(); const value = res.data.balance_recharge_multiplier; balanceCnyPerCredit.value = Number.isFinite(value) && value > 0 ? value : 6.8; setSettlementCnyPerCredit(balanceCnyPerCredit.value) } catch (error) { console.warn('Failed to load payment config:', error); balanceCnyPerCredit.value = 6.8; setSettlementCnyPerCredit(balanceCnyPerCredit.value) } }
 const refreshAll = () => { loadStats(); loadCharts(); loadRecent(); loadPlatformQuotas(); loadPaymentConfig() }
 
 onMounted(() => { refreshAll() })

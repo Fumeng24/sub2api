@@ -228,6 +228,7 @@ export interface PublicSettings {
   google_oauth_enabled: boolean
   backend_mode_enabled: boolean
   version: string
+  payment_balance_recharge_multiplier?: number
   balance_low_notify_enabled: boolean
   account_quota_notify_enabled: boolean
   balance_low_notify_threshold: number
@@ -566,6 +567,7 @@ export interface TicketPrefillOrder {
   order_no?: string
   amount: number
   pay_amount?: number
+  currency?: string
   status: string
   order_type?: string
   payment_type?: string

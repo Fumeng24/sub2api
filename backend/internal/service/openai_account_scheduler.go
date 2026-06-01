@@ -97,20 +97,27 @@ type OpenAIAccountSelectionDiagnostics struct {
 	ConcurrencySlotFilteredAccountIDs []int64
 	HalfOpenFilteredAccountIDs        []int64
 	FilterReasonCounts                map[string]int
+	GroupBindingAccountIDs            []int64
+	AfterExcludedAccountIDs           []int64
+	ModelSupportedAccountIDs          []int64
+	EndpointSupportedAccountIDs       []int64
+	CompactSupportedAccountIDs        []int64
+	StateAllowedAccountIDs            []int64
+	CircuitAllowedAccountIDs          []int64
 }
 
 type OpenAIAccountSchedulerMetricsSnapshot struct {
-	SelectTotal              int64
-	StickyPreviousHitTotal   int64
-	StickySessionHitTotal    int64
-	LoadBalanceSelectTotal   int64
-	AccountSwitchTotal       int64
-	SchedulerLatencyMsTotal  int64
-	SchedulerLatencyMsAvg    float64
-	StickyHitRatio           float64
-	AccountSwitchRate        float64
-	LoadSkewAvg              float64
-	RuntimeStatsAccountCount int
+	SelectTotal              int64   `json:"select_total"`
+	StickyPreviousHitTotal   int64   `json:"sticky_previous_hit_total"`
+	StickySessionHitTotal    int64   `json:"sticky_session_hit_total"`
+	LoadBalanceSelectTotal   int64   `json:"load_balance_select_total"`
+	AccountSwitchTotal       int64   `json:"account_switch_total"`
+	SchedulerLatencyMsTotal  int64   `json:"scheduler_latency_ms_total"`
+	SchedulerLatencyMsAvg    float64 `json:"scheduler_latency_ms_avg"`
+	StickyHitRatio           float64 `json:"sticky_hit_ratio"`
+	AccountSwitchRate        float64 `json:"account_switch_rate"`
+	LoadSkewAvg              float64 `json:"load_skew_avg"`
+	RuntimeStatsAccountCount int     `json:"runtime_stats_account_count"`
 }
 
 type OpenAIAccountScheduler interface {
@@ -377,6 +384,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 	decision.LoadSkew = loadSkew
 	if err != nil {
 		attachDiagnostics()
+		s.service.emitOpenAISelectionEmptyAlert(ctx, req, decision, err)
 		return nil, decision, err
 	}
 	if selection != nil && selection.Account != nil {
@@ -757,6 +765,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 			diag.addReason("nil_account")
 			continue
 		}
+		diag.GroupBindingAccountIDs = appendOpenAIAccountID(diag.GroupBindingAccountIDs, account)
 		if req.ExcludedIDs != nil {
 			if _, excluded := req.ExcludedIDs[account.ID]; excluded {
 				diag.addReason("excluded")
@@ -764,6 +773,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 			}
 		}
 		diag.AfterExcludedCount++
+		diag.AfterExcludedAccountIDs = appendOpenAIAccountID(diag.AfterExcludedAccountIDs, account)
 
 		if req.RequestedModel != "" && !account.IsModelSupported(req.RequestedModel) {
 			diag.ModelUnsupportedAccountIDs = appendOpenAIAccountID(diag.ModelUnsupportedAccountIDs, account)
@@ -771,6 +781,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 			continue
 		}
 		diag.ModelSupportedCount++
+		diag.ModelSupportedAccountIDs = appendOpenAIAccountID(diag.ModelSupportedAccountIDs, account)
 
 		if !accountSupportsOpenAICapabilities(account, req.RequiredCapability, req.RequiredImageCapability) ||
 			!s.isAccountTransportCompatible(account, req.RequiredTransport) {
@@ -779,6 +790,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 			continue
 		}
 		diag.EndpointSupportedCount++
+		diag.EndpointSupportedAccountIDs = appendOpenAIAccountID(diag.EndpointSupportedAccountIDs, account)
 
 		if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, account) {
 			diag.CompactUnsupportedCount++
@@ -791,6 +803,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 			continue
 		}
 		diag.CompactSupportedCount++
+		diag.CompactSupportedAccountIDs = appendOpenAIAccountID(diag.CompactSupportedAccountIDs, account)
 
 		if reason := openAIAccountStatusFilterReason(ctx, account, req, schedGroup); reason != "" {
 			diag.StateFilteredCount++
@@ -799,6 +812,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 			continue
 		}
 		diag.StateAllowedCount++
+		diag.StateAllowedAccountIDs = appendOpenAIAccountID(diag.StateAllowedAccountIDs, account)
 
 		if reason := s.openAIAccountCircuitFilterReason(account, req, diag.Endpoint); reason != "" {
 			diag.CircuitFilteredCount++
@@ -811,6 +825,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 			continue
 		}
 		diag.CircuitAllowedCount++
+		diag.CircuitAllowedAccountIDs = appendOpenAIAccountID(diag.CircuitAllowedAccountIDs, account)
 		circuitAllowed = append(circuitAllowed, account)
 	}
 

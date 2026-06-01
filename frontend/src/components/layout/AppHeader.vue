@@ -80,10 +80,10 @@
           </svg>
           <div class="flex min-w-[5.75rem] flex-col leading-tight">
             <span class="text-sm font-semibold text-primary-700 dark:text-primary-300">
-              ${{ formattedBalance }}
+              {{ formattedBalance }}
             </span>
             <span class="text-[11px] font-medium text-primary-600/80 dark:text-primary-300/80">
-              {{ t('dashboard.balanceApproxCny', { amount: formattedBalanceCny }) }}
+              {{ formattedBalanceSubtitle }}
             </span>
           </div>
         </div>
@@ -132,10 +132,32 @@
                   {{ t('common.balance') }}
                 </div>
                 <div class="text-sm font-semibold text-primary-600 dark:text-primary-400">
-                  ${{ formattedBalance }}
+                  {{ formattedBalance }}
                 </div>
                 <div class="text-xs font-medium text-primary-600/80 dark:text-primary-400/80">
-                  {{ t('dashboard.balanceApproxCny', { amount: formattedBalanceCny }) }}
+                  {{ formattedBalanceSubtitle }}
+                </div>
+              </div>
+
+              <div class="border-b border-gray-100 px-4 py-2.5 dark:border-dark-700">
+                <div class="mb-2 text-xs text-gray-500 dark:text-dark-400">
+                  {{ t('settlementCurrency.label') }}
+                </div>
+                <div class="inline-flex rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
+                  <button
+                    v-for="option in settlementCurrencyOptions"
+                    :key="option.value"
+                    type="button"
+                    class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+                    :class="
+                      settlementCurrency === option.value
+                        ? 'bg-white text-primary-600 shadow-sm dark:bg-dark-800 dark:text-primary-300'
+                        : 'text-gray-500 hover:text-gray-800 dark:text-dark-300 dark:hover:text-white'
+                    "
+                    @click.stop="setSettlementCurrency(option.value)"
+                  >
+                    {{ option.label }}
+                  </button>
                 </div>
               </div>
 
@@ -246,6 +268,7 @@ import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini.vue'
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { formatSettlementCurrencyAmount, setSettlementCnyPerCredit, useSettlementCurrency } from '@/composables/useSettlementCurrency'
 
 const router = useRouter()
 const route = useRoute()
@@ -256,6 +279,12 @@ const adminSettingsStore = useAdminSettingsStore()
 const onboardingStore = useOnboardingStore()
 const paymentStore = usePaymentStore()
 const ticketStore = useTicketStore()
+const {
+  settlementCurrency,
+  settlementCurrencyOptions,
+  setSettlementCurrency,
+  formatSettlementAmount,
+} = useSettlementCurrency()
 
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
@@ -266,17 +295,6 @@ const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 const ticketLink = computed(() => (authStore.canAccessTicketAdmin ? '/admin/tickets' : '/tickets'))
 const ticketUnreadCount = computed(() => (authStore.canAccessTicketAdmin ? ticketStore.adminUnreadCount : ticketStore.userUnreadCount))
 const showTicketShortcut = computed(() => !appStore.backendModeEnabled || authStore.canAccessTicketAdmin)
-const usdFormatter = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
-const cnyFormatter = new Intl.NumberFormat('zh-CN', {
-  style: 'currency',
-  currency: 'CNY',
-  currencyDisplay: 'narrowSymbol',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
 const balanceCredits = computed(() => {
   const value = user.value?.balance ?? 0
   return Number.isFinite(value) ? value : 0
@@ -285,8 +303,16 @@ const balanceCnyPerCredit = computed(() => {
   const value = paymentStore.config?.balance_recharge_multiplier ?? 6.8
   return Number.isFinite(value) && value > 0 ? value : 6.8
 })
-const formattedBalance = computed(() => usdFormatter.format(balanceCredits.value))
-const formattedBalanceCny = computed(() => cnyFormatter.format(balanceCredits.value * balanceCnyPerCredit.value))
+const formattedBalance = computed(() => formatSettlementAmount(balanceCredits.value, 2))
+const formattedBalanceSubtitle = computed(() => {
+  if (settlementCurrency.value === 'CNY') {
+    const base = formatSettlementCurrencyAmount(balanceCredits.value, 'USD', balanceCnyPerCredit.value, undefined, 2)
+    return `${base} ${t('settlementCurrency.baseCredit')}`
+  }
+  return t('dashboard.balanceApproxCny', {
+    amount: formatSettlementCurrencyAmount(balanceCredits.value, 'CNY', balanceCnyPerCredit.value, undefined, 2),
+  })
+})
 
 // 只在标准模式的管理员下显示新手引导按钮
 const showOnboardingButton = computed(() => {
@@ -402,6 +428,14 @@ watch(
     refreshTicketSummary(true)
     refreshPaymentConfig()
   }
+)
+
+watch(
+  balanceCnyPerCredit,
+  (value) => {
+    setSettlementCnyPerCredit(value)
+  },
+  { immediate: true }
 )
 </script>
 

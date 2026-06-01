@@ -92,6 +92,16 @@
         <p class="text-xs text-gray-400 dark:text-dark-500 mt-3 text-center">
           {{ t('keyUsage.privacyNote') }}
         </p>
+        <div class="mt-3 flex justify-center">
+          <div class="w-36">
+            <Select
+              :model-value="settlementCurrency"
+              :options="settlementCurrencyOptions"
+              :placeholder="t('settlementCurrency.label')"
+              @update:model-value="setSettlementCurrency"
+            />
+          </div>
+        </div>
 
         <!-- Date Range Picker -->
         <div v-if="showDatePicker" class="mt-4">
@@ -335,7 +345,7 @@
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.output_tokens) }}</td>
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.cache_read_tokens) }}</td>
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.cache_write_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right font-medium text-gray-900 dark:text-white">{{ usd(row.actual_cost != null ? row.actual_cost : row.cost) }}</td>
+                    <td class="px-4 py-3 text-sm tabular-nums text-right font-medium text-gray-900 dark:text-white">{{ formatMoney(row.actual_cost != null ? row.actual_cost : row.cost) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -380,7 +390,7 @@
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.cache_creation_tokens) }}</td>
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.cache_read_tokens) }}</td>
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.total_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right font-medium text-gray-900 dark:text-white">{{ usd(m.actual_cost != null ? m.actual_cost : m.cost) }}</td>
+                    <td class="px-4 py-3 text-sm tabular-nums text-right font-medium text-gray-900 dark:text-white">{{ formatMoney(m.actual_cost != null ? m.actual_cost : m.cost) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -417,14 +427,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
+import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { setSettlementCnyPerCredit, useSettlementCurrency } from '@/composables/useSettlementCurrency'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
+const {
+  settlementCurrency,
+  settlementCurrencyOptions,
+  setSettlementCurrency,
+  formatSettlementAmount,
+  formatSettlementAmountPair,
+} = useSettlementCurrency()
 
 // ==================== Site Settings (same as HomeView) ====================
 
@@ -432,6 +451,15 @@ const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appS
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
+const publicBalanceCnyPerCredit = computed(() => appStore.cachedPublicSettings?.payment_balance_recharge_multiplier)
+
+watch(
+  publicBalanceCnyPerCredit,
+  (value) => {
+    setSettlementCnyPerCredit(value)
+  },
+  { immediate: true }
+)
 
 // ==================== Theme (same as HomeView) ====================
 
@@ -533,6 +561,9 @@ const RING_GRADIENTS = [
 
 const ringAnimated = ref(false)
 const displayPcts = ref<number[]>([])
+let ringStartRAF: number | null = null
+let ringTickRAF: number | null = null
+let ringDelayTimer: ReturnType<typeof setTimeout> | null = null
 
 const ringTrackColor = computed(() => isDark.value ? '#222222' : '#F0F0EE')
 
@@ -552,12 +583,15 @@ function getRingOffset(ring: RingItem): number {
 }
 
 function triggerRingAnimation(items: RingItem[]) {
+  cancelRingAnimation()
   ringAnimated.value = false
   displayPcts.value = items.map(() => 0)
 
   nextTick(() => {
-    requestAnimationFrame(() => {
-      setTimeout(() => {
+    ringStartRAF = requestAnimationFrame(() => {
+      ringStartRAF = null
+      ringDelayTimer = setTimeout(() => {
+        ringDelayTimer = null
         ringAnimated.value = true
 
         // Animate percentage numbers
@@ -570,12 +604,31 @@ function triggerRingAnimation(items: RingItem[]) {
           const p = Math.min(elapsed / duration, 1)
           const ease = 1 - Math.pow(1 - p, 3)
           displayPcts.value = targets.map(target => Math.round(ease * target))
-          if (p < 1) requestAnimationFrame(tick)
+          if (p < 1) {
+            ringTickRAF = requestAnimationFrame(tick)
+          } else {
+            ringTickRAF = null
+          }
         }
-        requestAnimationFrame(tick)
+        ringTickRAF = requestAnimationFrame(tick)
       }, 50)
     })
   })
+}
+
+function cancelRingAnimation() {
+  if (ringStartRAF != null) {
+    cancelAnimationFrame(ringStartRAF)
+    ringStartRAF = null
+  }
+  if (ringTickRAF != null) {
+    cancelAnimationFrame(ringTickRAF)
+    ringTickRAF = null
+  }
+  if (ringDelayTimer != null) {
+    clearTimeout(ringDelayTimer)
+    ringDelayTimer = null
+  }
 }
 
 // ==================== Computed Data ====================
@@ -614,7 +667,7 @@ const ringItems = computed<RingItem[]>(() => {
   if (data.mode === 'quota_limited') {
     if (data.quota) {
       const pct = data.quota.limit > 0 ? Math.min(Math.round((data.quota.used / data.quota.limit) * 100), 100) : 0
-      items.push({ title: t('keyUsage.totalQuota'), pct, amount: `${usd(data.quota.used)} / ${usd(data.quota.limit)}`, iconType: 'dollar' })
+      items.push({ title: t('keyUsage.totalQuota'), pct, amount: formatSettlementAmountPair(data.quota.used, data.quota.limit, 2), iconType: 'dollar' })
     }
     if (data.rate_limits) {
       const windowLabels: Record<string, string> = { '5h': t('keyUsage.limit5h'), '1d': t('keyUsage.limitDaily'), '7d': t('keyUsage.limit7d') }
@@ -624,7 +677,7 @@ const ringItems = computed<RingItem[]>(() => {
         items.push({
           title: windowLabels[rl.window] || rl.window,
           pct,
-          amount: `${usd(rl.used)} / ${usd(rl.limit)}`,
+          amount: formatSettlementAmountPair(rl.used, rl.limit, 2),
           iconType: windowIcons[rl.window] || 'clock',
           resetAt: rl.reset_at,
         })
@@ -641,12 +694,12 @@ const ringItems = computed<RingItem[]>(() => {
       for (const l of limits) {
         if (l.limit != null && l.limit > 0) {
           const pct = Math.min(Math.round((l.usage / l.limit) * 100), 100)
-          items.push({ title: l.label, pct, amount: `${usd(l.usage)} / ${usd(l.limit)}`, iconType: 'calendar' })
+          items.push({ title: l.label, pct, amount: formatSettlementAmountPair(l.usage, l.limit, 2), iconType: 'calendar' })
         }
       }
     }
     if (!data.subscription && data.balance != null) {
-      items.push({ title: t('keyUsage.walletBalance'), pct: 0, amount: usd(data.balance), isBalance: true, iconType: 'dollar' })
+      items.push({ title: t('keyUsage.walletBalance'), pct: 0, amount: formatMoney(data.balance), isBalance: true, iconType: 'dollar' })
     }
   }
 
@@ -692,7 +745,7 @@ const detailRows = computed<DetailRow[]>(() => {
         : 'text-emerald-500'
       rows.push({
         iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_SHIELD,
-        label: t('keyUsage.remainingQuota'), value: usd(data.quota.remaining), valueClass: remainColor,
+        label: t('keyUsage.remainingQuota'), value: formatMoney(data.quota.remaining), valueClass: remainColor,
       })
     }
     if (data.expires_at) {
@@ -710,7 +763,7 @@ const detailRows = computed<DetailRow[]>(() => {
       const windowMap: Record<string, string> = { '5h': '5H', '1d': locale.value === 'zh' ? '日' : 'D', '7d': '7D' }
       for (const rl of data.rate_limits) {
         const pct = rl.limit > 0 ? (rl.used / rl.limit) * 100 : 0
-        let valueStr = `${usd(rl.used)} / ${usd(rl.limit)}`
+        let valueStr = formatSettlementAmountPair(rl.used, rl.limit, 2)
         const resetStr = formatResetTime(rl.reset_at)
         if (resetStr) {
           valueStr += ` (⟳ ${resetStr})`
@@ -735,21 +788,21 @@ const detailRows = computed<DetailRow[]>(() => {
         const pct = (sub.daily_usage_usd / sub.daily_limit_usd) * 100
         rows.push({
           iconBg: 'bg-primary-500/10', iconColor: 'text-primary-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '日' : 'D'})`, value: `${usd(sub.daily_usage_usd)} / ${usd(sub.daily_limit_usd)}`, valueClass: getUsageColor(pct),
+          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '日' : 'D'})`, value: formatSettlementAmountPair(sub.daily_usage_usd, sub.daily_limit_usd, 2), valueClass: getUsageColor(pct),
         })
       }
       if (sub.weekly_limit_usd > 0) {
         const pct = (sub.weekly_usage_usd / sub.weekly_limit_usd) * 100
         rows.push({
           iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '周' : 'W'})`, value: `${usd(sub.weekly_usage_usd)} / ${usd(sub.weekly_limit_usd)}`, valueClass: getUsageColor(pct),
+          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '周' : 'W'})`, value: formatSettlementAmountPair(sub.weekly_usage_usd, sub.weekly_limit_usd, 2), valueClass: getUsageColor(pct),
         })
       }
       if (sub.monthly_limit_usd > 0) {
         const pct = (sub.monthly_usage_usd / sub.monthly_limit_usd) * 100
         rows.push({
           iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '月' : 'M'})`, value: `${usd(sub.monthly_usage_usd)} / ${usd(sub.monthly_limit_usd)}`, valueClass: getUsageColor(pct),
+          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '月' : 'M'})`, value: formatSettlementAmountPair(sub.monthly_usage_usd, sub.monthly_limit_usd, 2), valueClass: getUsageColor(pct),
         })
       }
       if (sub.expires_at) {
@@ -765,7 +818,7 @@ const detailRows = computed<DetailRow[]>(() => {
       : ''
     rows.push({
       iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_SHIELD,
-      label: t('keyUsage.remainingQuota'), value: data.remaining != null ? usd(data.remaining) : '-', valueClass: remainColor,
+      label: t('keyUsage.remainingQuota'), value: data.remaining != null ? formatMoney(data.remaining) : '-', valueClass: remainColor,
     })
   }
 
@@ -791,7 +844,7 @@ const usageStatCells = computed<StatCell[]>(() => {
     { label: t('keyUsage.todayTokens'), value: fmtNum(today.total_tokens) },
     { label: t('keyUsage.todayCacheCreation'), value: fmtNum(today.cache_creation_tokens) },
     { label: t('keyUsage.todayCacheRead'), value: fmtNum(today.cache_read_tokens) },
-    { label: t('keyUsage.todayCost'), value: usd(today.actual_cost) },
+    { label: t('keyUsage.todayCost'), value: formatMoney(today.actual_cost) },
     { label: t('keyUsage.rpmTpm'), value: `${usage.rpm || 0} / ${usage.tpm || 0}` },
     { label: t('keyUsage.totalRequests'), value: fmtNum(total.requests) },
     { label: t('keyUsage.totalInputTokens'), value: fmtNum(total.input_tokens) },
@@ -799,7 +852,7 @@ const usageStatCells = computed<StatCell[]>(() => {
     { label: t('keyUsage.totalTokensLabel'), value: fmtNum(total.total_tokens) },
     { label: t('keyUsage.totalCacheCreation'), value: fmtNum(total.cache_creation_tokens) },
     { label: t('keyUsage.totalCacheRead'), value: fmtNum(total.cache_read_tokens) },
-    { label: t('keyUsage.totalCost'), value: usd(total.actual_cost) },
+    { label: t('keyUsage.totalCost'), value: formatMoney(total.actual_cost) },
     { label: t('keyUsage.avgDuration'), value: usage.average_duration_ms ? `${Math.round(usage.average_duration_ms)} ms` : '-' },
   ]
 })
@@ -827,9 +880,9 @@ const showDailyUsage = computed(() => Boolean(resultData.value && Array.isArray(
 
 // ==================== Utility Functions ====================
 
-function usd(value: number | null | undefined): string {
+function formatMoney(value: number | null | undefined): string {
   if (value == null || value < 0) return '-'
-  return '$' + Number(value).toFixed(2)
+  return formatSettlementAmount(value, 2)
 }
 
 function fmtNum(val: number | null | undefined): string {
@@ -934,6 +987,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (resetTimer) clearInterval(resetTimer)
+  cancelRingAnimation()
 })
 </script>
 

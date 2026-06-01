@@ -412,6 +412,101 @@ export async function getAccountAvailabilityStats(platform?: string, groupId?: n
   return data
 }
 
+export interface OpenAISchedulerMetrics {
+  select_total: number
+  sticky_previous_hit_total: number
+  sticky_session_hit_total: number
+  load_balance_select_total: number
+  account_switch_total: number
+  scheduler_latency_ms_total: number
+  scheduler_latency_ms_avg: number
+  sticky_hit_ratio: number
+  account_switch_rate: number
+  load_skew_avg: number
+  runtime_stats_account_count: number
+}
+
+export interface OpenAISchedulerSummary {
+  group_count: number
+  account_count: number
+  available_count: number
+  blocked_count: number
+  circuit_open_count: number
+  half_open_count: number
+  concurrency_full_count: number
+}
+
+export interface OpenAISchedulerAccountStatus {
+  account_id: number
+  account_name: string
+  account_type: string
+  status: string
+  role: string
+  priority: number
+  weight: number
+  sort_order: number
+  scheduling_configured: boolean
+  model_supported: boolean
+  endpoint_supported: boolean
+  compact_supported: boolean
+  state_allowed: boolean
+  state_reason?: string
+  circuit_state: string
+  circuit_reason?: string
+  is_available: boolean
+  block_reason?: string
+  current_concurrency: number
+  max_concurrency: number
+  waiting_count: number
+  load_rate: number
+  runtime_circuit_until?: string
+  runtime_circuit_remaining_sec?: number
+  temp_unschedulable_until?: string
+  temp_unschedulable_reason?: string
+  scheduler_health_score: number
+  scheduler_error_rate: number
+  scheduler_ttft_ms?: number
+  scheduler_consecutive_failed: number
+  scheduler_last_failure_reason?: string
+}
+
+export interface OpenAISchedulerGroupStatus {
+  group_id: number
+  group_name: string
+  platform: string
+  total_accounts: number
+  available_count: number
+  blocked_count: number
+  circuit_open_count: number
+  half_open_count: number
+  concurrency_full_count: number
+  accounts: OpenAISchedulerAccountStatus[]
+}
+
+export interface OpenAISchedulerStatusResponse {
+  enabled: boolean
+  advanced_scheduler_enabled: boolean
+  model: string
+  endpoint: string
+  timestamp: string
+  metrics: OpenAISchedulerMetrics
+  summary: OpenAISchedulerSummary
+  groups: OpenAISchedulerGroupStatus[]
+}
+
+export async function getOpenAISchedulerStatus(params: {
+  model?: string
+  endpoint?: string
+  group_id?: number | null
+} = {}): Promise<OpenAISchedulerStatusResponse> {
+  const query: Record<string, any> = {}
+  if (params.model) query.model = params.model
+  if (params.endpoint) query.endpoint = params.endpoint
+  if (typeof params.group_id === 'number' && params.group_id > 0) query.group_id = params.group_id
+  const { data } = await apiClient.get<OpenAISchedulerStatusResponse>('/admin/ops/openai-scheduler', { params: query })
+  return data
+}
+
 export interface OpsRateSummary {
   current: number
   peak: number
@@ -1285,6 +1380,7 @@ export const opsAPI = {
   getConcurrencyStats,
   getUserConcurrencyStats,
   getAccountAvailabilityStats,
+  getOpenAISchedulerStatus,
   getRealtimeTrafficSummary,
   subscribeQPS,
 

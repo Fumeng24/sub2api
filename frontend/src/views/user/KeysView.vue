@@ -32,20 +32,28 @@
       </template>
 
       <template #actions>
-        <div class="flex justify-end gap-3">
-        <button
-          @click="loadApiKeys"
-          :disabled="loading"
-          class="btn btn-secondary"
-          :title="t('common.refresh')"
-        >
-          <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-        </button>
-        <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
-          <Icon name="plus" size="md" class="mr-2" />
-          {{ t('keys.createKey') }}
-        </button>
-      </div>
+        <div class="flex flex-wrap justify-end gap-3">
+          <div class="w-36">
+            <Select
+              :model-value="settlementCurrency"
+              :options="settlementCurrencyOptions"
+              :placeholder="t('settlementCurrency.label')"
+              @update:model-value="setDisplayedSettlementCurrency"
+            />
+          </div>
+          <button
+            @click="loadApiKeys"
+            :disabled="loading"
+            class="btn btn-secondary"
+            :title="t('common.refresh')"
+          >
+            <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+          </button>
+          <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
+            <Icon name="plus" size="md" class="mr-2" />
+            {{ t('keys.createKey') }}
+          </button>
+        </div>
       </template>
 
       <template #table>
@@ -150,13 +158,13 @@
               <div class="flex items-center gap-1.5">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('keys.today') }}:</span>
                 <span class="font-medium text-gray-900 dark:text-white">
-                  ${{ (usageStats[row.id]?.today_actual_cost ?? 0).toFixed(4) }}
+                  {{ formatSettlementAmount(usageStats[row.id]?.today_actual_cost ?? 0, 4) }}
                 </span>
               </div>
               <div class="mt-0.5 flex items-center gap-1.5">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('keys.total') }}:</span>
                 <span class="font-medium text-gray-900 dark:text-white">
-                  ${{ (usageStats[row.id]?.total_actual_cost ?? 0).toFixed(4) }}
+                  {{ formatSettlementAmount(usageStats[row.id]?.total_actual_cost ?? 0, 4) }}
                 </span>
               </div>
               <!-- Quota progress (if quota is set) -->
@@ -169,7 +177,7 @@
                     row.quota_used >= row.quota * 0.8 ? 'text-yellow-500' :
                     'text-gray-900 dark:text-white'
                   ]">
-                    ${{ row.quota_used?.toFixed(2) || '0.00' }} / ${{ row.quota?.toFixed(2) }}
+                    {{ formatSettlementAmountPair(row.quota_used ?? 0, row.quota ?? 0, 2) }}
                   </span>
                 </div>
                 <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
@@ -199,7 +207,7 @@
                     row.usage_5h >= row.rate_limit_5h * 0.8 ? 'text-yellow-500' :
                     'text-gray-700 dark:text-gray-300'
                   ]">
-                    ${{ row.usage_5h?.toFixed(2) || '0.00' }}/${{ row.rate_limit_5h?.toFixed(2) }}
+                    {{ formatSettlementAmountPair(row.usage_5h ?? 0, row.rate_limit_5h ?? 0, 2) }}
                   </span>
                 </div>
                 <div class="h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
@@ -227,7 +235,7 @@
                     row.usage_1d >= row.rate_limit_1d * 0.8 ? 'text-yellow-500' :
                     'text-gray-700 dark:text-gray-300'
                   ]">
-                    ${{ row.usage_1d?.toFixed(2) || '0.00' }}/${{ row.rate_limit_1d?.toFixed(2) }}
+                    {{ formatSettlementAmountPair(row.usage_1d ?? 0, row.rate_limit_1d ?? 0, 2) }}
                   </span>
                 </div>
                 <div class="h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
@@ -255,7 +263,7 @@
                     row.usage_7d >= row.rate_limit_7d * 0.8 ? 'text-yellow-500' :
                     'text-gray-700 dark:text-gray-300'
                   ]">
-                    ${{ row.usage_7d?.toFixed(2) || '0.00' }}/${{ row.rate_limit_7d?.toFixed(2) }}
+                    {{ formatSettlementAmountPair(row.usage_7d ?? 0, row.rate_limit_7d ?? 0, 2) }}
                   </span>
                 </div>
                 <div class="h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
@@ -595,7 +603,7 @@
           <div class="space-y-4">
             <div>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ settlementAmountPrefix }}</span>
                 <input
                   v-model.number="formData.quota"
                   type="number"
@@ -614,11 +622,11 @@
               <div class="flex items-center gap-2">
                 <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700">
                   <span class="font-medium text-gray-900 dark:text-white">
-                    ${{ selectedKey.quota_used?.toFixed(4) || '0.0000' }}
+                    {{ formatSettlementAmount(selectedKey.quota_used ?? 0, 4) }}
                   </span>
                   <span class="mx-2 text-gray-400">/</span>
                   <span class="text-gray-500 dark:text-gray-400">
-                    ${{ selectedKey.quota?.toFixed(2) || '0.00' }}
+                    {{ formatSettlementAmount(selectedKey.quota ?? 0, 2) }}
                   </span>
                 </div>
                 <button
@@ -661,7 +669,7 @@
             <div>
               <label class="input-label">{{ t('keys.rateLimit5h') }}</label>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ settlementAmountPrefix }}</span>
                 <input
                   v-model.number="formData.rate_limit_5h"
                   type="number"
@@ -681,11 +689,11 @@
                       selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8 ? 'text-yellow-500' :
                       'text-gray-900 dark:text-white'
                     ]">
-                      ${{ selectedKey.usage_5h?.toFixed(4) || '0.0000' }}
+                      {{ formatSettlementAmount(selectedKey.usage_5h ?? 0, 4) }}
                     </span>
                     <span class="mx-2 text-gray-400">/</span>
                     <span class="text-gray-500 dark:text-gray-400">
-                      ${{ selectedKey.rate_limit_5h?.toFixed(2) || '0.00' }}
+                      {{ formatSettlementAmount(selectedKey.rate_limit_5h ?? 0, 2) }}
                     </span>
                   </div>
                 </div>
@@ -707,7 +715,7 @@
             <div>
               <label class="input-label">{{ t('keys.rateLimit1d') }}</label>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ settlementAmountPrefix }}</span>
                 <input
                   v-model.number="formData.rate_limit_1d"
                   type="number"
@@ -727,11 +735,11 @@
                       selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8 ? 'text-yellow-500' :
                       'text-gray-900 dark:text-white'
                     ]">
-                      ${{ selectedKey.usage_1d?.toFixed(4) || '0.0000' }}
+                      {{ formatSettlementAmount(selectedKey.usage_1d ?? 0, 4) }}
                     </span>
                     <span class="mx-2 text-gray-400">/</span>
                     <span class="text-gray-500 dark:text-gray-400">
-                      ${{ selectedKey.rate_limit_1d?.toFixed(2) || '0.00' }}
+                      {{ formatSettlementAmount(selectedKey.rate_limit_1d ?? 0, 2) }}
                     </span>
                   </div>
                 </div>
@@ -753,7 +761,7 @@
             <div>
               <label class="input-label">{{ t('keys.rateLimit7d') }}</label>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ settlementAmountPrefix }}</span>
                 <input
                   v-model.number="formData.rate_limit_7d"
                   type="number"
@@ -773,11 +781,11 @@
                       selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8 ? 'text-yellow-500' :
                       'text-gray-900 dark:text-white'
                     ]">
-                      ${{ selectedKey.usage_7d?.toFixed(4) || '0.0000' }}
+                      {{ formatSettlementAmount(selectedKey.usage_7d ?? 0, 4) }}
                     </span>
                     <span class="mx-2 text-gray-400">/</span>
                     <span class="text-gray-500 dark:text-gray-400">
-                      ${{ selectedKey.rate_limit_7d?.toFixed(2) || '0.00' }}
+                      {{ formatSettlementAmount(selectedKey.rate_limit_7d ?? 0, 2) }}
                     </span>
                   </div>
                 </div>
@@ -941,7 +949,7 @@
     <ConfirmDialog
       :show="showResetQuotaDialog"
       :title="t('keys.resetQuotaTitle')"
-      :message="t('keys.resetQuotaConfirmMessage', { name: selectedKey?.name, used: selectedKey?.quota_used?.toFixed(4) })"
+      :message="t('keys.resetQuotaConfirmMessage', { name: selectedKey?.name, used: selectedKey ? formatSettlementAmount(selectedKey.quota_used ?? 0, 4) : '-' })"
       :confirm-text="t('keys.reset')"
       :cancel-text="t('common.cancel')"
       :danger="true"
@@ -1097,13 +1105,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import {
+  convertSettlementAmount,
+  convertSettlementAmountToCredits,
+  setSettlementCnyPerCredit,
+  useSettlementCurrency,
+  type SettlementCurrency,
+} from '@/composables/useSettlementCurrency'
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -1162,6 +1177,16 @@ interface GroupOption {
 const appStore = useAppStore()
 const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
+const {
+  settlementCurrency,
+  settlementCurrencyOptions,
+  settlementAmountPrefix,
+  cnyPerCredit,
+  setSettlementCurrency,
+  formatSettlementAmount,
+  formatSettlementAmountPair,
+  toBalanceCreditAmount,
+} = useSettlementCurrency()
 
 const columns = computed<Column[]>(() => [
   { key: 'name', label: t('common.name'), sortable: true },
@@ -1428,6 +1453,7 @@ const loadUserGroupRates = async () => {
 const loadPublicSettings = async () => {
   try {
     publicSettings.value = await appStore.fetchPublicSettings(true) || await authAPI.getPublicSettings()
+    setSettlementCnyPerCredit(publicSettings.value?.payment_balance_recharge_multiplier)
   } catch (error) {
     console.error('Failed to load public settings:', error)
   }
@@ -1441,6 +1467,45 @@ const openUseKeyModal = (key: ApiKey) => {
 const closeUseKeyModal = () => {
   showUseKeyModal.value = false
   selectedKey.value = null
+}
+
+const toSettlementInputAmount = (
+  amount: number | null | undefined,
+  currency: SettlementCurrency = settlementCurrency.value,
+): number | null => {
+  const value = Number(amount)
+  if (!Number.isFinite(value) || value <= 0) return null
+  return Number(convertSettlementAmount(value, currency, cnyPerCredit.value).toFixed(4))
+}
+
+const toStoredBalanceAmount = (amount: number | null | undefined): number => {
+  const value = Number(amount)
+  if (!Number.isFinite(value) || value <= 0) return 0
+  return Number(toBalanceCreditAmount(value).toFixed(4))
+}
+
+const convertDisplayedBalanceAmount = (
+  amount: number | null | undefined,
+  fromCurrency: SettlementCurrency,
+  toCurrency: SettlementCurrency,
+): number | null => {
+  const value = Number(amount)
+  if (!Number.isFinite(value) || value <= 0) return null
+  const credits = convertSettlementAmountToCredits(value, fromCurrency, cnyPerCredit.value)
+  return toSettlementInputAmount(credits, toCurrency)
+}
+
+const setDisplayedSettlementCurrency = (value: unknown) => {
+  const previousCurrency = settlementCurrency.value
+  setSettlementCurrency(value)
+  const nextCurrency = settlementCurrency.value
+  if (previousCurrency === nextCurrency || (!showCreateModal.value && !showEditModal.value)) {
+    return
+  }
+  formData.value.quota = convertDisplayedBalanceAmount(formData.value.quota, previousCurrency, nextCurrency)
+  formData.value.rate_limit_5h = convertDisplayedBalanceAmount(formData.value.rate_limit_5h, previousCurrency, nextCurrency)
+  formData.value.rate_limit_1d = convertDisplayedBalanceAmount(formData.value.rate_limit_1d, previousCurrency, nextCurrency)
+  formData.value.rate_limit_7d = convertDisplayedBalanceAmount(formData.value.rate_limit_7d, previousCurrency, nextCurrency)
 }
 
 const handlePageChange = (page: number) => {
@@ -1487,11 +1552,11 @@ const editKey = (key: ApiKey) => {
     ip_whitelist: (key.ip_whitelist || []).join('\n'),
     ip_blacklist: (key.ip_blacklist || []).join('\n'),
     enable_quota: key.quota > 0,
-    quota: key.quota > 0 ? key.quota : null,
+    quota: toSettlementInputAmount(key.quota),
     enable_rate_limit: (key.rate_limit_5h > 0) || (key.rate_limit_1d > 0) || (key.rate_limit_7d > 0),
-    rate_limit_5h: key.rate_limit_5h || null,
-    rate_limit_1d: key.rate_limit_1d || null,
-    rate_limit_7d: key.rate_limit_7d || null,
+    rate_limit_5h: toSettlementInputAmount(key.rate_limit_5h),
+    rate_limit_1d: toSettlementInputAmount(key.rate_limit_1d),
+    rate_limit_7d: toSettlementInputAmount(key.rate_limit_7d),
     enable_expiration: hasExpiration,
     expiration_preset: 'custom',
     expiration_date: key.expires_at ? formatDateTimeLocal(key.expires_at) : ''
@@ -1597,7 +1662,7 @@ const handleSubmit = async () => {
   const ipBlacklist = formData.value.enable_ip_restriction ? parseIPList(formData.value.ip_blacklist) : []
 
   // Calculate quota value (null/empty/0 = unlimited, stored as 0)
-  const quota = formData.value.quota && formData.value.quota > 0 ? formData.value.quota : 0
+  const quota = toStoredBalanceAmount(formData.value.quota)
 
   // Calculate expiration
   let expiresInDays: number | undefined
@@ -1620,9 +1685,9 @@ const handleSubmit = async () => {
 
   // Calculate rate limit values (send 0 when toggle is off)
   const rateLimitData = formData.value.enable_rate_limit ? {
-    rate_limit_5h: formData.value.rate_limit_5h && formData.value.rate_limit_5h > 0 ? formData.value.rate_limit_5h : 0,
-    rate_limit_1d: formData.value.rate_limit_1d && formData.value.rate_limit_1d > 0 ? formData.value.rate_limit_1d : 0,
-    rate_limit_7d: formData.value.rate_limit_7d && formData.value.rate_limit_7d > 0 ? formData.value.rate_limit_7d : 0,
+    rate_limit_5h: toStoredBalanceAmount(formData.value.rate_limit_5h),
+    rate_limit_1d: toStoredBalanceAmount(formData.value.rate_limit_1d),
+    rate_limit_7d: toStoredBalanceAmount(formData.value.rate_limit_7d),
   } : { rate_limit_5h: 0, rate_limit_1d: 0, rate_limit_7d: 0 }
 
   submitting.value = true
@@ -1859,6 +1924,15 @@ function formatResetTime(resetAt: string | null): string {
   if (hours > 0) return `${hours}h ${mins}m`
   return `${mins}m`
 }
+
+watch(cnyPerCredit, () => {
+  if (showEditModal.value && selectedKey.value) {
+    formData.value.quota = toSettlementInputAmount(selectedKey.value.quota)
+    formData.value.rate_limit_5h = toSettlementInputAmount(selectedKey.value.rate_limit_5h)
+    formData.value.rate_limit_1d = toSettlementInputAmount(selectedKey.value.rate_limit_1d)
+    formData.value.rate_limit_7d = toSettlementInputAmount(selectedKey.value.rate_limit_7d)
+  }
+})
 
 onMounted(() => {
   loadApiKeys()

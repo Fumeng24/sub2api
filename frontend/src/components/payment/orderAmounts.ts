@@ -1,5 +1,10 @@
 import type { PaymentOrder } from '@/types/payment'
 import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
+import {
+  formatSettlementCurrencyAmount,
+  getCurrentSettlementCnyPerCredit,
+  getCurrentSettlementCurrency,
+} from '@/composables/useSettlementCurrency'
 
 export function orderCurrency(order: Pick<PaymentOrder, 'currency'>): string {
   return normalizePaymentCurrency(order.currency)
@@ -14,8 +19,13 @@ export function formatOrderPaymentAmount(
 }
 
 export function formatCreditedBalance(amount: number): string {
-  const safe = Number.isFinite(amount) ? amount : 0
-  return `$${safe.toFixed(2)}`
+  return formatSettlementCurrencyAmount(
+    amount,
+    getCurrentSettlementCurrency(),
+    getCurrentSettlementCnyPerCredit(),
+    undefined,
+    2,
+  )
 }
 
 export function shouldShowCreditedBalance(order: Pick<PaymentOrder, 'order_type'>): boolean {
