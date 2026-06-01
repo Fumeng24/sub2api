@@ -403,15 +403,17 @@ func TestOpenAIAdvancedSchedulerPolicy_DisablesLegacySameAccountRetry(t *testing
 		Type:     AccountTypeAPIKey,
 		Credentials: map[string]any{
 			"pool_mode":                    true,
-			"pool_mode_retry_status_codes": []any{float64(http.StatusTooManyRequests)},
+			"pool_mode_retry_status_codes": []any{float64(http.StatusTooManyRequests), float64(http.StatusBadGateway)},
 		},
 	}
 
 	legacySvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("false")}
-	require.True(t, legacySvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusTooManyRequests))
+	require.False(t, legacySvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusTooManyRequests))
+	require.True(t, legacySvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusBadGateway))
 
 	advancedSvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("true")}
 	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusTooManyRequests))
+	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusBadGateway))
 }
 
 func TestOpenAIAdvancedSchedulerPolicy_FailoversModelNotFound(t *testing.T) {
@@ -425,6 +427,17 @@ func TestOpenAIAdvancedSchedulerPolicy_FailoversModelNotFound(t *testing.T) {
 
 	advancedSvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("true")}
 	require.True(t, advancedSvc.shouldFailoverOpenAIUpstreamResponseForAccount(context.Background(), account, http.StatusNotFound, "model not found", body))
+}
+
+func TestOpenAIThinkingSignatureInvalid_DoesNotFailoverOrCooldown(t *testing.T) {
+	body := []byte(`{"error":{"code":"thinking_signature_invalid","message":"thinking signature invalid"}}`)
+	account := &Account{ID: 105, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	svc := &OpenAIGatewayService{}
+
+	require.True(t, isOpenAIThinkingSignatureInvalidError(body, ""))
+	require.False(t, svc.shouldFailoverOpenAIUpstreamResponseForAccount(context.Background(), account, http.StatusInternalServerError, "thinking signature invalid", body))
+	require.False(t, svc.handleOpenAIAccountUpstreamError(context.Background(), account, http.StatusInternalServerError, http.Header{}, body))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 
 func TestOpenAIRuntimeBlock_DoesNotShortenExistingBlock(t *testing.T) {

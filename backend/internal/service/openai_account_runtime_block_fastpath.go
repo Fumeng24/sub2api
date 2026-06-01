@@ -52,6 +52,9 @@ func (s *OpenAIGatewayService) usesOpenAIAdvancedSchedulerPolicy(ctx context.Con
 }
 
 func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponseForAccount(ctx context.Context, account *Account, statusCode int, upstreamMsg string, upstreamBody []byte) bool {
+	if statusCode >= 400 && isOpenAIThinkingSignatureInvalidError(upstreamBody, upstreamMsg) {
+		return false
+	}
 	if s.shouldFailoverOpenAIUpstreamResponse(statusCode, upstreamMsg, upstreamBody) {
 		return true
 	}
@@ -62,6 +65,9 @@ func (s *OpenAIGatewayService) retryableOnSameOpenAIAccount(ctx context.Context,
 	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
 		return false
 	}
+	if statusCode == http.StatusTooManyRequests {
+		return false
+	}
 	return account.IsPoolMode() &&
 		(account.IsPoolModeRetryableStatus(statusCode) || isOpenAITransientProcessingError(statusCode, upstreamMsg, upstreamBody))
 }
@@ -70,10 +76,17 @@ func (s *OpenAIGatewayService) retryableOnSameOpenAIAccountStatus(ctx context.Co
 	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
 		return false
 	}
+	if statusCode == http.StatusTooManyRequests {
+		return false
+	}
 	return account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode)
 }
 
 func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte, requestedModel ...string) bool {
+	if statusCode >= 400 && isOpenAIThinkingSignatureInvalidError(responseBody, extractUpstreamErrorMessage(responseBody)) {
+		return false
+	}
+
 	stateCtx, cancel := openAIAccountStateContext(ctx)
 	defer cancel()
 

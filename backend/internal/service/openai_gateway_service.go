@@ -3868,6 +3868,11 @@ func isOpenAIThinkingSignatureInvalidError(payload []byte, message string) bool 
 				parts = append(parts, value)
 			}
 		}
+		raw := string(payload)
+		if len(raw) > 4096 {
+			raw = raw[:4096]
+		}
+		parts = append(parts, raw)
 	}
 	combined := strings.ToLower(strings.TrimSpace(strings.Join(parts, " ")))
 	if combined == "" {
