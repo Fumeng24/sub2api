@@ -5147,6 +5147,11 @@ export default {
           scheduler_circuit_open: '调度熔断',
           scheduler_half_open: '调度探测',
           scheduler_half_open_in_flight: '调度探测中',
+          openai_transient_5xx: '上游 5xx',
+          openai_stream_error: '流式中断',
+          openai_request_error: '请求连接错误',
+          openai_temp_unschedulable: '临时摘除',
+          network_or_stream_interruption: '网络/流中断',
           concurrency_full: '并发满',
           unavailable: '不可用'
         }

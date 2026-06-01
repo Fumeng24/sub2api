@@ -69,10 +69,11 @@ type OpsOpenAISchedulerAccountStatus struct {
 	WaitingCount       int `json:"waiting_count"`
 	LoadRate           int `json:"load_rate"`
 
-	RuntimeCircuitUntil        *time.Time `json:"runtime_circuit_until,omitempty"`
-	RuntimeCircuitRemainingSec *int64     `json:"runtime_circuit_remaining_sec,omitempty"`
-	TempUnschedulableUntil     *time.Time `json:"temp_unschedulable_until,omitempty"`
-	TempUnschedulableReason    string     `json:"temp_unschedulable_reason,omitempty"`
+	RuntimeCircuitUntil         *time.Time `json:"runtime_circuit_until,omitempty"`
+	RuntimeCircuitRemainingSec  *int64     `json:"runtime_circuit_remaining_sec,omitempty"`
+	TempUnschedulableUntil      *time.Time `json:"temp_unschedulable_until,omitempty"`
+	TempUnschedulableReason     string     `json:"temp_unschedulable_reason,omitempty"`
+	TempUnschedulableStatusCode *int       `json:"temp_unschedulable_status_code,omitempty"`
 
 	SchedulerHealthScore       float64 `json:"scheduler_health_score"`
 	SchedulerErrorRate         float64 `json:"scheduler_error_rate"`
@@ -235,7 +236,9 @@ func (s *OpsService) openAISchedulerAccountStatus(ctx context.Context, account *
 	if account.TempUnschedulableUntil != nil && now.Before(account.TempUnschedulableUntil.UTC()) {
 		t := account.TempUnschedulableUntil.UTC()
 		item.TempUnschedulableUntil = &t
-		item.TempUnschedulableReason = truncateString(account.TempUnschedulableReason, 512)
+		details := TempUnschedulableReasonDetailsFromRaw(account.TempUnschedulableReason)
+		item.TempUnschedulableReason = details.DisplayReason
+		item.TempUnschedulableStatusCode = details.StatusCode
 	}
 	item.IsAvailable = item.ModelSupported &&
 		item.EndpointSupported &&

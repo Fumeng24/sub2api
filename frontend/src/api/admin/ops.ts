@@ -463,6 +463,7 @@ export interface OpenAISchedulerAccountStatus {
   runtime_circuit_remaining_sec?: number
   temp_unschedulable_until?: string
   temp_unschedulable_reason?: string
+  temp_unschedulable_status_code?: number
   scheduler_health_score: number
   scheduler_error_rate: number
   scheduler_ttft_ms?: number

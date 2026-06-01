@@ -72,7 +72,7 @@
               {{ t('admin.accounts.tempUnschedulable.errorCode') }}
             </p>
             <p class="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-              {{ state?.status_code || '-' }}
+              {{ statusCodeText }}
             </p>
           </div>
           <div class="rounded-lg border border-gray-200 p-3 dark:border-dark-600">
@@ -80,7 +80,7 @@
               {{ t('admin.accounts.tempUnschedulable.matchedKeyword') }}
             </p>
             <p class="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-              {{ state?.matched_keyword || '-' }}
+              {{ matchedKeywordText }}
             </p>
           </div>
           <div class="rounded-lg border border-gray-200 p-3 dark:border-dark-600">
@@ -170,6 +170,14 @@ const status = ref<TempUnschedulableStatus | null>(null)
 
 const state = computed(() => status.value?.state || null)
 
+const translateTempUnschedReason = (reason?: string | null): string => {
+  const value = (reason || '').trim()
+  if (!value) return ''
+  const key = `admin.ops.openAIScheduler.reason.${value}`
+  const translated = t(key)
+  return translated === key ? value : translated
+}
+
 const isActive = computed(() => {
   if (!status.value?.active || !state.value) return false
   return state.value.until_unix * 1000 > Date.now()
@@ -207,6 +215,16 @@ const remainingText = computed(() => {
   }
   return t('admin.accounts.tempUnschedulable.remainingHoursMinutes', { hours, minutes: rest })
 })
+
+const statusCodeText = computed(() => {
+  if (!state.value) return '-'
+  if (state.value.status_code === 0) {
+    return translateTempUnschedReason('network_or_stream_interruption')
+  }
+  return String(state.value.status_code || '-')
+})
+
+const matchedKeywordText = computed(() => translateTempUnschedReason(state.value?.matched_keyword) || '-')
 
 const loadStatus = async () => {
   if (!props.account) return

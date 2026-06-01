@@ -54,7 +54,22 @@ function accountBadgeClass(row: OpenAISchedulerAccountStatus): string {
 function accountBadgeText(row: OpenAISchedulerAccountStatus): string {
   if (row.is_available) return t('admin.ops.openAIScheduler.available')
   if (row.runtime_circuit_remaining_sec) return formatDuration(row.runtime_circuit_remaining_sec)
-  return t(`admin.ops.openAIScheduler.reason.${row.block_reason || 'unavailable'}`)
+  return translateSchedulerReason(row.block_reason || 'unavailable')
+}
+
+function translateSchedulerReason(reason?: string): string {
+  const value = (reason || '').trim()
+  if (!value) return ''
+  const key = `admin.ops.openAIScheduler.reason.${value}`
+  const translated = t(key)
+  return translated === key ? value : translated
+}
+
+function accountDetailText(row: OpenAISchedulerAccountStatus): string {
+  if (row.temp_unschedulable_reason) return translateSchedulerReason(row.temp_unschedulable_reason)
+  if (row.temp_unschedulable_status_code === 0) return translateSchedulerReason('network_or_stream_interruption')
+  if (row.scheduler_last_failure_reason) return translateSchedulerReason(row.scheduler_last_failure_reason)
+  return ''
 }
 
 async function loadData() {
@@ -184,7 +199,7 @@ watch([model, endpoint], () => loadData())
             </div>
             <div class="flex flex-wrap items-center gap-2 text-[10px]">
               <span :class="['rounded px-1.5 py-0.5 font-semibold', accountBadgeClass(row)]">{{ accountBadgeText(row) }}</span>
-              <span v-if="row.scheduler_last_failure_reason" class="truncate text-gray-500 dark:text-gray-400" :title="row.scheduler_last_failure_reason">{{ row.scheduler_last_failure_reason }}</span>
+              <span v-if="accountDetailText(row)" class="truncate text-gray-500 dark:text-gray-400" :title="accountDetailText(row)">{{ accountDetailText(row) }}</span>
             </div>
             <div class="min-w-0">
               <div class="mb-1 flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">

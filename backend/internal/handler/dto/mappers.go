@@ -201,37 +201,47 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		return nil
 	}
 	redactedCreds, credsStatus := RedactCredentials(a.Credentials)
+	var tempUnschedulableUntil *time.Time
+	var tempUnschedulableReason string
+	var tempUnschedulableStatusCode *int
+	if a.TempUnschedulableUntil != nil && time.Now().Before(*a.TempUnschedulableUntil) {
+		tempUnschedulableUntil = a.TempUnschedulableUntil
+		details := service.TempUnschedulableReasonDetailsFromRaw(a.TempUnschedulableReason)
+		tempUnschedulableReason = details.DisplayReason
+		tempUnschedulableStatusCode = details.StatusCode
+	}
 	out := &Account{
-		ID:                      a.ID,
-		Name:                    a.Name,
-		Notes:                   a.Notes,
-		Platform:                a.Platform,
-		Type:                    a.Type,
-		Credentials:             redactedCreds,
-		CredentialsStatus:       credsStatus,
-		Extra:                   a.Extra,
-		ProxyID:                 a.ProxyID,
-		Concurrency:             a.Concurrency,
-		LoadFactor:              a.LoadFactor,
-		Priority:                a.Priority,
-		RateMultiplier:          a.BillingRateMultiplier(),
-		Status:                  a.Status,
-		ErrorMessage:            a.ErrorMessage,
-		LastUsedAt:              a.LastUsedAt,
-		ExpiresAt:               timeToUnixSeconds(a.ExpiresAt),
-		AutoPauseOnExpired:      a.AutoPauseOnExpired,
-		CreatedAt:               a.CreatedAt,
-		UpdatedAt:               a.UpdatedAt,
-		Schedulable:             a.Schedulable,
-		RateLimitedAt:           a.RateLimitedAt,
-		RateLimitResetAt:        a.RateLimitResetAt,
-		OverloadUntil:           a.OverloadUntil,
-		TempUnschedulableUntil:  a.TempUnschedulableUntil,
-		TempUnschedulableReason: a.TempUnschedulableReason,
-		SessionWindowStart:      a.SessionWindowStart,
-		SessionWindowEnd:        a.SessionWindowEnd,
-		SessionWindowStatus:     a.SessionWindowStatus,
-		GroupIDs:                a.GroupIDs,
+		ID:                          a.ID,
+		Name:                        a.Name,
+		Notes:                       a.Notes,
+		Platform:                    a.Platform,
+		Type:                        a.Type,
+		Credentials:                 redactedCreds,
+		CredentialsStatus:           credsStatus,
+		Extra:                       a.Extra,
+		ProxyID:                     a.ProxyID,
+		Concurrency:                 a.Concurrency,
+		LoadFactor:                  a.LoadFactor,
+		Priority:                    a.Priority,
+		RateMultiplier:              a.BillingRateMultiplier(),
+		Status:                      a.Status,
+		ErrorMessage:                a.ErrorMessage,
+		LastUsedAt:                  a.LastUsedAt,
+		ExpiresAt:                   timeToUnixSeconds(a.ExpiresAt),
+		AutoPauseOnExpired:          a.AutoPauseOnExpired,
+		CreatedAt:                   a.CreatedAt,
+		UpdatedAt:                   a.UpdatedAt,
+		Schedulable:                 a.Schedulable,
+		RateLimitedAt:               a.RateLimitedAt,
+		RateLimitResetAt:            a.RateLimitResetAt,
+		OverloadUntil:               a.OverloadUntil,
+		TempUnschedulableUntil:      tempUnschedulableUntil,
+		TempUnschedulableReason:     tempUnschedulableReason,
+		TempUnschedulableStatusCode: tempUnschedulableStatusCode,
+		SessionWindowStart:          a.SessionWindowStart,
+		SessionWindowEnd:            a.SessionWindowEnd,
+		SessionWindowStatus:         a.SessionWindowStatus,
+		GroupIDs:                    a.GroupIDs,
 	}
 
 	// 提取 5h 窗口费用控制和会话数量控制配置（仅 Anthropic OAuth/SetupToken 账号有效）

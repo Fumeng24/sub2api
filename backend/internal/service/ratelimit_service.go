@@ -1593,9 +1593,16 @@ func (s *RateLimitService) GetTempUnschedStatus(ctx context.Context, accountID i
 			if parsed.UntilUnix == 0 {
 				parsed.UntilUnix = state.UntilUnix
 			}
+			details := TempUnschedulableReasonDetailsFromRaw(account.TempUnschedulableReason)
+			if parsed.MatchedKeyword == "" {
+				parsed.MatchedKeyword = details.DisplayReason
+			}
+			if details.StatusCode != nil {
+				parsed.StatusCode = *details.StatusCode
+			}
 			state = &parsed
 		} else {
-			state.ErrorMessage = account.TempUnschedulableReason
+			state.ErrorMessage = TempUnschedulableDisplayReasonFromRaw(account.TempUnschedulableReason)
 		}
 	}
 

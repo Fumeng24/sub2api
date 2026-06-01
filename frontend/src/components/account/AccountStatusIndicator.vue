@@ -171,6 +171,14 @@ const emit = defineEmits<{
   (e: 'show-temp-unsched', account: Account): void
 }>()
 
+const translateTempUnschedReason = (reason?: string | null): string => {
+  const value = (reason || '').trim()
+  if (!value) return ''
+  const key = `admin.ops.openAIScheduler.reason.${value}`
+  const translated = t(key)
+  return translated === key ? value : translated
+}
+
 // Computed: is rate limited (429)
 const isRateLimited = computed(() => {
   if (!props.account.rate_limit_reset_at) return false
@@ -371,8 +379,11 @@ const schedulingTitle = computed(() => {
   }
   if (props.account.temp_unschedulable_until && new Date(props.account.temp_unschedulable_until) > new Date()) {
     lines.push(t('admin.accounts.status.nextAvailableAt', { time: formatDateTime(props.account.temp_unschedulable_until) }))
-    if (props.account.temp_unschedulable_reason) {
-      lines.push(t('admin.accounts.status.schedulingReason', { reason: props.account.temp_unschedulable_reason }))
+    const tempReason = translateTempUnschedReason(props.account.temp_unschedulable_reason)
+    if (tempReason) {
+      lines.push(t('admin.accounts.status.schedulingReason', { reason: tempReason }))
+    } else if (props.account.temp_unschedulable_status_code === 0) {
+      lines.push(t('admin.accounts.status.schedulingReason', { reason: translateTempUnschedReason('network_or_stream_interruption') }))
     }
   }
   if (props.account.error_message) {

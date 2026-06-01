@@ -4992,6 +4992,11 @@ export default {
           scheduler_circuit_open: 'Scheduler circuit',
           scheduler_half_open: 'Scheduler probe',
           scheduler_half_open_in_flight: 'Scheduler probe',
+          openai_transient_5xx: 'Upstream 5xx',
+          openai_stream_error: 'Stream interrupted',
+          openai_request_error: 'Request connection error',
+          openai_temp_unschedulable: 'Temporarily skipped',
+          network_or_stream_interruption: 'Network/stream interrupted',
           concurrency_full: 'Concurrency full',
           unavailable: 'Unavailable'
         }
