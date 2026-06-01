@@ -59,6 +59,44 @@ type OpenAIAccountScheduleDecision struct {
 	LoadSkew            float64
 	SelectedAccountID   int64
 	SelectedAccountType string
+	Diagnostics         OpenAIAccountSelectionDiagnostics
+}
+
+type OpenAIAccountSelectionDiagnostics struct {
+	Collected                         bool
+	GroupID                           int64
+	Model                             string
+	Endpoint                          string
+	RequireCompact                    bool
+	CompactStrictSupportedOnly        bool
+	RequiredTransport                 string
+	RequiredCapability                string
+	RequiredImageCapability           string
+	GroupBindingAccountCount          int
+	ExcludedAccountCount              int
+	AfterExcludedCount                int
+	ModelSupportedCount               int
+	EndpointSupportedCount            int
+	CompactSupportedCount             int
+	StateAllowedCount                 int
+	CircuitAllowedCount               int
+	ConcurrencySlotAllowedCount       int
+	FinalCandidateCount               int
+	StateFilteredCount                int
+	CircuitFilteredCount              int
+	ConcurrencySlotFilteredCount      int
+	HalfOpenFilteredCount             int
+	CompactUnsupportedCount           int
+	ExcludedAccountIDs                []int64
+	CandidateAccountIDs               []int64
+	ModelUnsupportedAccountIDs        []int64
+	EndpointUnsupportedAccountIDs     []int64
+	CompactUnsupportedAccountIDs      []int64
+	StateFilteredAccountIDs           []int64
+	CircuitFilteredAccountIDs         []int64
+	ConcurrencySlotFilteredAccountIDs []int64
+	HalfOpenFilteredAccountIDs        []int64
+	FilterReasonCounts                map[string]int
 }
 
 type OpenAIAccountSchedulerMetricsSnapshot struct {
@@ -101,6 +139,15 @@ type openAIAccountLoadPlan struct {
 	candidateCount            int
 	topK                      int
 	loadSkew                  float64
+}
+
+type openAIForcedCircuitProbeCandidate struct {
+	account       *Account
+	cooldownUntil time.Time
+	reason        string
+	sortOrder     int
+	groupOrder    bool
+	groupPrio     int
 }
 
 func (m *openAIAccountSchedulerMetrics) recordSelect(decision OpenAIAccountScheduleDecision) {
@@ -256,6 +303,18 @@ func (s *defaultOpenAIAccountScheduler) Select(
 	req OpenAIAccountScheduleRequest,
 ) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
 	decision := OpenAIAccountScheduleDecision{}
+	var schedGroupForDiagnostics *Group
+	attachDiagnostics := func() {
+		if decision.Diagnostics.Collected || s == nil || s.service == nil {
+			return
+		}
+		diagCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), openAIAdvancedSchedulerSettingDBTimeout)
+		defer cancel()
+		if schedGroupForDiagnostics == nil {
+			schedGroupForDiagnostics = s.service.openAISchedulerGroupForFallback(diagCtx, req.GroupID)
+		}
+		decision.Diagnostics = s.buildOpenAISelectionDiagnostics(diagCtx, req, schedGroupForDiagnostics)
+	}
 	start := time.Now()
 	defer func() {
 		decision.LatencyMs = time.Since(start).Milliseconds()
@@ -275,6 +334,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 			schedulerEndpointFromOpenAIRequest(req),
 		)
 		if err != nil {
+			attachDiagnostics()
 			return nil, decision, err
 		}
 		if selection != nil && selection.Account != nil {
@@ -299,6 +359,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 
 	selection, err := s.selectBySessionHash(ctx, req)
 	if err != nil {
+		attachDiagnostics()
 		return nil, decision, err
 	}
 	if selection != nil && selection.Account != nil {
@@ -315,6 +376,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 	decision.TopK = topK
 	decision.LoadSkew = loadSkew
 	if err != nil {
+		attachDiagnostics()
 		return nil, decision, err
 	}
 	if selection != nil && selection.Account != nil {
@@ -366,7 +428,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 		_ = s.service.deleteStickySessionAccountID(ctx, req.GroupID, sessionHash)
 		return nil, nil
 	}
-	account = s.service.recheckSelectedOpenAIAccountFromDB(ctx, account, req.RequestedModel, req.RequireCompact, req.RequiredCapability)
+	account = s.service.recheckSelectedOpenAIAccountFromDBForSelection(ctx, account, req.RequestedModel, req.RequireCompact, req.ExcludedIDs, req.RequiredCapability)
 	if account == nil || !s.isAccountTransportCompatible(account, req.RequiredTransport) {
 		_ = s.service.deleteStickySessionAccountID(ctx, req.GroupID, sessionHash)
 		return nil, nil
@@ -539,6 +601,247 @@ func schedulerEndpointFromOpenAIContext(ctx context.Context, requireCompact bool
 	return schedulerEndpointFromContext(ctx, fallback)
 }
 
+func openAICompactStrictSupportedOnly(req OpenAIAccountScheduleRequest) bool {
+	return openAICompactStrictSupportedOnlyForSelection(req.RequireCompact, req.ExcludedIDs)
+}
+
+func openAICompactStrictSupportedOnlyForSelection(requireCompact bool, excludedIDs map[int64]struct{}) bool {
+	return requireCompact && len(excludedIDs) > 0
+}
+
+func openAICompactAccountAllowed(requireCompact bool, strictSupportedOnly bool, account *Account) bool {
+	if !requireCompact {
+		return true
+	}
+	tier := openAICompactSupportTier(account)
+	if strictSupportedOnly {
+		return tier == 2
+	}
+	return tier > 0
+}
+
+func openAICompactAccountAllowedForRequest(req OpenAIAccountScheduleRequest, account *Account) bool {
+	return openAICompactAccountAllowed(req.RequireCompact, openAICompactStrictSupportedOnly(req), account)
+}
+
+func openAICompactAccountAllowedForSelection(requireCompact bool, excludedIDs map[int64]struct{}, account *Account) bool {
+	return openAICompactAccountAllowed(requireCompact, openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), account)
+}
+
+func openAIAccountIDsFromMap(ids map[int64]struct{}) []int64 {
+	if len(ids) == 0 {
+		return nil
+	}
+	out := make([]int64, 0, len(ids))
+	for id := range ids {
+		out = append(out, id)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+func appendOpenAIAccountID(ids []int64, account *Account) []int64 {
+	if account == nil || account.ID <= 0 {
+		return ids
+	}
+	return append(ids, account.ID)
+}
+
+func openAIAccountStatusFilterReason(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest, schedGroup *Group) string {
+	if account == nil {
+		return "nil_account"
+	}
+	if !account.IsOpenAI() {
+		return "not_openai"
+	}
+	if !account.IsActive() {
+		return "inactive"
+	}
+	if !account.Schedulable {
+		return "manual_unschedulable"
+	}
+	now := time.Now()
+	if account.AutoPauseOnExpired && account.ExpiresAt != nil && !now.Before(*account.ExpiresAt) {
+		return "expired"
+	}
+	if account.OverloadUntil != nil && now.Before(*account.OverloadUntil) {
+		return "overloaded"
+	}
+	if account.RateLimitResetAt != nil && now.Before(*account.RateLimitResetAt) {
+		return "rate_limited"
+	}
+	if account.TempUnschedulableUntil != nil && now.Before(*account.TempUnschedulableUntil) {
+		return "temp_unschedulable"
+	}
+	if account.IsAPIKeyOrBedrock() && account.IsQuotaExceeded() {
+		return "quota_exceeded"
+	}
+	if account.GetRateLimitRemainingTimeWithContext(ctx, req.RequestedModel) > 0 {
+		return "model_rate_limited"
+	}
+	if schedGroup != nil && schedGroup.RequirePrivacySet && !account.IsPrivacySet() {
+		return "privacy_not_set"
+	}
+	return ""
+}
+
+func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterReason(account *Account, req OpenAIAccountScheduleRequest, endpoint string) string {
+	if s == nil || s.service == nil || account == nil {
+		return ""
+	}
+	now := time.Now()
+	if until, ok := s.service.openAIAccountRuntimeBlockUntil(account.ID); ok && until.After(now) {
+		return "runtime_circuit_open"
+	}
+	if s.service.isOpenAIAccountCircuitHalfOpenInFlight(account.ID, now) {
+		return "runtime_half_open_in_flight"
+	}
+	if s.service.schedulerHealth != nil {
+		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, false)
+		switch snap.CircuitState {
+		case schedulerCircuitOpen:
+			if snap.CooldownUntil.IsZero() || snap.CooldownUntil.After(now) {
+				return "scheduler_circuit_open"
+			}
+		case schedulerCircuitHalfOpen:
+			return "scheduler_half_open_in_flight"
+		}
+	}
+	return ""
+}
+
+func (d *OpenAIAccountSelectionDiagnostics) addReason(reason string) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return
+	}
+	if d.FilterReasonCounts == nil {
+		d.FilterReasonCounts = make(map[string]int)
+	}
+	d.FilterReasonCounts[reason]++
+}
+
+func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
+	ctx context.Context,
+	req OpenAIAccountScheduleRequest,
+	schedGroup *Group,
+) OpenAIAccountSelectionDiagnostics {
+	diag := OpenAIAccountSelectionDiagnostics{
+		Collected:                  true,
+		GroupID:                    derefGroupID(req.GroupID),
+		Model:                      req.RequestedModel,
+		Endpoint:                   schedulerEndpointFromOpenAIRequest(req),
+		RequireCompact:             req.RequireCompact,
+		CompactStrictSupportedOnly: openAICompactStrictSupportedOnly(req),
+		RequiredTransport:          string(req.RequiredTransport),
+		RequiredCapability:         string(req.RequiredCapability),
+		RequiredImageCapability:    string(req.RequiredImageCapability),
+		ExcludedAccountCount:       len(req.ExcludedIDs),
+		ExcludedAccountIDs:         openAIAccountIDsFromMap(req.ExcludedIDs),
+		FilterReasonCounts:         make(map[string]int),
+	}
+	if s == nil || s.service == nil {
+		diag.Collected = false
+		return diag
+	}
+	accounts, err := s.service.listOpenAICooldownFallbackAccounts(ctx, req.GroupID)
+	if err != nil {
+		diag.addReason("diagnostics_account_list_failed")
+		return diag
+	}
+
+	diag.GroupBindingAccountCount = len(accounts)
+	circuitAllowed := make([]*Account, 0, len(accounts))
+	for _, account := range accounts {
+		if account == nil {
+			diag.addReason("nil_account")
+			continue
+		}
+		if req.ExcludedIDs != nil {
+			if _, excluded := req.ExcludedIDs[account.ID]; excluded {
+				diag.addReason("excluded")
+				continue
+			}
+		}
+		diag.AfterExcludedCount++
+
+		if req.RequestedModel != "" && !account.IsModelSupported(req.RequestedModel) {
+			diag.ModelUnsupportedAccountIDs = appendOpenAIAccountID(diag.ModelUnsupportedAccountIDs, account)
+			diag.addReason("model_unsupported")
+			continue
+		}
+		diag.ModelSupportedCount++
+
+		if !accountSupportsOpenAICapabilities(account, req.RequiredCapability, req.RequiredImageCapability) ||
+			!s.isAccountTransportCompatible(account, req.RequiredTransport) {
+			diag.EndpointUnsupportedAccountIDs = appendOpenAIAccountID(diag.EndpointUnsupportedAccountIDs, account)
+			diag.addReason("endpoint_unsupported")
+			continue
+		}
+		diag.EndpointSupportedCount++
+
+		if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, account) {
+			diag.CompactUnsupportedCount++
+			diag.CompactUnsupportedAccountIDs = appendOpenAIAccountID(diag.CompactUnsupportedAccountIDs, account)
+			if openAICompactStrictSupportedOnly(req) {
+				diag.addReason("compact_not_explicitly_supported")
+			} else {
+				diag.addReason("compact_unsupported")
+			}
+			continue
+		}
+		diag.CompactSupportedCount++
+
+		if reason := openAIAccountStatusFilterReason(ctx, account, req, schedGroup); reason != "" {
+			diag.StateFilteredCount++
+			diag.StateFilteredAccountIDs = appendOpenAIAccountID(diag.StateFilteredAccountIDs, account)
+			diag.addReason(reason)
+			continue
+		}
+		diag.StateAllowedCount++
+
+		if reason := s.openAIAccountCircuitFilterReason(account, req, diag.Endpoint); reason != "" {
+			diag.CircuitFilteredCount++
+			diag.CircuitFilteredAccountIDs = appendOpenAIAccountID(diag.CircuitFilteredAccountIDs, account)
+			if strings.Contains(reason, "half_open") {
+				diag.HalfOpenFilteredCount++
+				diag.HalfOpenFilteredAccountIDs = appendOpenAIAccountID(diag.HalfOpenFilteredAccountIDs, account)
+			}
+			diag.addReason(reason)
+			continue
+		}
+		diag.CircuitAllowedCount++
+		circuitAllowed = append(circuitAllowed, account)
+	}
+
+	loadMap := map[int64]*AccountLoadInfo{}
+	if s.service.concurrencyService != nil && len(circuitAllowed) > 0 {
+		loadReq := make([]AccountWithConcurrency, 0, len(circuitAllowed))
+		for _, account := range circuitAllowed {
+			loadReq = append(loadReq, AccountWithConcurrency{
+				ID:             account.ID,
+				MaxConcurrency: account.EffectiveLoadFactor(),
+			})
+		}
+		if batchLoad, loadErr := s.service.concurrencyService.GetAccountsLoadBatch(ctx, loadReq); loadErr == nil {
+			loadMap = batchLoad
+		}
+	}
+	for _, account := range circuitAllowed {
+		loadInfo := loadMap[account.ID]
+		if loadInfo != nil && loadInfo.LoadRate >= 100 {
+			diag.ConcurrencySlotFilteredCount++
+			diag.ConcurrencySlotFilteredAccountIDs = appendOpenAIAccountID(diag.ConcurrencySlotFilteredAccountIDs, account)
+			diag.addReason("concurrency_full")
+			continue
+		}
+		diag.ConcurrencySlotAllowedCount++
+		diag.CandidateAccountIDs = appendOpenAIAccountID(diag.CandidateAccountIDs, account)
+	}
+	diag.FinalCandidateCount = len(diag.CandidateAccountIDs)
+	return diag
+}
+
 func openAIAccountCandidateFromSchedulerScore(score schedulerAccountScore) openAIAccountCandidateScore {
 	return openAIAccountCandidateScore{
 		account:    score.Account,
@@ -595,7 +898,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	if req.RequireCompact {
 		candidates = make([]openAIAccountCandidateScore, 0, len(allCandidates))
 		for _, candidate := range allCandidates {
-			if openAICompactSupportTier(candidate.account) == 0 {
+			if !openAICompactAccountAllowedForRequest(req, candidate.account) {
 				staleSnapshotCompactRetry = append(staleSnapshotCompactRetry, candidate)
 				continue
 			}
@@ -751,18 +1054,18 @@ func (s *defaultOpenAIAccountScheduler) trySelectOpenAICooldownFallback(
 
 	cfg := s.service.schedulingConfig()
 	for _, candidate := range order {
-		fresh := s.service.resolveFreshOpenAIAccountIgnoringCooldown(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
+		fresh := s.service.resolveFreshOpenAIAccountIgnoringCooldownForSelection(ctx, candidate.account, req.RequestedModel, false, nil, req.RequiredCapability)
 		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatibleIgnoringCooldown(ctx, fresh, req) {
 			continue
 		}
-		fresh = s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldown(ctx, fresh, req.RequestedModel, false, req.RequiredCapability)
+		fresh = s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldownForSelection(ctx, fresh, req.RequestedModel, false, nil, req.RequiredCapability)
 		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatibleIgnoringCooldown(ctx, fresh, req) {
 			continue
 		}
 		if s.service.isOpenAIAccountRuntimeBlocked(fresh) {
 			continue
 		}
-		if req.RequireCompact && openAICompactSupportTier(fresh) == 0 {
+		if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, fresh) {
 			compactBlocked = true
 			continue
 		}
@@ -778,6 +1081,190 @@ func (s *defaultOpenAIAccountScheduler) trySelectOpenAICooldownFallback(
 	}
 
 	return nil, count, compactBlocked, nil
+}
+
+func (s *defaultOpenAIAccountScheduler) forcedCircuitProbeReason(
+	account *Account,
+	req OpenAIAccountScheduleRequest,
+	endpoint string,
+	now time.Time,
+) (time.Time, string, bool) {
+	if s == nil || s.service == nil || account == nil {
+		return time.Time{}, "", false
+	}
+	if until, ok := s.service.openAIAccountRuntimeBlockUntil(account.ID); ok && until.After(now) {
+		return until, "runtime_circuit_open", true
+	}
+	if s.service.schedulerHealth != nil {
+		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, false)
+		if snap.CircuitState == schedulerCircuitOpen && snap.CooldownUntil.After(now) {
+			return snap.CooldownUntil, "scheduler_circuit_open", true
+		}
+	}
+	return time.Time{}, "", false
+}
+
+func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAIForcedCircuitProbe(
+	ctx context.Context,
+	account *Account,
+	reason string,
+) (*AcquireResult, error) {
+	if s == nil || s.service == nil || account == nil {
+		return nil, nil
+	}
+	var result *AcquireResult
+	var err error
+	if s.service.concurrencyService == nil {
+		result = &AcquireResult{Acquired: true, ReleaseFunc: func() {}}
+	} else {
+		result, err = s.service.concurrencyService.AcquireAccountSlot(ctx, account.ID, account.Concurrency)
+	}
+	if err != nil || result == nil || !result.Acquired {
+		return result, err
+	}
+	if !s.service.tryForceOpenAIAccountCircuitProbeByID(account.ID, reason) {
+		if result.ReleaseFunc != nil {
+			result.ReleaseFunc()
+		}
+		return nil, nil
+	}
+	return result, nil
+}
+
+func (s *defaultOpenAIAccountScheduler) trySelectOpenAIForcedCircuitProbe(
+	ctx context.Context,
+	req OpenAIAccountScheduleRequest,
+	schedGroup *Group,
+) (*AccountSelectionResult, int, error) {
+	if s == nil || s.service == nil {
+		return nil, 0, nil
+	}
+	if len(req.ExcludedIDs) > 0 {
+		return nil, 0, nil
+	}
+	if req.RequireCompact && openAICompactStrictSupportedOnly(req) {
+		return nil, 0, nil
+	}
+	accounts, err := s.service.listOpenAICooldownFallbackAccounts(ctx, req.GroupID)
+	if err != nil || len(accounts) == 0 {
+		return nil, 0, err
+	}
+	endpoint := schedulerEndpointFromOpenAIRequest(req)
+	now := time.Now()
+	candidates := make([]openAIForcedCircuitProbeCandidate, 0, len(accounts))
+	for _, account := range accounts {
+		if account == nil {
+			continue
+		}
+		if req.ExcludedIDs != nil {
+			if _, excluded := req.ExcludedIDs[account.ID]; excluded {
+				continue
+			}
+		}
+		if schedGroup != nil && schedGroup.RequirePrivacySet && !account.IsPrivacySet() {
+			continue
+		}
+		if !account.IsOpenAI() || account.Status != StatusActive || !account.Schedulable {
+			continue
+		}
+		if account.AutoPauseOnExpired && account.ExpiresAt != nil && !now.Before(*account.ExpiresAt) {
+			continue
+		}
+		if account.IsAPIKeyOrBedrock() && account.IsQuotaExceeded() {
+			continue
+		}
+		if account.RateLimitResetAt != nil && now.Before(*account.RateLimitResetAt) {
+			continue
+		}
+		if account.OverloadUntil != nil && now.Before(*account.OverloadUntil) {
+			continue
+		}
+		if account.GetRateLimitRemainingTimeWithContext(ctx, req.RequestedModel) > 0 {
+			continue
+		}
+		if req.RequestedModel != "" && !account.IsModelSupported(req.RequestedModel) {
+			continue
+		}
+		if !accountSupportsOpenAICapabilities(account, req.RequiredCapability, req.RequiredImageCapability) {
+			continue
+		}
+		if !s.isAccountTransportCompatible(account, req.RequiredTransport) {
+			continue
+		}
+		if req.GroupID != nil && s.service.needsUpstreamChannelRestrictionCheck(ctx, req.GroupID) &&
+			s.service.isUpstreamModelRestrictedByChannel(ctx, *req.GroupID, account, req.RequestedModel, req.RequireCompact) {
+			continue
+		}
+		if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, account) {
+			continue
+		}
+		cooldownUntil, reason, ok := s.forcedCircuitProbeReason(account, req, endpoint, now)
+		if !ok {
+			continue
+		}
+		cfg := accountGroupConfigFor(account, req.GroupID)
+		candidates = append(candidates, openAIForcedCircuitProbeCandidate{
+			account:       account,
+			cooldownUntil: cooldownUntil,
+			reason:        reason,
+			sortOrder:     cfg.SortOrder,
+			groupOrder:    cfg.GroupID > 0,
+			groupPrio:     cfg.Priority,
+		})
+	}
+	if len(candidates) == 0 {
+		return nil, 0, nil
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		left, right := candidates[i], candidates[j]
+		if !left.cooldownUntil.Equal(right.cooldownUntil) {
+			return left.cooldownUntil.Before(right.cooldownUntil)
+		}
+		if left.groupOrder != right.groupOrder {
+			return left.groupOrder
+		}
+		if left.sortOrder != right.sortOrder {
+			return left.sortOrder < right.sortOrder
+		}
+		if left.groupPrio != right.groupPrio {
+			return left.groupPrio < right.groupPrio
+		}
+		return left.account.ID < right.account.ID
+	})
+
+	for _, candidate := range candidates {
+		fresh := s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldownForSelection(ctx, candidate.account, req.RequestedModel, false, nil, req.RequiredCapability)
+		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatibleIgnoringCooldown(ctx, fresh, req) {
+			continue
+		}
+		if fresh.RateLimitResetAt != nil && now.Before(*fresh.RateLimitResetAt) {
+			continue
+		}
+		if fresh.OverloadUntil != nil && now.Before(*fresh.OverloadUntil) {
+			continue
+		}
+		if fresh.GetRateLimitRemainingTimeWithContext(ctx, req.RequestedModel) > 0 {
+			continue
+		}
+		if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, fresh) {
+			continue
+		}
+		result, acquireErr := s.tryAcquireOpenAIForcedCircuitProbe(ctx, fresh, candidate.reason)
+		if acquireErr != nil {
+			return nil, len(candidates), acquireErr
+		}
+		if result != nil && result.Acquired {
+			if req.SessionHash != "" {
+				_ = s.service.BindStickySession(ctx, req.GroupID, req.SessionHash, fresh.ID)
+			}
+			return &AccountSelectionResult{
+				Account:     fresh,
+				Acquired:    true,
+				ReleaseFunc: result.ReleaseFunc,
+			}, len(candidates), nil
+		}
+	}
+	return nil, len(candidates), nil
 }
 
 func (s *defaultOpenAIAccountScheduler) filterOpenAIAccountsForSchedule(
@@ -898,11 +1385,11 @@ func (s *defaultOpenAIAccountScheduler) trySelectOpenAIFreshLoadBalance(
 		waitOrder = activePlan.selectionOrder
 	}
 	for _, candidate := range waitOrder {
-		fresh := s.service.recheckSelectedOpenAIAccountFromDB(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
+		fresh := s.service.recheckSelectedOpenAIAccountFromDBForSelection(ctx, candidate.account, req.RequestedModel, false, nil, req.RequiredCapability)
 		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatible(ctx, fresh, req) {
 			continue
 		}
-		if req.RequireCompact && openAICompactSupportTier(fresh) == 0 {
+		if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, fresh) {
 			compactBlocked = true
 			continue
 		}
@@ -947,7 +1434,7 @@ func (s *defaultOpenAIAccountScheduler) isCooldownFallbackCandidate(ctx context.
 		s.service.isUpstreamModelRestrictedByChannel(ctx, *req.GroupID, account, req.RequestedModel, req.RequireCompact) {
 		return false
 	}
-	if req.RequireCompact && openAICompactSupportTier(account) == 0 {
+	if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, account) {
 		return false
 	}
 	return true
@@ -1003,8 +1490,10 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionOrder(
 		selectionOrder := make([]openAIAccountCandidateScore, 0, len(plan.allCandidates))
 		supported, unknown := splitOpenAICompactCandidates(plan.candidates)
 		selectionOrder = append(selectionOrder, buildSelectionOrder(supported)...)
-		selectionOrder = append(selectionOrder, buildSelectionOrder(unknown)...)
-		if len(plan.staleSnapshotCompactRetry) > 0 && s.service.schedulerSnapshot != nil {
+		if !openAICompactStrictSupportedOnly(req) {
+			selectionOrder = append(selectionOrder, buildSelectionOrder(unknown)...)
+		}
+		if len(plan.staleSnapshotCompactRetry) > 0 && s.service.schedulerSnapshot != nil && !openAICompactStrictSupportedOnly(req) {
 			selectionOrder = append(selectionOrder, sortOpenAICompactRetryCandidates(plan.staleSnapshotCompactRetry)...)
 		}
 		return selectionOrder
@@ -1052,24 +1541,24 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 		compatible := s.isAccountRequestCompatible
 		if allowCooldownFallback {
 			compatible = s.isAccountRequestCompatibleIgnoringCooldown
-			fresh = s.service.resolveFreshOpenAIAccountIgnoringCooldown(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
+			fresh = s.service.resolveFreshOpenAIAccountIgnoringCooldownForSelection(ctx, candidate.account, req.RequestedModel, false, nil, req.RequiredCapability)
 		} else if bypassSnapshot {
-			fresh = s.service.recheckSelectedOpenAIAccountFromDB(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
+			fresh = s.service.recheckSelectedOpenAIAccountFromDBForSelection(ctx, candidate.account, req.RequestedModel, false, nil, req.RequiredCapability)
 		} else {
-			fresh = s.service.resolveFreshSchedulableOpenAIAccount(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
+			fresh = s.service.resolveFreshSchedulableOpenAIAccountForSelection(ctx, candidate.account, req.RequestedModel, false, nil, req.RequiredCapability)
 		}
 		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !compatible(ctx, fresh, req) {
 			continue
 		}
 		if allowCooldownFallback {
-			fresh = s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldown(ctx, fresh, req.RequestedModel, false, req.RequiredCapability)
+			fresh = s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldownForSelection(ctx, fresh, req.RequestedModel, false, nil, req.RequiredCapability)
 		} else {
-			fresh = s.service.recheckSelectedOpenAIAccountFromDB(ctx, fresh, req.RequestedModel, false, req.RequiredCapability)
+			fresh = s.service.recheckSelectedOpenAIAccountFromDBForSelection(ctx, fresh, req.RequestedModel, false, nil, req.RequiredCapability)
 		}
 		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !compatible(ctx, fresh, req) {
 			continue
 		}
-		if req.RequireCompact && openAICompactSupportTier(fresh) == 0 {
+		if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, fresh) {
 			compactBlocked = true
 			continue
 		}
@@ -1128,6 +1617,11 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		} else if fallback != nil {
 			return fallback, fallbackCount, fallbackCount, 0, nil
 		}
+		if probe, probeCount, probeErr := s.trySelectOpenAIForcedCircuitProbe(ctx, req, schedGroup); probeErr != nil {
+			return nil, probeCount, probeCount, 0, probeErr
+		} else if probe != nil {
+			return probe, probeCount, probeCount, 0, nil
+		}
 		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false)
 	}
 
@@ -1154,6 +1648,11 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 			return nil, fallbackCount, fallbackCount, 0, fallbackErr
 		} else if fallback != nil {
 			return fallback, fallbackCount, fallbackCount, 0, nil
+		}
+		if probe, probeCount, probeErr := s.trySelectOpenAIForcedCircuitProbe(ctx, req, schedGroup); probeErr != nil {
+			return nil, probeCount, probeCount, 0, probeErr
+		} else if probe != nil {
+			return probe, probeCount, probeCount, 0, nil
 		}
 		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false)
 	}
@@ -1230,6 +1729,11 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		if freshCompactBlocked {
 			return nil, freshCount, freshTopK, freshSkew, ErrNoAvailableCompactAccounts
 		}
+		if probe, probeCount, probeErr := s.trySelectOpenAIForcedCircuitProbe(ctx, req, schedGroup); probeErr != nil {
+			return nil, probeCount, probeCount, loadSkew, probeErr
+		} else if probe != nil {
+			return probe, probeCount, probeCount, loadSkew, nil
+		}
 		return nil, candidateCount, topK, loadSkew, noAvailableOpenAISelectionError(req.RequestedModel, req.RequireCompact && len(plan.allCandidates) > 0)
 	}
 
@@ -1286,15 +1790,15 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		waitOrder = selectionOrder
 	}
 	for _, candidate := range waitOrder {
-		fresh := s.service.resolveFreshSchedulableOpenAIAccount(ctx, candidate.account, req.RequestedModel, false, req.RequiredCapability)
+		fresh := s.service.resolveFreshSchedulableOpenAIAccountForSelection(ctx, candidate.account, req.RequestedModel, false, nil, req.RequiredCapability)
 		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatible(ctx, fresh, req) {
 			continue
 		}
-		fresh = s.service.recheckSelectedOpenAIAccountFromDB(ctx, fresh, req.RequestedModel, false, req.RequiredCapability)
+		fresh = s.service.recheckSelectedOpenAIAccountFromDBForSelection(ctx, fresh, req.RequestedModel, false, nil, req.RequiredCapability)
 		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatible(ctx, fresh, req) {
 			continue
 		}
-		if req.RequireCompact && openAICompactSupportTier(fresh) == 0 {
+		if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, fresh) {
 			compactBlocked = true
 			continue
 		}
@@ -1317,6 +1821,11 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		compactBlocked = compactBlocked || fallbackCompactBlocked
 	}
 
+	if probe, probeCount, probeErr := s.trySelectOpenAIForcedCircuitProbe(ctx, req, schedGroup); probeErr != nil {
+		return nil, probeCount, probeCount, loadSkew, probeErr
+	} else if probe != nil {
+		return probe, probeCount, probeCount, loadSkew, nil
+	}
 	return nil, candidateCount, topK, loadSkew, noAvailableOpenAISelectionError(req.RequestedModel, compactBlocked)
 }
 

@@ -326,6 +326,29 @@ func (s *OpenAIGatewayService) tryEnterOpenAIAccountCircuitHalfOpenByID(accountI
 	return true
 }
 
+func (s *OpenAIGatewayService) tryForceOpenAIAccountCircuitProbeByID(accountID int64, reason string) bool {
+	if s == nil || accountID <= 0 {
+		return false
+	}
+	now := time.Now()
+	if s.isOpenAIAccountCircuitHalfOpenInFlight(accountID, now) {
+		return false
+	}
+	probeStartedAt := now
+	if _, loaded := s.openaiAccountCircuitHalfOpen.LoadOrStore(accountID, probeStartedAt); loaded {
+		return false
+	}
+	value, _ := s.openaiAccountRuntimeBlockUntil.Load(accountID)
+	cooldownUntil, _ := value.(time.Time)
+	slog.Info("account_circuit_half_open",
+		"account_id", accountID,
+		"previous_until", cooldownUntil,
+		"forced", true,
+		"reason", strings.TrimSpace(reason),
+	)
+	return true
+}
+
 func (s *OpenAIGatewayService) isOpenAIAccountCircuitHalfOpenInFlight(accountID int64, now time.Time) bool {
 	if s == nil || accountID <= 0 {
 		return false

@@ -4092,7 +4092,7 @@ func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
 		}
 		account = latest
 	}
-	if requireCompact && openAICompactSupportTier(account) == 0 {
+	if requireCompact && !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, account) {
 		_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 		return nil, nil
 	}
@@ -4105,7 +4105,7 @@ func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
 	}
 
 	result, acquireErr := s.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
-	if acquireErr == nil && result.Acquired {
+	if acquireErr == nil && result != nil && result.Acquired {
 		logOpenAIWSBindResponseAccountWarn(
 			derefGroupID(groupID),
 			accountID,

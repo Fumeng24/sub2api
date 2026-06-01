@@ -155,10 +155,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		)
 		cancelSchedule()
 		if err != nil {
-			reqLog.Warn("openai.images.account_select_failed",
-				zap.Error(err),
-				zap.Int("excluded_account_count", len(failedAccountIDs)),
-			)
+			reqLog.Warn("openai.images.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 			if len(failedAccountIDs) == 0 {
 				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 				h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available compatible accounts", streamStarted)
