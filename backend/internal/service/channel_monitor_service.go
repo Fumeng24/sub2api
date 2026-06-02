@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -307,11 +308,48 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 		return nil, err
 	}
 	if err := s.resolveRuntimeAPIKeyInPlace(ctx, m); err != nil {
+		results := buildChannelMonitorErrorResults(m, channelMonitorRuntimeKeyErrorKind(err)+": "+err.Error())
+		s.persistCheckResults(ctx, m, results)
 		return nil, err
 	}
 	results := s.runChecksConcurrent(ctx, m)
 	s.persistCheckResults(ctx, m, results)
 	return results, nil
+}
+
+func buildChannelMonitorErrorResults(m *ChannelMonitor, message string) []*CheckResult {
+	if m == nil {
+		return nil
+	}
+	models := append([]string{m.PrimaryModel}, m.ExtraModels...)
+	now := time.Now()
+	results := make([]*CheckResult, 0, len(models))
+	for _, model := range models {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		results = append(results, &CheckResult{
+			Model:     model,
+			Status:    MonitorStatusError,
+			Message:   truncateMessage(sanitizeErrorMessage(message)),
+			CheckedAt: now,
+		})
+	}
+	return results
+}
+
+func channelMonitorRuntimeKeyErrorKind(err error) string {
+	switch {
+	case errors.Is(err, ErrChannelMonitorAPIKeyDecryptFailed):
+		return "decrypt_failed"
+	case errors.Is(err, ErrChannelMonitorMissingAPIKey), errors.Is(err, ErrChannelMonitorInvalidAPIKeyID):
+		return "api_key_missing"
+	case errors.Is(err, ErrAPIKeyNotFound), errors.Is(err, ErrAPIKeyExpired), errors.Is(err, ErrAPIKeyQuotaExhausted):
+		return "linked_api_key_unavailable"
+	default:
+		return "api_key_unavailable"
+	}
 }
 
 // persistCheckResults 写入本次检测的历史记录并更新 last_checked_at。

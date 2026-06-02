@@ -61,6 +61,34 @@ func TestRateLimitService_HandleUpstreamError_OpenAI403FirstHitTempUnschedulable
 	require.True(t, blocker.until[0].After(time.Now()))
 }
 
+func TestRateLimitService_HandleUpstreamError_OpenAI403BypassesCustomErrorCodeSkip(t *testing.T) {
+	repo := &rateLimitAccountRepoStub{}
+	counter := &openAI403CounterCacheStub{counts: []int64{1}}
+	service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	service.SetOpenAI403CounterCache(counter)
+	account := &Account{
+		ID:       303,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"custom_error_codes_enabled": true,
+			"custom_error_codes":         []any{float64(http.StatusBadGateway)},
+		},
+	}
+
+	shouldDisable := service.HandleUpstreamError(
+		context.Background(),
+		account,
+		http.StatusForbidden,
+		http.Header{},
+		[]byte(`{"error":{"message":"channel disabled"}}`),
+	)
+
+	require.True(t, shouldDisable)
+	require.Equal(t, 1, repo.tempCalls)
+	require.Contains(t, repo.lastTempReason, "channel disabled")
+}
+
 func TestRateLimitService_HandleUpstreamError_OpenAI403ThresholdDisables(t *testing.T) {
 	repo := &rateLimitAccountRepoStub{}
 	counter := &openAI403CounterCacheStub{counts: []int64{3}}

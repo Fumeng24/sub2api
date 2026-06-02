@@ -87,6 +87,28 @@ func TestRateLimitService_HandleUpstreamError_ModelNotFoundWriteFailureDoesNotTe
 	require.Len(t, repo.modelRateLimitCalls, 1)
 }
 
+func TestRateLimitService_HandleUpstreamError_ModelNotFoundBypassesCustomErrorCodeSkip(t *testing.T) {
+	repo := &modelNotFoundAccountRepoStub{}
+	svc := &RateLimitService{accountRepo: repo}
+	account := openAIModelNotFoundTempAccount()
+	account.Credentials["custom_error_codes_enabled"] = true
+	account.Credentials["custom_error_codes"] = []any{float64(http.StatusBadGateway)}
+
+	handled := svc.HandleUpstreamError(
+		context.Background(),
+		account,
+		http.StatusNotFound,
+		http.Header{},
+		[]byte(`{"error":{"code":"model_not_found","message":"model not found"}}`),
+		"gpt-5.4",
+	)
+
+	require.True(t, handled)
+	require.Zero(t, repo.tempCalls)
+	require.Len(t, repo.modelRateLimitCalls, 1)
+	require.Equal(t, "gpt-5.4", repo.modelRateLimitCalls[0].scope)
+}
+
 func TestRateLimitService_HandleUpstreamError_Bare404KeepsTempUnschedulablePath(t *testing.T) {
 	repo := &modelNotFoundAccountRepoStub{}
 	svc := &RateLimitService{accountRepo: repo}

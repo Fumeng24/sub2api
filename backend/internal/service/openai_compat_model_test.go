@@ -1698,7 +1698,7 @@ func TestForwardAsAnthropic_DoneSentinelWithoutTerminalTriggersFailover(t *testi
 	require.True(t, errors.As(err, &failoverErr), "expected failover error, got %T", err)
 	require.Equal(t, 0, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "missing terminal event")
-	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 	require.Nil(t, result)
 }
 

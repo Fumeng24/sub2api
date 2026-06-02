@@ -65,7 +65,7 @@ func (s *OpenAIGatewayService) retryableOnSameOpenAIAccount(ctx context.Context,
 	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
 		return false
 	}
-	if statusCode == http.StatusTooManyRequests {
+	if statusCode == http.StatusPaymentRequired || statusCode == http.StatusForbidden || statusCode == http.StatusTooManyRequests {
 		return false
 	}
 	return account.IsPoolMode() &&
@@ -76,7 +76,7 @@ func (s *OpenAIGatewayService) retryableOnSameOpenAIAccountStatus(ctx context.Co
 	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
 		return false
 	}
-	if statusCode == http.StatusTooManyRequests {
+	if statusCode == http.StatusPaymentRequired || statusCode == http.StatusForbidden || statusCode == http.StatusTooManyRequests {
 		return false
 	}
 	return account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode)
@@ -426,8 +426,7 @@ func (s *OpenAIGatewayService) reopenOpenAIAccountCircuit(accountID int64, reaso
 		}
 	}
 	s.openaiAccountCircuitHalfOpen.Delete(accountID)
-	slog.Info("account_circuit_open", "account_id", accountID, "status_code", 0, "reason", reason, "until", until, "persisted", false)
-	s.emitOpenAIAccountCircuitOpenAlert(context.Background(), accountID, 0, reason, until, false)
+	slog.Info("account_circuit_reopen", "account_id", accountID, "reason", reason, "until", until, "persisted", false)
 }
 
 func (s *OpenAIGatewayService) emitOpenAIAccountCircuitOpenAlert(ctx context.Context, accountID int64, statusCode int, reason string, until time.Time, persisted bool) {
@@ -484,9 +483,6 @@ func shouldCloseOpenAIIdleConnectionsForCircuit(statusCode int, reason string, r
 		"clientconn.close",
 		"use of closed network connection",
 		"stream data interval timeout",
-		"stream usage incomplete",
-		"missing terminal event",
-		"upstream stream ended without terminal event",
 	}
 	for _, marker := range markers {
 		if strings.Contains(text, marker) {

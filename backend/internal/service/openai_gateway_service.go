@@ -3897,7 +3897,7 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 	if message == "" {
 		message = "OpenAI stream disconnected before completion"
 	}
-	if account != nil {
+	if account != nil && shouldCooldownOpenAIStreamFailover(message, payload) {
 		stateCtx, cancel := openAIAccountStateContext(context.Background())
 		s.markOpenAIAccountTemporarilyUnschedulable(stateCtx, account, 0, "openai_stream_error", openAIRequestErrorCooldown, []byte(message))
 		cancel()
@@ -3938,6 +3938,27 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 		StatusCode:   http.StatusBadGateway,
 		ResponseBody: body,
 	}
+}
+
+func shouldCooldownOpenAIStreamFailover(message string, payload []byte) bool {
+	combined := strings.ToLower(strings.TrimSpace(message + " " + string(payload)))
+	if combined == "" {
+		return false
+	}
+	diagnosticOnlyMarkers := []string{
+		"stream usage incomplete",
+		"missing terminal event",
+		"upstream stream ended without terminal event",
+		"stream ended before a terminal event",
+		"client disconnected",
+		"context canceled",
+	}
+	for _, marker := range diagnosticOnlyMarkers {
+		if strings.Contains(combined, marker) {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
@@ -4538,12 +4559,12 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		errType = "upstream_error"
 		errMsg = "Upstream authentication failed, please contact administrator"
 	case 402:
-		statusCode = http.StatusBadGateway
-		errType = "upstream_error"
+		statusCode = http.StatusPaymentRequired
+		errType = "billing_error"
 		errMsg = "Upstream payment required: insufficient balance or billing issue"
 	case 403:
-		statusCode = http.StatusBadGateway
-		errType = "upstream_error"
+		statusCode = http.StatusForbidden
+		errType = "forbidden_error"
 		errMsg = "Upstream access forbidden, please contact administrator"
 	case 429:
 		statusCode = http.StatusTooManyRequests

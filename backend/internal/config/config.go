@@ -1337,6 +1337,15 @@ func NormalizeRunMode(value string) string {
 	}
 }
 
+func isProductionLikeEnvironment(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "prod", "production":
+		return true
+	default:
+		return false
+	}
+}
+
 // Load 读取并校验完整配置（要求 jwt.secret 已显式提供）。
 func Load() (*Config, error) {
 	return load(false)
@@ -1464,6 +1473,9 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	// Auto-generate TOTP encryption key if not set (32 bytes = 64 hex chars for AES-256)
 	cfg.Totp.EncryptionKey = strings.TrimSpace(cfg.Totp.EncryptionKey)
 	if cfg.Totp.EncryptionKey == "" {
+		if isProductionLikeEnvironment(cfg.Log.Environment) {
+			return nil, fmt.Errorf("totp.encryption_key is required in production; set TOTP_ENCRYPTION_KEY to a stable 32-byte hex key")
+		}
 		key, err := generateJWTSecret(32) // Reuse the same random generation function
 		if err != nil {
 			return nil, fmt.Errorf("generate totp encryption key error: %w", err)

@@ -1754,8 +1754,10 @@ func (h *OpenAIGatewayHandler) mapUpstreamError(statusCode int) (int, string, st
 	switch statusCode {
 	case 401:
 		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
+	case 402:
+		return http.StatusPaymentRequired, "billing_error", "Upstream payment required: insufficient balance or billing issue"
 	case 403:
-		return http.StatusBadGateway, "upstream_error", "Upstream access forbidden, please contact administrator"
+		return http.StatusForbidden, "forbidden_error", "Upstream access forbidden, please contact administrator"
 	case 429:
 		return http.StatusTooManyRequests, "rate_limit_error", "Upstream rate limit exceeded, please retry later"
 	case 529:

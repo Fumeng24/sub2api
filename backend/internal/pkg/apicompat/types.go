@@ -311,6 +311,32 @@ type WebSearchAction struct {
 	Query string `json:"query,omitempty"` // primary search query
 }
 
+func (a *WebSearchAction) UnmarshalJSON(data []byte) error {
+	if a == nil {
+		return nil
+	}
+	var raw any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	switch v := raw.(type) {
+	case nil:
+		*a = WebSearchAction{}
+	case string:
+		*a = WebSearchAction{Type: v}
+	case map[string]any:
+		type alias WebSearchAction
+		var parsed alias
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			return err
+		}
+		*a = WebSearchAction(parsed)
+	default:
+		*a = WebSearchAction{}
+	}
+	return nil
+}
+
 // ResponsesSummary is a summary text block inside a reasoning output.
 type ResponsesSummary struct {
 	Type string `json:"type"` // "summary_text"

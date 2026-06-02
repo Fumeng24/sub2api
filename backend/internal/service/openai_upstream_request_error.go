@@ -128,7 +128,7 @@ func isOpenAIUpstreamNetworkFailoverError(err error, safeErr string) bool {
 }
 
 func (s *OpenAIGatewayService) handleOpenAIUpstreamStreamError(ctx context.Context, c *gin.Context, account *Account, err error, upstreamURL string, passthrough bool) *UpstreamFailoverError {
-	if err == nil || !isOpenAIUpstreamStreamCircuitError(err) {
+	if err == nil || !isOpenAIUpstreamStreamFailoverError(err) {
 		return nil
 	}
 	safeErr := sanitizeUpstreamErrorMessage(err.Error())
@@ -137,16 +137,23 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamStreamError(ctx context.Conte
 	}
 	responseCommitted := c != nil && c.Writer.Written()
 
-	stateCtx, cancel := openAIAccountStateContext(ctx)
-	defer cancel()
-	cooldownApplied := s.markOpenAIAccountTemporarilyUnschedulable(
-		stateCtx,
-		account,
-		0,
-		"openai_stream_error",
-		openAIRequestErrorCooldown,
-		[]byte(safeErr),
-	)
+	cooldownApplied := false
+	cooldownReason := ""
+	if isOpenAIUpstreamStreamCircuitError(err) {
+		stateCtx, cancel := openAIAccountStateContext(ctx)
+		cooldownApplied = s.markOpenAIAccountTemporarilyUnschedulable(
+			stateCtx,
+			account,
+			0,
+			"openai_stream_error",
+			openAIRequestErrorCooldown,
+			[]byte(safeErr),
+		)
+		cancel()
+		if cooldownApplied {
+			cooldownReason = "openai_stream_error"
+		}
+	}
 
 	kind := "failover"
 	if responseCommitted {
@@ -163,7 +170,7 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamStreamError(ctx context.Conte
 			Kind:               kind,
 			Message:            safeErr,
 			CooldownApplied:    cooldownApplied,
-			CooldownReason:     "openai_stream_error",
+			CooldownReason:     cooldownReason,
 		})
 	}
 	if responseCommitted {
@@ -172,19 +179,63 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamStreamError(ctx context.Conte
 	return newNetworkUpstreamFailoverError(safeErr)
 }
 
-func isOpenAIUpstreamStreamCircuitError(err error) bool {
+func isOpenAIUpstreamStreamFailoverError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		msg := strings.ToLower(err.Error())
-		return strings.Contains(msg, "connection reset") ||
-			strings.Contains(msg, "client connection force closed") ||
-			strings.Contains(msg, "clientconn.close")
+	if errors.Is(err, context.Canceled) {
+		return false
 	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
 	if msg == "" {
 		return false
+	}
+	nonReplayableMarkers := []string{
+		"client disconnected",
+		"context canceled",
+	}
+	for _, marker := range nonReplayableMarkers {
+		if strings.Contains(msg, marker) {
+			return false
+		}
+	}
+	if isOpenAIUpstreamStreamCircuitError(err) {
+		return true
+	}
+	diagnosticFailoverMarkers := []string{
+		"stream usage incomplete",
+		"missing terminal event",
+		"upstream stream ended without terminal event",
+	}
+	for _, marker := range diagnosticFailoverMarkers {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func isOpenAIUpstreamStreamCircuitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	if msg == "" {
+		return false
+	}
+	diagnosticOnlyMarkers := []string{
+		"stream usage incomplete",
+		"missing terminal event",
+		"upstream stream ended without terminal event",
+		"client disconnected",
+	}
+	for _, marker := range diagnosticOnlyMarkers {
+		if strings.Contains(msg, marker) {
+			return false
+		}
 	}
 	markers := []string{
 		"connection reset by peer",
@@ -192,9 +243,6 @@ func isOpenAIUpstreamStreamCircuitError(err error) bool {
 		"client connection force closed",
 		"clientconn.close",
 		"stream data interval timeout",
-		"missing terminal event",
-		"upstream stream ended without terminal event",
-		"stream usage incomplete",
 		"stream read error",
 	}
 	for _, marker := range markers {

@@ -139,6 +139,9 @@ func (s *RateLimitService) CheckErrorPolicy(ctx context.Context, account *Accoun
 		if account.ShouldHandleErrorCode(statusCode) {
 			return ErrorPolicyMatched
 		}
+		if shouldBypassCustomErrorCodeSkip(account, statusCode, responseBody) {
+			return ErrorPolicyMatched
+		}
 		slog.Info("account_error_code_skipped", "account_id", account.ID, "status_code", statusCode)
 		return ErrorPolicySkipped
 	}
@@ -164,7 +167,7 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 
 	// apikey 类型账号：检查自定义错误码配置
 	// 如果启用且错误码不在列表中，则不处理（不停止调度、不标记限流/过载）
-	if !account.ShouldHandleErrorCode(statusCode) {
+	if !account.ShouldHandleErrorCode(statusCode) && !shouldBypassCustomErrorCodeSkip(account, statusCode, responseBody) {
 		slog.Info("account_error_code_skipped", "account_id", account.ID, "status_code", statusCode)
 		return false
 	}
@@ -331,6 +334,18 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 	}
 
 	return shouldDisable
+}
+
+func shouldBypassCustomErrorCodeSkip(account *Account, statusCode int, responseBody []byte) bool {
+	if account == nil || account.Platform != PlatformOpenAI {
+		return false
+	}
+	switch statusCode {
+	case http.StatusPaymentRequired, http.StatusForbidden:
+		return true
+	default:
+		return isUpstreamModelNotFoundError(statusCode, responseBody)
+	}
 }
 
 // PreCheckUsage proactively checks local quota before dispatching a request.
@@ -1634,10 +1649,10 @@ func (s *RateLimitService) HandleUpstreamModelNotFound(ctx context.Context, acco
 	if s == nil || account == nil || s.accountRepo == nil {
 		return false
 	}
-	if !account.ShouldHandleErrorCode(statusCode) {
+	if !isUpstreamModelNotFoundError(statusCode, responseBody) {
 		return false
 	}
-	if !isUpstreamModelNotFoundError(statusCode, responseBody) {
+	if !account.ShouldHandleErrorCode(statusCode) && !shouldBypassCustomErrorCodeSkip(account, statusCode, responseBody) {
 		return false
 	}
 	modelKey := modelRateLimitKeyForUpstreamModelNotFound(ctx, account, requestedModel)

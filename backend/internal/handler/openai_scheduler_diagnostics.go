@@ -20,6 +20,7 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 		zap.String("selection_diag_required_capability", diag.RequiredCapability),
 		zap.String("selection_diag_required_image_capability", diag.RequiredImageCapability),
 		zap.Int("selection_diag_group_binding_count", diag.GroupBindingAccountCount),
+		zap.Int("selection_diag_active_schedulable_count", diag.ActiveSchedulableCount),
 		zap.Int("selection_diag_excluded_count", diag.ExcludedAccountCount),
 		zap.Int("selection_diag_after_excluded_count", diag.AfterExcludedCount),
 		zap.Int("selection_diag_model_supported_count", diag.ModelSupportedCount),
@@ -34,12 +35,22 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 		zap.Int("selection_diag_concurrency_slot_filtered_count", diag.ConcurrencySlotFilteredCount),
 		zap.Int("selection_diag_half_open_filtered_count", diag.HalfOpenFilteredCount),
 		zap.Int("selection_diag_compact_unsupported_count", diag.CompactUnsupportedCount),
+		zap.Int("selection_diag_status_filtered_count", diag.StatusFilteredCount),
+		zap.Int("selection_diag_temp_unschedulable_filtered_count", diag.TempUnschedulableFilteredCount),
+		zap.Int("selection_diag_overload_filtered_count", diag.OverloadFilteredCount),
+		zap.Int("selection_diag_rate_limit_filtered_count", diag.RateLimitFilteredCount),
+		zap.Int("selection_diag_model_rate_limit_filtered_count", diag.ModelRateLimitFilteredCount),
+		zap.Int("selection_diag_channel_pricing_restriction_filtered_count", diag.ChannelRestrictionFilteredCount),
+		zap.Int("selection_diag_group_scope_filtered_count", diag.GroupScopeFilteredCount),
 	}
 	if len(diag.ExcludedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_excluded_account_ids", diag.ExcludedAccountIDs))
 	}
 	if len(diag.GroupBindingAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_group_binding_account_ids", diag.GroupBindingAccountIDs))
+	}
+	if len(diag.ActiveSchedulableAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_active_schedulable_account_ids", diag.ActiveSchedulableAccountIDs))
 	}
 	if len(diag.AfterExcludedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_after_excluded_account_ids", diag.AfterExcludedAccountIDs))
@@ -62,11 +73,17 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 	if len(diag.CandidateAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_candidate_account_ids", diag.CandidateAccountIDs))
 	}
+	if len(diag.OrderedCandidateAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_ordered_candidate_account_ids", diag.OrderedCandidateAccountIDs))
+	}
 	if len(diag.ModelUnsupportedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_model_unsupported_account_ids", diag.ModelUnsupportedAccountIDs))
 	}
 	if len(diag.EndpointUnsupportedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_endpoint_unsupported_account_ids", diag.EndpointUnsupportedAccountIDs))
+	}
+	if len(diag.ChannelRestrictionAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_channel_pricing_restriction_account_ids", diag.ChannelRestrictionAccountIDs))
 	}
 	if len(diag.CompactUnsupportedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_compact_unsupported_account_ids", diag.CompactUnsupportedAccountIDs))

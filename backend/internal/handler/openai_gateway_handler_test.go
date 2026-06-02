@@ -24,6 +24,20 @@ import (
 	"github.com/tidwall/sjson"
 )
 
+func TestOpenAIGatewayHandlerMapUpstreamErrorKeepsDeterministicBusinessStatuses(t *testing.T) {
+	h := &OpenAIGatewayHandler{}
+
+	status, errType, msg := h.mapUpstreamError(http.StatusPaymentRequired)
+	require.Equal(t, http.StatusPaymentRequired, status)
+	require.Equal(t, "billing_error", errType)
+	require.Contains(t, msg, "payment")
+
+	status, errType, msg = h.mapUpstreamError(http.StatusForbidden)
+	require.Equal(t, http.StatusForbidden, status)
+	require.Equal(t, "forbidden_error", errType)
+	require.Contains(t, msg, "forbidden")
+}
+
 func TestOpenAIHandleStreamingAwareError_JSONEscaping(t *testing.T) {
 	tests := []struct {
 		name    string

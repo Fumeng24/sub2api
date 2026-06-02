@@ -73,6 +73,7 @@ type OpenAIAccountSelectionDiagnostics struct {
 	RequiredCapability                string
 	RequiredImageCapability           string
 	GroupBindingAccountCount          int
+	ActiveSchedulableCount            int
 	ExcludedAccountCount              int
 	AfterExcludedCount                int
 	ModelSupportedCount               int
@@ -87,10 +88,20 @@ type OpenAIAccountSelectionDiagnostics struct {
 	ConcurrencySlotFilteredCount      int
 	HalfOpenFilteredCount             int
 	CompactUnsupportedCount           int
+	StatusFilteredCount               int
+	TempUnschedulableFilteredCount    int
+	OverloadFilteredCount             int
+	RateLimitFilteredCount            int
+	ModelRateLimitFilteredCount       int
+	ChannelRestrictionFilteredCount   int
+	GroupScopeFilteredCount           int
 	ExcludedAccountIDs                []int64
 	CandidateAccountIDs               []int64
+	OrderedCandidateAccountIDs        []int64
+	ActiveSchedulableAccountIDs       []int64
 	ModelUnsupportedAccountIDs        []int64
 	EndpointUnsupportedAccountIDs     []int64
+	ChannelRestrictionAccountIDs      []int64
 	CompactUnsupportedAccountIDs      []int64
 	StateFilteredAccountIDs           []int64
 	CircuitFilteredAccountIDs         []int64
@@ -760,12 +771,17 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 
 	diag.GroupBindingAccountCount = len(accounts)
 	circuitAllowed := make([]*Account, 0, len(accounts))
+	finalCandidates := make([]*Account, 0, len(accounts))
 	for _, account := range accounts {
 		if account == nil {
 			diag.addReason("nil_account")
 			continue
 		}
 		diag.GroupBindingAccountIDs = appendOpenAIAccountID(diag.GroupBindingAccountIDs, account)
+		if account.IsOpenAI() && account.Status == StatusActive && account.Schedulable {
+			diag.ActiveSchedulableCount++
+			diag.ActiveSchedulableAccountIDs = appendOpenAIAccountID(diag.ActiveSchedulableAccountIDs, account)
+		}
 		if req.ExcludedIDs != nil {
 			if _, excluded := req.ExcludedIDs[account.ID]; excluded {
 				diag.addReason("excluded")
@@ -782,6 +798,14 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 		}
 		diag.ModelSupportedCount++
 		diag.ModelSupportedAccountIDs = appendOpenAIAccountID(diag.ModelSupportedAccountIDs, account)
+
+		if req.GroupID != nil && s.service.needsUpstreamChannelRestrictionCheck(ctx, req.GroupID) &&
+			s.service.isUpstreamModelRestrictedByChannel(ctx, *req.GroupID, account, req.RequestedModel, req.RequireCompact) {
+			diag.ChannelRestrictionFilteredCount++
+			diag.ChannelRestrictionAccountIDs = appendOpenAIAccountID(diag.ChannelRestrictionAccountIDs, account)
+			diag.addReason("channel_pricing_restricted")
+			continue
+		}
 
 		if !accountSupportsOpenAICapabilities(account, req.RequiredCapability, req.RequiredImageCapability) ||
 			!s.isAccountTransportCompatible(account, req.RequiredTransport) {
@@ -808,6 +832,20 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 		if reason := openAIAccountStatusFilterReason(ctx, account, req, schedGroup); reason != "" {
 			diag.StateFilteredCount++
 			diag.StateFilteredAccountIDs = appendOpenAIAccountID(diag.StateFilteredAccountIDs, account)
+			switch reason {
+			case "inactive", "manual_unschedulable", "expired", "quota_exceeded":
+				diag.StatusFilteredCount++
+			case "temp_unschedulable":
+				diag.TempUnschedulableFilteredCount++
+			case "overloaded":
+				diag.OverloadFilteredCount++
+			case "rate_limited":
+				diag.RateLimitFilteredCount++
+			case "model_rate_limited":
+				diag.ModelRateLimitFilteredCount++
+			case "privacy_not_set":
+				diag.GroupScopeFilteredCount++
+			}
 			diag.addReason(reason)
 			continue
 		}
@@ -852,8 +890,23 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 		}
 		diag.ConcurrencySlotAllowedCount++
 		diag.CandidateAccountIDs = appendOpenAIAccountID(diag.CandidateAccountIDs, account)
+		finalCandidates = append(finalCandidates, account)
 	}
 	diag.FinalCandidateCount = len(diag.CandidateAccountIDs)
+	if len(finalCandidates) > 0 {
+		endpoint := schedulerEndpointFromOpenAIRequest(req)
+		var health *accountSchedulerHealthStats
+		if s.service != nil {
+			health = s.service.schedulerHealth
+		}
+		scores := buildSchedulerAccountScoresWithOptions(finalCandidates, req.GroupID, req.RequestedModel, endpoint, loadMap, health, false, true)
+		for _, candidate := range buildOpenAIOrderedSelectionOrder(openAIAccountCandidatesFromSchedulerScores(scores)) {
+			diag.OrderedCandidateAccountIDs = appendOpenAIAccountID(diag.OrderedCandidateAccountIDs, candidate.account)
+			if len(diag.OrderedCandidateAccountIDs) >= 10 {
+				break
+			}
+		}
+	}
 	return diag
 }
 

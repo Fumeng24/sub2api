@@ -371,6 +371,79 @@ func TestOpenAIRequestErrorClosesIdleConnectionsOnConnectionReset(t *testing.T) 
 	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 
+func TestOpenAIStreamDiagnosticErrorsFailoverWithoutCooldown(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &rateLimitAccountRepoStub{}
+	upstream := &closeIdleHTTPUpstreamStub{}
+	svc := &OpenAIGatewayService{
+		accountRepo:  repo,
+		httpUpstream: upstream,
+	}
+	account := &Account{ID: 111, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true}
+
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{name: "usage_incomplete", err: errors.New("stream usage incomplete: missing terminal event")},
+		{name: "missing_terminal", err: errors.New("missing terminal event")},
+		{name: "upstream_ended_without_terminal", err: errors.New("upstream stream ended without terminal event")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+			failoverErr := svc.handleOpenAIUpstreamStreamError(context.Background(), c, account, tc.err, "", false)
+
+			require.NotNil(t, failoverErr)
+			require.Equal(t, 0, failoverErr.StatusCode)
+			require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+			require.Zero(t, repo.tempCalls)
+			require.Empty(t, upstream.closed)
+		})
+	}
+}
+
+func TestOpenAIStreamClientCancelDoesNotFailoverOrCooldown(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &rateLimitAccountRepoStub{}
+	svc := &OpenAIGatewayService{accountRepo: repo}
+	account := &Account{ID: 111, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	failoverErr := svc.handleOpenAIUpstreamStreamError(context.Background(), c, account, context.Canceled, "", false)
+
+	require.Nil(t, failoverErr)
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.Zero(t, repo.tempCalls)
+}
+
+func TestOpenAIStreamFailoverDiagnosticMessageDoesNotCooldownAccount(t *testing.T) {
+	repo := &rateLimitAccountRepoStub{}
+	svc := &OpenAIGatewayService{accountRepo: repo}
+	account := &Account{ID: 112, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true}
+
+	failoverErr := svc.newOpenAIStreamFailoverError(nil, account, false, "", nil, "OpenAI stream ended before a terminal event")
+
+	require.NotNil(t, failoverErr)
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.Zero(t, repo.tempCalls)
+}
+
+func TestOpenAIRuntimeBlock_ReopenDoesNotPersistStatusZero(t *testing.T) {
+	repo := &rateLimitAccountRepoStub{}
+	svc := &OpenAIGatewayService{accountRepo: repo}
+	account := &Account{ID: 113, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true}
+
+	svc.reopenOpenAIAccountCircuit(account.ID, "openai_stream_error", time.Minute)
+
+	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.Zero(t, repo.tempCalls)
+}
+
 func TestOpsUpstreamErrorAnnotatesOpenAITransientFailoverCooldown(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -403,15 +476,19 @@ func TestOpenAIAdvancedSchedulerPolicy_DisablesLegacySameAccountRetry(t *testing
 		Type:     AccountTypeAPIKey,
 		Credentials: map[string]any{
 			"pool_mode":                    true,
-			"pool_mode_retry_status_codes": []any{float64(http.StatusTooManyRequests), float64(http.StatusBadGateway)},
+			"pool_mode_retry_status_codes": []any{float64(http.StatusPaymentRequired), float64(http.StatusForbidden), float64(http.StatusTooManyRequests), float64(http.StatusBadGateway)},
 		},
 	}
 
 	legacySvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("false")}
+	require.False(t, legacySvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusPaymentRequired))
+	require.False(t, legacySvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusForbidden))
 	require.False(t, legacySvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusTooManyRequests))
 	require.True(t, legacySvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusBadGateway))
 
 	advancedSvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("true")}
+	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusPaymentRequired))
+	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusForbidden))
 	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusTooManyRequests))
 	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusBadGateway))
 }
