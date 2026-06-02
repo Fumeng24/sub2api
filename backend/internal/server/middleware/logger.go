@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
@@ -60,8 +61,26 @@ func Logger() gin.HandlerFunc {
 		l := logger.FromContext(c.Request.Context()).With(fields...)
 		l.Info("http request completed", zap.Time("completed_at", endTime))
 
-		if len(c.Errors) > 0 {
+		if len(c.Errors) > 0 && !onlyRequestBodyLimitErrors(c.Errors.String()) {
 			l.Warn("http request contains gin errors", zap.String("errors", c.Errors.String()))
 		}
 	}
+}
+
+func onlyRequestBodyLimitErrors(errorsText string) bool {
+	errorsText = strings.ToLower(strings.TrimSpace(errorsText))
+	if errorsText == "" {
+		return false
+	}
+	for _, part := range strings.Split(errorsText, "\n") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if !strings.Contains(part, "http: request body too large") &&
+			!strings.Contains(part, "request body too large") {
+			return false
+		}
+	}
+	return true
 }

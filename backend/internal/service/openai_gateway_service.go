@@ -2363,22 +2363,6 @@ func (s *OpenAIGatewayService) GetAccessToken(ctx context.Context, account *Acco
 	}
 }
 
-func (s *OpenAIGatewayService) shouldFailoverUpstreamError(statusCode int) bool {
-	switch statusCode {
-	case 401, 402, 403, 429, 529:
-		return true
-	default:
-		return statusCode >= 500
-	}
-}
-
-func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponse(statusCode int, upstreamMsg string, upstreamBody []byte) bool {
-	if s.shouldFailoverUpstreamError(statusCode) {
-		return true
-	}
-	return isOpenAITransientProcessingError(statusCode, upstreamMsg, upstreamBody)
-}
-
 func (s *OpenAIGatewayService) handleFailoverSideEffects(ctx context.Context, resp *http.Response, account *Account, requestedModel ...string) {
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if len(requestedModel) > 0 {
@@ -3898,9 +3882,7 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 		message = "OpenAI stream disconnected before completion"
 	}
 	if account != nil && shouldCooldownOpenAIStreamFailover(message, payload) {
-		stateCtx, cancel := openAIAccountStateContext(context.Background())
-		s.markOpenAIAccountTemporarilyUnschedulable(stateCtx, account, 0, "openai_stream_error", openAIRequestErrorCooldown, []byte(message))
-		cancel()
+		s.closeOpenAIAccountIdleConnectionsForCircuit(account.ID, 0, "openai_stream_error", []byte(message))
 	}
 	detail := ""
 	if len(payload) > 0 && s != nil && s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
@@ -4526,9 +4508,11 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	if reqModel == "" {
 		reqModel, _, _ = extractOpenAIRequestMetaFromBody(requestBody)
 	}
+	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+	shouldFailover := openAIUpstreamErrorClassShouldFailover(upstreamClass)
 	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
 	kind := "http_error"
-	if shouldDisable {
+	if shouldDisable && shouldFailover {
 		kind = "failover"
 	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -4541,7 +4525,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		Message:            upstreamMsg,
 		Detail:             upstreamDetail,
 	})
-	if shouldDisable {
+	if shouldDisable && shouldFailover {
 		return nil, &UpstreamFailoverError{
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,
@@ -4663,11 +4647,13 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 	if len(requestedModel) > 0 {
 		modelForCooldown = requestedModel[0]
 	}
+	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+	shouldFailover := openAIUpstreamErrorClassShouldFailover(upstreamClass)
 	shouldDisable := s.handleOpenAIAccountUpstreamError(
 		c.Request.Context(), account, resp.StatusCode, resp.Header, body, modelForCooldown,
 	)
 	kind := "http_error"
-	if shouldDisable {
+	if shouldDisable && shouldFailover {
 		kind = "failover"
 	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -4680,7 +4666,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		Message:            upstreamMsg,
 		Detail:             upstreamDetail,
 	})
-	if shouldDisable {
+	if shouldDisable && shouldFailover {
 		return nil, &UpstreamFailoverError{
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,

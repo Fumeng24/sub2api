@@ -4,7 +4,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +32,7 @@ func (s *closeIdleHTTPUpstreamStub) CloseIdleConnectionsForAccount(accountID int
 	s.closed = append(s.closed, accountID)
 }
 
-func TestOpenAI429FastPath_MarksOAuthAccountCoolingDown(t *testing.T) {
+func TestOpenAI429FastPath_DoesNotGloballyBlockSharedAccount(t *testing.T) {
 	svc := &OpenAIGatewayService{}
 	account := &Account{ID: 42, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
 	apiKeyAccount := &Account{ID: 43, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
@@ -43,7 +42,7 @@ func TestOpenAI429FastPath_MarksOAuthAccountCoolingDown(t *testing.T) {
 
 	require.False(t, shouldDisable)
 	require.False(t, apiKeyShouldDisable)
-	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 	require.False(t, svc.isOpenAIAccountRuntimeBlocked(apiKeyAccount))
 }
 
@@ -185,19 +184,12 @@ func TestOpenAITransient5xxShortCooldownIgnoresCustomCodeSkip(t *testing.T) {
 	)
 
 	require.True(t, shouldDisable)
-	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
-	require.Equal(t, 1, repo.tempCalls)
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.Equal(t, 0, repo.tempCalls)
 	require.Zero(t, repo.setErrorCalls)
-	require.True(t, repo.lastTempUntil.After(time.Now()))
-
-	var state TempUnschedState
-	require.NoError(t, json.Unmarshal([]byte(repo.lastTempReason), &state))
-	require.Equal(t, 524, state.StatusCode)
-	require.Equal(t, "openai_transient_5xx", state.MatchedKeyword)
-	require.True(t, state.UntilUnix > time.Now().Unix())
 }
 
-func TestOpenAITransientCooldownPersistThrottleKeepsRuntimeBlock(t *testing.T) {
+func TestOpenAITransientCooldownDoesNotPersistGlobalRuntimeBlock(t *testing.T) {
 	repo := &rateLimitAccountRepoStub{}
 	svc := &OpenAIGatewayService{
 		accountRepo:                     repo,
@@ -216,8 +208,8 @@ func TestOpenAITransientCooldownPersistThrottleKeepsRuntimeBlock(t *testing.T) {
 
 	require.True(t, first)
 	require.True(t, second)
-	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
-	require.Equal(t, 1, repo.tempCalls)
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.Equal(t, 0, repo.tempCalls)
 }
 
 func TestOpenAIRequestErrorFailoversAndCoolsAccount(t *testing.T) {
@@ -245,14 +237,8 @@ func TestOpenAIRequestErrorFailoversAndCoolsAccount(t *testing.T) {
 	require.NotNil(t, failoverErr)
 	require.Equal(t, 0, failoverErr.StatusCode)
 	require.Equal(t, 0, w.Body.Len(), "failover path must not write the response")
-	require.Equal(t, 1, repo.tempCalls)
-	require.True(t, repo.lastTempUntil.After(time.Now()))
-	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
-
-	var state TempUnschedState
-	require.NoError(t, json.Unmarshal([]byte(repo.lastTempReason), &state))
-	require.Equal(t, 0, state.StatusCode)
-	require.Equal(t, "openai_request_error", state.MatchedKeyword)
+	require.Equal(t, 0, repo.tempCalls)
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 
 	rawEvents, ok := c.Get(OpsUpstreamErrorsKey)
 	require.True(t, ok)
@@ -260,8 +246,8 @@ func TestOpenAIRequestErrorFailoversAndCoolsAccount(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, events, 1)
 	require.Equal(t, "failover", events[0].Kind)
-	require.True(t, events[0].CooldownApplied)
-	require.Equal(t, "openai_request_error", events[0].CooldownReason)
+	require.False(t, events[0].CooldownApplied)
+	require.Empty(t, events[0].CooldownReason)
 }
 
 func TestOpenAIRequestErrorDoesNotFailoverWhenRequestCanceled(t *testing.T) {
@@ -330,8 +316,8 @@ func TestOpenAIRequestErrorFailoversWhenCanceledContextHasNetworkTimeout(t *test
 	require.Equal(t, 0, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "i/o timeout")
 	require.Equal(t, 0, w.Body.Len(), "failover path must not write the response")
-	require.Equal(t, 1, repo.tempCalls)
-	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.Equal(t, 0, repo.tempCalls)
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 
 	rawEvents, ok := c.Get(OpsUpstreamErrorsKey)
 	require.True(t, ok)
@@ -339,8 +325,8 @@ func TestOpenAIRequestErrorFailoversWhenCanceledContextHasNetworkTimeout(t *test
 	require.True(t, ok)
 	require.Len(t, events, 1)
 	require.Equal(t, "failover", events[0].Kind)
-	require.True(t, events[0].CooldownApplied)
-	require.Equal(t, "openai_request_error", events[0].CooldownReason)
+	require.False(t, events[0].CooldownApplied)
+	require.Empty(t, events[0].CooldownReason)
 }
 
 func TestOpenAIRequestErrorClosesIdleConnectionsOnConnectionReset(t *testing.T) {
@@ -368,7 +354,7 @@ func TestOpenAIRequestErrorClosesIdleConnectionsOnConnectionReset(t *testing.T) 
 
 	require.NotNil(t, failoverErr)
 	require.Equal(t, []int64{account.ID}, upstream.closed)
-	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 
 func TestOpenAIStreamDiagnosticErrorsFailoverWithoutCooldown(t *testing.T) {
@@ -504,6 +490,34 @@ func TestOpenAIAdvancedSchedulerPolicy_FailoversModelNotFound(t *testing.T) {
 
 	advancedSvc := &OpenAIGatewayService{rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("true")}
 	require.True(t, advancedSvc.shouldFailoverOpenAIUpstreamResponseForAccount(context.Background(), account, http.StatusNotFound, "model not found", body))
+}
+
+func TestOpenAIForbiddenBusinessErrorDoesNotFailover(t *testing.T) {
+	account := &Account{ID: 114, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	body := []byte(`{"error":{"message":"Image generation is not enabled for this group"}}`)
+	svc := &OpenAIGatewayService{}
+
+	require.Equal(t, openAIUpstreamErrorForbidden, classifyOpenAIUpstreamError(http.StatusForbidden, "", body))
+	require.False(t, svc.shouldFailoverOpenAIUpstreamResponseForAccount(context.Background(), account, http.StatusForbidden, "", body))
+}
+
+func TestOpenAITransientScheduleFailureUsesScopedSchedulerCooldown(t *testing.T) {
+	svc := &OpenAIGatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
+	accountID := int64(115)
+	model := "gpt-5.5"
+	endpoint := "/v1/responses"
+	failoverErr := &UpstreamFailoverError{
+		StatusCode:   http.StatusBadGateway,
+		ResponseBody: []byte(`{"error":{"message":"bad gateway"}}`),
+	}
+
+	svc.ReportOpenAIAccountScheduleFailure(accountID, model, endpoint, failoverErr)
+
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(&Account{ID: accountID, Platform: PlatformOpenAI}))
+	sameScope := svc.schedulerHealth.snapshot(accountID, model, endpoint, false)
+	require.Equal(t, schedulerCircuitOpen, sameScope.CircuitState)
+	otherModel := svc.schedulerHealth.snapshot(accountID, "gpt-5.4", endpoint, false)
+	require.Equal(t, schedulerCircuitClosed, otherModel.CircuitState)
 }
 
 func TestOpenAIThinkingSignatureInvalid_DoesNotFailoverOrCooldown(t *testing.T) {

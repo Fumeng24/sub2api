@@ -42,20 +42,8 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamRequestError(ctx context.Cont
 		return safeErr, nil
 	}
 
-	stateCtx, cancel := openAIAccountStateContext(ctx)
-	defer cancel()
-
-	cooldownApplied := s.markOpenAIAccountTemporarilyUnschedulable(
-		stateCtx,
-		account,
-		0,
-		"openai_request_error",
-		openAIRequestErrorCooldown,
-		[]byte(safeErr),
-	)
-	cooldownReason := ""
-	if cooldownApplied {
-		cooldownReason = "openai_request_error"
+	if account != nil {
+		s.closeOpenAIAccountIdleConnectionsForCircuit(account.ID, 0, "openai_request_error", []byte(safeErr))
 	}
 
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -67,8 +55,7 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamRequestError(ctx context.Cont
 		Passthrough:        passthrough,
 		Kind:               "failover",
 		Message:            safeErr,
-		CooldownApplied:    cooldownApplied,
-		CooldownReason:     cooldownReason,
+		CooldownApplied:    false,
 	})
 	return safeErr, newNetworkUpstreamFailoverError(safeErr)
 }
@@ -137,21 +124,9 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamStreamError(ctx context.Conte
 	}
 	responseCommitted := c != nil && c.Writer.Written()
 
-	cooldownApplied := false
-	cooldownReason := ""
 	if isOpenAIUpstreamStreamCircuitError(err) {
-		stateCtx, cancel := openAIAccountStateContext(ctx)
-		cooldownApplied = s.markOpenAIAccountTemporarilyUnschedulable(
-			stateCtx,
-			account,
-			0,
-			"openai_stream_error",
-			openAIRequestErrorCooldown,
-			[]byte(safeErr),
-		)
-		cancel()
-		if cooldownApplied {
-			cooldownReason = "openai_stream_error"
+		if account != nil {
+			s.closeOpenAIAccountIdleConnectionsForCircuit(account.ID, 0, "openai_stream_error", []byte(safeErr))
 		}
 	}
 
@@ -169,8 +144,7 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamStreamError(ctx context.Conte
 			Passthrough:        passthrough,
 			Kind:               kind,
 			Message:            safeErr,
-			CooldownApplied:    cooldownApplied,
-			CooldownReason:     cooldownReason,
+			CooldownApplied:    false,
 		})
 	}
 	if responseCommitted {

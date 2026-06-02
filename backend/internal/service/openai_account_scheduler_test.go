@@ -411,6 +411,11 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_DefaultDisabled_Require
 	require.ErrorContains(t, err, "no available OpenAI accounts")
 	require.Nil(t, selection)
 	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+	require.True(t, decision.Diagnostics.Collected)
+	require.Equal(t, groupID, decision.Diagnostics.GroupID)
+	require.Equal(t, "gpt-5.1", decision.Diagnostics.Model)
+	require.Equal(t, 0, decision.Diagnostics.GroupBindingAccountCount)
+	require.Empty(t, decision.Diagnostics.CandidateAccountIDs)
 }
 
 func TestOpenAIGatewayService_SelectAccountWithScheduler_DefaultDisabled_EmbeddingsSkipsChatOnlyAccount(t *testing.T) {
@@ -1914,7 +1919,7 @@ func TestOpenAIStreamInterruptionCircuit_DoesNotReplayAfterClientOutput(t *testi
 	)
 
 	require.Nil(t, failoverErr, "stream already committed, handler must not replay on another account")
-	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account), "stream transport errors must not globally remove a shared account from every group")
 }
 
 func TestClamp01_AllBranches(t *testing.T) {

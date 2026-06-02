@@ -2112,11 +2112,37 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 	scheduler := s.getOpenAIAccountScheduler(ctx)
 	if scheduler == nil {
 		decision.Layer = openAIAccountScheduleLayerLoadBalance
+		attachFallbackDiagnostics := func(effectiveExcludedIDs map[int64]struct{}) {
+			if decision.Diagnostics.Collected || s == nil {
+				return
+			}
+			diagReq := OpenAIAccountScheduleRequest{
+				GroupID:                 groupID,
+				SessionHash:             sessionHash,
+				PreviousResponseID:      previousResponseID,
+				RequestedModel:          requestedModel,
+				RequiredTransport:       requiredTransport,
+				RequiredCapability:      requiredCapability,
+				RequiredImageCapability: requiredImageCapability,
+				RequireCompact:          requireCompact,
+				ExcludedIDs:             effectiveExcludedIDs,
+			}
+			diagReq.SchedulerEndpoint = schedulerEndpointFromContext(ctx, schedulerEndpointFromOpenAIRequest(diagReq))
+			diagCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), openAIAdvancedSchedulerSettingDBTimeout)
+			defer cancel()
+			diagnosticScheduler := &defaultOpenAIAccountScheduler{service: s}
+			decision.Diagnostics = diagnosticScheduler.buildOpenAISelectionDiagnostics(
+				diagCtx,
+				diagReq,
+				s.openAISchedulerGroupForFallback(diagCtx, groupID),
+			)
+		}
 		if requiredTransport == OpenAIUpstreamTransportAny || requiredTransport == OpenAIUpstreamTransportHTTPSSE {
 			effectiveExcludedIDs := cloneExcludedAccountIDs(excludedIDs)
 			for {
 				selection, err := s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, effectiveExcludedIDs, requireCompact, requiredCapability)
 				if err != nil {
+					attachFallbackDiagnostics(effectiveExcludedIDs)
 					return nil, decision, err
 				}
 				if selection == nil || selection.Account == nil {
@@ -2132,6 +2158,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 					effectiveExcludedIDs = make(map[int64]struct{})
 				}
 				if _, exists := effectiveExcludedIDs[selection.Account.ID]; exists {
+					attachFallbackDiagnostics(effectiveExcludedIDs)
 					return nil, decision, ErrNoAvailableAccounts
 				}
 				effectiveExcludedIDs[selection.Account.ID] = struct{}{}
@@ -2142,6 +2169,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 		for {
 			selection, err := s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, effectiveExcludedIDs, requireCompact, requiredCapability)
 			if err != nil {
+				attachFallbackDiagnostics(effectiveExcludedIDs)
 				return nil, decision, err
 			}
 			if selection == nil || selection.Account == nil {
@@ -2158,6 +2186,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 				effectiveExcludedIDs = make(map[int64]struct{})
 			}
 			if _, exists := effectiveExcludedIDs[selection.Account.ID]; exists {
+				attachFallbackDiagnostics(effectiveExcludedIDs)
 				return nil, decision, ErrNoAvailableAccounts
 			}
 			effectiveExcludedIDs[selection.Account.ID] = struct{}{}
@@ -2270,15 +2299,32 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleFailure(accountID int6
 	}
 	category := schedulerFailureCategory(statusCode, body)
 	cooldown := schedulerCooldownForCategory(category, headers)
-	if statusCode == 0 || isOpenAITransient5xxStatus(statusCode) {
-		reason := "openai_request_error"
-		if isOpenAITransient5xxStatus(statusCode) {
-			reason = "openai_transient_5xx"
-		}
+	if category == "auth" {
+		reason := "openai_auth_error"
 		s.reopenOpenAIAccountCircuit(accountID, reason, cooldown)
 	}
 	if s.schedulerHealth != nil {
 		s.schedulerHealth.reportFailure(accountID, model, endpoint, category, cooldown)
+	}
+	if category == "transient" || category == "rate_limit" || category == "model_unsupported" {
+		reason := "openai_request_error"
+		if category == "transient" && isOpenAITransient5xxStatus(statusCode) {
+			reason = "openai_transient_5xx"
+		} else if category == "rate_limit" {
+			reason = "openai_rate_limit"
+		} else if category == "model_unsupported" {
+			reason = "openai_model_unsupported"
+		}
+		slog.Info("account_circuit_open",
+			"account_id", accountID,
+			"model", model,
+			"endpoint", endpoint,
+			"status_code", statusCode,
+			"reason", reason,
+			"until", time.Now().Add(cooldown),
+			"scope", "account_model_endpoint",
+			"persisted", false,
+		)
 	}
 	scheduler := s.getOpenAIAccountScheduler(context.Background())
 	if scheduler != nil {

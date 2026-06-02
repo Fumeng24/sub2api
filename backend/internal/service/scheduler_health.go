@@ -249,7 +249,12 @@ func (s *accountSchedulerHealthStats) reportFailure(accountID int64, model, endp
 	recentSampleCount := entry.recentSampleCount()
 	shouldOpen := entry.consecutiveFailure >= 3 ||
 		(recentSampleCount >= schedulerFailureRateMinSamples && recentFailureRate > 0.20)
-	if category == "auth" || category == "forbidden" || category == "balance" {
+	if category == "auth" ||
+		category == "forbidden" ||
+		category == "balance" ||
+		category == "rate_limit" ||
+		category == "transient" ||
+		category == "model_unsupported" {
 		shouldOpen = true
 	}
 	if shouldOpen {
@@ -327,6 +332,9 @@ func latencyScoreFromTTFT(ttft float64, hasTTFT bool) float64 {
 }
 
 func schedulerFailureCategory(statusCode int, body []byte) string {
+	if class := classifyOpenAIUpstreamError(statusCode, "", body); class != openAIUpstreamErrorUnknown {
+		return openAIUpstreamErrorClassSchedulerCategory(class)
+	}
 	text := strings.ToLower(string(body))
 	switch statusCode {
 	case http.StatusUnauthorized:
