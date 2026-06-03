@@ -3804,6 +3804,10 @@ func openAIStreamFailedEventShouldFailover(payload []byte, message string) bool 
 	if isOpenAIThinkingSignatureInvalidError(payload, message) {
 		return false
 	}
+	class := classifyOpenAIUpstreamError(http.StatusBadRequest, message, payload)
+	if !openAIUpstreamErrorClassShouldFailover(class) && class != openAIUpstreamErrorUnknown {
+		return false
+	}
 	if isOpenAITransientProcessingError(http.StatusBadRequest, message, payload) {
 		return true
 	}
@@ -3834,6 +3838,16 @@ func openAIStreamFailedEventShouldFailover(payload []byte, message string) bool 
 		}
 	}
 	return true
+}
+
+func newOpenAIStreamTerminalError(payload []byte, message string) error {
+	message = sanitizeUpstreamErrorMessage(strings.TrimSpace(message))
+	if message == "" {
+		message = "Upstream response failed"
+	}
+	class := classifyOpenAIUpstreamError(http.StatusBadRequest, message, payload)
+	statusCode, _, _ := openAIErrorResponseForClass(http.StatusBadRequest, class, message, false)
+	return newUpstreamTerminalError(statusCode, message)
 }
 
 func isOpenAIThinkingSignatureInvalidError(payload []byte, message string) bool {
@@ -3976,6 +3990,8 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 	sawDone := false
 	sawTerminalEvent := false
 	sawFailedEvent := false
+	failedEventShouldFailover := false
+	var failedPayload []byte
 	failedMessage := ""
 	clientOutputStarted := false
 	upstreamRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
@@ -4028,7 +4044,10 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			eventType := strings.TrimSpace(gjson.Get(trimmedData, "type").String())
 			if eventType == "response.failed" {
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
-				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && openAIStreamFailedEventShouldFailover(dataBytes, failedMessage) {
+				failedPayload = append(failedPayload[:0], dataBytes...)
+				shouldFailoverFailedEvent := openAIStreamFailedEventShouldFailover(dataBytes, failedMessage)
+				failedEventShouldFailover = failedEventShouldFailover || shouldFailoverFailedEvent
+				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && shouldFailoverFailedEvent {
 					return resultWithUsage(),
 						s.newOpenAIStreamFailoverError(c, account, true, upstreamRequestID, dataBytes, failedMessage)
 				}
@@ -4074,6 +4093,9 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			return resultWithUsage(), nil
 		}
 		if sawFailedEvent {
+			if !failedEventShouldFailover {
+				return resultWithUsage(), newOpenAIStreamTerminalError(failedPayload, failedMessage)
+			}
 			return resultWithUsage(), fmt.Errorf("upstream response failed: %s", failedMessage)
 		}
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -4103,6 +4125,9 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 		return resultWithUsage(), fmt.Errorf("stream read error: %w", err)
 	}
 	if sawFailedEvent {
+		if !failedEventShouldFailover {
+			return resultWithUsage(), newOpenAIStreamTerminalError(failedPayload, failedMessage)
+		}
 		return resultWithUsage(), fmt.Errorf("upstream response failed: %s", failedMessage)
 	}
 	if !clientDisconnected && !sawDone && !sawTerminalEvent && ctx.Err() == nil {
@@ -4470,11 +4495,19 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		if upstreamMsg == "" {
 			upstreamMsg = errMsg
 		}
-		if upstreamMsg == "" {
-			return nil, fmt.Errorf("upstream error: %d (passthrough rule matched)", resp.StatusCode)
-		}
-		return nil, fmt.Errorf("upstream error: %d (passthrough rule matched) message=%s", resp.StatusCode, upstreamMsg)
+		return nil, newUpstreamTerminalError(status, upstreamMsg)
 	}
+
+	var reqModel string
+	if len(requestedModel) > 0 {
+		reqModel = strings.TrimSpace(requestedModel[0])
+	}
+	if reqModel == "" {
+		reqModel, _, _ = extractOpenAIRequestMetaFromBody(requestBody)
+	}
+	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+	shouldFailover := openAIUpstreamErrorClassShouldFailover(upstreamClass)
+	reqCtx := openAIContextFromGin(ctx, c)
 
 	// Check custom error codes
 	if !s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) && !account.ShouldHandleErrorCode(resp.StatusCode) {
@@ -4488,29 +4521,20 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			Message:            upstreamMsg,
 			Detail:             upstreamDetail,
 		})
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": gin.H{
-				"type":    "upstream_error",
-				"message": "Upstream gateway error",
-			},
-		})
-		if upstreamMsg == "" {
-			return nil, fmt.Errorf("upstream error: %d (not in custom error codes)", resp.StatusCode)
+		if !shouldFailover {
+			statusCode, errType, errMsg := openAIErrorResponseForClass(resp.StatusCode, upstreamClass, upstreamMsg, false)
+			c.JSON(statusCode, gin.H{
+				"error": gin.H{
+					"type":    errType,
+					"message": errMsg,
+				},
+			})
+			return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
 		}
-		return nil, fmt.Errorf("upstream error: %d (not in custom error codes) message=%s", resp.StatusCode, upstreamMsg)
 	}
 
 	// Handle upstream error (mark account status)
-	var reqModel string
-	if len(requestedModel) > 0 {
-		reqModel = strings.TrimSpace(requestedModel[0])
-	}
-	if reqModel == "" {
-		reqModel, _, _ = extractOpenAIRequestMetaFromBody(requestBody)
-	}
-	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
-	shouldFailover := openAIUpstreamErrorClassShouldFailover(upstreamClass)
-	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
+	shouldDisable := s.handleOpenAIAccountUpstreamError(reqCtx, account, resp.StatusCode, resp.Header, body, reqModel)
 	kind := "http_error"
 	if shouldDisable && shouldFailover {
 		kind = "failover"
@@ -4529,37 +4553,11 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		return nil, &UpstreamFailoverError{
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,
-			RetryableOnSameAccount: s.retryableOnSameOpenAIAccountStatus(c.Request.Context(), account, resp.StatusCode),
+			RetryableOnSameAccount: s.retryableOnSameOpenAIAccountStatus(reqCtx, account, resp.StatusCode),
 		}
 	}
 
-	// Return appropriate error response
-	var errType, errMsg string
-	var statusCode int
-
-	switch resp.StatusCode {
-	case 401:
-		statusCode = http.StatusBadGateway
-		errType = "upstream_error"
-		errMsg = "Upstream authentication failed, please contact administrator"
-	case 402:
-		statusCode = http.StatusPaymentRequired
-		errType = "billing_error"
-		errMsg = "Upstream payment required: insufficient balance or billing issue"
-	case 403:
-		statusCode = http.StatusForbidden
-		errType = "forbidden_error"
-		errMsg = "Upstream access forbidden, please contact administrator"
-	case 429:
-		statusCode = http.StatusTooManyRequests
-		errType = "rate_limit_error"
-		errMsg = "Upstream rate limit exceeded, please retry later"
-	default:
-		statusCode = http.StatusBadGateway
-		errType = "upstream_error"
-		errMsg = "Upstream request failed"
-	}
-
+	statusCode, errType, errMsg := openAIErrorResponseForClass(resp.StatusCode, upstreamClass, upstreamMsg, false)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
 			"type":    errType,
@@ -4567,15 +4565,84 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		},
 	})
 
-	if upstreamMsg == "" {
-		return nil, fmt.Errorf("upstream error: %d", resp.StatusCode)
-	}
-	return nil, fmt.Errorf("upstream error: %d message=%s", resp.StatusCode, upstreamMsg)
+	return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
 }
 
 // compatErrorWriter is the signature for format-specific error writers used by
 // the compat paths (Chat Completions and Anthropic Messages).
 type compatErrorWriter func(c *gin.Context, statusCode int, errType, message string)
+
+func openAIContextFromGin(fallback context.Context, c *gin.Context) context.Context {
+	if c != nil && c.Request != nil && c.Request.Context() != nil {
+		return c.Request.Context()
+	}
+	if fallback != nil {
+		return fallback
+	}
+	return context.Background()
+}
+
+func openAIErrorResponseForClass(statusCode int, class openAIUpstreamErrorClass, upstreamMsg string, compat bool) (int, string, string) {
+	msg := strings.TrimSpace(upstreamMsg)
+	switch class {
+	case openAIUpstreamErrorBilling:
+		return http.StatusPaymentRequired, "billing_error", "Upstream payment required: insufficient balance or billing issue"
+	case openAIUpstreamErrorForbidden:
+		return http.StatusForbidden, "forbidden_error", "Upstream access forbidden, please contact administrator"
+	case openAIUpstreamErrorBusiness:
+		if msg == "" {
+			msg = "Upstream request is not enabled or not supported"
+		}
+		return clientFacingOpenAI4xxStatus(statusCode, http.StatusBadRequest), "invalid_request_error", msg
+	case openAIUpstreamErrorRateLimit:
+		return http.StatusTooManyRequests, "rate_limit_error", "Upstream rate limit exceeded, please retry later"
+	case openAIUpstreamErrorAuth:
+		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
+	case openAIUpstreamErrorTransient:
+		return http.StatusBadGateway, "api_error", "Upstream service temporarily unavailable"
+	case openAIUpstreamErrorModelUnsupported:
+		if msg == "" {
+			msg = "Requested model is not supported by upstream"
+		}
+		return clientFacingOpenAI4xxStatus(statusCode, http.StatusNotFound), "not_found_error", msg
+	}
+	switch statusCode {
+	case 400:
+		if msg == "" || !compat {
+			msg = "Upstream request failed"
+		}
+		return http.StatusBadRequest, "invalid_request_error", msg
+	case 401:
+		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
+	case 402:
+		return http.StatusPaymentRequired, "billing_error", "Upstream payment required: insufficient balance or billing issue"
+	case 403:
+		return http.StatusForbidden, "forbidden_error", "Upstream access forbidden, please contact administrator"
+	case 404:
+		if msg == "" || !compat {
+			msg = "Upstream resource not found"
+		}
+		return http.StatusNotFound, "not_found_error", msg
+	case 429:
+		return http.StatusTooManyRequests, "rate_limit_error", "Upstream rate limit exceeded, please retry later"
+	case 529:
+		return http.StatusServiceUnavailable, "api_error", "Upstream service overloaded, please retry later"
+	}
+	if statusCode >= 500 {
+		return http.StatusBadGateway, "api_error", "Upstream service temporarily unavailable"
+	}
+	if compat && msg != "" && statusCode >= 400 && statusCode < 500 {
+		return statusCode, "api_error", msg
+	}
+	return http.StatusBadGateway, "upstream_error", "Upstream request failed"
+}
+
+func clientFacingOpenAI4xxStatus(statusCode int, fallback int) int {
+	if statusCode >= 400 && statusCode < 500 {
+		return statusCode
+	}
+	return fallback
+}
 
 // handleCompatErrorResponse is the shared non-failover error handler for the
 // Chat Completions and Anthropic Messages compat paths. It mirrors the logic of
@@ -4616,15 +4683,16 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		if upstreamMsg == "" {
 			upstreamMsg = errMsg
 		}
-		if upstreamMsg == "" {
-			return nil, fmt.Errorf("upstream error: %d (passthrough rule matched)", resp.StatusCode)
-		}
-		return nil, fmt.Errorf("upstream error: %d (passthrough rule matched) message=%s", resp.StatusCode, upstreamMsg)
+		return nil, newUpstreamTerminalError(status, upstreamMsg)
 	}
+
+	reqCtx := openAIContextFromGin(context.Background(), c)
+	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+	shouldFailover := openAIUpstreamErrorClassShouldFailover(upstreamClass)
 
 	// Check custom error codes — if the account does not handle this status,
 	// return a generic error without exposing upstream details.
-	if !s.usesOpenAIAdvancedSchedulerPolicy(c.Request.Context(), account) && !account.ShouldHandleErrorCode(resp.StatusCode) {
+	if !s.usesOpenAIAdvancedSchedulerPolicy(reqCtx, account) && !account.ShouldHandleErrorCode(resp.StatusCode) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:           account.Platform,
 			AccountID:          account.ID,
@@ -4635,22 +4703,20 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 			Message:            upstreamMsg,
 			Detail:             upstreamDetail,
 		})
-		writeError(c, http.StatusInternalServerError, "api_error", "Upstream gateway error")
-		if upstreamMsg == "" {
-			return nil, fmt.Errorf("upstream error: %d (not in custom error codes)", resp.StatusCode)
+		if !shouldFailover {
+			statusCode, errType, errMsg := openAIErrorResponseForClass(resp.StatusCode, upstreamClass, upstreamMsg, true)
+			writeError(c, statusCode, errType, errMsg)
+			return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
 		}
-		return nil, fmt.Errorf("upstream error: %d (not in custom error codes) message=%s", resp.StatusCode, upstreamMsg)
 	}
 
 	// Track rate limits and decide whether to trigger secondary failover.
 	var modelForCooldown string
 	if len(requestedModel) > 0 {
-		modelForCooldown = requestedModel[0]
+		modelForCooldown = strings.TrimSpace(requestedModel[0])
 	}
-	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
-	shouldFailover := openAIUpstreamErrorClassShouldFailover(upstreamClass)
 	shouldDisable := s.handleOpenAIAccountUpstreamError(
-		c.Request.Context(), account, resp.StatusCode, resp.Header, body, modelForCooldown,
+		reqCtx, account, resp.StatusCode, resp.Header, body, modelForCooldown,
 	)
 	kind := "http_error"
 	if shouldDisable && shouldFailover {
@@ -4670,25 +4736,13 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		return nil, &UpstreamFailoverError{
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,
-			RetryableOnSameAccount: s.retryableOnSameOpenAIAccountStatus(c.Request.Context(), account, resp.StatusCode),
+			RetryableOnSameAccount: s.retryableOnSameOpenAIAccountStatus(reqCtx, account, resp.StatusCode),
 		}
 	}
 
-	// Map status code to error type and write response
-	errType := "api_error"
-	switch {
-	case resp.StatusCode == 400:
-		errType = "invalid_request_error"
-	case resp.StatusCode == 404:
-		errType = "not_found_error"
-	case resp.StatusCode == 429:
-		errType = "rate_limit_error"
-	case resp.StatusCode >= 500:
-		errType = "api_error"
-	}
-
-	writeError(c, resp.StatusCode, errType, upstreamMsg)
-	return nil, fmt.Errorf("upstream error: %d %s", resp.StatusCode, upstreamMsg)
+	statusCode, errType, errMsg := openAIErrorResponseForClass(resp.StatusCode, upstreamClass, upstreamMsg, true)
+	writeError(c, statusCode, errType, errMsg)
+	return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
 }
 
 // openaiStreamingResult streaming response result
@@ -4788,6 +4842,8 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 	clientDisconnected := false // 客户端断开后继续 drain 上游以收集 usage
 	sawTerminalEvent := false
 	sawFailedEvent := false
+	failedEventShouldFailover := false
+	var failedPayload []byte
 	failedMessage := ""
 	clientOutputStarted := false
 	upstreamRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
@@ -4838,6 +4894,9 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 			return resultWithUsage(), fmt.Errorf("stream usage incomplete: missing terminal event")
 		}
 		if sawFailedEvent {
+			if !failedEventShouldFailover {
+				return resultWithUsage(), newOpenAIStreamTerminalError(failedPayload, failedMessage)
+			}
 			return resultWithUsage(), fmt.Errorf("upstream response failed: %s", failedMessage)
 		}
 		if !clientDisconnected {
@@ -4861,6 +4920,9 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 			return resultWithUsage(), nil, true
 		}
 		if sawFailedEvent {
+			if !failedEventShouldFailover {
+				return resultWithUsage(), newOpenAIStreamTerminalError(failedPayload, failedMessage), true
+			}
 			return resultWithUsage(), fmt.Errorf("upstream response failed: %s", failedMessage), true
 		}
 		// 客户端断开/取消请求时，上游读取往往会返回 context canceled。
@@ -4908,7 +4970,10 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 			forceFlushFailedEvent := false
 			if eventType == "response.failed" {
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
-				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && openAIStreamFailedEventShouldFailover(dataBytes, failedMessage) {
+				failedPayload = append(failedPayload[:0], dataBytes...)
+				shouldFailoverFailedEvent := openAIStreamFailedEventShouldFailover(dataBytes, failedMessage)
+				failedEventShouldFailover = failedEventShouldFailover || shouldFailoverFailedEvent
+				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && shouldFailoverFailedEvent {
 					sawFailedEvent = true
 					streamFailoverErr = s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, dataBytes, failedMessage)
 					return
@@ -5813,6 +5878,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if result == nil {
 		return errors.New("openai usage result is nil")
 	}
+	result = cloneOpenAIForwardResultForUsage(result)
 	if s.rateLimitService != nil && input.Account != nil && input.Account.Platform == PlatformOpenAI {
 		s.rateLimitService.ResetOpenAI403Counter(ctx, input.Account.ID)
 	}

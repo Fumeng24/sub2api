@@ -256,6 +256,9 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 					)
 					continue
 				}
+				if h.handleOpenAIForwardTerminalError(c, reqLog, account, reqModel, schedulerEndpoint, "openai_chat_completions.forward_terminal_error", err) {
+					return
+				}
 				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, reqModel, schedulerEndpoint, false, nil)
 				wroteFallback := h.ensureForwardErrorResponse(c, streamStarted)
 				reqLog.Warn("openai_chat_completions.forward_failed",

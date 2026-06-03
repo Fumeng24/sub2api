@@ -409,6 +409,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					)
 					continue
 				}
+				if h.handleOpenAIForwardTerminalError(c, reqLog, account, reqModel, schedulerEndpoint, "openai.forward_terminal_error", err) {
+					return
+				}
 				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, reqModel, schedulerEndpoint, false, nil)
 				wroteFallback := h.ensureForwardErrorResponse(c, streamStarted)
 				fields := []zap.Field{
@@ -807,6 +810,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 						zap.Int("max_switches", maxAccountSwitches),
 					)
 					continue
+				}
+				if h.handleOpenAIForwardTerminalError(c, reqLog, account, scheduleModel, schedulerEndpoint, "openai_messages.forward_terminal_error", err) {
+					return
 				}
 				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, scheduleModel, schedulerEndpoint, false, nil)
 				wroteFallback := h.ensureAnthropicErrorResponse(c, streamStarted)
@@ -1812,6 +1818,36 @@ func (h *OpenAIGatewayHandler) ensureForwardErrorResponse(c *gin.Context, stream
 		streamStarted = true
 	}
 	h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed", streamStarted)
+	return true
+}
+
+func (h *OpenAIGatewayHandler) handleOpenAIForwardTerminalError(
+	c *gin.Context,
+	reqLog *zap.Logger,
+	account *service.Account,
+	model string,
+	schedulerEndpoint string,
+	eventName string,
+	err error,
+) bool {
+	var terminalErr *service.UpstreamTerminalError
+	if !errors.As(err, &terminalErr) {
+		return false
+	}
+	if h != nil && h.gatewayService != nil && account != nil {
+		h.gatewayService.ReportOpenAIAccountScheduleTerminal(account.ID, model, schedulerEndpoint)
+	}
+	if reqLog != nil {
+		accountID := int64(0)
+		if account != nil {
+			accountID = account.ID
+		}
+		reqLog.Warn(eventName,
+			zap.Int64("account_id", accountID),
+			zap.Int("terminal_status", terminalErr.StatusCode),
+			zap.Error(err),
+		)
+	}
 	return true
 }
 

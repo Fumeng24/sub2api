@@ -274,6 +274,9 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 					)
 					continue
 				}
+				if h.handleOpenAIForwardTerminalError(c, reqLog, account, parsed.Model, schedulerEndpoint, "openai.images.forward_terminal_error", err) {
+					return
+				}
 				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, parsed.Model, schedulerEndpoint, false, nil)
 				wroteFallback := h.ensureForwardErrorResponse(c, streamStarted)
 				fields := []zap.Field{

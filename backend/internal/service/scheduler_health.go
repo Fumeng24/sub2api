@@ -166,7 +166,6 @@ func (s *accountSchedulerHealthStats) snapshot(accountID int64, model, endpoint 
 		snap.ConsecutiveFailed = entry.consecutiveFailure
 		snap.LastFailureReason = entry.lastFailureReason
 		if allowHalfOpen && !entry.halfOpenInFlight {
-			entry.halfOpenInFlight = true
 			snap.HalfOpenProbe = true
 		}
 		return snap
@@ -229,6 +228,28 @@ func (s *accountSchedulerHealthStats) reportSuccess(accountID int64, model, endp
 	entry.updatedAt = time.Now()
 }
 
+func (s *accountSchedulerHealthStats) reportNeutral(accountID int64, model, endpoint string) {
+	key := makeAccountSchedulerHealthKey(accountID, model, endpoint)
+	if s == nil || accountID <= 0 {
+		return
+	}
+	value, ok := s.entries.Load(key)
+	if !ok {
+		return
+	}
+	entry, _ := value.(*accountSchedulerHealthEntry)
+	if entry == nil {
+		return
+	}
+
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	if entry.circuitState == schedulerCircuitHalfOpen {
+		entry.halfOpenInFlight = false
+		entry.updatedAt = time.Now()
+	}
+}
+
 func (s *accountSchedulerHealthStats) reportFailure(accountID int64, model, endpoint string, category string, cooldown time.Duration) {
 	key := makeAccountSchedulerHealthKey(accountID, model, endpoint)
 	entry := s.loadOrCreate(key)
@@ -243,7 +264,8 @@ func (s *accountSchedulerHealthStats) reportFailure(accountID int64, model, endp
 	entry.consecutiveFailure++
 	entry.recordRecent(true)
 	entry.lastFailureReason = strings.TrimSpace(category)
-	entry.updatedAt = time.Now()
+	now := time.Now()
+	entry.updatedAt = now
 
 	recentFailureRate := entry.recentFailureRate()
 	recentSampleCount := entry.recentSampleCount()
@@ -261,10 +283,46 @@ func (s *accountSchedulerHealthStats) reportFailure(accountID int64, model, endp
 		if cooldown <= 0 {
 			cooldown = schedulerCooldownForCategory(category, nil)
 		}
+		newUntil := now.Add(cooldown)
+		if entry.circuitState == schedulerCircuitOpen && entry.cooldownUntil.After(now) {
+			return
+		}
 		entry.circuitState = schedulerCircuitOpen
-		entry.cooldownUntil = time.Now().Add(cooldown)
+		entry.cooldownUntil = newUntil
 		entry.halfOpenInFlight = false
 	}
+}
+
+func (s *accountSchedulerHealthStats) tryBeginHalfOpenProbe(accountID int64, model, endpoint string) bool {
+	key := makeAccountSchedulerHealthKey(accountID, model, endpoint)
+	if s == nil || accountID <= 0 {
+		return true
+	}
+	value, ok := s.entries.Load(key)
+	if !ok {
+		return true
+	}
+	entry, _ := value.(*accountSchedulerHealthEntry)
+	if entry == nil {
+		return true
+	}
+
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+
+	now := time.Now()
+	if entry.circuitState == schedulerCircuitOpen && !entry.cooldownUntil.IsZero() && now.After(entry.cooldownUntil) {
+		entry.circuitState = schedulerCircuitHalfOpen
+		entry.halfOpenInFlight = false
+	}
+	if entry.circuitState != schedulerCircuitHalfOpen {
+		return true
+	}
+	if entry.halfOpenInFlight {
+		return false
+	}
+	entry.halfOpenInFlight = true
+	return true
 }
 
 func (e *accountSchedulerHealthEntry) recordRecent(failed bool) {

@@ -716,13 +716,16 @@ func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterReason(account
 		return "runtime_half_open_in_flight"
 	}
 	if s.service.schedulerHealth != nil {
-		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, false)
+		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, true)
 		switch snap.CircuitState {
 		case schedulerCircuitOpen:
 			if snap.CooldownUntil.IsZero() || snap.CooldownUntil.After(now) {
 				return "scheduler_circuit_open"
 			}
 		case schedulerCircuitHalfOpen:
+			if snap.HalfOpenProbe {
+				return ""
+			}
 			return "scheduler_half_open_in_flight"
 		}
 	}
@@ -899,7 +902,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 		if s.service != nil {
 			health = s.service.schedulerHealth
 		}
-		scores := buildSchedulerAccountScoresWithOptions(finalCandidates, req.GroupID, req.RequestedModel, endpoint, loadMap, health, false, true)
+		scores := buildSchedulerAccountScoresWithOptions(finalCandidates, req.GroupID, req.RequestedModel, endpoint, loadMap, health, true, true)
 		for _, candidate := range buildOpenAIOrderedSelectionOrder(openAIAccountCandidatesFromSchedulerScores(scores)) {
 			diag.OrderedCandidateAccountIDs = appendOpenAIAccountID(diag.OrderedCandidateAccountIDs, candidate.account)
 			if len(diag.OrderedCandidateAccountIDs) >= 10 {
@@ -1635,6 +1638,13 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 			return nil, compactBlocked, acquireErr
 		}
 		if result != nil && result.Acquired {
+			if candidate.halfOpen && s.service.schedulerHealth != nil &&
+				!s.service.schedulerHealth.tryBeginHalfOpenProbe(fresh.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req)) {
+				if result.ReleaseFunc != nil {
+					result.ReleaseFunc()
+				}
+				continue
+			}
 			if req.SessionHash != "" && !allowCooldownFallback {
 				_ = s.service.BindStickySession(ctx, req.GroupID, req.SessionHash, fresh.ID)
 			}
@@ -2282,6 +2292,16 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResultForRequest(accou
 	scheduler := s.getOpenAIAccountScheduler(context.Background())
 	if scheduler != nil {
 		scheduler.ReportResult(accountID, success, firstTokenMs)
+	}
+}
+
+func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleTerminal(accountID int64, model, endpoint string) {
+	if s == nil || accountID <= 0 {
+		return
+	}
+	s.openaiAccountCircuitHalfOpen.Delete(accountID)
+	if s.schedulerHealth != nil {
+		s.schedulerHealth.reportNeutral(accountID, model, endpoint)
 	}
 }
 

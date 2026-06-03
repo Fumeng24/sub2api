@@ -63,6 +63,8 @@ func classifyOpenAIUpstreamError(statusCode int, upstreamMsg string, upstreamBod
 		"precharge",
 		"pre-charge",
 		"预扣费",
+		"insufficient_quota",
+		"insufficient quota",
 		"insufficient balance",
 		"insufficient account balance",
 		"payment required",
@@ -72,6 +74,32 @@ func classifyOpenAIUpstreamError(statusCode int, upstreamMsg string, upstreamBod
 		"deactivated_workspace",
 	) {
 		return openAIUpstreamErrorBilling
+	}
+
+	if containsAnyOpenAIErrorText(text,
+		"upstream access forbidden",
+		"access forbidden",
+		"permission denied",
+	) {
+		return openAIUpstreamErrorForbidden
+	}
+
+	if containsAnyOpenAIErrorText(text,
+		"channel affinity disabled",
+		"channel is disabled",
+		"channel disabled",
+		"渠道被禁用",
+		"model/group not supported",
+		"model group not supported",
+		"model not support",
+		"group not support",
+		"group not enabled",
+		"not enabled for this group",
+		"image generation is not enabled for this group",
+		"endpoint not supported",
+		"endpoint unsupported",
+	) {
+		return openAIUpstreamErrorBusiness
 	}
 
 	switch statusCode {

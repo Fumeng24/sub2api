@@ -305,6 +305,39 @@ func TestGatewayServiceRecordUsage_EmptyImageSizeDefaultsBeforeBillingAndPersist
 	require.InDelta(t, 0.19, usageRepo.lastLog.ActualCost, 1e-12)
 }
 
+func TestGatewayServiceRecordUsage_DoesNotMutateForwardResultForForceCacheBilling(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	svc := newGatewayRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{})
+	result := &ForwardResult{
+		RequestID: "gateway_force_cache_immutable",
+		Model:     "claude-sonnet-4",
+		Usage: ClaudeUsage{
+			InputTokens:  10,
+			OutputTokens: 1,
+		},
+		Duration: time.Second,
+	}
+
+	err := svc.RecordUsage(context.Background(), &RecordUsageInput{
+		Result: result,
+		APIKey: &APIKey{
+			ID:    802,
+			Quota: 100,
+			Group: &Group{RateMultiplier: 1.0},
+		},
+		User:              &User{ID: 602},
+		Account:           &Account{ID: 702},
+		ForceCacheBilling: true,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Zero(t, usageRepo.lastLog.InputTokens)
+	require.Equal(t, 10, usageRepo.lastLog.CacheReadTokens)
+	require.Equal(t, 10, result.Usage.InputTokens)
+	require.Zero(t, result.Usage.CacheReadInputTokens)
+}
+
 func TestGatewayServiceRecordUsage_UsageLogWriteErrorDoesNotSkipBilling(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: false, err: MarkUsageLogCreateNotPersisted(context.Canceled)}
 	userRepo := &openAIRecordUsageUserRepoStub{}

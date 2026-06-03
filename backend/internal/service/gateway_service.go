@@ -168,6 +168,59 @@ func cloneStringSlice(src []string) []string {
 	return dst
 }
 
+func cloneIntPtr(src *int) *int {
+	if src == nil {
+		return nil
+	}
+	value := *src
+	return &value
+}
+
+func cloneStringPtr(src *string) *string {
+	if src == nil {
+		return nil
+	}
+	value := *src
+	return &value
+}
+
+func cloneIntMap(src map[string]int) map[string]int {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]int, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
+}
+
+func cloneForwardResultForUsage(src *ForwardResult) *ForwardResult {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	dst.FirstTokenMs = cloneIntPtr(src.FirstTokenMs)
+	dst.ReasoningEffort = cloneStringPtr(src.ReasoningEffort)
+	dst.ImageOutputSizes = cloneStringSlice(src.ImageOutputSizes)
+	dst.ImageSizeBreakdown = cloneIntMap(src.ImageSizeBreakdown)
+	return &dst
+}
+
+func cloneOpenAIForwardResultForUsage(src *OpenAIForwardResult) *OpenAIForwardResult {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	dst.ServiceTier = cloneStringPtr(src.ServiceTier)
+	dst.ReasoningEffort = cloneStringPtr(src.ReasoningEffort)
+	dst.FirstTokenMs = cloneIntPtr(src.FirstTokenMs)
+	dst.ImageOutputSizes = cloneStringSlice(src.ImageOutputSizes)
+	dst.ImageSizeBreakdown = cloneIntMap(src.ImageSizeBreakdown)
+	dst.ResponseHeaders = src.ResponseHeaders.Clone()
+	return &dst
+}
+
 // accountsToPointers converts []Account to []*Account.
 // Used at repo call sites where scheduler snapshot path returns []*Account
 // but fallback repo path returns []Account.
@@ -552,6 +605,28 @@ func newNetworkUpstreamFailoverError(message string) *UpstreamFailoverError {
 		ResponseBody:           []byte(message),
 		RetryableOnSameAccount: false,
 	}
+}
+
+// UpstreamTerminalError means the service already wrote a final client error
+// and the failure should not be fed back into account health or failover.
+type UpstreamTerminalError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *UpstreamTerminalError) Error() string {
+	if e == nil {
+		return "upstream terminal error"
+	}
+	message := strings.TrimSpace(e.Message)
+	if message == "" {
+		return fmt.Sprintf("upstream error: %d", e.StatusCode)
+	}
+	return fmt.Sprintf("upstream error: %d message=%s", e.StatusCode, message)
+}
+
+func newUpstreamTerminalError(statusCode int, message string) error {
+	return &UpstreamTerminalError{StatusCode: statusCode, Message: sanitizeUpstreamErrorMessage(message)}
 }
 
 // TempUnscheduleRetryableError 对 RetryableOnSameAccount 类型的 failover 错误触发临时封禁。
@@ -8318,6 +8393,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	if result == nil {
 		return errors.New("usage result is nil")
 	}
+	result = cloneForwardResultForUsage(result)
 	apiKey := input.APIKey
 	user := input.User
 	account := input.Account

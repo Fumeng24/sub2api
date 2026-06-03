@@ -297,7 +297,7 @@ func TestSchedulerHalfOpenAllowsSingleProbeAfterCooldown(t *testing.T) {
 		t.Fatalf("expected one half-open probe candidate, got %d", len(firstScores))
 	}
 	if !firstScores[0].HalfOpen || !firstScores[0].Health.HalfOpenProbe {
-		t.Fatalf("expected first candidate to consume half-open probe, got half_open=%v probe=%v", firstScores[0].HalfOpen, firstScores[0].Health.HalfOpenProbe)
+		t.Fatalf("expected first candidate to be eligible for half-open probe, got half_open=%v probe=%v", firstScores[0].HalfOpen, firstScores[0].Health.HalfOpenProbe)
 	}
 
 	secondScores := buildSchedulerAccountScores(
@@ -309,8 +309,34 @@ func TestSchedulerHalfOpenAllowsSingleProbeAfterCooldown(t *testing.T) {
 		health,
 		true,
 	)
-	if len(secondScores) != 0 {
-		t.Fatalf("expected second half-open probe to be suppressed while first is in flight, got %d", len(secondScores))
+	if len(secondScores) != 1 {
+		t.Fatalf("expected scoring to keep half-open candidate visible before acquisition, got %d", len(secondScores))
+	}
+
+	if !health.tryBeginHalfOpenProbe(account.ID, "gpt-5.5", "/v1/responses") {
+		t.Fatal("expected first acquired candidate to begin half-open probe")
+	}
+	if health.tryBeginHalfOpenProbe(account.ID, "gpt-5.5", "/v1/responses") {
+		t.Fatal("expected second acquired candidate to be suppressed while first is in flight")
+	}
+}
+
+func TestSchedulerFailureDoesNotExtendAlreadyOpenCooldown(t *testing.T) {
+	health := newAccountSchedulerHealthStats()
+	accountID := int64(1)
+	model := "gpt-5.5"
+	endpoint := "/v1/responses"
+
+	health.reportFailure(accountID, model, endpoint, "transient", time.Minute)
+	first := health.snapshot(accountID, model, endpoint, false)
+	if first.CircuitState != schedulerCircuitOpen || first.CooldownUntil.IsZero() {
+		t.Fatalf("expected open circuit, got state=%s until=%v", first.CircuitState, first.CooldownUntil)
+	}
+
+	health.reportFailure(accountID, model, endpoint, "transient", 5*time.Minute)
+	second := health.snapshot(accountID, model, endpoint, false)
+	if !second.CooldownUntil.Equal(first.CooldownUntil) {
+		t.Fatalf("expected existing cooldown to remain unchanged, first=%v second=%v", first.CooldownUntil, second.CooldownUntil)
 	}
 }
 

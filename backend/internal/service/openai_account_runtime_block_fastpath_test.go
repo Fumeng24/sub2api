@@ -497,7 +497,7 @@ func TestOpenAIForbiddenBusinessErrorDoesNotFailover(t *testing.T) {
 	body := []byte(`{"error":{"message":"Image generation is not enabled for this group"}}`)
 	svc := &OpenAIGatewayService{}
 
-	require.Equal(t, openAIUpstreamErrorForbidden, classifyOpenAIUpstreamError(http.StatusForbidden, "", body))
+	require.Equal(t, openAIUpstreamErrorBusiness, classifyOpenAIUpstreamError(http.StatusForbidden, "", body))
 	require.False(t, svc.shouldFailoverOpenAIUpstreamResponseForAccount(context.Background(), account, http.StatusForbidden, "", body))
 }
 
@@ -518,6 +518,30 @@ func TestOpenAITransientScheduleFailureUsesScopedSchedulerCooldown(t *testing.T)
 	require.Equal(t, schedulerCircuitOpen, sameScope.CircuitState)
 	otherModel := svc.schedulerHealth.snapshot(accountID, "gpt-5.4", endpoint, false)
 	require.Equal(t, schedulerCircuitClosed, otherModel.CircuitState)
+}
+
+func TestOpenAITerminalScheduleResultDoesNotRecoverHalfOpenCircuit(t *testing.T) {
+	svc := &OpenAIGatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
+	accountID := int64(116)
+	model := "gpt-5.5"
+	endpoint := "/v1/responses"
+
+	svc.schedulerHealth.reportFailure(accountID, model, endpoint, "transient", time.Minute)
+	key := makeAccountSchedulerHealthKey(accountID, model, endpoint)
+	value, ok := svc.schedulerHealth.entries.Load(key)
+	require.True(t, ok)
+	entry, ok := value.(*accountSchedulerHealthEntry)
+	require.True(t, ok)
+	entry.mu.Lock()
+	entry.cooldownUntil = time.Now().Add(-time.Second)
+	entry.mu.Unlock()
+
+	require.True(t, svc.schedulerHealth.tryBeginHalfOpenProbe(accountID, model, endpoint))
+	svc.ReportOpenAIAccountScheduleTerminal(accountID, model, endpoint)
+
+	snap := svc.schedulerHealth.snapshot(accountID, model, endpoint, true)
+	require.Equal(t, schedulerCircuitHalfOpen, snap.CircuitState)
+	require.True(t, snap.HalfOpenProbe)
 }
 
 func TestOpenAIThinkingSignatureInvalid_DoesNotFailoverOrCooldown(t *testing.T) {
