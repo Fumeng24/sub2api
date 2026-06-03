@@ -2101,7 +2101,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			return result, nil
 		}
 	} else {
-		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, false)
 		selectionOrder := buildRoleAwareSchedulerOrder(scores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash)
 		for _, item := range selectionOrder {
 			acc := item.Account
@@ -2143,7 +2143,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 }
 
 func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates []*Account, groupID *int64, sessionHash string, preferOAuth bool, requestedModel string, schedulerEndpoint string) (*AccountSelectionResult, bool, error) {
-	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, true)
+	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, false)
 	ordered := buildRoleAwareSchedulerOrder(scores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "legacy")
 
 	for _, item := range ordered {
@@ -2532,7 +2532,7 @@ func (s *GatewayService) orderGatewaySchedulerCandidates(
 	preferOAuth bool,
 	seedParts ...string,
 ) []schedulerAccountScore {
-	scores := buildSchedulerAccountScores(accounts, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
+	scores := buildSchedulerAccountScores(accounts, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, false)
 	return buildRoleAwareSchedulerOrder(scores, preferOAuth, append([]string{
 		strconv.FormatInt(derefGroupID(groupID), 10),
 		requestedModel,

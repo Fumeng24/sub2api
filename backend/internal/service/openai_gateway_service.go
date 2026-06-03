@@ -360,6 +360,7 @@ type OpenAIGatewayService struct {
 	openaiWSFallbackUntil               sync.Map // key: int64(accountID), value: time.Time
 	openaiAccountRuntimeBlockUntil      sync.Map // key: int64(accountID), value: time.Time
 	openaiAccountCircuitHalfOpen        sync.Map // key: int64(accountID), value: time.Time
+	openaiAccountCircuitProbes          sync.Map // key: accountSchedulerHealthKey, value: *openAIAccountCircuitProbe
 	openaiOAuth429WindowStartUnixNano   atomic.Int64
 	openaiOAuth429WindowCount           atomic.Int64
 	openaiWSRetryMetrics                openAIWSRetryMetrics
@@ -1638,7 +1639,7 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 	if len(candidates) == 0 {
 		return nil, compactBlocked
 	}
-	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, true)
+	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, false)
 	order := buildRoleAwareSchedulerOrder(scores, true, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "best")
 	if requireCompact {
 		order = orderOpenAISchedulerScoresForCompact(order, !openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), s.schedulerSnapshot != nil)
@@ -1677,33 +1678,14 @@ func (s *OpenAIGatewayService) openAISchedulerGroupForFallback(ctx context.Conte
 }
 
 func (s *OpenAIGatewayService) selectOpenAICooldownFallbackAccount(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability) (*Account, bool, error) {
-	scheduler := &defaultOpenAIAccountScheduler{service: s}
-	req := s.openAICooldownFallbackRequest(groupID, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability)
-	order, count := scheduler.buildOpenAICooldownFallbackOrder(ctx, req, s.openAISchedulerGroupForFallback(ctx, groupID))
-	if count == 0 {
-		return nil, false, nil
-	}
-
-	compactBlocked := false
-	for _, candidate := range order {
-		fresh := s.resolveFreshOpenAIAccountIgnoringCooldownForSelection(ctx, candidate.account, requestedModel, false, nil, requiredCapability)
-		if fresh == nil || !scheduler.isAccountRequestCompatibleIgnoringCooldown(ctx, fresh, req) {
-			continue
-		}
-		fresh = s.recheckSelectedOpenAIAccountFromDBIgnoringCooldownForSelection(ctx, fresh, requestedModel, false, nil, requiredCapability)
-		if fresh == nil || !scheduler.isAccountRequestCompatibleIgnoringCooldown(ctx, fresh, req) {
-			continue
-		}
-		if s.isOpenAIAccountRuntimeBlocked(fresh) {
-			continue
-		}
-		if requireCompact && !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, fresh) {
-			compactBlocked = true
-			continue
-		}
-		return fresh, compactBlocked, nil
-	}
-	return nil, compactBlocked, nil
+	_ = ctx
+	_ = groupID
+	_ = sessionHash
+	_ = requestedModel
+	_ = excludedIDs
+	_ = requireCompact
+	_ = requiredCapability
+	return nil, false, nil
 }
 
 func (s *OpenAIGatewayService) selectOpenAICooldownFallbackResult(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, allowWaitPlan bool) (*AccountSelectionResult, bool, error) {
@@ -1944,7 +1926,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		return s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, fresh, requestedModel, requireCompact, excludedIDs, requiredCapability)
 	}
 	tryAcquireFromLoadMap := func(loadMap map[int64]*AccountLoadInfo) (*AccountSelectionResult, bool, error) {
-		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, false)
 		selectionOrder := orderScores(scores, "load")
 		if len(selectionOrder) == 0 {
 			return nil, false, nil
@@ -1975,7 +1957,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 
 	loadMap, err := s.concurrencyService.GetAccountsLoadBatch(ctx, accountLoads)
 	if err != nil {
-		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, true)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, false)
 		selectionOrder := orderScores(scores, "load_error")
 		for _, item := range selectionOrder {
 			fresh := resolveCandidate(item.Account)

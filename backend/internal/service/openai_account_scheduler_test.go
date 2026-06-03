@@ -716,7 +716,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_SessionStickyRateLimite
 	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
 }
 
-func TestOpenAIGatewayService_SelectAccountWithScheduler_AllNormalCandidatesCoolingUsesCooldownFallback(t *testing.T) {
+func TestOpenAIGatewayService_SelectAccountWithScheduler_AllNormalCandidatesCoolingDoesNotUseUserTrafficAsProbe(t *testing.T) {
 	ctx := context.Background()
 	rateLimitedUntil := time.Now().Add(30 * time.Minute)
 	accounts := []Account{
@@ -750,13 +750,11 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_AllNormalCandidatesCool
 	}
 
 	selection, decision, err := svc.SelectAccountWithScheduler(ctx, nil, "", "", "gpt-5.1", nil, OpenAIUpstreamTransportAny, false)
-	require.NoError(t, err)
-	require.NotNil(t, selection)
-	require.NotNil(t, selection.Account)
-	require.Equal(t, int64(31101), selection.Account.ID)
+	require.Error(t, err)
+	require.Nil(t, selection)
 	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
-	require.Equal(t, 2, decision.CandidateCount)
-	require.Equal(t, 2, decision.TopK)
+	require.Equal(t, 0, decision.CandidateCount)
+	require.Equal(t, 0, decision.TopK)
 }
 
 func TestOpenAIGatewayService_SelectAccountForModelWithExclusions_SkipsFreshlyRateLimitedSnapshotCandidate(t *testing.T) {
@@ -908,7 +906,7 @@ func TestOpenAIGatewayService_SelectAccountForModelWithExclusions_RetriesFreshDB
 	require.Equal(t, int64(37002), account.ID)
 }
 
-func TestOpenAIGatewayService_SelectAccountWithLoadAwareness_LegacyUsesCooldownFallback(t *testing.T) {
+func TestOpenAIGatewayService_SelectAccountWithLoadAwareness_DoesNotUseCooldownAsUserProbe(t *testing.T) {
 	ctx := context.Background()
 	rateLimitedUntil := time.Now().Add(30 * time.Minute)
 	account := Account{
@@ -929,10 +927,9 @@ func TestOpenAIGatewayService_SelectAccountWithLoadAwareness_LegacyUsesCooldownF
 	}
 
 	selection, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "", "gpt-5.1", nil)
-	require.NoError(t, err)
-	require.NotNil(t, selection)
-	require.NotNil(t, selection.Account)
-	require.Equal(t, int64(37011), selection.Account.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no available OpenAI accounts")
+	require.Nil(t, selection)
 }
 
 func TestOpenAIGatewayService_SelectAccountWithScheduler_PreviousResponseSticky(t *testing.T) {
@@ -1844,14 +1841,7 @@ func TestOpenAICodexAccountCircuit_GlobalAcrossGroupsAndHalfOpenRecovery(t *test
 		require.Equal(t, int64(38797), selectID(groupID), "healthy primary should stay first for group %d", groupID)
 	}
 
-	svc.markOpenAIAccountTemporarilyUnschedulable(
-		ctx,
-		&primary,
-		0,
-		"openai_request_error",
-		openAIRequestErrorCooldown,
-		[]byte("read tcp: connection reset by peer"),
-	)
+	svc.schedulerHealth.reportFailure(primary.ID, "gpt-5.1", "/v1/responses", "transient", time.Minute)
 	for _, groupID := range groups {
 		require.Equal(t, int64(38801), selectID(groupID), "open global circuit should skip primary for group %d", groupID)
 	}
@@ -1869,25 +1859,27 @@ func TestOpenAICodexAccountCircuit_GlobalAcrossGroupsAndHalfOpenRecovery(t *test
 	require.Contains(t, err.Error(), "no available OpenAI accounts")
 	require.Nil(t, selection, "active global circuit should not be returned by cooldown fallback")
 
-	svc.openaiAccountRuntimeBlockUntil.Store(primary.ID, time.Now().Add(-time.Second))
-	require.Equal(t, int64(38797), selectID(2), "expired circuit should allow one half-open probe")
-	require.Equal(t, int64(38801), selectID(10), "other groups should skip while half-open probe is in flight")
+	svc.schedulerHealth.reportSuccess(primary.ID, "gpt-5.1", "/v1/responses", nil)
+	svc.schedulerHealth.reportFailure(primary.ID, "gpt-5.1", "/v1/responses", "transient", time.Nanosecond)
+	require.Eventually(t, func() bool {
+		snap := svc.schedulerHealth.snapshot(primary.ID, "gpt-5.1", "/v1/responses", false)
+		return snap.CircuitState == schedulerCircuitHalfOpen
+	}, time.Second, time.Millisecond)
+	for _, groupID := range groups {
+		require.Equal(t, int64(38801), selectID(groupID), "expired circuit should wait for background probe, not user traffic, for group %d", groupID)
+	}
 
 	svc.ReportOpenAIAccountScheduleResultForRequest(primary.ID, "gpt-5.1", "/v1/responses", true, nil)
 	require.Equal(t, int64(38797), selectID(12), "successful half-open probe should restore primary order")
 
-	svc.markOpenAIAccountTemporarilyUnschedulable(
-		ctx,
-		&primary,
-		0,
-		"openai_request_error",
-		openAIRequestErrorCooldown,
-		[]byte("read tcp: connection reset by peer"),
-	)
-	svc.openaiAccountRuntimeBlockUntil.Store(primary.ID, time.Now().Add(-time.Second))
-	require.Equal(t, int64(38797), selectID(2), "expired circuit should allow a later half-open probe")
+	svc.schedulerHealth.reportFailure(primary.ID, "gpt-5.1", "/v1/responses", "transient", time.Nanosecond)
+	require.Eventually(t, func() bool {
+		snap := svc.schedulerHealth.snapshot(primary.ID, "gpt-5.1", "/v1/responses", false)
+		return snap.CircuitState == schedulerCircuitHalfOpen
+	}, time.Second, time.Millisecond)
+	require.Equal(t, int64(38801), selectID(2), "later half-open state should still wait for background probe")
 	svc.ReportOpenAIAccountScheduleResultForRequest(primary.ID, "gpt-5.1", "/v1/responses", false, nil)
-	require.Equal(t, int64(38797), selectID(10), "non-failover half-open result should recover the primary")
+	require.Equal(t, int64(38801), selectID(10), "failed half-open result should not recover the primary")
 }
 
 func TestOpenAIStreamInterruptionCircuit_DoesNotReplayAfterClientOutput(t *testing.T) {
