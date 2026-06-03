@@ -111,6 +111,59 @@ func openAIAccountSelectFailedFields(err error, excludedAccountCount int, decisi
 		zap.Error(err),
 		zap.Int("excluded_account_count", excludedAccountCount),
 	}
+	if diag := decision.Diagnostics; diag.Collected {
+		fields = append(fields,
+			zap.Int64("group_id", diag.GroupID),
+			zap.String("model", diag.Model),
+			zap.String("endpoint", diag.Endpoint),
+			zap.Int("group_binding_count", diag.GroupBindingAccountCount),
+			zap.Int("active_schedulable_count", diag.ActiveSchedulableCount),
+			zap.Int("model_supported_count", diag.ModelSupportedCount),
+			zap.Int("endpoint_supported_count", diag.EndpointSupportedCount),
+			zap.Int("state_allowed_count", diag.StateAllowedCount),
+			zap.Int("circuit_allowed_count", diag.CircuitAllowedCount),
+			zap.Int("concurrency_slot_allowed_count", diag.ConcurrencySlotAllowedCount),
+			zap.Int("final_candidate_count", diag.FinalCandidateCount),
+		)
+		if len(diag.ExcludedAccountIDs) > 0 {
+			fields = append(fields, zap.Int64s("tried_accounts", diag.ExcludedAccountIDs))
+		}
+		if len(diag.GroupBindingAccountIDs) > 0 {
+			fields = append(fields, zap.Int64s("group_binding_accounts", diag.GroupBindingAccountIDs))
+		}
+		if len(diag.CandidateAccountIDs) > 0 {
+			fields = append(fields, zap.Int64s("candidate_accounts", diag.CandidateAccountIDs))
+		}
+		if len(diag.OrderedCandidateAccountIDs) > 0 {
+			fields = append(fields, zap.Int64s("ordered_candidate_accounts", diag.OrderedCandidateAccountIDs))
+		}
+		if skipped := openAISelectionSkippedAccounts(diag); len(skipped) > 0 {
+			fields = append(fields, zap.Any("skipped_accounts", skipped))
+		}
+		if len(diag.FilterReasonCounts) > 0 {
+			fields = append(fields, zap.Any("skip_reason", diag.FilterReasonCounts))
+		}
+	}
 	fields = append(fields, openAISelectionDiagnosticZapFields(decision)...)
 	return fields
+}
+
+func openAISelectionSkippedAccounts(diag service.OpenAIAccountSelectionDiagnostics) map[string][]int64 {
+	skipped := make(map[string][]int64)
+	add := func(reason string, ids []int64) {
+		if len(ids) == 0 {
+			return
+		}
+		skipped[reason] = ids
+	}
+	add("excluded", diag.ExcludedAccountIDs)
+	add("model_unsupported", diag.ModelUnsupportedAccountIDs)
+	add("endpoint_unsupported", diag.EndpointUnsupportedAccountIDs)
+	add("channel_pricing_restricted", diag.ChannelRestrictionAccountIDs)
+	add("compact_unsupported", diag.CompactUnsupportedAccountIDs)
+	add("state_filtered", diag.StateFilteredAccountIDs)
+	add("circuit_filtered", diag.CircuitFilteredAccountIDs)
+	add("concurrency_full", diag.ConcurrencySlotFilteredAccountIDs)
+	add("half_open_filtered", diag.HalfOpenFilteredAccountIDs)
+	return skipped
 }

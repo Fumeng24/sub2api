@@ -251,7 +251,8 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 
 	// 2) billing eligibility check (after wait)
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		reqLog.Info("gemini.billing_eligibility_check_failed", zap.Error(err))
+		reqLog.Info("gemini.billing_eligibility_check_failed",
+			billingEligibilityFailureFields(c.Request.Context(), h.billingCacheService, err, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey), body, modelName, GetInboundEndpoint(c))...)
 		status, _, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -483,6 +484,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if fs.SwitchCount > 0 {
 			requestCtx = service.WithAccountSwitchCount(requestCtx, fs.SwitchCount, h.metadataBridgeEnabled())
 		}
+		writerSizeBeforeForward := c.Writer.Size()
 		if account.Platform == service.PlatformAntigravity && account.Type != service.AccountTypeAPIKey {
 			result, err = h.antigravityGatewayService.ForwardGemini(requestCtx, c, account, modelName, action, stream, body, hasBoundSession)
 		} else {
@@ -494,8 +496,12 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
+				if c.Writer.Size() != writerSizeBeforeForward {
+					h.handleGeminiFailoverExhausted(c, failoverErr)
+					return
+				}
 				actionCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
-				failoverAction := fs.HandleFailoverErrorForRequest(actionCtx, h.gatewayService, account.ID, account.Platform, modelName, schedulerEndpoint, failoverErr)
+				failoverAction := fs.HandleFailoverErrorForRequest(actionCtx, h.gatewayService, account.ID, account.Platform, modelName, schedulerEndpoint, failoverErr, failoverWriterFields(c.Writer.Size(), writerSizeBeforeForward)...)
 				switch failoverAction {
 				case FailoverContinue:
 					continue

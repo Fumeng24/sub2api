@@ -149,7 +149,8 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 
 	// 2. Re-check billing
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		reqLog.Info("gateway.responses.billing_check_failed", zap.Error(err))
+		reqLog.Info("gateway.responses.billing_check_failed",
+			billingEligibilityFailureFields(c.Request.Context(), h.billingCacheService, err, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey), body, reqModel, GetInboundEndpoint(c))...)
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -247,7 +248,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 					return
 				}
 				actionCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
-				action := fs.HandleFailoverErrorForRequest(actionCtx, h.gatewayService, account.ID, account.Platform, reqModel, schedulerEndpoint, failoverErr)
+				action := fs.HandleFailoverErrorForRequest(actionCtx, h.gatewayService, account.ID, account.Platform, reqModel, schedulerEndpoint, failoverErr, failoverWriterFields(c.Writer.Size(), writerSizeBeforeForward)...)
 				switch action {
 				case FailoverContinue:
 					continue

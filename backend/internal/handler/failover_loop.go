@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -84,6 +86,7 @@ func (s *FailoverState) HandleFailoverErrorForRequest(
 	model string,
 	endpoint string,
 	failoverErr *service.UpstreamFailoverError,
+	extraFields ...zap.Field,
 ) FailoverAction {
 	s.LastFailoverErr = failoverErr
 	if reporter, ok := gatewayService.(AccountScheduleFailureReporter); ok {
@@ -98,12 +101,12 @@ func (s *FailoverState) HandleFailoverErrorForRequest(
 	// 同账号重试：对 RetryableOnSameAccount 的临时性错误，先在同一账号上重试
 	if failoverErr.RetryableOnSameAccount && s.SameAccountRetryCount[accountID] < maxSameAccountRetries {
 		s.SameAccountRetryCount[accountID]++
-		logger.FromContext(ctx).Warn("gateway.failover_same_account_retry",
-			zap.Int64("account_id", accountID),
-			zap.Int("upstream_status", failoverErr.StatusCode),
+		fields := s.failoverLogFields(accountID, model, endpoint, failoverErr, extraFields...)
+		fields = append(fields,
 			zap.Int("same_account_retry_count", s.SameAccountRetryCount[accountID]),
 			zap.Int("same_account_retry_max", maxSameAccountRetries),
 		)
+		logger.FromContext(ctx).Warn("gateway.failover_same_account_retry", fields...)
 		if !sleepWithContext(ctx, sameAccountRetryDelay) {
 			return FailoverCanceled
 		}
@@ -125,12 +128,12 @@ func (s *FailoverState) HandleFailoverErrorForRequest(
 
 	// 递增切换计数
 	s.SwitchCount++
-	logger.FromContext(ctx).Warn("gateway.failover_switch_account",
-		zap.Int64("account_id", accountID),
-		zap.Int("upstream_status", failoverErr.StatusCode),
+	fields := s.failoverLogFields(accountID, model, endpoint, failoverErr, extraFields...)
+	fields = append(fields,
 		zap.Int("switch_count", s.SwitchCount),
 		zap.Int("max_switches", s.MaxSwitches),
 	)
+	logger.FromContext(ctx).Warn("gateway.failover_switch_account", fields...)
 
 	// Antigravity 平台换号线性递增延时
 	if platform == service.PlatformAntigravity {
@@ -156,6 +159,8 @@ func (s *FailoverState) HandleSelectionExhausted(ctx context.Context) FailoverAc
 		s.SwitchCount <= s.MaxSwitches {
 
 		logger.FromContext(ctx).Warn("gateway.failover_single_account_backoff",
+			zap.Int64s("tried_accounts", s.FailedAccountIDList()),
+			zap.Int("upstream_status", s.LastFailoverErr.StatusCode),
 			zap.Duration("backoff_delay", singleAccountBackoffDelay),
 			zap.Int("switch_count", s.SwitchCount),
 			zap.Int("max_switches", s.MaxSwitches),
@@ -164,6 +169,8 @@ func (s *FailoverState) HandleSelectionExhausted(ctx context.Context) FailoverAc
 			return FailoverCanceled
 		}
 		logger.FromContext(ctx).Warn("gateway.failover_single_account_retry",
+			zap.Int64s("tried_accounts", s.FailedAccountIDList()),
+			zap.Int("upstream_status", s.LastFailoverErr.StatusCode),
 			zap.Int("switch_count", s.SwitchCount),
 			zap.Int("max_switches", s.MaxSwitches),
 		)
@@ -171,6 +178,125 @@ func (s *FailoverState) HandleSelectionExhausted(ctx context.Context) FailoverAc
 		return FailoverContinue
 	}
 	return FailoverExhausted
+}
+
+func (s *FailoverState) FailedAccountIDList() []int64 {
+	if s == nil {
+		return nil
+	}
+	return sortedInt64SetKeys(s.FailedAccountIDs)
+}
+
+func (s *FailoverState) triedAccountIDsWith(accountID int64) []int64 {
+	ids := s.FailedAccountIDList()
+	for _, id := range ids {
+		if id == accountID {
+			return ids
+		}
+	}
+	ids = append(ids, accountID)
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
+}
+
+func (s *FailoverState) failoverLogFields(accountID int64, model, endpoint string, failoverErr *service.UpstreamFailoverError, extraFields ...zap.Field) []zap.Field {
+	statusCode := 0
+	if failoverErr != nil {
+		statusCode = failoverErr.StatusCode
+	}
+	fields := []zap.Field{
+		zap.Int64("account_id", accountID),
+		zap.Int64("failed_account", accountID),
+		zap.Int64s("tried_accounts", s.triedAccountIDsWith(accountID)),
+		zap.Int("upstream_status", statusCode),
+		zap.String("circuit_scope", failoverCircuitScope(model, endpoint)),
+	}
+	if strings.TrimSpace(model) != "" {
+		fields = append(fields, zap.String("model", model))
+	}
+	if strings.TrimSpace(endpoint) != "" {
+		fields = append(fields, zap.String("endpoint", endpoint))
+	}
+	fields = append(fields, extraFields...)
+	return fields
+}
+
+func failoverCircuitScope(model, endpoint string) string {
+	model = strings.TrimSpace(model)
+	endpoint = strings.TrimSpace(endpoint)
+	switch {
+	case model != "" && endpoint != "":
+		return "account+model+endpoint"
+	case model != "":
+		return "account+model"
+	case endpoint != "":
+		return "account+endpoint"
+	default:
+		return "account"
+	}
+}
+
+func sortedInt64SetKeys(values map[int64]struct{}) []int64 {
+	if len(values) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(values))
+	for id := range values {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
+}
+
+func failoverWriterFields(currentSize, writerSizeBeforeForward int) []zap.Field {
+	bytesWritten := failoverBytesWritten(currentSize, writerSizeBeforeForward)
+	return []zap.Field{
+		zap.Int("bytes_written", bytesWritten),
+		zap.Bool("response_started", bytesWritten > 0),
+		zap.Int("writer_size_before_forward", writerSizeBeforeForward),
+		zap.Int("writer_size_after_forward", currentSize),
+	}
+}
+
+func failoverBytesWritten(currentSize, writerSizeBeforeForward int) int {
+	if currentSize <= writerSizeBeforeForward {
+		return 0
+	}
+	if writerSizeBeforeForward < 0 {
+		return currentSize
+	}
+	return currentSize - writerSizeBeforeForward
+}
+
+func manualFailoverSwitchFields(
+	accountID int64,
+	upstreamStatus int,
+	switchCount int,
+	maxSwitches int,
+	failedAccountIDs map[int64]struct{},
+	model string,
+	endpoint string,
+	currentSize int,
+	writerSizeBeforeForward int,
+) []zap.Field {
+	triedAccounts := sortedInt64SetKeys(failedAccountIDs)
+	fields := []zap.Field{
+		zap.Int64("account_id", accountID),
+		zap.Int64("failed_account", accountID),
+		zap.Int64s("tried_accounts", triedAccounts),
+		zap.Int("upstream_status", upstreamStatus),
+		zap.Int("switch_count", switchCount),
+		zap.Int("max_switches", maxSwitches),
+		zap.String("circuit_scope", failoverCircuitScope(model, endpoint)),
+	}
+	if model != "" {
+		fields = append(fields, zap.String("model", model))
+	}
+	if endpoint != "" {
+		fields = append(fields, zap.String("endpoint", endpoint))
+	}
+	fields = append(fields, failoverWriterFields(currentSize, writerSizeBeforeForward)...)
+	return fields
 }
 
 // needForceCacheBilling 判断 failover 时是否需要强制缓存计费。

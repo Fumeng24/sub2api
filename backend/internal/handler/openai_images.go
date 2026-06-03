@@ -124,7 +124,8 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 	}
 
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		reqLog.Info("openai.images.billing_eligibility_check_failed", zap.Error(err))
+		reqLog.Info("openai.images.billing_eligibility_check_failed",
+			billingEligibilityFailureFields(c.Request.Context(), h.billingCacheService, err, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey), body, parsed.Model, GetInboundEndpoint(c))...)
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -195,6 +196,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
 		forwardStart := time.Now()
+		writerSizeBeforeForward := c.Writer.Size()
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
 				if accountReleaseFunc != nil {
@@ -235,6 +237,10 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				}
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
+					if c.Writer.Size() != writerSizeBeforeForward {
+						h.handleFailoverExhausted(c, failoverErr, true)
+						return
+					}
 					h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, parsed.Model, schedulerEndpoint, failoverErr)
 					if failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
@@ -267,11 +273,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 						return
 					}
 					reqLog.Warn("openai.images.upstream_failover_switching",
-						zap.Int64("account_id", account.ID),
-						zap.Int("upstream_status", failoverErr.StatusCode),
-						zap.Int("switch_count", switchCount),
-						zap.Int("max_switches", maxAccountSwitches),
-					)
+						manualFailoverSwitchFields(account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches, failedAccountIDs, parsed.Model, schedulerEndpoint, c.Writer.Size(), writerSizeBeforeForward)...)
 					continue
 				}
 				if h.handleOpenAIForwardTerminalError(c, reqLog, account, parsed.Model, schedulerEndpoint, "openai.images.forward_terminal_error", err) {

@@ -247,7 +247,8 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 
 	// 2. Re-check billing eligibility after wait
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
+		reqLog.Info("openai.billing_eligibility_check_failed",
+			billingEligibilityFailureFields(c.Request.Context(), h.billingCacheService, err, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey), body, reqModel, GetInboundEndpoint(c))...)
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -402,11 +403,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						return
 					}
 					reqLog.Warn("openai.upstream_failover_switching",
-						zap.Int64("account_id", account.ID),
-						zap.Int("upstream_status", failoverErr.StatusCode),
-						zap.Int("switch_count", switchCount),
-						zap.Int("max_switches", maxAccountSwitches),
-					)
+						manualFailoverSwitchFields(account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches, failedAccountIDs, reqModel, schedulerEndpoint, c.Writer.Size(), writerSizeBeforeForward)...)
 					continue
 				}
 				if h.handleOpenAIForwardTerminalError(c, reqLog, account, reqModel, schedulerEndpoint, "openai.forward_terminal_error", err) {
@@ -659,7 +656,8 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	}
 
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
+		reqLog.Info("openai_messages.billing_eligibility_check_failed",
+			billingEligibilityFailureFields(c.Request.Context(), h.billingCacheService, err, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey), body, reqModel, GetInboundEndpoint(c))...)
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -742,6 +740,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		if channelMappingMsg.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMappingMsg.MappedModel)
 		}
+		writerSizeBeforeForward := c.Writer.Size()
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
 				if accountReleaseFunc != nil {
@@ -771,6 +770,10 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			} else {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
+					if c.Writer.Size() != writerSizeBeforeForward {
+						h.handleAnthropicFailoverExhausted(c, failoverErr, true)
+						return
+					}
 					h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, scheduleModel, schedulerEndpoint, failoverErr)
 					// 池模式：同账号重试
 					if failoverErr.RetryableOnSameAccount {
@@ -804,11 +807,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 						return
 					}
 					reqLog.Warn("openai_messages.upstream_failover_switching",
-						zap.Int64("account_id", account.ID),
-						zap.Int("upstream_status", failoverErr.StatusCode),
-						zap.Int("switch_count", switchCount),
-						zap.Int("max_switches", maxAccountSwitches),
-					)
+						manualFailoverSwitchFields(account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches, failedAccountIDs, scheduleModel, schedulerEndpoint, c.Writer.Size(), writerSizeBeforeForward)...)
 					continue
 				}
 				if h.handleOpenAIForwardTerminalError(c, reqLog, account, scheduleModel, schedulerEndpoint, "openai_messages.forward_terminal_error", err) {
@@ -1271,7 +1270,8 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
-		reqLog.Info("openai.websocket_billing_eligibility_check_failed", zap.Error(err))
+		reqLog.Info("openai.websocket_billing_eligibility_check_failed",
+			billingEligibilityFailureFields(ctx, h.billingCacheService, err, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey), firstMessage, reqModel, GetInboundEndpoint(c))...)
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
 		return
 	}
@@ -1489,11 +1489,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				}
 				h.gatewayService.RecordOpenAIAccountSwitch()
 				reqLog.Warn("openai.websocket_upstream_failover_switching",
-					zap.Int64("account_id", account.ID),
-					zap.Int("upstream_status", failoverErr.StatusCode),
-					zap.Int("switch_count", switchCount),
-					zap.Int("max_switches", maxAccountSwitches),
-				)
+					manualFailoverSwitchFields(account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches, failedAccountIDs, reqModel, schedulerEndpoint, -1, -1)...)
 				if !ensureUserSlotHeld() {
 					return
 				}
