@@ -554,13 +554,6 @@ func (s *OpenAIGatewayService) getCodexSnapshotThrottle() *accountWriteThrottle 
 	return defaultOpenAICodexSnapshotPersistThrottle
 }
 
-func (s *OpenAIGatewayService) getOpenAITransientCooldownPersistThrottle() *accountWriteThrottle {
-	if s != nil && s.openaiTransientCooldownThrottle != nil {
-		return s.openaiTransientCooldownThrottle
-	}
-	return defaultOpenAITransientCooldownPersistThrottle
-}
-
 func (s *OpenAIGatewayService) billingDeps() *billingDeps {
 	return &billingDeps{
 		accountRepo:           s.accountRepo,
@@ -1662,33 +1655,6 @@ func (s *OpenAIGatewayService) withOpenAIQuotaAutoPauseContext(ctx context.Conte
 	return withOpenAIQuotaAutoPauseSettings(ctx, s.settingService.GetOpenAIQuotaAutoPauseSettings(ctx))
 }
 
-// prioritizeOpenAICompactAccounts re-orders a slice so that accounts with known
-// compact support are tried first, followed by unknown, then explicitly unsupported.
-// The relative order within each tier is preserved.
-func prioritizeOpenAICompactAccounts(accounts []*Account) []*Account {
-	if len(accounts) == 0 {
-		return nil
-	}
-	supported := make([]*Account, 0, len(accounts))
-	unknown := make([]*Account, 0, len(accounts))
-	unsupported := make([]*Account, 0, len(accounts))
-	for _, account := range accounts {
-		switch openAICompactSupportTier(account) {
-		case 2:
-			supported = append(supported, account)
-		case 1:
-			unknown = append(unknown, account)
-		default:
-			unsupported = append(unsupported, account)
-		}
-	}
-	out := make([]*Account, 0, len(accounts))
-	out = append(out, supported...)
-	out = append(out, unknown...)
-	out = append(out, unsupported...)
-	return out
-}
-
 // resolveOpenAIAccountUpstreamModelForRequest resolves the upstream model that
 // would be sent for a given request, honouring compact-only mappings when the
 // caller is on the /responses/compact path.
@@ -2592,22 +2558,6 @@ func (s *OpenAIGatewayService) GetAccessToken(ctx context.Context, account *Acco
 	default:
 		return "", "", fmt.Errorf("unsupported account type: %s", account.Type)
 	}
-}
-
-func (s *OpenAIGatewayService) shouldFailoverUpstreamError(statusCode int) bool {
-	switch statusCode {
-	case 401, 402, 403, 429, 529:
-		return true
-	default:
-		return statusCode >= 500
-	}
-}
-
-func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponse(statusCode int, upstreamMsg string, upstreamBody []byte) bool {
-	if s.shouldFailoverUpstreamError(statusCode) {
-		return true
-	}
-	return isOpenAITransientProcessingError(statusCode, upstreamMsg, upstreamBody)
 }
 
 func marshalOpenAIUpstreamJSON(v any) ([]byte, error) {

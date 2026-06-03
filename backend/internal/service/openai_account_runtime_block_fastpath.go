@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -21,8 +19,6 @@ const (
 	openAIOAuth429StormThreshold              = 20
 	openAIOAuth429StormMaxAccountSwitches     = 1
 )
-
-var defaultOpenAITransientCooldownPersistThrottle = newAccountWriteThrottle(openAITransientCooldownPersistMinInterval)
 
 func openAIAccountStateContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	base := context.Background()
@@ -153,71 +149,6 @@ func shouldSkipLegacyOpenAITransientErrorPolicy(account *Account, statusCode int
 		return true
 	}
 	return account.IsCustomErrorCodesEnabled() && !account.ShouldHandleErrorCode(statusCode)
-}
-
-func (s *OpenAIGatewayService) markOpenAIAccountTemporarilyUnschedulable(ctx context.Context, account *Account, statusCode int, reason string, cooldown time.Duration, responseBody []byte) bool {
-	if s == nil || !isOpenAIAccount(account) || cooldown <= 0 {
-		return false
-	}
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		reason = "openai_temp_unschedulable"
-	}
-
-	now := time.Now()
-	until := now.Add(cooldown)
-
-	s.BlockAccountScheduling(account, until, reason)
-	s.closeOpenAIAccountIdleConnectionsForCircuit(account.ID, statusCode, reason, responseBody)
-
-	state := &TempUnschedState{
-		UntilUnix:       until.Unix(),
-		TriggeredAtUnix: now.Unix(),
-		StatusCode:      statusCode,
-		MatchedKeyword:  reason,
-		RuleIndex:       -1,
-		ErrorMessage:    truncateTempUnschedMessage(responseBody, tempUnschedMessageMaxBytes),
-	}
-	if state.ErrorMessage == "" {
-		state.ErrorMessage = defaultOpenAIAccountCooldownMessage(reason)
-	}
-
-	persistReason := state.ErrorMessage
-	if raw, err := json.Marshal(state); err == nil {
-		persistReason = string(raw)
-	}
-
-	persisted := s.getOpenAITransientCooldownPersistThrottle().Allow(account.ID, now)
-	if persisted {
-		if s.accountRepo != nil {
-			if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, persistReason); err != nil {
-				slog.Warn("openai_temp_unsched_failed", "account_id", account.ID, "status_code", statusCode, "reason", reason, "error", err)
-			}
-		}
-		if s.rateLimitService != nil && s.rateLimitService.tempUnschedCache != nil {
-			if err := s.rateLimitService.tempUnschedCache.SetTempUnsched(ctx, account.ID, state); err != nil {
-				slog.Warn("openai_temp_unsched_cache_failed", "account_id", account.ID, "status_code", statusCode, "reason", reason, "error", err)
-			}
-		}
-	}
-
-	slog.Info("openai_temp_unschedulable", "account_id", account.ID, "status_code", statusCode, "reason", reason, "until", until, "persisted", persisted)
-	slog.Info("account_circuit_open", "account_id", account.ID, "status_code", statusCode, "reason", reason, "until", until, "persisted", persisted)
-	s.emitOpenAIAccountCircuitOpenAlert(ctx, account.ID, statusCode, reason, until, persisted)
-	return true
-}
-
-func defaultOpenAIAccountCooldownMessage(reason string) string {
-	switch reason {
-	case "openai_transient_5xx":
-		return "OpenAI upstream transient 5xx"
-	case "openai_request_error":
-		return "OpenAI upstream request error"
-	case "openai_stream_error":
-		return "OpenAI upstream stream error"
-	default:
-		return "OpenAI account temporarily unschedulable"
-	}
 }
 
 func (s *OpenAIGatewayService) markOpenAIOAuth429RateLimited(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {
@@ -364,29 +295,6 @@ func (s *OpenAIGatewayService) tryEnterOpenAIAccountCircuitHalfOpenByID(accountI
 	return true
 }
 
-func (s *OpenAIGatewayService) tryForceOpenAIAccountCircuitProbeByID(accountID int64, reason string) bool {
-	if s == nil || accountID <= 0 {
-		return false
-	}
-	now := time.Now()
-	if s.isOpenAIAccountCircuitHalfOpenInFlight(accountID, now) {
-		return false
-	}
-	probeStartedAt := now
-	if _, loaded := s.openaiAccountCircuitHalfOpen.LoadOrStore(accountID, probeStartedAt); loaded {
-		return false
-	}
-	value, _ := s.openaiAccountRuntimeBlockUntil.Load(accountID)
-	cooldownUntil, _ := value.(time.Time)
-	slog.Info("account_circuit_half_open",
-		"account_id", accountID,
-		"previous_until", cooldownUntil,
-		"forced", true,
-		"reason", strings.TrimSpace(reason),
-	)
-	return true
-}
-
 func (s *OpenAIGatewayService) isOpenAIAccountCircuitHalfOpenInFlight(accountID int64, now time.Time) bool {
 	if s == nil || accountID <= 0 {
 		return false
@@ -450,33 +358,6 @@ func (s *OpenAIGatewayService) reopenOpenAIAccountCircuit(accountID int64, reaso
 	}
 	s.openaiAccountCircuitHalfOpen.Delete(accountID)
 	slog.Info("account_circuit_reopen", "account_id", accountID, "reason", reason, "until", until, "persisted", false)
-}
-
-func (s *OpenAIGatewayService) emitOpenAIAccountCircuitOpenAlert(ctx context.Context, accountID int64, statusCode int, reason string, until time.Time, persisted bool) {
-	if s == nil || s.opsRuntimeAlerts == nil || accountID <= 0 {
-		return
-	}
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		reason = "openai_circuit_open"
-	}
-	dimensions := map[string]any{
-		"platform":    PlatformOpenAI,
-		"account_id":  accountID,
-		"status_code": statusCode,
-		"reason":      reason,
-		"until":       until.UTC().Format(time.RFC3339),
-		"persisted":   persisted,
-	}
-	s.opsRuntimeAlerts.Emit(ctx, OpsRuntimeAlertInput{
-		Type:        OpsRuntimeAlertTypeOpenAIAccountCircuitOpen,
-		Severity:    "P1",
-		Title:       fmt.Sprintf("OpenAI account %d circuit open", accountID),
-		Description: fmt.Sprintf("OpenAI account %d is temporarily skipped: %s, until %s", accountID, reason, until.UTC().Format(time.RFC3339)),
-		Dimensions:  dimensions,
-		DedupKey:    fmt.Sprintf("%s:%d:%s", OpsRuntimeAlertTypeOpenAIAccountCircuitOpen, accountID, reason),
-		DedupWindow: time.Minute,
-	})
 }
 
 func (s *OpenAIGatewayService) closeOpenAIAccountIdleConnectionsForCircuit(accountID int64, statusCode int, reason string, responseBody []byte) {
