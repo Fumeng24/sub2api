@@ -33,7 +33,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="input-label">{{ t('admin.users.columns.balance') }}</label>
-          <input v-model.number="form.balance" type="number" step="any" class="input" />
+          <input v-model="form.balance" type="number" step="any" class="input" />
         </div>
         <div>
           <label class="input-label">{{ t('admin.users.columns.concurrency') }}</label>
@@ -82,7 +82,7 @@ const form = reactive({
   username: '',
   notes: '',
   role: 'user' as NonNullable<UpdateUserRequest['role']>,
-  balance: 0,
+  balance: '',
   concurrency: 1,
   rpm_limit: 0
 })
@@ -96,13 +96,19 @@ const roleOptions = [
 const { loading, submit } = useForm({
   form,
   submitFn: async (data) => {
-    await adminAPI.users.create(data)
+    const { balance: rawBalance, ...rest } = data
+    const balance = String(rawBalance).trim()
+    const payload: typeof rest & { balance?: number } = { ...rest }
+    if (balance !== '') {
+      payload.balance = Number(balance)
+    }
+    await adminAPI.users.create(payload)
     emit('success'); emit('close')
   },
   successMsg: t('admin.users.userCreated')
 })
 
-watch(() => props.show, (v) => { if(v) Object.assign(form, { email: '', password: '', username: '', notes: '', role: 'user', balance: 0, concurrency: 1, rpm_limit: 0 }) })
+watch(() => props.show, (v) => { if(v) Object.assign(form, { email: '', password: '', username: '', notes: '', role: 'user', balance: '', concurrency: 1, rpm_limit: 0 }) })
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*'

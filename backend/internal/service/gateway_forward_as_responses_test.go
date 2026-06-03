@@ -91,7 +91,7 @@ func TestGatewayForward_UpstreamNetworkErrorReturnsFailover(t *testing.T) {
 		Concurrency: 1,
 		Credentials: map[string]any{"api_key": "sk-ant-test"},
 	}
-	parsed := &ParsedRequest{Body: body, Model: "claude-sonnet-4.5", Stream: false}
+	parsed := &ParsedRequest{Body: NewRequestBodyRef(body), Model: "claude-sonnet-4.5", Stream: false}
 
 	result, err := svc.Forward(context.Background(), c, account, parsed)
 
