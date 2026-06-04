@@ -340,6 +340,67 @@ func TestSchedulerFailureDoesNotExtendAlreadyOpenCooldown(t *testing.T) {
 	}
 }
 
+func TestSchedulerStatusZeroFailureCategoryClassifiesTransportAndTimeout(t *testing.T) {
+	tests := []struct {
+		name string
+		body []byte
+		want string
+	}{
+		{
+			name: "openai request error",
+			body: []byte("openai_request_error: dial tcp: connection refused"),
+			want: "transient_transport",
+		},
+		{
+			name: "transport closed",
+			body: []byte("account_circuit_transport_closed http2: client connection force closed"),
+			want: "transient_transport",
+		},
+		{
+			name: "context canceled",
+			body: []byte("context canceled"),
+			want: "transient_transport",
+		},
+		{
+			name: "timeout",
+			body: []byte("i/o timeout awaiting response headers"),
+			want: "transient_timeout",
+		},
+		{
+			name: "empty",
+			body: nil,
+			want: "error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := schedulerFailureCategory(0, tt.body); got != tt.want {
+				t.Fatalf("schedulerFailureCategory(0, %q) = %q, want %q", string(tt.body), got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSchedulerHealthClearRemovesScopedDisplayState(t *testing.T) {
+	health := newAccountSchedulerHealthStats()
+	accountID := int64(39001)
+	model := "gpt-5.4"
+	endpoint := "/v1/responses"
+
+	health.reportFailure(accountID, model, endpoint, "transient_transport", time.Minute)
+	openSnap := health.snapshot(accountID, model, endpoint, false)
+	if openSnap.CircuitState != schedulerCircuitOpen || openSnap.LastFailureReason != "transient_transport" {
+		t.Fatalf("expected open transient transport circuit, got state=%s reason=%s", openSnap.CircuitState, openSnap.LastFailureReason)
+	}
+
+	health.clear(accountID, model, endpoint)
+	cleared := health.snapshot(accountID, model, endpoint, false)
+	if cleared.CircuitState != schedulerCircuitClosed || cleared.LastFailureReason != "" {
+		t.Fatalf("expected cleared scoped state, got state=%s reason=%s", cleared.CircuitState, cleared.LastFailureReason)
+	}
+}
+
 func TestSchedulerAccountGroupConfigIsIndependentPerGroup(t *testing.T) {
 	primaryGroupID := int64(100)
 	backupGroupID := int64(200)

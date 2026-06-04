@@ -2209,9 +2209,13 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleFailure(accountID int6
 		s.schedulerHealth.reportFailure(accountID, model, endpoint, category, cooldown)
 	}
 	s.maybeStartOpenAIAccountCircuitProbe(accountID, model, endpoint, category)
-	if category == "transient" || category == "rate_limit" || category == "model_unsupported" {
+	if category == "transient" || category == "transient_transport" || category == "transient_timeout" || category == "rate_limit" || category == "model_unsupported" {
 		reason := "openai_request_error"
-		if category == "transient" && isOpenAITransient5xxStatus(statusCode) {
+		if category == "transient_transport" {
+			reason = "openai_transport_error"
+		} else if category == "transient_timeout" {
+			reason = "openai_timeout"
+		} else if category == "transient" && isOpenAITransient5xxStatus(statusCode) {
 			reason = "openai_transient_5xx"
 		} else if category == "rate_limit" {
 			reason = "openai_rate_limit"

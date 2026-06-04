@@ -144,3 +144,40 @@ func TestOpenAIAccountCircuitProbe_RecoveryRequiresSuccessfulProbe(t *testing.T)
 		selection.ReleaseFunc()
 	}
 }
+
+func TestOpenAIAccountCircuitProbe_StopsWhenAccountManuallyUnschedulable(t *testing.T) {
+	oldInterval := openAIAccountCircuitProbeInterval
+	openAIAccountCircuitProbeInterval = 10 * time.Millisecond
+	defer func() { openAIAccountCircuitProbeInterval = oldInterval }()
+
+	account := Account{
+		ID:          9002,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: false,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "sk-test"},
+	}
+	upstream := &openAIAccountCircuitProbeUpstreamStub{
+		callCh: make(chan int, 4),
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:     schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		httpUpstream:    upstream,
+		schedulerHealth: newAccountSchedulerHealthStats(),
+	}
+	defer svc.stopOpenAIAccountCircuitProbe(account.ID, "gpt-5.4", "/v1/responses")
+
+	svc.ReportOpenAIAccountScheduleFailure(account.ID, "gpt-5.4", "/v1/responses", newNetworkUpstreamFailoverError("openai_request_error: use of closed network connection"))
+	openSnap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.4", "/v1/responses", false)
+	require.Equal(t, schedulerCircuitOpen, openSnap.CircuitState)
+	require.Equal(t, "transient_transport", openSnap.LastFailureReason)
+
+	require.Eventually(t, func() bool {
+		snap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.4", "/v1/responses", false)
+		_, probeRunning := svc.openaiAccountCircuitProbes.Load(makeAccountSchedulerHealthKey(account.ID, "gpt-5.4", "/v1/responses"))
+		return snap.CircuitState == schedulerCircuitClosed && !probeRunning
+	}, time.Second, time.Millisecond)
+	require.Zero(t, upstream.callCount(), "manual unschedulable accounts must not be probed upstream")
+}

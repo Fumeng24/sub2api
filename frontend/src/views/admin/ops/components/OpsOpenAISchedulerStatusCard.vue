@@ -46,6 +46,7 @@ function formatDuration(seconds?: number): string {
 
 function accountBadgeClass(row: OpenAISchedulerAccountStatus): string {
   if (row.is_available) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+  if (isScopedSchedulerCircuit(row)) return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
   if (row.circuit_state !== 'closed') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
   if (row.load_rate >= 100) return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
   return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
@@ -53,8 +54,16 @@ function accountBadgeClass(row: OpenAISchedulerAccountStatus): string {
 
 function accountBadgeText(row: OpenAISchedulerAccountStatus): string {
   if (row.is_available) return t('admin.ops.openAIScheduler.available')
+  if (isScopedSchedulerCircuit(row)) {
+    if (row.circuit_state === 'half_open') return translateSchedulerReason('partial_model_probe')
+    return translateSchedulerReason('partial_model_circuit')
+  }
   if (row.runtime_circuit_remaining_sec) return formatDuration(row.runtime_circuit_remaining_sec)
   return translateSchedulerReason(row.block_reason || 'unavailable')
+}
+
+function isScopedSchedulerCircuit(row: OpenAISchedulerAccountStatus): boolean {
+  return row.circuit_scope === 'account_model_endpoint' && row.circuit_state !== 'closed'
 }
 
 function translateSchedulerReason(reason?: string): string {
@@ -66,10 +75,25 @@ function translateSchedulerReason(reason?: string): string {
 }
 
 function accountDetailText(row: OpenAISchedulerAccountStatus): string {
+  if (isScopedSchedulerCircuit(row)) {
+    const parts = [
+      row.circuit_model || status.value?.model || model.value,
+      endpointLabel(row.circuit_endpoint || status.value?.endpoint || endpoint.value)
+    ].filter(Boolean)
+    const reason = translateSchedulerReason(row.scheduler_last_failure_reason || row.circuit_reason || '')
+    if (reason) parts.push(reason)
+    return parts.join(' · ')
+  }
   if (row.temp_unschedulable_reason) return translateSchedulerReason(row.temp_unschedulable_reason)
   if (row.temp_unschedulable_status_code === 0) return translateSchedulerReason('network_or_stream_interruption')
   if (row.scheduler_last_failure_reason) return translateSchedulerReason(row.scheduler_last_failure_reason)
   return ''
+}
+
+function endpointLabel(value?: string): string {
+  const normalized = (value || '').trim()
+  const option = endpointOptions.value.find((item) => item.value === normalized)
+  return option?.label || normalized
 }
 
 async function loadData() {

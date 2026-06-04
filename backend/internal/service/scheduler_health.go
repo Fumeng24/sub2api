@@ -225,7 +225,18 @@ func (s *accountSchedulerHealthStats) reportSuccess(accountID int64, model, endp
 	entry.circuitState = schedulerCircuitClosed
 	entry.cooldownUntil = time.Time{}
 	entry.halfOpenInFlight = false
+	entry.lastFailureReason = ""
 	entry.updatedAt = time.Now()
+}
+
+func (s *accountSchedulerHealthStats) clear(accountID int64, model, endpoint string) {
+	if s == nil || accountID <= 0 {
+		return
+	}
+	key := makeAccountSchedulerHealthKey(accountID, model, endpoint)
+	if _, deleted := s.entries.LoadAndDelete(key); deleted {
+		s.count.Add(-1)
+	}
 }
 
 func (s *accountSchedulerHealthStats) reportNeutral(accountID int64, model, endpoint string) {
@@ -276,6 +287,8 @@ func (s *accountSchedulerHealthStats) reportFailure(accountID int64, model, endp
 		category == "balance" ||
 		category == "rate_limit" ||
 		category == "transient" ||
+		category == "transient_transport" ||
+		category == "transient_timeout" ||
 		category == "model_unsupported" {
 		shouldOpen = true
 	}
@@ -390,6 +403,9 @@ func latencyScoreFromTTFT(ttft float64, hasTTFT bool) float64 {
 }
 
 func schedulerFailureCategory(statusCode int, body []byte) string {
+	if statusCode == 0 {
+		return schedulerStatusZeroFailureCategory(body)
+	}
 	if class := classifyOpenAIUpstreamError(statusCode, "", body); class != openAIUpstreamErrorUnknown {
 		return openAIUpstreamErrorClassSchedulerCategory(class)
 	}
@@ -425,7 +441,72 @@ func schedulerFailureCategory(statusCode int, body []byte) string {
 	if statusCode > 0 {
 		return "error"
 	}
-	return "unknown"
+	return "error"
+}
+
+func schedulerStatusZeroFailureCategory(body []byte) string {
+	text := strings.ToLower(strings.TrimSpace(string(body)))
+	if text == "" {
+		return "error"
+	}
+	normalized := strings.NewReplacer("_", " ", "-", " ", "\n", " ", "\r", " ", "\t", " ").Replace(text)
+	normalized = strings.Join(strings.Fields(normalized), " ")
+	combined := text + " " + normalized
+	if containsAnySchedulerText(combined,
+		"timeout",
+		"deadline exceeded",
+		"awaiting response headers",
+		"stream data interval timeout",
+	) {
+		return "transient_timeout"
+	}
+	if containsAnySchedulerText(combined,
+		"openai_request_error",
+		"openai request error",
+		"transport_closed",
+		"transport closed",
+		"account_circuit_transport_closed",
+		"account circuit transport closed",
+		"context canceled",
+		"context cancelled",
+		"connection reset by peer",
+		"connection refused",
+		"use of closed network connection",
+		"client connection force closed",
+		"clientconn.close",
+		"http2:",
+		"goaway",
+		"dial tcp",
+		"dial udp",
+		"network is unreachable",
+		"no such host",
+		"broken pipe",
+		"unexpected eof",
+		" eof",
+		"stream error",
+		"request failed",
+		"upstream connection error",
+	) {
+		return "transient_transport"
+	}
+	if strings.Contains(combined, "overload") {
+		return "transient"
+	}
+	return "error"
+}
+
+func containsAnySchedulerText(text string, markers ...string) bool {
+	text = strings.ToLower(strings.TrimSpace(text))
+	if text == "" {
+		return false
+	}
+	for _, marker := range markers {
+		marker = strings.ToLower(strings.TrimSpace(marker))
+		if marker != "" && strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func schedulerCooldownForCategory(category string, headers http.Header) time.Duration {
@@ -450,6 +531,8 @@ func schedulerCooldownForCategory(category string, headers http.Header) time.Dur
 		return time.Minute
 	case "transient", "unknown":
 		return 90 * time.Second
+	case "transient_transport", "transient_timeout":
+		return openAIRequestErrorCooldown
 	default:
 		return 2 * time.Minute
 	}

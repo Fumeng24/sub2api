@@ -86,6 +86,12 @@ func isOpenAIUpstreamNetworkFailoverError(err error, safeErr string) bool {
 	}
 
 	networkSignals := []string{
+		"openai_request_error",
+		"openai request error",
+		"transport_closed",
+		"transport closed",
+		"account_circuit_transport_closed",
+		"account circuit transport closed",
 		"context deadline exceeded",
 		"i/o timeout",
 		"dial tcp",
@@ -105,6 +111,8 @@ func isOpenAIUpstreamNetworkFailoverError(err error, safeErr string) bool {
 		"goaway",
 		"network is unreachable",
 		"no such host",
+		"broken pipe",
+		"unexpected eof",
 	}
 	for _, signal := range networkSignals {
 		if strings.Contains(msg, signal) {

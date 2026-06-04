@@ -61,6 +61,9 @@ type OpsOpenAISchedulerAccountStatus struct {
 	StateReason       string `json:"state_reason,omitempty"`
 	CircuitState      string `json:"circuit_state"`
 	CircuitReason     string `json:"circuit_reason,omitempty"`
+	CircuitScope      string `json:"circuit_scope,omitempty"`
+	CircuitModel      string `json:"circuit_model,omitempty"`
+	CircuitEndpoint   string `json:"circuit_endpoint,omitempty"`
 	IsAvailable       bool   `json:"is_available"`
 	BlockReason       string `json:"block_reason,omitempty"`
 
@@ -232,7 +235,9 @@ func (s *OpsService) openAISchedulerAccountStatus(ctx context.Context, account *
 		item.StateAllowed = false
 		item.StateReason = reason
 	}
-	item.applyOpenAISchedulerCircuitStatus(s.openAIGatewayService, account.ID, req, now)
+	if item.StateAllowed {
+		item.applyOpenAISchedulerCircuitStatus(s.openAIGatewayService, account.ID, req, now)
+	}
 	if account.TempUnschedulableUntil != nil && now.Before(account.TempUnschedulableUntil.UTC()) {
 		t := account.TempUnschedulableUntil.UTC()
 		item.TempUnschedulableUntil = &t
@@ -257,6 +262,7 @@ func (item *OpsOpenAISchedulerAccountStatus) applyOpenAISchedulerCircuitStatus(g
 	if until, ok := gateway.openAIAccountRuntimeBlockUntil(accountID); ok && until.After(now) {
 		item.CircuitState = "runtime_open"
 		item.CircuitReason = "runtime_circuit_open"
+		item.CircuitScope = "account"
 		t := until.UTC()
 		item.RuntimeCircuitUntil = &t
 		remaining := int64(until.Sub(now).Seconds())
@@ -267,11 +273,13 @@ func (item *OpsOpenAISchedulerAccountStatus) applyOpenAISchedulerCircuitStatus(g
 	if gateway.isOpenAIAccountCircuitHalfOpenInFlight(accountID, now) {
 		item.CircuitState = "runtime_half_open"
 		item.CircuitReason = "runtime_half_open_in_flight"
+		item.CircuitScope = "account"
 	}
 	if gateway.schedulerHealth == nil {
 		return
 	}
-	snap := gateway.schedulerHealth.snapshot(accountID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req), false)
+	schedulerEndpoint := schedulerEndpointFromOpenAIRequest(req)
+	snap := gateway.schedulerHealth.snapshot(accountID, req.RequestedModel, schedulerEndpoint, false)
 	item.SchedulerHealthScore = snap.HealthScore
 	item.SchedulerErrorRate = snap.ErrorRate
 	if snap.HasTTFT {
@@ -286,6 +294,9 @@ func (item *OpsOpenAISchedulerAccountStatus) applyOpenAISchedulerCircuitStatus(g
 	case schedulerCircuitOpen:
 		item.CircuitState = schedulerCircuitOpen
 		item.CircuitReason = "scheduler_circuit_open"
+		item.CircuitScope = "account_model_endpoint"
+		item.CircuitModel = snap.Key.Model
+		item.CircuitEndpoint = snap.Key.Endpoint
 		if !snap.CooldownUntil.IsZero() {
 			t := snap.CooldownUntil.UTC()
 			item.RuntimeCircuitUntil = &t
@@ -297,6 +308,9 @@ func (item *OpsOpenAISchedulerAccountStatus) applyOpenAISchedulerCircuitStatus(g
 	case schedulerCircuitHalfOpen:
 		item.CircuitState = schedulerCircuitHalfOpen
 		item.CircuitReason = "scheduler_half_open"
+		item.CircuitScope = "account_model_endpoint"
+		item.CircuitModel = snap.Key.Model
+		item.CircuitEndpoint = snap.Key.Endpoint
 	}
 }
 

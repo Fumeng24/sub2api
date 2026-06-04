@@ -453,6 +453,9 @@ export interface OpenAISchedulerAccountStatus {
   state_reason?: string
   circuit_state: string
   circuit_reason?: string
+  circuit_scope?: string
+  circuit_model?: string
+  circuit_endpoint?: string
   is_available: boolean
   block_reason?: string
   current_concurrency: number

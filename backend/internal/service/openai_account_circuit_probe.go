@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -21,6 +22,8 @@ const (
 )
 
 var openAIAccountCircuitProbeInterval = 5 * time.Second
+
+var errOpenAIAccountCircuitProbeUnschedulable = errors.New("probe account not active or schedulable")
 
 type openAIAccountCircuitProbe struct {
 	cancel context.CancelFunc
@@ -49,7 +52,7 @@ func (s *OpenAIGatewayService) maybeStartOpenAIAccountCircuitProbe(accountID int
 
 func shouldStartOpenAIAccountCircuitProbe(model, endpoint, category string) bool {
 	switch strings.TrimSpace(category) {
-	case "transient", "unknown":
+	case "transient", "transient_transport", "transient_timeout", "unknown":
 	default:
 		return false
 	}
@@ -87,9 +90,23 @@ func (s *OpenAIGatewayService) runOpenAIAccountCircuitProbe(ctx context.Context,
 		}
 
 		statusCode, body, err := s.probeOpenAIAccountCircuit(ctx, key)
+		if errors.Is(err, errOpenAIAccountCircuitProbeUnschedulable) {
+			if s.schedulerHealth != nil {
+				s.schedulerHealth.clear(key.AccountID, key.Model, key.Endpoint)
+			}
+			s.recoverOpenAIAccountCircuit(key.AccountID)
+			slog.Info("account_circuit_probe_stopped",
+				"account_id", key.AccountID,
+				"model", key.Model,
+				"endpoint", key.Endpoint,
+				"category", "manual_unschedulable",
+				"error", err,
+			)
+			return
+		}
 		if err == nil && statusCode >= 200 && statusCode < 400 {
 			if s.schedulerHealth != nil {
-				s.schedulerHealth.reportSuccess(key.AccountID, key.Model, key.Endpoint, nil)
+				s.schedulerHealth.clear(key.AccountID, key.Model, key.Endpoint)
 			}
 			s.recoverOpenAIAccountCircuit(key.AccountID)
 			slog.Info("account_circuit_probe_recovered",
@@ -107,8 +124,8 @@ func (s *OpenAIGatewayService) runOpenAIAccountCircuitProbe(ctx context.Context,
 		}
 		if category == "" || category == "unknown" {
 			category = strings.TrimSpace(initialCategory)
-			if category == "" {
-				category = "unknown"
+			if category == "" || category == "unknown" {
+				category = "error"
 			}
 		}
 		if s.schedulerHealth != nil {
@@ -153,7 +170,7 @@ func (s *OpenAIGatewayService) probeOpenAIAccountCircuit(ctx context.Context, ke
 		return 0, nil, fmt.Errorf("probe account not found")
 	}
 	if account.Platform != PlatformOpenAI || account.Status != StatusActive || !account.Schedulable {
-		return 0, nil, fmt.Errorf("probe account not active or schedulable")
+		return 0, nil, fmt.Errorf("%w: status=%s schedulable=%t", errOpenAIAccountCircuitProbeUnschedulable, account.Status, account.Schedulable)
 	}
 
 	token, _, err := s.GetAccessToken(probeCtx, account)
