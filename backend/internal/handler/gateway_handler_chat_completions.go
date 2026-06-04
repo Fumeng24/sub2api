@@ -259,7 +259,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			}
 			result, err = h.geminiCompatService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody)
 		} else {
-			result, err = h.gatewayService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody, parsedReq)
+			result, err = h.gatewayService.ForwardAsChatCompletions(openAIForwardContextForSelection(c.Request.Context(), selection), c, account, forwardBody, parsedReq)
 		}
 
 		if accountReleaseFunc != nil {

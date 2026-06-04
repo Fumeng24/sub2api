@@ -234,7 +234,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
-		result, err := h.gatewayService.ForwardAsResponses(c.Request.Context(), c, account, forwardBody, parsedReq)
+		result, err := h.gatewayService.ForwardAsResponses(openAIForwardContextForSelection(c.Request.Context(), selection), c, account, forwardBody, parsedReq)
 
 		if accountReleaseFunc != nil {
 			accountReleaseFunc()

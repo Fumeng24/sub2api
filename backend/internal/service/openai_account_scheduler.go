@@ -20,6 +20,7 @@ const (
 	openAIAccountScheduleLayerSessionSticky    = "session_hash"
 	openAIAccountScheduleLayerLoadBalance      = "load_balance"
 	openAIAdvancedSchedulerSettingKey          = "openai_advanced_scheduler_enabled"
+	openAIAccountWeakFallbackReason            = "same_group_soft_filter_relaxed"
 )
 
 const (
@@ -488,11 +489,15 @@ type openAIAccountCandidateScore struct {
 	halfOpen   bool
 	cooldown   bool
 	cooldownAt time.Time
+	excluded   bool
 }
 
 func isOpenAIAccountCandidateBetter(left openAIAccountCandidateScore, right openAIAccountCandidateScore) bool {
 	if left.groupOrder || right.groupOrder {
 		return isOpenAIAccountGroupOrderCandidateBetter(left, right)
+	}
+	if left.excluded != right.excluded {
+		return !left.excluded
 	}
 	if left.cooldown != right.cooldown {
 		return !left.cooldown
@@ -530,6 +535,9 @@ func isOpenAIAccountCandidateBetter(left openAIAccountCandidateScore, right open
 }
 
 func isOpenAIAccountGroupOrderCandidateBetter(left openAIAccountCandidateScore, right openAIAccountCandidateScore) bool {
+	if left.excluded != right.excluded {
+		return !left.excluded
+	}
 	if left.cooldown != right.cooldown {
 		return !left.cooldown
 	}
@@ -1028,20 +1036,255 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	return plan
 }
 
+func openAIAccountSoftCooldownState(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest, schedGroup *Group, health schedulerHealthSnapshot, loadInfo *AccountLoadInfo) (cooldown bool, cooldownAt time.Time, reasons []string) {
+	if account == nil {
+		return false, time.Time{}, nil
+	}
+	now := time.Now()
+	addReason := func(reason string) {
+		if reason == "" {
+			return
+		}
+		reasons = append(reasons, reason)
+	}
+	if account.OverloadUntil != nil && now.Before(*account.OverloadUntil) {
+		cooldown = true
+		cooldownAt = earliestNonZeroTime(cooldownAt, *account.OverloadUntil)
+		addReason("overloaded")
+	}
+	if account.RateLimitResetAt != nil && now.Before(*account.RateLimitResetAt) {
+		cooldown = true
+		cooldownAt = earliestNonZeroTime(cooldownAt, *account.RateLimitResetAt)
+		addReason("rate_limited")
+	}
+	if account.TempUnschedulableUntil != nil && now.Before(*account.TempUnschedulableUntil) {
+		cooldown = true
+		cooldownAt = earliestNonZeroTime(cooldownAt, *account.TempUnschedulableUntil)
+		addReason("temp_unschedulable")
+	}
+	if account.GetRateLimitRemainingTimeWithContext(ctx, req.RequestedModel) > 0 {
+		cooldown = true
+		addReason("model_rate_limited")
+	}
+	if health.CircuitState == schedulerCircuitOpen || health.CircuitState == schedulerCircuitHalfOpen {
+		cooldown = true
+		cooldownAt = earliestNonZeroTime(cooldownAt, health.CooldownUntil)
+		addReason("scheduler_" + health.CircuitState)
+	}
+	if loadInfo != nil && loadInfo.LoadRate >= 100 {
+		cooldown = true
+		addReason("concurrency_full")
+	}
+	_ = schedGroup
+	return cooldown, cooldownAt, reasons
+}
+
+func earliestNonZeroTime(current time.Time, candidate time.Time) time.Time {
+	if candidate.IsZero() {
+		return current
+	}
+	if current.IsZero() || candidate.Before(current) {
+		return candidate
+	}
+	return current
+}
+
+func (s *defaultOpenAIAccountScheduler) isOpenAIWeakFallbackHardCompatible(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest, schedGroup *Group) bool {
+	if account == nil || !account.IsOpenAI() {
+		return false
+	}
+	if account.Status != StatusActive || !account.Schedulable {
+		return false
+	}
+	now := time.Now()
+	if account.AutoPauseOnExpired && account.ExpiresAt != nil && !now.Before(*account.ExpiresAt) {
+		return false
+	}
+	if account.IsAPIKeyOrBedrock() && account.IsQuotaExceeded() {
+		return false
+	}
+	if paused, _ := shouldAutoPauseOpenAIAccountByQuota(ctx, account); paused {
+		return false
+	}
+	if schedGroup != nil && schedGroup.RequirePrivacySet && !account.IsPrivacySet() {
+		return false
+	}
+	if req.RequestedModel != "" && !account.IsModelSupported(req.RequestedModel) {
+		return false
+	}
+	if req.GroupID != nil && s != nil && s.service != nil &&
+		s.service.needsUpstreamChannelRestrictionCheck(ctx, req.GroupID) &&
+		s.service.isUpstreamModelRestrictedByChannel(ctx, *req.GroupID, account, req.RequestedModel, req.RequireCompact) {
+		return false
+	}
+	if !s.isAccountTransportCompatible(account, req.RequiredTransport) {
+		return false
+	}
+	if !accountSupportsOpenAICapabilities(account, req.RequiredCapability, req.RequiredImageCapability) {
+		return false
+	}
+	if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, account) {
+		return false
+	}
+	return true
+}
+
+func (s *defaultOpenAIAccountScheduler) buildOpenAIWeakFallbackOrder(
+	ctx context.Context,
+	req OpenAIAccountScheduleRequest,
+	schedGroup *Group,
+	accounts []*Account,
+	loadMap map[int64]*AccountLoadInfo,
+) ([]openAIAccountCandidateScore, bool, int) {
+	if len(accounts) == 0 {
+		return nil, false, 0
+	}
+	endpoint := schedulerEndpointFromOpenAIRequest(req)
+	var healthStats *accountSchedulerHealthStats
+	if s != nil && s.service != nil {
+		healthStats = s.service.schedulerHealth
+	}
+	candidates := make([]openAIAccountCandidateScore, 0, len(accounts))
+	compactBlocked := false
+	excludedCount := 0
+	for _, account := range accounts {
+		if account == nil {
+			continue
+		}
+		if req.RequireCompact && !openAICompactAccountAllowedForRequest(req, account) {
+			compactBlocked = true
+		}
+		if !s.isOpenAIWeakFallbackHardCompatible(ctx, account, req, schedGroup) {
+			continue
+		}
+		excluded := false
+		if req.ExcludedIDs != nil {
+			_, excluded = req.ExcludedIDs[account.ID]
+		}
+		if excluded {
+			excludedCount++
+		}
+		health := schedulerHealthSnapshot{HealthScore: 1, ModelScore: 1, LatencyScore: 1, CircuitState: schedulerCircuitClosed}
+		if healthStats != nil {
+			health = healthStats.snapshot(account.ID, req.RequestedModel, endpoint, true)
+		}
+		loadInfo := loadMap[account.ID]
+		if loadInfo == nil {
+			loadInfo = &AccountLoadInfo{AccountID: account.ID}
+		}
+		cfg := accountGroupConfigFor(account, req.GroupID)
+		cooldown, cooldownAt, _ := openAIAccountSoftCooldownState(ctx, account, req, schedGroup, health, loadInfo)
+		score := 1.0
+		if health.HealthScore > 0 {
+			score *= health.HealthScore
+		}
+		if health.ModelScore > 0 {
+			score *= health.ModelScore
+		}
+		if health.LatencyScore > 0 {
+			score *= health.LatencyScore
+		}
+		candidates = append(candidates, openAIAccountCandidateScore{
+			account:    account,
+			loadInfo:   loadInfo,
+			score:      score,
+			errorRate:  health.ErrorRate,
+			ttft:       health.TTFTEWMA,
+			hasTTFT:    health.HasTTFT,
+			sortOrder:  cfg.SortOrder,
+			groupOrder: cfg.GroupID > 0,
+			groupPrio:  cfg.Priority,
+			health:     health,
+			halfOpen:   health.CircuitState == schedulerCircuitHalfOpen || health.HalfOpenProbe,
+			cooldown:   cooldown,
+			cooldownAt: cooldownAt,
+			excluded:   excluded,
+		})
+	}
+	return buildOpenAIOrderedSelectionOrder(candidates), compactBlocked, excludedCount
+}
+
 func (s *defaultOpenAIAccountScheduler) trySelectOpenAICooldownFallback(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
 	schedGroup *Group,
 	allowWaitPlan bool,
 ) (*AccountSelectionResult, int, bool, error) {
-	_ = ctx
-	_ = req
-	_ = schedGroup
-	_ = allowWaitPlan
-	// Circuit and cooldown recovery is handled by the background OpenAI account
-	// probe runner. User and channel-monitor requests must never be used as
-	// recovery probes.
-	return nil, 0, false, nil
+	if s == nil || s.service == nil {
+		return nil, 0, false, nil
+	}
+	accounts, err := s.service.listOpenAICooldownFallbackAccounts(ctx, req.GroupID)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	if len(accounts) == 0 {
+		return nil, 0, false, nil
+	}
+	loadMap := map[int64]*AccountLoadInfo{}
+	if s.service.concurrencyService != nil {
+		loadReq := make([]AccountWithConcurrency, 0, len(accounts))
+		for _, account := range accounts {
+			if account == nil || !account.IsOpenAI() {
+				continue
+			}
+			loadReq = append(loadReq, AccountWithConcurrency{
+				ID:             account.ID,
+				MaxConcurrency: account.EffectiveLoadFactor(),
+			})
+		}
+		if len(loadReq) > 0 {
+			if batchLoad, loadErr := s.service.concurrencyService.GetAccountsLoadBatchFresh(ctx, loadReq); loadErr == nil {
+				loadMap = batchLoad
+			} else if batchLoad, loadErr := s.service.concurrencyService.GetAccountsLoadBatch(ctx, loadReq); loadErr == nil {
+				loadMap = batchLoad
+			}
+		}
+	}
+	order, compactBlocked, excludedCount := s.buildOpenAIWeakFallbackOrder(ctx, req, schedGroup, accounts, loadMap)
+	if len(order) == 0 {
+		return nil, 0, compactBlocked, nil
+	}
+	result, orderCompactBlocked, acquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, order, true, true)
+	if acquireErr != nil {
+		return nil, len(order), compactBlocked || orderCompactBlocked, acquireErr
+	}
+	if result == nil {
+		if allowWaitPlan && s.service.concurrencyService != nil {
+			cfg := s.service.schedulingConfig()
+			for _, candidate := range order {
+				fresh := s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldownForSelection(ctx, candidate.account, req.RequestedModel, req.RequireCompact, nil, req.RequiredCapability)
+				if fresh == nil || !s.isOpenAIWeakFallbackHardCompatible(ctx, fresh, req, schedGroup) {
+					continue
+				}
+				return &AccountSelectionResult{
+					Account:              fresh,
+					WeakFallback:         true,
+					WeakFallbackReason:   openAIAccountWeakFallbackReason,
+					BypassOpenAIHeaderTO: true,
+					WaitPlan: &AccountWaitPlan{
+						AccountID:      fresh.ID,
+						MaxConcurrency: fresh.Concurrency,
+						Timeout:        cfg.FallbackWaitTimeout,
+						MaxWaiting:     cfg.FallbackMaxWaiting,
+					},
+				}, len(order), compactBlocked || orderCompactBlocked, nil
+			}
+		}
+		return nil, len(order), compactBlocked || orderCompactBlocked, nil
+	}
+	result.WeakFallback = true
+	result.WeakFallbackReason = openAIAccountWeakFallbackReason
+	result.BypassOpenAIHeaderTO = true
+	slog.Warn("openai_account_weak_fallback_selected",
+		"group_id", derefGroupID(req.GroupID),
+		"model", req.RequestedModel,
+		"endpoint", schedulerEndpointFromOpenAIRequest(req),
+		"account_id", result.Account.ID,
+		"group_binding_count", len(accounts),
+		"candidate_count", len(order),
+		"excluded_candidate_count", excludedCount,
+	)
+	return result, len(order), compactBlocked || orderCompactBlocked, nil
 }
 
 func (s *defaultOpenAIAccountScheduler) filterOpenAIAccountsForSchedule(
@@ -1271,12 +1514,18 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 			compactBlocked = true
 			continue
 		}
-		result, acquireErr := s.service.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
+		var result *AcquireResult
+		var acquireErr error
+		if allowCooldownFallback {
+			result, acquireErr = s.service.tryAcquireAccountSlotIgnoringCircuit(ctx, fresh.ID, fresh.Concurrency)
+		} else {
+			result, acquireErr = s.service.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
+		}
 		if acquireErr != nil {
 			return nil, compactBlocked, acquireErr
 		}
 		if result != nil && result.Acquired {
-			if candidate.halfOpen && s.service.schedulerHealth != nil &&
+			if !allowCooldownFallback && candidate.halfOpen && s.service.schedulerHealth != nil &&
 				!s.service.schedulerHealth.tryBeginHalfOpenProbe(fresh.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req)) {
 				if result.ReleaseFunc != nil {
 					result.ReleaseFunc()
@@ -1286,11 +1535,17 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 			if req.SessionHash != "" && !allowCooldownFallback {
 				_ = s.service.BindStickySession(ctx, req.GroupID, req.SessionHash, fresh.ID)
 			}
-			return &AccountSelectionResult{
-				Account:     fresh,
-				Acquired:    true,
-				ReleaseFunc: result.ReleaseFunc,
-			}, compactBlocked, nil
+			selection := &AccountSelectionResult{
+				Account:              fresh,
+				Acquired:             true,
+				ReleaseFunc:          result.ReleaseFunc,
+				WeakFallback:         allowCooldownFallback,
+				BypassOpenAIHeaderTO: allowCooldownFallback,
+			}
+			if allowCooldownFallback {
+				selection.WeakFallbackReason = openAIAccountWeakFallbackReason
+			}
+			return selection, compactBlocked, nil
 		}
 	}
 	return nil, compactBlocked, nil

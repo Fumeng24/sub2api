@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	openAIAccountCircuitProbeTimeout = 8 * time.Second
+	openAIAccountCircuitProbeTimeout = 15 * time.Second
 	openAIAccountCircuitProbeBodyMax = 4096
 	openAIAccountCircuitProbeModel   = "gpt-4.1-mini"
 )

@@ -190,7 +190,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 					accountReleaseFunc()
 				}
 			}()
-			return h.gatewayService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody, promptCacheKey, "")
+			return h.gatewayService.ForwardAsChatCompletions(openAIForwardContextForSelection(c.Request.Context(), selection), c, account, forwardBody, promptCacheKey, "")
 		}()
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()

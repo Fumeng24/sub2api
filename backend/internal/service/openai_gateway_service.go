@@ -1893,14 +1893,11 @@ func (s *OpenAIGatewayService) openAISchedulerGroupForFallback(ctx context.Conte
 }
 
 func (s *OpenAIGatewayService) selectOpenAICooldownFallbackAccount(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability) (*Account, bool, error) {
-	_ = ctx
-	_ = groupID
-	_ = sessionHash
-	_ = requestedModel
-	_ = excludedIDs
-	_ = requireCompact
-	_ = requiredCapability
-	return nil, false, nil
+	selection, compactBlocked, err := s.selectOpenAICooldownFallbackResult(ctx, groupID, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability, false)
+	if err != nil || selection == nil {
+		return nil, compactBlocked, err
+	}
+	return selection.Account, compactBlocked, nil
 }
 
 func (s *OpenAIGatewayService) selectOpenAICooldownFallbackResult(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, allowWaitPlan bool) (*AccountSelectionResult, bool, error) {
@@ -1913,6 +1910,11 @@ func (s *OpenAIGatewayService) selectOpenAICooldownFallbackResult(ctx context.Co
 	hydrated, hydrateErr := s.newSelectionResult(ctx, selection.Account, selection.Acquired, selection.ReleaseFunc, selection.WaitPlan)
 	if hydrateErr != nil && selection.ReleaseFunc != nil {
 		selection.ReleaseFunc()
+	}
+	if hydrated != nil {
+		hydrated.WeakFallback = selection.WeakFallback
+		hydrated.WeakFallbackReason = selection.WeakFallbackReason
+		hydrated.BypassOpenAIHeaderTO = selection.BypassOpenAIHeaderTO
 	}
 	return hydrated, compactBlocked, hydrateErr
 }
@@ -1943,9 +1945,21 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		if err != nil {
 			return nil, err
 		}
+		weakFallback := !isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability) ||
+			s.isOpenAIAccountRuntimeBlocked(account) ||
+			!s.isOpenAIAccountSchedulerHealthAllowed(account.ID, requestedModel, s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability))
 		result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
+		if weakFallback {
+			result, err = s.tryAcquireAccountSlotIgnoringCircuit(ctx, account.ID, account.Concurrency)
+		}
 		if err == nil && result != nil && result.Acquired {
-			return s.newAcquiredSelectionResult(ctx, account, result.ReleaseFunc)
+			selection, selectErr := s.newAcquiredSelectionResult(ctx, account, result.ReleaseFunc)
+			if selection != nil && weakFallback {
+				selection.WeakFallback = true
+				selection.WeakFallbackReason = openAIAccountWeakFallbackReason
+				selection.BypassOpenAIHeaderTO = true
+			}
+			return selection, selectErr
 		}
 		if err == nil && result == nil && s.isOpenAIAccountRuntimeBlocked(account) {
 			retryExcluded := cloneExcludedAccountIDs(excludedIDs)
@@ -1966,12 +1980,18 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				})
 			}
 		}
-		return s.newSelectionResult(ctx, account, false, nil, &AccountWaitPlan{
+		selection, selectErr := s.newSelectionResult(ctx, account, false, nil, &AccountWaitPlan{
 			AccountID:      account.ID,
 			MaxConcurrency: account.Concurrency,
 			Timeout:        cfg.FallbackWaitTimeout,
 			MaxWaiting:     cfg.FallbackMaxWaiting,
 		})
+		if selection != nil && weakFallback {
+			selection.WeakFallback = true
+			selection.WeakFallbackReason = openAIAccountWeakFallbackReason
+			selection.BypassOpenAIHeaderTO = true
+		}
+		return selection, selectErr
 	}
 
 	accounts, err := s.listSchedulableAccounts(ctx, groupID)
@@ -2364,6 +2384,13 @@ func (s *OpenAIGatewayService) tryAcquireAccountSlot(ctx context.Context, accoun
 		return nil, nil
 	}
 	return result, nil
+}
+
+func (s *OpenAIGatewayService) tryAcquireAccountSlotIgnoringCircuit(ctx context.Context, accountID int64, maxConcurrency int) (*AcquireResult, error) {
+	if s.concurrencyService == nil {
+		return &AcquireResult{Acquired: true, ReleaseFunc: func() {}}, nil
+	}
+	return s.concurrencyService.AcquireAccountSlot(ctx, accountID, maxConcurrency)
 }
 
 func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccountForSelection(ctx context.Context, account *Account, requestedModel string, requireCompact bool, excludedIDs map[int64]struct{}, requiredCapability OpenAIEndpointCapability) *Account {
@@ -3659,7 +3686,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(WithHTTPUpstreamProfile(req.Context(), HTTPUpstreamProfileOpenAI))
+	req = req.WithContext(WithOpenAIHTTPUpstreamProfile(req.Context()))
 
 	// 透传客户端请求头（安全白名单）。
 	allowTimeoutHeaders := s.isOpenAIPassthroughTimeoutHeadersAllowed()
@@ -4469,7 +4496,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(WithHTTPUpstreamProfile(req.Context(), HTTPUpstreamProfileOpenAI))
+	req = req.WithContext(WithOpenAIHTTPUpstreamProfile(req.Context()))
 
 	// Set authentication header
 	req.Header.Set("authorization", "Bearer "+token)

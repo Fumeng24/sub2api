@@ -26,6 +26,30 @@ type schedulerTestOpenAIAccountRepo struct {
 	accounts []Account
 }
 
+type schedulerTestGroupAwareOpenAIAccountRepo struct {
+	schedulerTestOpenAIAccountRepo
+}
+
+func (r schedulerTestGroupAwareOpenAIAccountRepo) ListByGroup(ctx context.Context, groupID int64) ([]Account, error) {
+	var result []Account
+	for _, acc := range r.accounts {
+		if openAIAccountBelongsToGroup(acc, groupID) {
+			result = append(result, acc)
+		}
+	}
+	return result, nil
+}
+
+func (r schedulerTestGroupAwareOpenAIAccountRepo) ListSchedulableByGroupIDAndPlatform(ctx context.Context, groupID int64, platform string) ([]Account, error) {
+	var result []Account
+	for _, acc := range r.accounts {
+		if acc.Platform == platform && openAIAccountBelongsToGroup(acc, groupID) {
+			result = append(result, acc)
+		}
+	}
+	return result, nil
+}
+
 func (r schedulerTestOpenAIAccountRepo) GetByID(ctx context.Context, id int64) (*Account, error) {
 	for i := range r.accounts {
 		if r.accounts[i].ID == id {
@@ -716,7 +740,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_SessionStickyRateLimite
 	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
 }
 
-func TestOpenAIGatewayService_SelectAccountWithScheduler_AllNormalCandidatesCoolingDoesNotUseUserTrafficAsProbe(t *testing.T) {
+func TestOpenAIGatewayService_SelectAccountWithScheduler_AllNormalCandidatesCoolingUsesSameGroupWeakFallback(t *testing.T) {
 	ctx := context.Background()
 	rateLimitedUntil := time.Now().Add(30 * time.Minute)
 	accounts := []Account{
@@ -750,11 +774,72 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_AllNormalCandidatesCool
 	}
 
 	selection, decision, err := svc.SelectAccountWithScheduler(ctx, nil, "", "", "gpt-5.1", nil, OpenAIUpstreamTransportAny, false)
-	require.Error(t, err)
-	require.Nil(t, selection)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, int64(31101), selection.Account.ID)
+	require.True(t, selection.WeakFallback)
+	require.True(t, selection.BypassOpenAIHeaderTO)
 	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
-	require.Equal(t, 0, decision.CandidateCount)
-	require.Equal(t, 0, decision.TopK)
+	require.Equal(t, 2, decision.CandidateCount)
+	require.Equal(t, 2, decision.TopK)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_WeakFallbackDoesNotBorrowUnboundAccount(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(12)
+	rateLimitedUntil := time.Now().Add(30 * time.Minute)
+	boundCooling := Account{
+		ID:               31201,
+		Platform:         PlatformOpenAI,
+		Type:             AccountTypeAPIKey,
+		Status:           StatusActive,
+		Schedulable:      true,
+		Concurrency:      1,
+		Priority:         0,
+		GroupIDs:         []int64{groupID},
+		RateLimitResetAt: &rateLimitedUntil,
+		AccountGroups: []AccountGroup{{
+			AccountID:            31201,
+			GroupID:              groupID,
+			SortOrder:            10,
+			Priority:             1,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               100,
+			SchedulingConfigured: true,
+		}},
+	}
+	unboundHealthy := Account{
+		ID:          31202,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    0,
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: []Account{boundCooling, unboundHealthy}}},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(ctx, &groupID, "", "", "gpt-5.1", nil, OpenAIUpstreamTransportAny, false)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, int64(31201), selection.Account.ID)
+	require.True(t, selection.WeakFallback)
+	require.True(t, selection.BypassOpenAIHeaderTO)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
 }
 
 func TestOpenAIGatewayService_SelectAccountForModelWithExclusions_AutoPauseBy5hThreshold(t *testing.T) {
@@ -1124,7 +1209,7 @@ func TestOpenAIGatewayService_SelectAccountForModelWithExclusions_RetriesFreshDB
 	require.Equal(t, int64(37002), account.ID)
 }
 
-func TestOpenAIGatewayService_SelectAccountWithLoadAwareness_DoesNotUseCooldownAsUserProbe(t *testing.T) {
+func TestOpenAIGatewayService_SelectAccountWithLoadAwareness_UsesSameGroupCooldownWeakFallback(t *testing.T) {
 	ctx := context.Background()
 	rateLimitedUntil := time.Now().Add(30 * time.Minute)
 	account := Account{
@@ -1145,9 +1230,15 @@ func TestOpenAIGatewayService_SelectAccountWithLoadAwareness_DoesNotUseCooldownA
 	}
 
 	selection, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "", "gpt-5.1", nil)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "no available OpenAI accounts")
-	require.Nil(t, selection)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, int64(37011), selection.Account.ID)
+	require.True(t, selection.WeakFallback)
+	require.True(t, selection.BypassOpenAIHeaderTO)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
 }
 
 func TestOpenAIGatewayService_SelectAccountWithScheduler_PreviousResponseSticky(t *testing.T) {
@@ -2152,9 +2243,15 @@ func TestOpenAICodexAccountCircuit_GlobalAcrossGroupsAndHalfOpenRecovery(t *test
 		OpenAIUpstreamTransportAny,
 		false,
 	)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "no available OpenAI accounts")
-	require.Nil(t, selection, "active global circuit should not be returned by cooldown fallback")
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, primary.ID, selection.Account.ID, "same-group weak fallback may try the only remaining bound account after alternatives are excluded")
+	require.True(t, selection.WeakFallback)
+	require.True(t, selection.BypassOpenAIHeaderTO)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
 
 	svc.schedulerHealth.reportSuccess(primary.ID, "gpt-5.1", "/v1/responses", nil)
 	svc.schedulerHealth.reportFailure(primary.ID, "gpt-5.1", "/v1/responses", "transient", time.Nanosecond)

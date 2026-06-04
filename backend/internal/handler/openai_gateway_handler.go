@@ -72,6 +72,13 @@ func wrapUsageRecordTaskContext(parent context.Context, task service.UsageRecord
 	}
 }
 
+func openAIForwardContextForSelection(ctx context.Context, selection *service.AccountSelectionResult) context.Context {
+	if selection == nil || !selection.BypassOpenAIHeaderTO {
+		return ctx
+	}
+	return service.WithOpenAIWeakFallbackUpstream(ctx, true)
+}
+
 // NewOpenAIGatewayHandler creates a new OpenAIGatewayHandler
 func NewOpenAIGatewayHandler(
 	gatewayService *service.OpenAIGatewayService,
@@ -370,7 +377,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					accountReleaseFunc()
 				}
 			}()
-			return h.gatewayService.Forward(c.Request.Context(), c, account, forwardBody)
+			return h.gatewayService.Forward(openAIForwardContextForSelection(c.Request.Context(), selection), c, account, forwardBody)
 		}()
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
@@ -773,7 +780,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 					accountReleaseFunc()
 				}
 			}()
-			return h.gatewayService.ForwardAsAnthropic(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
+			return h.gatewayService.ForwardAsAnthropic(openAIForwardContextForSelection(c.Request.Context(), selection), c, account, forwardBody, promptCacheKey, defaultMappedModel)
 		}()
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
