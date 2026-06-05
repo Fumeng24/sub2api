@@ -455,6 +455,53 @@ var (
 // ErrNoAvailableAccounts 表示没有可用的账号
 var ErrNoAvailableAccounts = errors.New("no available accounts")
 
+type gatewayDeferredHalfOpenProbeContextKey struct{}
+
+var gatewayDeferredHalfOpenProbeKey = gatewayDeferredHalfOpenProbeContextKey{}
+
+func withGatewayDeferredHalfOpenProbe(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, gatewayDeferredHalfOpenProbeKey, true)
+}
+
+func gatewayHalfOpenProbeDeferredFromContext(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	v, _ := ctx.Value(gatewayDeferredHalfOpenProbeKey).(bool)
+	return v
+}
+
+// GatewayNoAvailableAccountsError carries structured diagnostics for non-OpenAI
+// gateway account selection while preserving errors.Is(err, ErrNoAvailableAccounts).
+type GatewayNoAvailableAccountsError struct {
+	Cause       error
+	Diagnostics GatewaySelectionDiagnostics
+}
+
+func (e *GatewayNoAvailableAccountsError) Error() string {
+	if e == nil {
+		return ErrNoAvailableAccounts.Error()
+	}
+	cause := e.Cause
+	if cause == nil {
+		cause = ErrNoAvailableAccounts
+	}
+	if e.Diagnostics.Collected {
+		return fmt.Sprintf("%s (%s)", cause.Error(), e.Diagnostics.Summary())
+	}
+	return cause.Error()
+}
+
+func (e *GatewayNoAvailableAccountsError) Unwrap() error {
+	if e == nil || e.Cause == nil {
+		return ErrNoAvailableAccounts
+	}
+	return e.Cause
+}
+
 // ErrClaudeCodeOnly 表示分组仅允许 Claude Code 客户端访问
 var ErrClaudeCodeOnly = errors.New("this group only allows Claude Code clients")
 
@@ -1684,13 +1731,19 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		}
 
 		for {
-			account, err := s.SelectAccountForModelWithExclusions(ctx, groupID, sessionHash, requestedModel, localExcluded)
+			selectionCtx := withGatewayDeferredHalfOpenProbe(ctx)
+			account, err := s.SelectAccountForModelWithExclusions(selectionCtx, groupID, sessionHash, requestedModel, localExcluded)
 			if err != nil {
 				return nil, err
 			}
 
 			result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
 			if err == nil && result.Acquired {
+				if !s.tryBeginGatewayHalfOpenProbeForAccount(account, requestedModel, schedulerEndpointFromContext(ctx, account.Platform)) {
+					result.ReleaseFunc()
+					localExcluded[account.ID] = struct{}{}
+					continue
+				}
 				// 获取槽位后检查会话限制（使用 sessionHash 作为会话标识符）
 				if !s.checkAndRegisterSession(ctx, account, sessionHash) {
 					result.ReleaseFunc()                   // 释放槽位
@@ -1742,7 +1795,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		return nil, err
 	}
 	if len(accounts) == 0 {
-		return nil, ErrNoAvailableAccounts
+		return nil, s.newGatewayNoAvailableError(ctx, groupID, requestedModel, platform, schedulerEndpoint, accounts, excludedIDs, useMixed, group, needsUpstreamCheck, nil)
 	}
 	ctx = s.withWindowCostPrefetch(ctx, accounts)
 	ctx = s.withRPMPrefetch(ctx, accounts)
@@ -1878,8 +1931,10 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 						if rpmPass { // 粘性会话窗口费用+RPM 检查
 							result, err := s.tryAcquireAccountSlot(ctx, stickyAccountID, stickyAccount.Concurrency)
 							if err == nil && result.Acquired {
-								// 会话数量限制检查
-								if !s.checkAndRegisterSession(ctx, stickyAccount, sessionHash) {
+								if !s.tryBeginGatewayHalfOpenProbeForAccount(stickyAccount, requestedModel, schedulerEndpoint) {
+									result.ReleaseFunc()
+									stickyCacheMissReason = "half_open_in_flight"
+								} else if !s.checkAndRegisterSession(ctx, stickyAccount, sessionHash) {
 									result.ReleaseFunc() // 释放槽位
 									stickyCacheMissReason = "session_limit"
 									// 继续到负载感知选择
@@ -1959,6 +2014,10 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					}
 					result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
 					if err == nil && result.Acquired {
+						if !s.tryBeginGatewayHalfOpenProbe(item, requestedModel, schedulerEndpoint) {
+							result.ReleaseFunc()
+							continue
+						}
 						// 会话数量限制检查
 						if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
 							result.ReleaseFunc() // 释放槽位，继续尝试下一个账号
@@ -2051,24 +2110,33 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 				if !clearSticky && platformOK && privacyOK && modelSupported && modelSchedulable && quotaOK && windowCostOK && rpmOK && schedulable && upstreamOK && healthOK {
 					result, err := s.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
 					if err == nil && result.Acquired {
-						// 会话数量限制检查
-						if !s.checkAndRegisterSession(ctx, account, sessionHash) {
-							result.ReleaseFunc() // 释放槽位，继续到 Layer 2
+						if !s.tryBeginGatewayHalfOpenProbeForAccount(account, requestedModel, schedulerEndpoint) {
+							result.ReleaseFunc()
 							slog.Debug("sticky.layer1_5_no_routing_miss",
 								"account_id", accountID,
-								"reason", "session_limit",
+								"reason", "half_open_in_flight",
 								"session", shortSessionHash(sessionHash),
 							)
 						} else {
-							slog.Debug("sticky.layer1_5_no_routing_hit",
-								"account_id", accountID,
-								"session", shortSessionHash(sessionHash),
-								"result", "slot_acquired",
-							)
-							if s.cache != nil {
-								_ = s.cache.RefreshSessionTTL(ctx, derefGroupID(groupID), sessionHash, stickySessionTTL)
+							// 会话数量限制检查
+							if !s.checkAndRegisterSession(ctx, account, sessionHash) {
+								result.ReleaseFunc() // 释放槽位，继续到 Layer 2
+								slog.Debug("sticky.layer1_5_no_routing_miss",
+									"account_id", accountID,
+									"reason", "session_limit",
+									"session", shortSessionHash(sessionHash),
+								)
+							} else {
+								slog.Debug("sticky.layer1_5_no_routing_hit",
+									"account_id", accountID,
+									"session", shortSessionHash(sessionHash),
+									"result", "slot_acquired",
+								)
+								if s.cache != nil {
+									_ = s.cache.RefreshSessionTTL(ctx, derefGroupID(groupID), sessionHash, stickySessionTTL)
+								}
+								return s.newSelectionResult(ctx, account, true, result.ReleaseFunc, nil)
 							}
-							return s.newSelectionResult(ctx, account, true, result.ReleaseFunc, nil)
 						}
 					} else {
 						slog.Debug("sticky.layer1_5_no_routing_slot_busy",
@@ -2144,7 +2212,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	}
 
 	if len(candidates) == 0 {
-		return nil, ErrNoAvailableAccounts
+		return nil, s.newGatewayNoAvailableError(ctx, groupID, requestedModel, platform, schedulerEndpoint, accounts, excludedIDs, useMixed, group, needsUpstreamCheck, nil)
 	}
 
 	accountLoads := make([]AccountWithConcurrency, 0, len(candidates))
@@ -2163,12 +2231,16 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			return result, nil
 		}
 	} else {
-		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, false)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
 		selectionOrder := buildRoleAwareSchedulerOrder(scores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash)
 		for _, item := range selectionOrder {
 			acc := item.Account
 			result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
 			if err == nil && result.Acquired {
+				if !s.tryBeginGatewayHalfOpenProbe(item, requestedModel, schedulerEndpoint) {
+					result.ReleaseFunc()
+					continue
+				}
 				// 会话数量限制检查
 				if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
 					result.ReleaseFunc() // 释放槽位，继续尝试下一个账号
@@ -2201,17 +2273,21 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			MaxWaiting:     cfg.FallbackMaxWaiting,
 		})
 	}
-	return nil, ErrNoAvailableAccounts
+	return nil, s.newGatewayNoAvailableError(ctx, groupID, requestedModel, platform, schedulerEndpoint, accounts, excludedIDs, useMixed, group, needsUpstreamCheck, loadMap)
 }
 
 func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates []*Account, groupID *int64, sessionHash string, preferOAuth bool, requestedModel string, schedulerEndpoint string) (*AccountSelectionResult, bool, error) {
-	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, false)
+	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, true)
 	ordered := buildRoleAwareSchedulerOrder(scores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "legacy")
 
 	for _, item := range ordered {
 		acc := item.Account
 		result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
 		if err == nil && result.Acquired {
+			if !s.tryBeginGatewayHalfOpenProbe(item, requestedModel, schedulerEndpoint) {
+				result.ReleaseFunc()
+				continue
+			}
 			// 会话数量限制检查
 			if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
 				result.ReleaseFunc() // 释放槽位，继续尝试下一个账号
@@ -2594,7 +2670,7 @@ func (s *GatewayService) orderGatewaySchedulerCandidates(
 	preferOAuth bool,
 	seedParts ...string,
 ) []schedulerAccountScore {
-	scores := buildSchedulerAccountScores(accounts, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, false)
+	scores := buildSchedulerAccountScores(accounts, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
 	return buildRoleAwareSchedulerOrder(scores, preferOAuth, append([]string{
 		strconv.FormatInt(derefGroupID(groupID), 10),
 		requestedModel,
@@ -2603,6 +2679,7 @@ func (s *GatewayService) orderGatewaySchedulerCandidates(
 }
 
 func (s *GatewayService) selectFirstGatewaySchedulerAccount(
+	ctx context.Context,
 	accounts []*Account,
 	groupID *int64,
 	requestedModel string,
@@ -2612,11 +2689,39 @@ func (s *GatewayService) selectFirstGatewaySchedulerAccount(
 ) *Account {
 	order := s.orderGatewaySchedulerCandidates(accounts, groupID, requestedModel, schedulerEndpoint, nil, preferOAuth, seedParts...)
 	for _, item := range order {
-		if item.Account != nil {
+		if item.Account == nil {
+			continue
+		}
+		if gatewayHalfOpenProbeDeferredFromContext(ctx) || s.tryBeginGatewayHalfOpenProbe(item, requestedModel, schedulerEndpoint) {
 			return item.Account
 		}
 	}
 	return nil
+}
+
+func (s *GatewayService) tryBeginGatewayHalfOpenProbe(score schedulerAccountScore, model, endpoint string) bool {
+	if !score.HalfOpen || score.Account == nil || s == nil || s.schedulerHealth == nil {
+		return true
+	}
+	return s.schedulerHealth.tryBeginHalfOpenProbe(score.Account.ID, model, endpoint)
+}
+
+func (s *GatewayService) tryBeginGatewayHalfOpenProbeForAccount(account *Account, model, endpoint string) bool {
+	if account == nil || s == nil || s.schedulerHealth == nil {
+		return true
+	}
+	snap := s.schedulerHealth.snapshot(account.ID, model, endpoint, true)
+	switch snap.CircuitState {
+	case schedulerCircuitClosed:
+		return true
+	case schedulerCircuitHalfOpen:
+		if !snap.HalfOpenProbe {
+			return false
+		}
+		return s.schedulerHealth.tryBeginHalfOpenProbe(account.ID, model, endpoint)
+	default:
+		return false
+	}
 }
 
 // isAccountInGroup checks if the account belongs to the specified group.
@@ -3081,7 +3186,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 			routingCandidates = append(routingCandidates, acc)
 		}
 
-		selected := s.selectFirstGatewaySchedulerAccount(routingCandidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_routing")
+		selected := s.selectFirstGatewaySchedulerAccount(ctx, routingCandidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_routing")
 		if selected != nil {
 			if sessionHash != "" && s.cache != nil {
 				if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
@@ -3134,7 +3239,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 		}
 		candidates = append(candidates, acc)
 	}
-	selected := s.selectFirstGatewaySchedulerAccount(candidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy")
+	selected := s.selectFirstGatewaySchedulerAccount(ctx, candidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy")
 
 	if selected == nil {
 		stats := s.logDetailedSelectionFailure(ctx, groupID, sessionHash, requestedModel, platform, accounts, excludedIDs, false)
@@ -3249,7 +3354,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 			routingCandidates = append(routingCandidates, acc)
 		}
 
-		selected := s.selectFirstGatewaySchedulerAccount(routingCandidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_mixed_routing")
+		selected := s.selectFirstGatewaySchedulerAccount(ctx, routingCandidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_mixed_routing")
 		if selected != nil {
 			if sessionHash != "" && s.cache != nil {
 				if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
@@ -3302,7 +3407,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 		}
 		candidates = append(candidates, acc)
 	}
-	selected := s.selectFirstGatewaySchedulerAccount(candidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_mixed")
+	selected := s.selectFirstGatewaySchedulerAccount(ctx, candidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_mixed")
 
 	if selected == nil {
 		stats := s.logDetailedSelectionFailure(ctx, groupID, sessionHash, requestedModel, nativePlatform, accounts, excludedIDs, true)
@@ -3333,6 +3438,321 @@ type selectionFailureStats struct {
 	SamplePlatformIDs  []int64
 	SampleMappingIDs   []int64
 	SampleRateLimitIDs []string
+}
+
+type GatewaySelectionSkippedAccount struct {
+	AccountID          int64  `json:"account_id"`
+	Reason             string `json:"reason"`
+	CircuitState       string `json:"circuit_state,omitempty"`
+	CircuitReason      string `json:"circuit_reason,omitempty"`
+	CircuitModel       string `json:"circuit_model,omitempty"`
+	CircuitEndpoint    string `json:"circuit_endpoint,omitempty"`
+	LoadRate           int    `json:"load_rate,omitempty"`
+	CurrentConcurrency int    `json:"current_concurrency,omitempty"`
+	MaxConcurrency     int    `json:"max_concurrency,omitempty"`
+}
+
+type GatewaySelectionDiagnostics struct {
+	Collected                     bool
+	GroupID                       int64
+	Model                         string
+	Endpoint                      string
+	Platform                      string
+	GroupBindingAccountCount      int
+	ActiveSchedulableCount        int
+	ExcludedAccountCount          int
+	AfterExcludedCount            int
+	ModelSupportedCount           int
+	EndpointSupportedCount        int
+	StateAllowedCount             int
+	CircuitAllowedCount           int
+	ConcurrencySlotAllowedCount   int
+	FinalCandidateCount           int
+	ExcludedAccountIDs            []int64
+	ActiveSchedulableAccountIDs   []int64
+	AfterExcludedAccountIDs       []int64
+	ModelSupportedAccountIDs      []int64
+	EndpointSupportedAccountIDs   []int64
+	StateAllowedAccountIDs        []int64
+	CircuitAllowedAccountIDs      []int64
+	CandidateAccountIDs           []int64
+	ModelUnsupportedAccountIDs    []int64
+	EndpointUnsupportedAccountIDs []int64
+	StateFilteredAccountIDs       []int64
+	CircuitFilteredAccountIDs     []int64
+	ChannelRestrictionAccountIDs  []int64
+	ConcurrencyFullAccountIDs     []int64
+	SkippedAccounts               []GatewaySelectionSkippedAccount
+	FilterReasonCounts            map[string]int
+}
+
+func (d GatewaySelectionDiagnostics) Summary() string {
+	return fmt.Sprintf(
+		"group_id=%d platform=%s model=%s endpoint=%s group_binding_count=%d active_schedulable_count=%d excluded_count=%d after_excluded_count=%d model_supported_count=%d endpoint_supported_count=%d state_allowed_count=%d circuit_allowed_count=%d concurrency_slot_allowed_count=%d final_candidate_count=%d skip_reason=%v",
+		d.GroupID,
+		d.Platform,
+		d.Model,
+		d.Endpoint,
+		d.GroupBindingAccountCount,
+		d.ActiveSchedulableCount,
+		d.ExcludedAccountCount,
+		d.AfterExcludedCount,
+		d.ModelSupportedCount,
+		d.EndpointSupportedCount,
+		d.StateAllowedCount,
+		d.CircuitAllowedCount,
+		d.ConcurrencySlotAllowedCount,
+		d.FinalCandidateCount,
+		d.FilterReasonCounts,
+	)
+}
+
+func (d *GatewaySelectionDiagnostics) addReason(reason string) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return
+	}
+	if d.FilterReasonCounts == nil {
+		d.FilterReasonCounts = make(map[string]int)
+	}
+	d.FilterReasonCounts[reason]++
+}
+
+func (d *GatewaySelectionDiagnostics) addSkipped(account *Account, reason string, snap schedulerHealthSnapshot, loadInfo *AccountLoadInfo) {
+	if account == nil {
+		d.addReason(reason)
+		return
+	}
+	d.addReason(reason)
+	skipped := GatewaySelectionSkippedAccount{
+		AccountID:       account.ID,
+		Reason:          strings.TrimSpace(reason),
+		CircuitState:    snap.CircuitState,
+		CircuitReason:   snap.LastFailureReason,
+		CircuitModel:    snap.Key.Model,
+		CircuitEndpoint: snap.Key.Endpoint,
+		MaxConcurrency:  account.Concurrency,
+	}
+	if loadInfo != nil {
+		skipped.LoadRate = loadInfo.LoadRate
+		skipped.CurrentConcurrency = loadInfo.CurrentConcurrency
+	}
+	d.SkippedAccounts = appendGatewaySelectionSkippedAccount(d.SkippedAccounts, skipped)
+}
+
+func appendGatewaySelectionID(ids []int64, account *Account) []int64 {
+	if account == nil {
+		return ids
+	}
+	return append(ids, account.ID)
+}
+
+func appendGatewaySelectionSkippedAccount(items []GatewaySelectionSkippedAccount, item GatewaySelectionSkippedAccount) []GatewaySelectionSkippedAccount {
+	const limit = 20
+	if len(items) >= limit {
+		return items
+	}
+	return append(items, item)
+}
+
+func (s *GatewayService) newGatewayNoAvailableError(
+	ctx context.Context,
+	groupID *int64,
+	requestedModel string,
+	platform string,
+	endpoint string,
+	accounts []*Account,
+	excludedIDs map[int64]struct{},
+	useMixed bool,
+	schedGroup *Group,
+	needsUpstreamCheck bool,
+	loadMap map[int64]*AccountLoadInfo,
+) error {
+	diag := s.buildGatewaySelectionDiagnostics(ctx, groupID, requestedModel, platform, endpoint, accounts, excludedIDs, useMixed, schedGroup, needsUpstreamCheck, loadMap)
+	return &GatewayNoAvailableAccountsError{
+		Cause:       ErrNoAvailableAccounts,
+		Diagnostics: diag,
+	}
+}
+
+func (s *GatewayService) buildGatewaySelectionDiagnostics(
+	ctx context.Context,
+	groupID *int64,
+	requestedModel string,
+	platform string,
+	endpoint string,
+	accounts []*Account,
+	excludedIDs map[int64]struct{},
+	useMixed bool,
+	schedGroup *Group,
+	needsUpstreamCheck bool,
+	loadMap map[int64]*AccountLoadInfo,
+) GatewaySelectionDiagnostics {
+	diag := GatewaySelectionDiagnostics{
+		Collected:                true,
+		GroupID:                  derefGroupID(groupID),
+		Model:                    strings.TrimSpace(requestedModel),
+		Endpoint:                 strings.TrimSpace(endpoint),
+		Platform:                 strings.TrimSpace(platform),
+		GroupBindingAccountCount: len(accounts),
+		ExcludedAccountCount:     len(excludedIDs),
+		ExcludedAccountIDs:       gatewaySelectionIDsFromMap(excludedIDs),
+		FilterReasonCounts:       make(map[string]int),
+	}
+
+	circuitAllowed := make([]*Account, 0, len(accounts))
+	for _, account := range accounts {
+		if account == nil {
+			diag.addReason("nil_account")
+			continue
+		}
+		if account.Status == StatusActive && account.Schedulable {
+			diag.ActiveSchedulableCount++
+			diag.ActiveSchedulableAccountIDs = appendGatewaySelectionID(diag.ActiveSchedulableAccountIDs, account)
+		}
+		if excludedIDs != nil {
+			if _, excluded := excludedIDs[account.ID]; excluded {
+				diag.addSkipped(account, "excluded", schedulerHealthSnapshot{}, gatewaySelectionLoadInfo(loadMap, account))
+				continue
+			}
+		}
+		diag.AfterExcludedCount++
+		diag.AfterExcludedAccountIDs = appendGatewaySelectionID(diag.AfterExcludedAccountIDs, account)
+
+		if requestedModel != "" && !s.isModelSupportedByAccountWithContext(ctx, account, requestedModel) {
+			diag.ModelUnsupportedAccountIDs = appendGatewaySelectionID(diag.ModelUnsupportedAccountIDs, account)
+			diag.addSkipped(account, "model_unsupported", schedulerHealthSnapshot{}, gatewaySelectionLoadInfo(loadMap, account))
+			continue
+		}
+		diag.ModelSupportedCount++
+		diag.ModelSupportedAccountIDs = appendGatewaySelectionID(diag.ModelSupportedAccountIDs, account)
+
+		if !s.isAccountAllowedForPlatform(account, platform, useMixed) {
+			diag.EndpointUnsupportedAccountIDs = appendGatewaySelectionID(diag.EndpointUnsupportedAccountIDs, account)
+			diag.addSkipped(account, "endpoint_unsupported", schedulerHealthSnapshot{}, gatewaySelectionLoadInfo(loadMap, account))
+			continue
+		}
+		diag.EndpointSupportedCount++
+		diag.EndpointSupportedAccountIDs = appendGatewaySelectionID(diag.EndpointSupportedAccountIDs, account)
+
+		if reason := s.gatewaySelectionStateFilterReason(ctx, account, groupID, requestedModel, schedGroup, needsUpstreamCheck); reason != "" {
+			diag.StateFilteredAccountIDs = appendGatewaySelectionID(diag.StateFilteredAccountIDs, account)
+			if reason == "channel_pricing_restricted" {
+				diag.ChannelRestrictionAccountIDs = appendGatewaySelectionID(diag.ChannelRestrictionAccountIDs, account)
+			}
+			diag.addSkipped(account, reason, schedulerHealthSnapshot{}, gatewaySelectionLoadInfo(loadMap, account))
+			continue
+		}
+		diag.StateAllowedCount++
+		diag.StateAllowedAccountIDs = appendGatewaySelectionID(diag.StateAllowedAccountIDs, account)
+
+		snap := schedulerHealthSnapshot{CircuitState: schedulerCircuitClosed}
+		if s != nil && s.schedulerHealth != nil {
+			snap = s.schedulerHealth.snapshot(account.ID, requestedModel, endpoint, true)
+		}
+		switch snap.CircuitState {
+		case schedulerCircuitClosed:
+		case schedulerCircuitHalfOpen:
+			if !snap.HalfOpenProbe {
+				diag.CircuitFilteredAccountIDs = appendGatewaySelectionID(diag.CircuitFilteredAccountIDs, account)
+				diag.addSkipped(account, "scheduler_half_open_in_flight", snap, gatewaySelectionLoadInfo(loadMap, account))
+				continue
+			}
+		default:
+			diag.CircuitFilteredAccountIDs = appendGatewaySelectionID(diag.CircuitFilteredAccountIDs, account)
+			diag.addSkipped(account, "scheduler_circuit_open", snap, gatewaySelectionLoadInfo(loadMap, account))
+			continue
+		}
+		diag.CircuitAllowedCount++
+		diag.CircuitAllowedAccountIDs = appendGatewaySelectionID(diag.CircuitAllowedAccountIDs, account)
+		circuitAllowed = append(circuitAllowed, account)
+	}
+
+	for _, account := range circuitAllowed {
+		loadInfo := gatewaySelectionLoadInfo(loadMap, account)
+		if loadInfo != nil && loadInfo.LoadRate >= 100 {
+			diag.ConcurrencyFullAccountIDs = appendGatewaySelectionID(diag.ConcurrencyFullAccountIDs, account)
+			diag.addSkipped(account, "concurrency_full", schedulerHealthSnapshot{}, loadInfo)
+			continue
+		}
+		diag.ConcurrencySlotAllowedCount++
+		diag.CandidateAccountIDs = appendGatewaySelectionID(diag.CandidateAccountIDs, account)
+	}
+	diag.FinalCandidateCount = len(diag.CandidateAccountIDs)
+	return diag
+}
+
+func (s *GatewayService) gatewaySelectionStateFilterReason(
+	ctx context.Context,
+	account *Account,
+	groupID *int64,
+	requestedModel string,
+	schedGroup *Group,
+	needsUpstreamCheck bool,
+) string {
+	if account == nil {
+		return "nil_account"
+	}
+	now := time.Now()
+	if account.Status != StatusActive {
+		return "inactive"
+	}
+	if !account.Schedulable {
+		return "manual_unschedulable"
+	}
+	if account.AutoPauseOnExpired && account.ExpiresAt != nil && !now.Before(*account.ExpiresAt) {
+		return "expired"
+	}
+	if account.OverloadUntil != nil && now.Before(*account.OverloadUntil) {
+		return "overloaded"
+	}
+	if account.RateLimitResetAt != nil && now.Before(*account.RateLimitResetAt) {
+		return "rate_limited"
+	}
+	if account.TempUnschedulableUntil != nil && now.Before(*account.TempUnschedulableUntil) {
+		return "temp_unschedulable"
+	}
+	if account.IsAPIKeyOrBedrock() && account.IsQuotaExceeded() {
+		return "quota_exceeded"
+	}
+	if schedGroup != nil && schedGroup.RequirePrivacySet && !account.IsPrivacySet() {
+		return "privacy_not_set"
+	}
+	if needsUpstreamCheck && groupID != nil && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel) {
+		return "channel_pricing_restricted"
+	}
+	if !s.isAccountSchedulableForModelSelection(ctx, account, requestedModel) {
+		return "model_rate_limited"
+	}
+	if !s.isAccountSchedulableForQuota(account) {
+		return "quota_exceeded"
+	}
+	if !s.isAccountSchedulableForWindowCost(ctx, account, false) {
+		return "window_cost_limited"
+	}
+	if !s.isAccountSchedulableForRPM(ctx, account, false) {
+		return "rpm_limited"
+	}
+	return ""
+}
+
+func gatewaySelectionLoadInfo(loadMap map[int64]*AccountLoadInfo, account *Account) *AccountLoadInfo {
+	if account == nil || loadMap == nil {
+		return nil
+	}
+	return loadMap[account.ID]
+}
+
+func gatewaySelectionIDsFromMap(values map[int64]struct{}) []int64 {
+	if len(values) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(values))
+	for id := range values {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
 }
 
 type selectionFailureDiagnosis struct {

@@ -289,6 +289,7 @@ func (s *accountSchedulerHealthStats) reportFailure(accountID int64, model, endp
 		category == "transient" ||
 		category == "transient_transport" ||
 		category == "transient_timeout" ||
+		category == "compact_bad_output" ||
 		category == "model_unsupported" {
 		shouldOpen = true
 	}
@@ -327,6 +328,9 @@ func (s *accountSchedulerHealthStats) tryBeginHalfOpenProbe(accountID int64, mod
 	if entry.circuitState == schedulerCircuitOpen && !entry.cooldownUntil.IsZero() && now.After(entry.cooldownUntil) {
 		entry.circuitState = schedulerCircuitHalfOpen
 		entry.halfOpenInFlight = false
+	}
+	if entry.circuitState == schedulerCircuitOpen {
+		return false
 	}
 	if entry.circuitState != schedulerCircuitHalfOpen {
 		return true
@@ -406,6 +410,9 @@ func schedulerFailureCategory(statusCode int, body []byte) string {
 	if statusCode == 0 {
 		return schedulerStatusZeroFailureCategory(body)
 	}
+	if isOpenAICompactBadOutputBody(body) {
+		return "compact_bad_output"
+	}
 	if class := classifyOpenAIUpstreamError(statusCode, "", body); class != openAIUpstreamErrorUnknown {
 		return openAIUpstreamErrorClassSchedulerCategory(class)
 	}
@@ -442,6 +449,18 @@ func schedulerFailureCategory(statusCode int, body []byte) string {
 		return "error"
 	}
 	return "error"
+}
+
+func isOpenAICompactBadOutputBody(body []byte) bool {
+	text := strings.ToLower(strings.TrimSpace(string(body)))
+	if text == "" {
+		return false
+	}
+	if strings.Contains(text, openAICompactBadOutputCode) {
+		return true
+	}
+	code := strings.ToLower(strings.TrimSpace(extractUpstreamErrorCode(body)))
+	return code == openAICompactBadOutputCode
 }
 
 func schedulerStatusZeroFailureCategory(body []byte) string {
@@ -533,6 +552,8 @@ func schedulerCooldownForCategory(category string, headers http.Header) time.Dur
 		return 90 * time.Second
 	case "transient_transport", "transient_timeout":
 		return openAIRequestErrorCooldown
+	case "compact_bad_output":
+		return 30 * time.Second
 	default:
 		return 2 * time.Minute
 	}

@@ -170,6 +170,61 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactFallsBackToUnkno
 	require.Equal(t, int64(71021), selection.Account.ID, "unknown account should be picked when no supported account available")
 }
 
+func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactStrictFailoverAllowsMappedAccount(t *testing.T) {
+	resetOpenAIAdvancedSchedulerSettingCacheForTest()
+
+	ctx := context.Background()
+	groupID := int64(91004)
+	accounts := []Account{
+		{
+			ID:          71030,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			Priority:    0,
+			Extra:       map[string]any{}, // failed first compact account
+		},
+		{
+			ID:          71031,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			Priority:    0,
+			Credentials: map[string]any{
+				"compact_model_mapping": map[string]any{"gpt-5.4": "gpt-5.4-openai-compact"},
+			},
+			Extra: map[string]any{}, // mapping is the explicit compact capability signal
+		},
+	}
+	cfg := &config.Config{}
+	cfg.Gateway.Scheduling.LoadBatchEnabled = false
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                cfg,
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, _, err := svc.SelectAccountWithScheduler(
+		ctx,
+		&groupID,
+		"",
+		"",
+		"gpt-5.4",
+		map[int64]struct{}{71030: {}},
+		OpenAIUpstreamTransportAny,
+		true,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, int64(71031), selection.Account.ID, "compact mapping account should remain eligible during strict compact failover")
+}
+
 // TestOpenAICompactSupportTier 验证 tier 分类逻辑。
 func TestOpenAICompactSupportTier(t *testing.T) {
 	tests := []struct {
@@ -192,4 +247,35 @@ func TestOpenAICompactSupportTier(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestOpenAICompactSupportTierForModel_CompactMapping(t *testing.T) {
+	mappedAccount := &Account{
+		Platform: PlatformOpenAI,
+		Credentials: map[string]any{
+			"compact_model_mapping": map[string]any{"gpt-5.4": "gpt-5.4-openai-compact"},
+		},
+		Extra: map[string]any{},
+	}
+	require.Equal(t, 2, openAICompactSupportTierForModel(mappedAccount, "gpt-5.4"))
+	require.Equal(t, 1, openAICompactSupportTierForModel(mappedAccount, "gpt-5.3"))
+
+	regularThenCompactMapped := &Account{
+		Platform: PlatformOpenAI,
+		Credentials: map[string]any{
+			"model_mapping":         map[string]any{"gpt-5.4": "gpt-5.5"},
+			"compact_model_mapping": map[string]any{"gpt-5.5": "gpt-5.5-openai-compact"},
+		},
+		Extra: map[string]any{},
+	}
+	require.Equal(t, 2, openAICompactSupportTierForModel(regularThenCompactMapped, "gpt-5.4"))
+
+	forceOff := &Account{
+		Platform: PlatformOpenAI,
+		Credentials: map[string]any{
+			"compact_model_mapping": map[string]any{"gpt-5.4": "gpt-5.4-openai-compact"},
+		},
+		Extra: map[string]any{"openai_compact_mode": OpenAICompactModeForceOff},
+	}
+	require.Equal(t, 0, openAICompactSupportTierForModel(forceOff, "gpt-5.4"))
 }

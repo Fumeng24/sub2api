@@ -3203,6 +3203,74 @@ func TestGatewayService_SelectAccountWithLoadAwareness(t *testing.T) {
 		require.NotNil(t, result.Account)
 		require.Equal(t, int64(2), result.Account.ID)
 	})
+
+	t.Run("Anthropic单账号半开探测-恢复候选", func(t *testing.T) {
+		groupID := int64(11)
+		accountID := int64(38800)
+		model := "claude-opus-4-7"
+		endpoint := "/v1/messages"
+		testCtx := WithSchedulerEndpoint(ctx, endpoint)
+
+		repo := &mockAccountRepoForPlatform{
+			accounts: []Account{
+				{
+					ID:            accountID,
+					Platform:      PlatformAnthropic,
+					Priority:      1,
+					Status:        StatusActive,
+					Schedulable:   true,
+					Concurrency:   5,
+					AccountGroups: []AccountGroup{{GroupID: groupID}},
+					Credentials: map[string]any{
+						"model_mapping": map[string]any{model: model},
+					},
+				},
+			},
+			accountsByID: map[int64]*Account{},
+		}
+		for i := range repo.accounts {
+			repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+		}
+
+		groupRepo := &mockGroupRepoForGateway{
+			groups: map[int64]*Group{
+				groupID: {
+					ID:       groupID,
+					Name:     "Full Claude",
+					Platform: PlatformAnthropic,
+					Status:   StatusActive,
+					Hydrated: true,
+				},
+			},
+		}
+
+		cfg := testConfig()
+		cfg.Gateway.Scheduling.LoadBatchEnabled = true
+		concurrencyCache := &mockConcurrencyCache{}
+
+		svc := &GatewayService{
+			accountRepo:        repo,
+			groupRepo:          groupRepo,
+			cache:              &mockGatewayCacheForPlatform{},
+			cfg:                cfg,
+			concurrencyService: NewConcurrencyService(concurrencyCache),
+			schedulerHealth:    newAccountSchedulerHealthStats(),
+		}
+
+		svc.schedulerHealth.reportFailure(accountID, model, endpoint, "transient_timeout", time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
+
+		result, err := svc.SelectAccountWithLoadAwareness(testCtx, &groupID, "", model, nil, "", int64(0))
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.True(t, result.Acquired)
+		require.NotNil(t, result.Account)
+		require.Equal(t, accountID, result.Account.ID)
+
+		snap := svc.schedulerHealth.snapshot(accountID, model, endpoint, true)
+		require.Equal(t, schedulerCircuitHalfOpen, snap.CircuitState)
+		require.False(t, snap.HalfOpenProbe, "半开探测已登记后不应再允许第二个并发探测")
+	})
 }
 
 func TestGatewayService_GroupResolution_ReusesContextGroup(t *testing.T) {

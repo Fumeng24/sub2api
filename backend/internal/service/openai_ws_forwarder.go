@@ -4310,7 +4310,7 @@ func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
 		}
 		account = latest
 	}
-	if requireCompact && !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, account) {
+	if requireCompact && !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, account, requestedModel) {
 		_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 		return nil, nil
 	}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -137,5 +138,62 @@ func TestDiagnoseSelectionFailure_ModelRateLimitedDetail(t *testing.T) {
 	}
 	if !strings.Contains(diagnosis.Detail, "remaining=") {
 		t.Fatalf("detail=%s want contains remaining=", diagnosis.Detail)
+	}
+}
+
+func TestGatewaySelectionDiagnostics_CircuitOpen(t *testing.T) {
+	groupID := int64(11)
+	model := "claude-opus-4-7"
+	endpoint := "/v1/messages"
+	account := &Account{
+		ID:            38800,
+		Platform:      PlatformAnthropic,
+		Status:        StatusActive,
+		Schedulable:   true,
+		Concurrency:   5,
+		AccountGroups: []AccountGroup{{GroupID: groupID}},
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{model: model},
+		},
+	}
+	svc := &GatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
+	svc.schedulerHealth.reportFailure(account.ID, model, endpoint, "transient_transport", time.Minute)
+
+	err := svc.newGatewayNoAvailableError(
+		context.Background(),
+		&groupID,
+		model,
+		PlatformAnthropic,
+		endpoint,
+		[]*Account{account},
+		nil,
+		false,
+		&Group{ID: groupID, Platform: PlatformAnthropic, Status: StatusActive},
+		false,
+		map[int64]*AccountLoadInfo{account.ID: {AccountID: account.ID, LoadRate: 0}},
+	)
+
+	var noAvailable *GatewayNoAvailableAccountsError
+	if !errors.As(err, &noAvailable) {
+		t.Fatalf("expected GatewayNoAvailableAccountsError, got %T", err)
+	}
+	diag := noAvailable.Diagnostics
+	if !diag.Collected {
+		t.Fatal("expected diagnostics to be collected")
+	}
+	if diag.ModelSupportedCount != 1 || diag.EndpointSupportedCount != 1 || diag.StateAllowedCount != 1 {
+		t.Fatalf("unexpected pre-circuit counts: model=%d endpoint=%d state=%d", diag.ModelSupportedCount, diag.EndpointSupportedCount, diag.StateAllowedCount)
+	}
+	if diag.CircuitAllowedCount != 0 || diag.FinalCandidateCount != 0 {
+		t.Fatalf("expected circuit to remove final candidate, circuit_allowed=%d final=%d", diag.CircuitAllowedCount, diag.FinalCandidateCount)
+	}
+	if len(diag.CircuitFilteredAccountIDs) != 1 || diag.CircuitFilteredAccountIDs[0] != account.ID {
+		t.Fatalf("expected account %d circuit-filtered, got %v", account.ID, diag.CircuitFilteredAccountIDs)
+	}
+	if diag.FilterReasonCounts["scheduler_circuit_open"] != 1 {
+		t.Fatalf("expected scheduler_circuit_open skip reason, got %v", diag.FilterReasonCounts)
+	}
+	if len(diag.SkippedAccounts) != 1 || diag.SkippedAccounts[0].CircuitState != schedulerCircuitOpen || diag.SkippedAccounts[0].CircuitEndpoint != endpoint {
+		t.Fatalf("expected scoped circuit details in skipped account, got %+v", diag.SkippedAccounts)
 	}
 }

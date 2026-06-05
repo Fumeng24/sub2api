@@ -19,6 +19,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
@@ -59,6 +60,12 @@ const (
 	codexCLIVersion                    = "0.125.0"
 	// Codex 限额快照仅用于后台展示/诊断，不需要每个成功请求都立即落库。
 	openAICodexSnapshotPersistMinInterval = 30 * time.Second
+
+	openAICompactBadOutputCode             = "compact_bad_output"
+	openAICompactMinOutputRunes            = 8
+	openAICompactLargeInputTokenThreshold  = 4096
+	openAICompactLargeInputMinOutputTokens = 16
+	openAICompactLargeInputMinOutputRunes  = 80
 )
 
 // OpenAI allowed headers whitelist (for non-passthrough).
@@ -1335,11 +1342,28 @@ func noAvailableOpenAISelectionError(requestedModel string, compactBlocked bool)
 	return errors.New("no available OpenAI accounts")
 }
 
-// openAICompactSupportTier classifies an OpenAI account by compact capability.
+// openAICompactSupportTier classifies an OpenAI account by compact capability
+// without request-model context.
 // 0 = explicitly unsupported, 1 = unknown / not yet probed, 2 = explicitly supported.
 func openAICompactSupportTier(account *Account) int {
+	return openAICompactSupportTierForModel(account, "")
+}
+
+// openAICompactSupportTierForModel classifies compact capability for a request.
+// A compact_model_mapping that matches the requested or account-mapped model is
+// an explicit compact capability signal, so failover strict mode may still use it.
+func openAICompactSupportTierForModel(account *Account, requestedModel string) int {
 	if account == nil || !account.IsOpenAI() {
 		return 0
+	}
+	switch account.GetOpenAICompactMode() {
+	case OpenAICompactModeForceOff:
+		return 0
+	case OpenAICompactModeForceOn:
+		return 2
+	}
+	if openAICompactMappingMatchesRequest(account, requestedModel) {
+		return 2
 	}
 	supported, known := account.OpenAICompactSupportKnown()
 	if !known {
@@ -1349,6 +1373,26 @@ func openAICompactSupportTier(account *Account) int {
 		return 2
 	}
 	return 0
+}
+
+func openAICompactMappingMatchesRequest(account *Account, requestedModel string) bool {
+	requestedModel = strings.TrimSpace(requestedModel)
+	if account == nil || requestedModel == "" {
+		return false
+	}
+	if _, matched := account.ResolveCompactMappedModel(requestedModel); matched {
+		return true
+	}
+	mappedModel, mapped := account.ResolveMappedModel(requestedModel)
+	if !mapped {
+		return false
+	}
+	mappedModel = strings.TrimSpace(mappedModel)
+	if mappedModel == "" || mappedModel == requestedModel {
+		return false
+	}
+	_, compactMatched := account.ResolveCompactMappedModel(mappedModel)
+	return compactMatched
 }
 
 // isOpenAIAccountEligibleForRequest centralises the schedulable / OpenAI / model /
@@ -1374,7 +1418,7 @@ func isOpenAIAccountEligibleForRequest(ctx context.Context, account *Account, re
 	if !account.SupportsOpenAIEndpointCapability(requiredCapability) {
 		return false
 	}
-	if requireCompact && !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, account) {
+	if requireCompact && !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, account, requestedModel) {
 		return false
 	}
 	return true
@@ -1397,13 +1441,13 @@ func isOpenAIAccountEligibleForRequestIgnoringCooldown(account *Account, request
 	if !account.SupportsOpenAIEndpointCapability(requiredCapability) {
 		return false
 	}
-	if requireCompact && !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, account) {
+	if requireCompact && !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, account, requestedModel) {
 		return false
 	}
 	return true
 }
 
-func orderOpenAISchedulerScoresForCompact(scores []schedulerAccountScore, includeUnknown bool, includeUnsupported bool) []schedulerAccountScore {
+func orderOpenAISchedulerScoresForCompact(scores []schedulerAccountScore, requestedModel string, includeUnknown bool, includeUnsupported bool) []schedulerAccountScore {
 	if len(scores) == 0 {
 		return nil
 	}
@@ -1418,7 +1462,7 @@ func orderOpenAISchedulerScoresForCompact(scores []schedulerAccountScore, includ
 			return
 		}
 		backup := score.Role == AccountGroupRoleBackup
-		switch openAICompactSupportTier(score.Account) {
+		switch openAICompactSupportTierForModel(score.Account, requestedModel) {
 		case 2:
 			if backup {
 				backupSupported = append(backupSupported, score)
@@ -1843,7 +1887,7 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 			continue
 		}
 		if requireCompact {
-			if !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, fresh) {
+			if !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, fresh, requestedModel) {
 				compactBlocked = true
 				continue
 			}
@@ -1857,7 +1901,7 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, false)
 	order := buildRoleAwareSchedulerOrder(scores, true, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "best")
 	if requireCompact {
-		order = orderOpenAISchedulerScoresForCompact(order, !openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), s.schedulerSnapshot != nil)
+		order = orderOpenAISchedulerScoresForCompact(order, requestedModel, !openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), s.schedulerSnapshot != nil)
 	}
 	for _, item := range order {
 		if item.Account != nil {
@@ -2146,7 +2190,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	orderScores := func(scores []schedulerAccountScore, seedSuffix string) []schedulerAccountScore {
 		order := buildRoleAwareSchedulerOrder(scores, true, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, seedSuffix)
 		if requireCompact {
-			order = orderOpenAISchedulerScoresForCompact(order, !openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), s.schedulerSnapshot != nil)
+			order = orderOpenAISchedulerScoresForCompact(order, requestedModel, !openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), s.schedulerSnapshot != nil)
 		}
 		return order
 	}
@@ -3586,7 +3630,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 		imageCount = result.imageCount
 		imageOutputSizes = result.imageOutputSizes
 	} else {
-		result, err := s.handleNonStreamingResponsePassthrough(ctx, resp, c, reqModel, upstreamPassthroughModel)
+		result, err := s.handleNonStreamingResponsePassthrough(ctx, resp, c, account, reqModel, upstreamPassthroughModel)
 		if err != nil {
 			if failoverErr := s.handleOpenAIUpstreamStreamError(ctx, c, account, err, "", true); failoverErr != nil {
 				return nil, failoverErr
@@ -4310,6 +4354,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	ctx context.Context,
 	resp *http.Response,
 	c *gin.Context,
+	account *Account,
 	originalModel string,
 	mappedModel string,
 ) (*openaiNonStreamingResultPassthrough, error) {
@@ -4323,7 +4368,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	// stream=false was requested. Without this conversion the client would
 	// receive raw SSE text or a terminal event with empty output.
 	if isEventStreamResponse(resp.Header) {
-		return s.handlePassthroughSSEToJSON(resp, c, body, originalModel, mappedModel)
+		return s.handlePassthroughSSEToJSON(resp, c, account, body, originalModel, mappedModel)
 	}
 
 	usage := &OpenAIUsage{}
@@ -4348,6 +4393,9 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	if originalModel != "" && mappedModel != "" && originalModel != mappedModel {
 		body = s.replaceModelInResponseBody(body, mappedModel, originalModel)
 	}
+	if err := s.validateOpenAICompactResponseForFailover(c, account, resp, body, true); err != nil {
+		return nil, err
+	}
 	c.Data(resp.StatusCode, contentType, body)
 	return &openaiNonStreamingResultPassthrough{
 		OpenAIUsage:      usage,
@@ -4361,7 +4409,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 // response for the passthrough path. It mirrors handleSSEToJSON while
 // preserving passthrough payloads, except compact-only model remapping may
 // rewrite model fields back to the original requested model.
-func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c *gin.Context, body []byte, originalModel string, mappedModel string) (*openaiNonStreamingResultPassthrough, error) {
+func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c *gin.Context, account *Account, body []byte, originalModel string, mappedModel string) (*openaiNonStreamingResultPassthrough, error) {
 	bodyText := string(body)
 	finalResponse, ok := extractCodexFinalResponse(bodyText)
 
@@ -4399,6 +4447,10 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c
 			bodyText = s.replaceModelInSSEBody(bodyText, mappedModel, originalModel)
 		}
 		body = []byte(bodyText)
+	}
+
+	if err := s.validateOpenAICompactResponseForFailover(c, account, resp, body, true); err != nil {
+		return nil, err
 	}
 
 	writeOpenAIPassthroughResponseHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
@@ -5532,6 +5584,9 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	if originalModel != mappedModel {
 		body = s.replaceModelInResponseBody(body, mappedModel, originalModel)
 	}
+	if err := s.validateOpenAICompactResponseForFailover(c, account, resp, body, false); err != nil {
+		return nil, err
+	}
 
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 
@@ -5596,6 +5651,10 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 			bodyText = s.replaceModelInSSEBody(bodyText, mappedModel, originalModel)
 		}
 		body = []byte(bodyText)
+	}
+
+	if err := s.validateOpenAICompactResponseForFailover(c, nil, resp, body, false); err != nil {
+		return nil, err
 	}
 
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
@@ -5664,6 +5723,151 @@ func (s *OpenAIGatewayService) writeOpenAINonStreamingProtocolError(resp *http.R
 		},
 	})
 	return fmt.Errorf("non-streaming openai protocol error: %s", message)
+}
+
+func (s *OpenAIGatewayService) validateOpenAICompactResponseForFailover(
+	c *gin.Context,
+	account *Account,
+	resp *http.Response,
+	body []byte,
+	passthrough bool,
+) error {
+	if !isOpenAIResponsesCompactPath(c) {
+		return nil
+	}
+	reason := openAICompactBadOutputReason(body)
+	if reason == "" {
+		return nil
+	}
+	reason = sanitizeUpstreamErrorMessage(reason)
+	message := "OpenAI compact returned unusable output: " + reason
+	if c != nil {
+		setOpsUpstreamError(c, http.StatusBadGateway, message, "")
+		event := OpsUpstreamErrorEvent{
+			Platform:           PlatformOpenAI,
+			UpstreamStatusCode: http.StatusBadGateway,
+			Passthrough:        passthrough,
+			Kind:               "failover",
+			Message:            message,
+			Detail:             openAICompactBadOutputCode,
+			CooldownApplied:    false,
+		}
+		if resp != nil {
+			event.UpstreamRequestID = strings.TrimSpace(resp.Header.Get("x-request-id"))
+		}
+		if account != nil {
+			event.Platform = account.Platform
+			event.AccountID = account.ID
+			event.AccountName = account.Name
+		}
+		appendOpsUpstreamError(c, event)
+	}
+	responseBody, _ := json.Marshal(gin.H{
+		"error": gin.H{
+			"type":    "upstream_error",
+			"code":    openAICompactBadOutputCode,
+			"message": message,
+		},
+	})
+	var headers http.Header
+	if resp != nil && resp.Header != nil {
+		headers = resp.Header.Clone()
+	}
+	return &UpstreamFailoverError{
+		StatusCode:      http.StatusBadGateway,
+		ResponseBody:    responseBody,
+		ResponseHeaders: headers,
+	}
+}
+
+func openAICompactBadOutputReason(body []byte) string {
+	if len(bytes.TrimSpace(body)) == 0 {
+		return "empty_response"
+	}
+	if !gjson.ValidBytes(body) {
+		return "invalid_json"
+	}
+	root := gjson.ParseBytes(body)
+	status := strings.ToLower(strings.TrimSpace(root.Get("status").String()))
+	if status == "" {
+		status = strings.ToLower(strings.TrimSpace(root.Get("response.status").String()))
+	}
+	switch status {
+	case "failed", "incomplete", "cancelled", "canceled":
+		return "status_" + status
+	}
+
+	outputText := strings.TrimSpace(extractOpenAICompactOutputText(root))
+	outputRunes := utf8.RuneCountInString(outputText)
+	if outputRunes == 0 {
+		return "empty_output"
+	}
+	if outputRunes < openAICompactMinOutputRunes {
+		return "too_short_output"
+	}
+
+	usage, usageOK := extractOpenAIUsageFromJSONBytes(body)
+	if !usageOK || usage.InputTokens < openAICompactLargeInputTokenThreshold {
+		return ""
+	}
+	if usage.OutputTokens > 0 && usage.OutputTokens < openAICompactLargeInputMinOutputTokens {
+		return "too_few_output_tokens"
+	}
+	if outputRunes < openAICompactLargeInputMinOutputRunes {
+		return "too_short_output_for_large_input"
+	}
+	return ""
+}
+
+func extractOpenAICompactOutputText(root gjson.Result) string {
+	var parts []string
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			parts = append(parts, value)
+		}
+	}
+	add(root.Get("output_text").String())
+	add(root.Get("response.output_text").String())
+	appendOutputText := func(output gjson.Result) {
+		if !output.Exists() || !output.IsArray() {
+			return
+		}
+		for _, item := range output.Array() {
+			add(item.Get("text").String())
+			add(item.Get("output_text").String())
+			content := item.Get("content")
+			if content.IsArray() {
+				for _, part := range content.Array() {
+					if part.Type == gjson.String {
+						add(part.String())
+						continue
+					}
+					add(part.Get("text").String())
+					add(part.Get("output_text").String())
+				}
+			} else if content.Type == gjson.String {
+				add(content.String())
+			}
+			summary := item.Get("summary")
+			if summary.IsArray() {
+				for _, part := range summary.Array() {
+					if part.Type == gjson.String {
+						add(part.String())
+						continue
+					}
+					add(part.Get("text").String())
+				}
+			}
+		}
+	}
+	appendOutputText(root.Get("output"))
+	appendOutputText(root.Get("response.output"))
+	add(root.Get("message.content").String())
+	for _, choice := range root.Get("choices").Array() {
+		add(choice.Get("message.content").String())
+	}
+	return strings.Join(parts, "\n")
 }
 
 func extractCodexFinalResponse(body string) ([]byte, bool) {

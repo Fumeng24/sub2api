@@ -627,11 +627,11 @@ func openAICompactStrictSupportedOnlyForSelection(requireCompact bool, excludedI
 	return requireCompact && len(excludedIDs) > 0
 }
 
-func openAICompactAccountAllowed(requireCompact bool, strictSupportedOnly bool, account *Account) bool {
+func openAICompactAccountAllowed(requireCompact bool, strictSupportedOnly bool, account *Account, requestedModel string) bool {
 	if !requireCompact {
 		return true
 	}
-	tier := openAICompactSupportTier(account)
+	tier := openAICompactSupportTierForModel(account, requestedModel)
 	if strictSupportedOnly {
 		return tier == 2
 	}
@@ -639,11 +639,11 @@ func openAICompactAccountAllowed(requireCompact bool, strictSupportedOnly bool, 
 }
 
 func openAICompactAccountAllowedForRequest(req OpenAIAccountScheduleRequest, account *Account) bool {
-	return openAICompactAccountAllowed(req.RequireCompact, openAICompactStrictSupportedOnly(req), account)
+	return openAICompactAccountAllowed(req.RequireCompact, openAICompactStrictSupportedOnly(req), account, req.RequestedModel)
 }
 
-func openAICompactAccountAllowedForSelection(requireCompact bool, excludedIDs map[int64]struct{}, account *Account) bool {
-	return openAICompactAccountAllowed(requireCompact, openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), account)
+func openAICompactAccountAllowedForSelection(requireCompact bool, excludedIDs map[int64]struct{}, account *Account, requestedModel string) bool {
+	return openAICompactAccountAllowed(requireCompact, openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), account, requestedModel)
 }
 
 func openAIAccountIDsFromMap(ids map[int64]struct{}) []int64 {
@@ -995,7 +995,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		waitPlan.candidateCount = len(waitCandidates)
 		waitPlan.staleSnapshotCompactRetry = nil
 		if req.RequireCompact {
-			waitPlan.candidates, waitPlan.staleSnapshotCompactRetry = splitOpenAICompactCandidates(waitCandidates)
+			waitPlan.candidates, waitPlan.staleSnapshotCompactRetry = splitOpenAICompactCandidates(waitCandidates, req.RequestedModel)
 			waitPlan.candidateCount = len(waitPlan.candidates)
 		}
 		waitPlan.topK = len(waitPlan.candidates)
@@ -1025,7 +1025,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	waitPlan.candidateCount = len(waitCandidates)
 	waitPlan.staleSnapshotCompactRetry = nil
 	if req.RequireCompact {
-		waitPlan.candidates, waitPlan.staleSnapshotCompactRetry = splitOpenAICompactCandidates(waitCandidates)
+		waitPlan.candidates, waitPlan.staleSnapshotCompactRetry = splitOpenAICompactCandidates(waitCandidates, req.RequestedModel)
 		waitPlan.candidateCount = len(waitPlan.candidates)
 	}
 	waitPlan.topK = len(waitPlan.candidates)
@@ -1440,7 +1440,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionOrder(
 
 	if req.RequireCompact {
 		selectionOrder := make([]openAIAccountCandidateScore, 0, len(plan.allCandidates))
-		supported, unknown := splitOpenAICompactCandidates(plan.candidates)
+		supported, unknown := splitOpenAICompactCandidates(plan.candidates, req.RequestedModel)
 		selectionOrder = append(selectionOrder, buildSelectionOrder(supported)...)
 		if !openAICompactStrictSupportedOnly(req) {
 			selectionOrder = append(selectionOrder, buildSelectionOrder(unknown)...)
@@ -1456,9 +1456,9 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionOrder(
 	return selectionOrder
 }
 
-func splitOpenAICompactCandidates(candidates []openAIAccountCandidateScore) (supported []openAIAccountCandidateScore, unknown []openAIAccountCandidateScore) {
+func splitOpenAICompactCandidates(candidates []openAIAccountCandidateScore, requestedModel string) (supported []openAIAccountCandidateScore, unknown []openAIAccountCandidateScore) {
 	for _, candidate := range candidates {
-		switch openAICompactSupportTier(candidate.account) {
+		switch openAICompactSupportTierForModel(candidate.account, requestedModel) {
 		case 2:
 			supported = append(supported, candidate)
 		case 1:
@@ -2209,12 +2209,14 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleFailure(accountID int6
 		s.schedulerHealth.reportFailure(accountID, model, endpoint, category, cooldown)
 	}
 	s.maybeStartOpenAIAccountCircuitProbe(accountID, model, endpoint, category)
-	if category == "transient" || category == "transient_transport" || category == "transient_timeout" || category == "rate_limit" || category == "model_unsupported" {
+	if category == "transient" || category == "transient_transport" || category == "transient_timeout" || category == "compact_bad_output" || category == "rate_limit" || category == "model_unsupported" {
 		reason := "openai_request_error"
 		if category == "transient_transport" {
 			reason = "openai_transport_error"
 		} else if category == "transient_timeout" {
 			reason = "openai_timeout"
+		} else if category == "compact_bad_output" {
+			reason = "openai_compact_bad_output"
 		} else if category == "transient" && isOpenAITransient5xxStatus(statusCode) {
 			reason = "openai_transient_5xx"
 		} else if category == "rate_limit" {
