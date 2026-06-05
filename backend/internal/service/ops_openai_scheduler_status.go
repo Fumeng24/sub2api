@@ -217,7 +217,7 @@ func (s *OpsService) openAISchedulerAccountStatus(ctx context.Context, account *
 		Weight:               cfg.EffectiveWeight(),
 		SortOrder:            cfg.EffectiveSortOrder(),
 		SchedulingConfigured: cfg.SchedulingConfigured,
-		ModelSupported:       req.RequestedModel == "" || account.IsModelSupported(req.RequestedModel),
+		ModelSupported:       openAIAccountSupportsModelForSchedule(account, req.RequestedModel, req.RequireCompact, openAIAccountScheduleOptionsFromRequest(req)),
 		EndpointSupported:    accountSupportsOpenAICapabilities(account, req.RequiredCapability, req.RequiredImageCapability),
 		CompactSupported:     openAICompactAccountAllowedForRequest(req, account),
 		StateAllowed:         true,

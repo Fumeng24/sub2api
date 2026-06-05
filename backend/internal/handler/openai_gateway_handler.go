@@ -238,6 +238,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		h.errorResponse(c, http.StatusForbidden, "permission_error", service.ImageGenerationPermissionMessage())
 		return
 	}
+	scheduleOptions := service.OpenAIAccountScheduleOptions{
+		RequireCodexImageGenerationBridge: imageIntent,
+	}
 	var imageReleaseFunc func()
 	if imageIntent {
 		var imageAcquired bool
@@ -305,7 +308,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		// Select account supporting the requested model
 		reqLog.Debug("openai.account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
 		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(c.Request.Context(), schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
-		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
+		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapabilityAndOptions(
 			scheduleCtx,
 			apiKey.GroupID,
 			previousResponseID,
@@ -315,6 +318,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			service.OpenAIUpstreamTransportAny,
 			service.OpenAIEndpointCapabilityChatCompletions,
 			requireCompact,
+			scheduleOptions,
 		)
 		cancelSchedule()
 		if err != nil {
@@ -1239,9 +1243,13 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		return
 	}
 
-	if service.IsImageGenerationIntent("/v1/responses", reqModel, firstMessage) && !service.GroupAllowsImageGeneration(apiKey.Group) {
+	wsImageIntent := service.IsImageGenerationIntent("/v1/responses", reqModel, firstMessage)
+	if wsImageIntent && !service.GroupAllowsImageGeneration(apiKey.Group) {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, service.ImageGenerationPermissionMessage())
 		return
+	}
+	scheduleOptions := service.OpenAIAccountScheduleOptions{
+		RequireCodexImageGenerationBridge: wsImageIntent,
 	}
 
 	// 解析渠道级模型映射
@@ -1316,7 +1324,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	for {
 		reqLog.Debug("openai.websocket_account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
 		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(ctx, schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
-		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
+		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapabilityAndOptions(
 			scheduleCtx,
 			apiKey.GroupID,
 			previousResponseID,
@@ -1326,6 +1334,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			service.OpenAIUpstreamTransportResponsesWebsocketV2,
 			service.OpenAIEndpointCapabilityChatCompletions,
 			false,
+			scheduleOptions,
 		)
 		cancelSchedule()
 		if err != nil {

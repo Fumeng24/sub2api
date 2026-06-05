@@ -62,3 +62,18 @@ func (a *Account) CodexImageGenerationBridgeOverride() *bool {
 	openaiConfig, _ := a.Extra[PlatformOpenAI].(map[string]any)
 	return boolOverrideFromMap(openaiConfig, featureKeyCodexImageGenerationBridge, "codex_image_generation_bridge_enabled")
 }
+
+func accountHasExplicitCodexImageGenerationBridge(account *Account) bool {
+	if account == nil {
+		return false
+	}
+	override := account.CodexImageGenerationBridgeOverride()
+	return override != nil && *override
+}
+
+func accountSatisfiesOpenAIScheduleOptions(account *Account, options OpenAIAccountScheduleOptions) bool {
+	if options.RequireCodexImageGenerationBridge && !accountHasExplicitCodexImageGenerationBridge(account) {
+		return false
+	}
+	return true
+}

@@ -4223,7 +4223,7 @@ func (s *OpenAIGatewayService) SelectAccountByPreviousResponseID(
 	requireCompact bool,
 ) (*AccountSelectionResult, error) {
 	endpoint := schedulerEndpointFromOpenAIContext(ctx, requireCompact, "")
-	return s.selectAccountByPreviousResponseIDForCapability(ctx, groupID, previousResponseID, requestedModel, excludedIDs, "", requireCompact, endpoint)
+	return s.selectAccountByPreviousResponseIDForCapability(ctx, groupID, previousResponseID, requestedModel, excludedIDs, "", requireCompact, endpoint, OpenAIAccountScheduleOptions{})
 }
 
 func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
@@ -4235,7 +4235,9 @@ func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
 	requiredCapability OpenAIEndpointCapability,
 	requireCompact bool,
 	schedulerEndpoint string,
+	options OpenAIAccountScheduleOptions,
 ) (*AccountSelectionResult, error) {
+	options = normalizeOpenAIAccountScheduleOptions(requireCompact, options)
 	if s == nil {
 		return nil, nil
 	}
@@ -4272,10 +4274,13 @@ func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
 		_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 		return nil, nil
 	}
-	if requestedModel != "" && !account.IsModelSupported(requestedModel) {
+	if !openAIAccountSupportsModelForSchedule(account, requestedModel, requireCompact, options) {
 		return nil, nil
 	}
 	if !account.SupportsOpenAIEndpointCapability(requiredCapability) {
+		return nil, nil
+	}
+	if !accountSatisfiesOpenAIScheduleOptions(account, options) {
 		return nil, nil
 	}
 	// Quota auto-pause must also gate the previous_response_id sticky path; otherwise an
@@ -4295,10 +4300,13 @@ func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
 			_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 			return nil, nil
 		}
-		if requestedModel != "" && !latest.IsModelSupported(requestedModel) {
+		if !openAIAccountSupportsModelForSchedule(latest, requestedModel, requireCompact, options) {
 			return nil, nil
 		}
 		if !latest.SupportsOpenAIEndpointCapability(requiredCapability) {
+			return nil, nil
+		}
+		if !accountSatisfiesOpenAIScheduleOptions(latest, options) {
 			return nil, nil
 		}
 		if paused, _ := shouldAutoPauseOpenAIAccountByQuota(ctx, latest); paused {

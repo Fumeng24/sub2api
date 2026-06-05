@@ -320,6 +320,32 @@ func TestOpenAIGatewayServiceHandleResponsesImageOutputs_Streaming(t *testing.T)
 	require.Equal(t, 4, result.usage.ImageOutputTokens)
 }
 
+func TestOpenAIGatewayServiceForward_StreamingImagePartialErrorReturnsResult(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body: io.NopCloser(strings.NewReader(
+				"data: {\"type\":\"response.output_item.done\",\"item\":{\"id\":\"ig_stream_partial\",\"type\":\"image_generation_call\",\"result\":\"final-image\"}}\n\n",
+			)),
+		},
+	}
+	svc := newOpenAIImageGenerationControlTestService(upstream)
+	c, _ := newOpenAIImageGenerationControlTestContext(true, "codex_cli_rs/0.98.0")
+	account := newOpenAIImageGenerationControlTestAccount()
+	body := []byte(`{"model":"gpt-5.5","stream":true,"input":"draw","tools":[{"type":"image_generation"}]}`)
+
+	result, err := svc.Forward(context.Background(), c, account, body)
+
+	require.Error(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 1, result.ImageCount)
+	require.Equal(t, "gpt-5.5", result.Model)
+	require.True(t, result.Stream)
+}
+
 func newOpenAIImageGenerationControlTestService(upstream *httpUpstreamRecorder) *OpenAIGatewayService {
 	cfg := &config.Config{}
 	return &OpenAIGatewayService{

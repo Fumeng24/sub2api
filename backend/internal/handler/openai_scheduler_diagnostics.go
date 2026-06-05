@@ -19,12 +19,14 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 		zap.String("selection_diag_required_transport", diag.RequiredTransport),
 		zap.String("selection_diag_required_capability", diag.RequiredCapability),
 		zap.String("selection_diag_required_image_capability", diag.RequiredImageCapability),
+		zap.Bool("selection_diag_require_codex_image_generation_bridge", diag.RequireCodexImageGenerationBridge),
 		zap.Int("selection_diag_group_binding_count", diag.GroupBindingAccountCount),
 		zap.Int("selection_diag_active_schedulable_count", diag.ActiveSchedulableCount),
 		zap.Int("selection_diag_excluded_count", diag.ExcludedAccountCount),
 		zap.Int("selection_diag_after_excluded_count", diag.AfterExcludedCount),
 		zap.Int("selection_diag_model_supported_count", diag.ModelSupportedCount),
 		zap.Int("selection_diag_endpoint_supported_count", diag.EndpointSupportedCount),
+		zap.Int("selection_diag_image_generation_bridge_supported_count", diag.ImageGenerationBridgeSupportedCount),
 		zap.Int("selection_diag_compact_supported_count", diag.CompactSupportedCount),
 		zap.Int("selection_diag_state_allowed_count", diag.StateAllowedCount),
 		zap.Int("selection_diag_circuit_allowed_count", diag.CircuitAllowedCount),
@@ -35,6 +37,7 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 		zap.Int("selection_diag_concurrency_slot_filtered_count", diag.ConcurrencySlotFilteredCount),
 		zap.Int("selection_diag_half_open_filtered_count", diag.HalfOpenFilteredCount),
 		zap.Int("selection_diag_compact_unsupported_count", diag.CompactUnsupportedCount),
+		zap.Int("selection_diag_image_generation_bridge_unsupported_count", diag.ImageGenerationBridgeUnsupportedCount),
 		zap.Int("selection_diag_status_filtered_count", diag.StatusFilteredCount),
 		zap.Int("selection_diag_temp_unschedulable_filtered_count", diag.TempUnschedulableFilteredCount),
 		zap.Int("selection_diag_overload_filtered_count", diag.OverloadFilteredCount),
@@ -61,6 +64,9 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 	if len(diag.EndpointSupportedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_endpoint_supported_account_ids", diag.EndpointSupportedAccountIDs))
 	}
+	if len(diag.ImageGenerationBridgeSupportedAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_image_generation_bridge_supported_account_ids", diag.ImageGenerationBridgeSupportedAccountIDs))
+	}
 	if len(diag.CompactSupportedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_compact_supported_account_ids", diag.CompactSupportedAccountIDs))
 	}
@@ -81,6 +87,9 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 	}
 	if len(diag.EndpointUnsupportedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_endpoint_unsupported_account_ids", diag.EndpointUnsupportedAccountIDs))
+	}
+	if len(diag.ImageGenerationBridgeUnsupportedAccountIDs) > 0 {
+		fields = append(fields, zap.Int64s("selection_diag_image_generation_bridge_unsupported_account_ids", diag.ImageGenerationBridgeUnsupportedAccountIDs))
 	}
 	if len(diag.ChannelRestrictionAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_channel_pricing_restriction_account_ids", diag.ChannelRestrictionAccountIDs))
@@ -159,6 +168,7 @@ func openAISelectionSkippedAccounts(diag service.OpenAIAccountSelectionDiagnosti
 	add("excluded", diag.ExcludedAccountIDs)
 	add("model_unsupported", diag.ModelUnsupportedAccountIDs)
 	add("endpoint_unsupported", diag.EndpointUnsupportedAccountIDs)
+	add("image_generation_bridge_unsupported", diag.ImageGenerationBridgeUnsupportedAccountIDs)
 	add("channel_pricing_restricted", diag.ChannelRestrictionAccountIDs)
 	add("compact_unsupported", diag.CompactUnsupportedAccountIDs)
 	add("state_filtered", diag.StateFilteredAccountIDs)

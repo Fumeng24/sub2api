@@ -347,6 +347,7 @@ func TestOpenAIGatewayService_SelectAccountByPreviousResponseID_CapabilityMismat
 		OpenAIEndpointCapabilityEmbeddings,
 		false,
 		"/v1/embeddings",
+		OpenAIAccountScheduleOptions{},
 	)
 	require.NoError(t, err)
 	require.Nil(t, selection)
