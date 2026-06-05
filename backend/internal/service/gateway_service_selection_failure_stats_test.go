@@ -197,3 +197,35 @@ func TestGatewaySelectionDiagnostics_CircuitOpen(t *testing.T) {
 		t.Fatalf("expected scoped circuit details in skipped account, got %+v", diag.SkippedAccounts)
 	}
 }
+
+func TestGatewayServiceReportAccountScheduleSuccessForRequestClearsContextEndpoint(t *testing.T) {
+	accountID := int64(38800)
+	model := "claude-opus-4-7"
+	explicitEndpoint := "anthropic"
+	contextEndpoint := "/v1/messages"
+	ctx := WithSchedulerEndpoint(context.Background(), contextEndpoint)
+	svc := &GatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
+
+	failoverErr := &UpstreamFailoverError{
+		StatusCode:   0,
+		ResponseBody: []byte("openai_request_error: context canceled"),
+	}
+	svc.ReportAccountScheduleFailure(ctx, accountID, model, explicitEndpoint, failoverErr)
+
+	if snap := svc.schedulerHealth.snapshot(accountID, model, explicitEndpoint, true); snap.CircuitState != schedulerCircuitOpen {
+		t.Fatalf("explicit endpoint circuit=%s want=%s", snap.CircuitState, schedulerCircuitOpen)
+	}
+	if snap := svc.schedulerHealth.snapshot(accountID, model, contextEndpoint, true); snap.CircuitState != schedulerCircuitOpen {
+		t.Fatalf("context endpoint circuit=%s want=%s", snap.CircuitState, schedulerCircuitOpen)
+	}
+
+	firstTokenMs := 42
+	svc.ReportAccountScheduleSuccessForRequest(ctx, accountID, model, explicitEndpoint, &firstTokenMs)
+
+	if snap := svc.schedulerHealth.snapshot(accountID, model, explicitEndpoint, true); snap.CircuitState != schedulerCircuitClosed {
+		t.Fatalf("explicit endpoint circuit=%s want=%s", snap.CircuitState, schedulerCircuitClosed)
+	}
+	if snap := svc.schedulerHealth.snapshot(accountID, model, contextEndpoint, true); snap.CircuitState != schedulerCircuitClosed {
+		t.Fatalf("context endpoint circuit=%s want=%s", snap.CircuitState, schedulerCircuitClosed)
+	}
+}

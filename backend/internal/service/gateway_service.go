@@ -728,6 +728,26 @@ func (s *GatewayService) ReportAccountScheduleSuccess(accountID int64, model, en
 	s.schedulerHealth.reportSuccess(accountID, model, endpoint, firstTokenMs)
 }
 
+func (s *GatewayService) ReportAccountScheduleSuccessForRequest(ctx context.Context, accountID int64, model, endpoint string, firstTokenMs *int) {
+	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
+		return
+	}
+	endpoints := []string{endpoint, schedulerEndpointFromContext(ctx, "")}
+	seen := make(map[string]struct{}, len(endpoints))
+	for _, schedulerEndpoint := range endpoints {
+		schedulerEndpoint = strings.TrimSpace(schedulerEndpoint)
+		if schedulerEndpoint == "" {
+			continue
+		}
+		key := strings.ToLower(schedulerEndpoint)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		s.schedulerHealth.reportSuccess(accountID, model, schedulerEndpoint, firstTokenMs)
+	}
+}
+
 func (s *GatewayService) ReportAccountScheduleFailure(ctx context.Context, accountID int64, model, endpoint string, failoverErr *UpstreamFailoverError) {
 	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
 		return
@@ -3242,11 +3262,8 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	selected := s.selectFirstGatewaySchedulerAccount(ctx, candidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy")
 
 	if selected == nil {
-		stats := s.logDetailedSelectionFailure(ctx, groupID, sessionHash, requestedModel, platform, accounts, excludedIDs, false)
-		if requestedModel != "" {
-			return nil, fmt.Errorf("%w supporting model: %s (%s)", ErrNoAvailableAccounts, requestedModel, summarizeSelectionFailureStats(stats))
-		}
-		return nil, ErrNoAvailableAccounts
+		s.logDetailedSelectionFailure(ctx, groupID, sessionHash, requestedModel, platform, accounts, excludedIDs, false)
+		return nil, s.newGatewayNoAvailableError(ctx, groupID, requestedModel, platform, schedulerEndpoint, accounts, excludedIDs, false, schedGroup, needsUpstreamCheck, nil)
 	}
 
 	// 4. 建立粘性绑定
@@ -3410,11 +3427,8 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	selected := s.selectFirstGatewaySchedulerAccount(ctx, candidates, groupID, requestedModel, schedulerEndpoint, preferOAuth, sessionHash, "legacy_mixed")
 
 	if selected == nil {
-		stats := s.logDetailedSelectionFailure(ctx, groupID, sessionHash, requestedModel, nativePlatform, accounts, excludedIDs, true)
-		if requestedModel != "" {
-			return nil, fmt.Errorf("%w supporting model: %s (%s)", ErrNoAvailableAccounts, requestedModel, summarizeSelectionFailureStats(stats))
-		}
-		return nil, ErrNoAvailableAccounts
+		s.logDetailedSelectionFailure(ctx, groupID, sessionHash, requestedModel, nativePlatform, accounts, excludedIDs, true)
+		return nil, s.newGatewayNoAvailableError(ctx, groupID, requestedModel, nativePlatform, schedulerEndpoint, accounts, excludedIDs, true, schedGroup, needsUpstreamCheck, nil)
 	}
 
 	// 4. 建立粘性绑定
@@ -3568,9 +3582,13 @@ func (s *GatewayService) newGatewayNoAvailableError(
 	needsUpstreamCheck bool,
 	loadMap map[int64]*AccountLoadInfo,
 ) error {
+	cause := error(ErrNoAvailableAccounts)
+	if strings.TrimSpace(requestedModel) != "" {
+		cause = fmt.Errorf("%w supporting model: %s", ErrNoAvailableAccounts, strings.TrimSpace(requestedModel))
+	}
 	diag := s.buildGatewaySelectionDiagnostics(ctx, groupID, requestedModel, platform, endpoint, accounts, excludedIDs, useMixed, schedGroup, needsUpstreamCheck, loadMap)
 	return &GatewayNoAvailableAccountsError{
-		Cause:       ErrNoAvailableAccounts,
+		Cause:       cause,
 		Diagnostics: diag,
 	}
 }

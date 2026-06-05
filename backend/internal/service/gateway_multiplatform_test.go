@@ -1869,6 +1869,83 @@ func TestGatewayService_selectAccountWithMixedScheduling(t *testing.T) {
 		require.Contains(t, err.Error(), "supporting model")
 	})
 
+	t.Run("混合调度-Claude单账号熔断返回结构化诊断", func(t *testing.T) {
+		groupID := int64(11)
+		accountID := int64(38800)
+		model := "claude-opus-4-7"
+		endpoint := "/v1/messages"
+		testCtx := WithSchedulerEndpoint(ctx, endpoint)
+
+		repo := &mockAccountRepoForPlatform{
+			accounts: []Account{
+				{
+					ID:            accountID,
+					Platform:      PlatformAnthropic,
+					Priority:      1,
+					Status:        StatusActive,
+					Schedulable:   true,
+					Concurrency:   5,
+					AccountGroups: []AccountGroup{{GroupID: groupID}},
+					Credentials: map[string]any{
+						"model_mapping": map[string]any{model: model},
+					},
+				},
+			},
+			accountsByID: map[int64]*Account{},
+		}
+		for i := range repo.accounts {
+			repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+		}
+
+		groupRepo := &mockGroupRepoForGateway{
+			groups: map[int64]*Group{
+				groupID: {
+					ID:       groupID,
+					Name:     "Full Claude",
+					Platform: PlatformAnthropic,
+					Status:   StatusActive,
+					Hydrated: true,
+				},
+			},
+		}
+
+		svc := &GatewayService{
+			accountRepo:     repo,
+			groupRepo:       groupRepo,
+			cache:           &mockGatewayCacheForPlatform{},
+			cfg:             testConfig(),
+			schedulerHealth: newAccountSchedulerHealthStats(),
+		}
+		svc.schedulerHealth.reportFailure(accountID, model, endpoint, "transient_transport", time.Minute)
+
+		acc, err := svc.selectAccountWithMixedScheduling(testCtx, &groupID, "", model, nil, PlatformAnthropic)
+		require.Error(t, err)
+		require.Nil(t, acc)
+		require.ErrorIs(t, err, ErrNoAvailableAccounts)
+		require.Contains(t, err.Error(), "supporting model")
+
+		var noAvailable *GatewayNoAvailableAccountsError
+		require.True(t, errors.As(err, &noAvailable), "expected structured no-available diagnostics")
+		diag := noAvailable.Diagnostics
+		require.True(t, diag.Collected)
+		require.Equal(t, groupID, diag.GroupID)
+		require.Equal(t, model, diag.Model)
+		require.Equal(t, endpoint, diag.Endpoint)
+		require.Equal(t, PlatformAnthropic, diag.Platform)
+		require.Equal(t, 1, diag.ModelSupportedCount)
+		require.Equal(t, 1, diag.EndpointSupportedCount)
+		require.Equal(t, 1, diag.StateAllowedCount)
+		require.Equal(t, 0, diag.CircuitAllowedCount)
+		require.Equal(t, 0, diag.ConcurrencySlotAllowedCount)
+		require.Equal(t, 0, diag.FinalCandidateCount)
+		require.Equal(t, []int64{accountID}, diag.CircuitFilteredAccountIDs)
+		require.Equal(t, 1, diag.FilterReasonCounts["scheduler_circuit_open"])
+		require.Len(t, diag.SkippedAccounts, 1)
+		require.Equal(t, accountID, diag.SkippedAccounts[0].AccountID)
+		require.Equal(t, endpoint, diag.SkippedAccounts[0].CircuitEndpoint)
+		require.Equal(t, schedulerCircuitOpen, diag.SkippedAccounts[0].CircuitState)
+	})
+
 	t.Run("混合调度-优先未使用账号", func(t *testing.T) {
 		lastUsed := time.Now().Add(-2 * time.Hour)
 		repo := &mockAccountRepoForPlatform{
