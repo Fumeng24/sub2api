@@ -1787,11 +1787,36 @@ func (s *OpenAIGatewayService) openAISchedulerEndpoint(ctx context.Context, requ
 }
 
 func (s *OpenAIGatewayService) isOpenAIAccountSchedulerHealthAllowed(accountID int64, model, endpoint string) bool {
+	return s.isOpenAIAccountSchedulerHealthAllowedForSelection(accountID, model, endpoint, false)
+}
+
+func (s *OpenAIGatewayService) isOpenAIAccountSchedulerHealthAllowedForSelection(accountID int64, model, endpoint string, allowHalfOpen bool) bool {
 	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
 		return true
 	}
-	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, false)
-	return snap.CircuitState == schedulerCircuitClosed
+	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, allowHalfOpen)
+	if snap.CircuitState == schedulerCircuitClosed {
+		return true
+	}
+	return allowHalfOpen && snap.CircuitState == schedulerCircuitHalfOpen && snap.HalfOpenProbe
+}
+
+func (s *OpenAIGatewayService) tryBeginOpenAIAccountSchedulerHalfOpenProbe(accountID int64, model, endpoint string, allowHalfOpen bool) bool {
+	if !allowHalfOpen || s == nil || s.schedulerHealth == nil || accountID <= 0 {
+		return true
+	}
+	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, true)
+	switch snap.CircuitState {
+	case schedulerCircuitClosed:
+		return true
+	case schedulerCircuitHalfOpen:
+		if !snap.HalfOpenProbe {
+			return false
+		}
+		return s.schedulerHealth.tryBeginHalfOpenProbe(accountID, model, endpoint)
+	default:
+		return false
+	}
 }
 
 // tryStickySessionHit 尝试从粘性会话获取账号。
@@ -1838,7 +1863,9 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
 	}
-	if !s.isOpenAIAccountSchedulerHealthAllowed(account.ID, requestedModel, s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)) {
+	schedulerEndpoint := s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)
+	allowHalfOpen := options.RequireCodexImageGenerationBridge || isOpenAIImageGenerationSchedulerEndpoint(schedulerEndpoint)
+	if !s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
 	}
@@ -1870,6 +1897,7 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 	compactBlocked := false
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	schedulerEndpoint := s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)
+	allowHalfOpen := options.RequireCodexImageGenerationBridge || isOpenAIImageGenerationSchedulerEndpoint(schedulerEndpoint)
 
 	candidates := make([]*Account, 0, len(accounts))
 	for _, acc := range accounts {
@@ -1907,7 +1935,7 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 	if len(candidates) == 0 {
 		return nil, compactBlocked
 	}
-	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, false)
+	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, allowHalfOpen)
 	order := buildRoleAwareSchedulerOrder(scores, true, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "best")
 	if requireCompact {
 		order = orderOpenAISchedulerScoresForCompact(order, requestedModel, !openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), s.schedulerSnapshot != nil)
@@ -1990,6 +2018,8 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 
 	cfg := s.schedulingConfig()
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
+	schedulerEndpoint := s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)
+	allowHalfOpen := options.RequireCodexImageGenerationBridge || isOpenAIImageGenerationSchedulerEndpoint(schedulerEndpoint)
 	var stickyAccountID int64
 	if sessionHash != "" && s.cache != nil {
 		if accountID, err := s.getStickySessionAccountID(ctx, groupID, sessionHash); err == nil {
@@ -2003,12 +2033,23 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		}
 		weakFallback := !isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability, options) ||
 			s.isOpenAIAccountRuntimeBlocked(account) ||
-			!s.isOpenAIAccountSchedulerHealthAllowed(account.ID, requestedModel, s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability))
+			!s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen)
 		result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
 		if weakFallback {
 			result, err = s.tryAcquireAccountSlotIgnoringCircuit(ctx, account.ID, account.Concurrency)
 		}
 		if err == nil && result != nil && result.Acquired {
+			if !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+				if result.ReleaseFunc != nil {
+					result.ReleaseFunc()
+				}
+				retryExcluded := cloneExcludedAccountIDs(excludedIDs)
+				if retryExcluded == nil {
+					retryExcluded = make(map[int64]struct{}, 1)
+				}
+				retryExcluded[account.ID] = struct{}{}
+				return s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, retryExcluded, requireCompact, requiredCapability, options)
+			}
 			selection, selectErr := s.newAcquiredSelectionResult(ctx, account, result.ReleaseFunc)
 			if selection != nil && weakFallback {
 				selection.WeakFallback = true
@@ -2095,13 +2136,25 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else if s.isOpenAIAccountRuntimeBlocked(account) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
-					} else if !s.isOpenAIAccountSchedulerHealthAllowed(account.ID, requestedModel, s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)) {
+					} else if !s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel, requireCompact) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else {
 						result, err := s.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
 						if err == nil && result != nil && result.Acquired {
+							if !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+								if result.ReleaseFunc != nil {
+									result.ReleaseFunc()
+								}
+								_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+								retryExcluded := cloneExcludedAccountIDs(excludedIDs)
+								if retryExcluded == nil {
+									retryExcluded = make(map[int64]struct{}, 1)
+								}
+								retryExcluded[account.ID] = struct{}{}
+								return s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, retryExcluded, requireCompact, requiredCapability, options)
+							}
 							selection, selectErr := s.newAcquiredSelectionResult(ctx, account, result.ReleaseFunc)
 							if selectErr != nil {
 								return nil, selectErr
@@ -2198,7 +2251,6 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	}
 	accountLoads := accountLoadsFor(candidates)
 
-	schedulerEndpoint := s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)
 	orderScores := func(scores []schedulerAccountScore, seedSuffix string) []schedulerAccountScore {
 		order := buildRoleAwareSchedulerOrder(scores, true, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, seedSuffix)
 		if requireCompact {
@@ -2217,7 +2269,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		return s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, fresh, requestedModel, requireCompact, excludedIDs, requiredCapability, options)
 	}
 	tryAcquireFromLoadMap := func(loadMap map[int64]*AccountLoadInfo) (*AccountSelectionResult, bool, error) {
-		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, false)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, allowHalfOpen)
 		selectionOrder := orderScores(scores, "load")
 		if len(selectionOrder) == 0 {
 			return nil, false, nil
@@ -2233,6 +2285,12 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			}
 			result, err := s.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
 			if err == nil && result != nil && result.Acquired {
+				if !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(fresh.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+					if result.ReleaseFunc != nil {
+						result.ReleaseFunc()
+					}
+					continue
+				}
 				selection, selectErr := s.newAcquiredSelectionResult(ctx, fresh, result.ReleaseFunc)
 				if selectErr != nil {
 					return nil, true, selectErr
@@ -2248,7 +2306,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 
 	loadMap, err := s.concurrencyService.GetAccountsLoadBatch(ctx, accountLoads)
 	if err != nil {
-		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, false)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, allowHalfOpen)
 		selectionOrder := orderScores(scores, "load_error")
 		for _, item := range selectionOrder {
 			fresh := resolveCandidate(item.Account)
@@ -2260,6 +2318,12 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			}
 			result, err := s.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
 			if err == nil && result != nil && result.Acquired {
+				if !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(fresh.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+					if result.ReleaseFunc != nil {
+						result.ReleaseFunc()
+					}
+					continue
+				}
 				selection, selectErr := s.newAcquiredSelectionResult(ctx, fresh, result.ReleaseFunc)
 				if selectErr != nil {
 					return nil, selectErr

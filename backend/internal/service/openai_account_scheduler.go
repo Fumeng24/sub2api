@@ -602,6 +602,12 @@ func schedulerEndpointFromOpenAIRequest(req OpenAIAccountScheduleRequest) string
 	if req.RequireCompact {
 		return "/v1/responses/compact"
 	}
+	if req.RequireCodexImageGenerationBridge {
+		if req.RequiredTransport == OpenAIUpstreamTransportResponsesWebsocketV2 {
+			return OpenAIResponsesSchedulerEndpointForIntent("/v1/responses/ws", true)
+		}
+		return OpenAIResponsesSchedulerEndpointForIntent("/v1/responses", true)
+	}
 	if req.RequiredImageCapability != "" {
 		return "images:" + string(req.RequiredImageCapability)
 	}
@@ -757,16 +763,20 @@ func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterReason(account
 		return "runtime_half_open_in_flight"
 	}
 	if s.service.schedulerHealth != nil {
-		// Half-open recovery is driven by the background probe runner. Normal
-		// user and channel-monitor traffic must keep skipping the account until
-		// that probe reports success.
-		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, false)
+		allowHalfOpen := openAIRequestRequiresImageGenerationBridge(req)
+		// Most OpenAI dimensions recover through the background probe runner.
+		// Responses image_generation uses real user requests as the half-open
+		// probe because a text-only probe does not validate that tool chain.
+		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, allowHalfOpen)
 		switch snap.CircuitState {
 		case schedulerCircuitOpen:
 			if snap.CooldownUntil.IsZero() || snap.CooldownUntil.After(now) {
 				return "scheduler_circuit_open"
 			}
 		case schedulerCircuitHalfOpen:
+			if allowHalfOpen && snap.HalfOpenProbe {
+				return ""
+			}
 			return "scheduler_probe_pending"
 		}
 	}
@@ -955,7 +965,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionDiagnostics(
 		if s.service != nil {
 			health = s.service.schedulerHealth
 		}
-		scores := buildSchedulerAccountScoresWithOptions(finalCandidates, req.GroupID, req.RequestedModel, endpoint, loadMap, health, false, true)
+		scores := buildSchedulerAccountScoresWithOptions(finalCandidates, req.GroupID, req.RequestedModel, endpoint, loadMap, health, openAIRequestRequiresImageGenerationBridge(req), true)
 		for _, candidate := range buildOpenAIOrderedSelectionOrder(openAIAccountCandidatesFromSchedulerScores(scores)) {
 			diag.OrderedCandidateAccountIDs = appendOpenAIAccountID(diag.OrderedCandidateAccountIDs, candidate.account)
 			if len(diag.OrderedCandidateAccountIDs) >= 10 {
@@ -1014,7 +1024,8 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	if s != nil && s.service != nil {
 		health = s.service.schedulerHealth
 	}
-	allScores := buildSchedulerAccountScores(filtered, req.GroupID, req.RequestedModel, endpoint, loadMap, health, false)
+	allowHalfOpen := openAIRequestRequiresImageGenerationBridge(req)
+	allScores := buildSchedulerAccountScores(filtered, req.GroupID, req.RequestedModel, endpoint, loadMap, health, allowHalfOpen)
 	allCandidates := openAIAccountCandidatesFromSchedulerScores(allScores)
 
 	candidates := allCandidates
@@ -1268,6 +1279,9 @@ func (s *defaultOpenAIAccountScheduler) trySelectOpenAICooldownFallback(
 	allowWaitPlan bool,
 ) (*AccountSelectionResult, int, bool, error) {
 	if s == nil || s.service == nil {
+		return nil, 0, false, nil
+	}
+	if openAIRequestRequiresImageGenerationBridge(req) {
 		return nil, 0, false, nil
 	}
 	accounts, err := s.service.listOpenAICooldownFallbackAccounts(ctx, req.GroupID)

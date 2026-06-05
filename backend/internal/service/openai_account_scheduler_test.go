@@ -682,6 +682,171 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_ImageGenerationBridgeRe
 	require.Equal(t, 1, decision.CandidateCount)
 }
 
+func TestOpenAIGatewayService_SelectAccountWithScheduler_ImageGenerationBridgeCircuitDoesNotBlockTextResponses(t *testing.T) {
+	resetOpenAIAdvancedSchedulerSettingCacheForTest()
+
+	ctx := context.Background()
+	groupID := int64(10114)
+	account := Account{
+		ID:          37041,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    1,
+		GroupIDs:    []int64{groupID},
+		Extra:       map[string]any{featureKeyCodexImageGenerationBridge: true},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+
+	imageEndpoint := OpenAIResponsesSchedulerEndpointForIntent("/v1/responses", true)
+	svc.ReportOpenAIAccountScheduleFailure(account.ID, "gpt-5.4", imageEndpoint, &UpstreamFailoverError{
+		StatusCode:   http.StatusServiceUnavailable,
+		ResponseBody: []byte(`{"error":{"message":"Service temporarily unavailable","type":"api_error"}}`),
+	})
+
+	textSelection, textDecision, err := svc.SelectAccountWithSchedulerForCapabilityAndOptions(
+		WithSchedulerEndpoint(ctx, "/v1/responses"),
+		&groupID,
+		"",
+		"",
+		"gpt-5.4",
+		nil,
+		OpenAIUpstreamTransportAny,
+		OpenAIEndpointCapabilityChatCompletions,
+		false,
+		OpenAIAccountScheduleOptions{},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, textSelection)
+	require.NotNil(t, textSelection.Account)
+	require.Equal(t, account.ID, textSelection.Account.ID)
+	require.False(t, textSelection.WeakFallback)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, textDecision.Layer)
+	if textSelection.ReleaseFunc != nil {
+		textSelection.ReleaseFunc()
+	}
+
+	imageSelection, imageDecision, err := svc.SelectAccountWithSchedulerForCapabilityAndOptions(
+		WithSchedulerEndpoint(ctx, imageEndpoint),
+		&groupID,
+		"",
+		"",
+		"gpt-5.4",
+		nil,
+		OpenAIUpstreamTransportAny,
+		OpenAIEndpointCapabilityChatCompletions,
+		false,
+		OpenAIAccountScheduleOptions{RequireCodexImageGenerationBridge: true},
+	)
+	require.Error(t, err)
+	require.Nil(t, imageSelection)
+	require.True(t, imageDecision.Diagnostics.Collected)
+	require.Equal(t, 1, imageDecision.Diagnostics.FilterReasonCounts["scheduler_circuit_open"])
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_ImageGenerationBridgeUsesSingleHalfOpenProbe(t *testing.T) {
+	resetOpenAIAdvancedSchedulerSettingCacheForTest()
+
+	ctx := context.Background()
+	groupID := int64(10115)
+	account := Account{
+		ID:          37042,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    1,
+		GroupIDs:    []int64{groupID},
+		Extra:       map[string]any{featureKeyCodexImageGenerationBridge: true},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+
+	imageEndpoint := OpenAIResponsesSchedulerEndpointForIntent("/v1/responses", true)
+	svc.schedulerHealth.reportFailure(account.ID, "gpt-5.4", imageEndpoint, "transient", time.Nanosecond)
+	require.Eventually(t, func() bool {
+		snap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.4", imageEndpoint, false)
+		return snap.CircuitState == schedulerCircuitHalfOpen
+	}, time.Second, time.Millisecond)
+
+	imageCtx := WithSchedulerEndpoint(ctx, imageEndpoint)
+	firstProbe, _, err := svc.SelectAccountWithSchedulerForCapabilityAndOptions(
+		imageCtx,
+		&groupID,
+		"",
+		"",
+		"gpt-5.4",
+		nil,
+		OpenAIUpstreamTransportAny,
+		OpenAIEndpointCapabilityChatCompletions,
+		false,
+		OpenAIAccountScheduleOptions{RequireCodexImageGenerationBridge: true},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, firstProbe)
+	require.NotNil(t, firstProbe.Account)
+	require.Equal(t, account.ID, firstProbe.Account.ID)
+	require.False(t, firstProbe.WeakFallback)
+	if firstProbe.ReleaseFunc != nil {
+		firstProbe.ReleaseFunc()
+	}
+
+	secondProbe, secondDecision, err := svc.SelectAccountWithSchedulerForCapabilityAndOptions(
+		imageCtx,
+		&groupID,
+		"",
+		"",
+		"gpt-5.4",
+		nil,
+		OpenAIUpstreamTransportAny,
+		OpenAIEndpointCapabilityChatCompletions,
+		false,
+		OpenAIAccountScheduleOptions{RequireCodexImageGenerationBridge: true},
+	)
+	require.Error(t, err)
+	require.Nil(t, secondProbe)
+	require.True(t, secondDecision.Diagnostics.Collected)
+	require.Equal(t, 1, secondDecision.Diagnostics.FilterReasonCounts["scheduler_probe_pending"])
+
+	svc.ReportOpenAIAccountScheduleResultForRequest(account.ID, "gpt-5.4", imageEndpoint, true, nil)
+	recovered, _, err := svc.SelectAccountWithSchedulerForCapabilityAndOptions(
+		imageCtx,
+		&groupID,
+		"",
+		"",
+		"gpt-5.4",
+		nil,
+		OpenAIUpstreamTransportAny,
+		OpenAIEndpointCapabilityChatCompletions,
+		false,
+		OpenAIAccountScheduleOptions{RequireCodexImageGenerationBridge: true},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, recovered)
+	require.NotNil(t, recovered.Account)
+	require.Equal(t, account.ID, recovered.Account.ID)
+	require.False(t, recovered.WeakFallback)
+	if recovered.ReleaseFunc != nil {
+		recovered.ReleaseFunc()
+	}
+}
+
 func TestOpenAIGatewayService_SelectAccountWithScheduler_Enabled_EmbeddingsSkipsChatOnlyStickyBindings(t *testing.T) {
 	resetOpenAIAdvancedSchedulerSettingCacheForTest()
 

@@ -296,7 +296,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// Generate session hash (header first; fallback to prompt_cache_key)
 	sessionHash := h.gatewayService.GenerateSessionHash(c, sessionHashBody)
 	requireCompact := isOpenAIRemoteCompactPath(c)
-	schedulerEndpoint := GetUpstreamEndpoint(c, service.PlatformOpenAI)
+	schedulerEndpoint := service.OpenAIResponsesSchedulerEndpointForIntent(GetUpstreamEndpoint(c, service.PlatformOpenAI), imageIntent)
 
 	maxAccountSwitches := h.gatewayService.MaxOpenAIAccountSwitches(c.Request.Context(), h.maxAccountSwitches, apiKey.GroupID)
 	switchCount := 0
@@ -1315,7 +1315,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		firstMessage,
 		openAIWSIngressFallbackSessionSeed(subject.UserID, apiKey.ID, apiKey.GroupID),
 	)
-	schedulerEndpoint := "/v1/responses/ws"
+	schedulerEndpoint := service.OpenAIResponsesSchedulerEndpointForIntent("/v1/responses/ws", wsImageIntent)
 	maxAccountSwitches := h.gatewayService.MaxOpenAIAccountSwitches(ctx, h.maxAccountSwitches, apiKey.GroupID)
 	switchCount := 0
 	failedAccountIDs := make(map[int64]struct{})

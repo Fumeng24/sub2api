@@ -358,6 +358,9 @@ func openAISchedulerStatusRequest(model string, endpoint string) OpenAIAccountSc
 	if strings.Contains(lower, "embeddings") {
 		req.RequiredCapability = OpenAIEndpointCapabilityEmbeddings
 	}
+	if isOpenAIImageGenerationSchedulerEndpoint(req.SchedulerEndpoint) {
+		req.RequireCodexImageGenerationBridge = true
+	}
 	return req
 }
 
