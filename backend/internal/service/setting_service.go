@@ -1061,6 +1061,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyGroupRateDiscountSettings,
 		SettingKeyAffiliateEnabled,
 		SettingKeyRiskControlEnabled,
+		SettingKeyAllowUserViewErrorRequests,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
@@ -1180,9 +1181,10 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 
 		AffiliateEnabled: settings[SettingKeyAffiliateEnabled] == "true",
 
-		GroupRateDiscount:         groupRateDiscount,
-		UpcomingGroupRateDiscount: upcomingGroupRateDiscount,
-		RiskControlEnabled:        settings[SettingKeyRiskControlEnabled] == "true",
+		GroupRateDiscount:          groupRateDiscount,
+		UpcomingGroupRateDiscount:  upcomingGroupRateDiscount,
+		RiskControlEnabled:         settings[SettingKeyRiskControlEnabled] == "true",
+		AllowUserViewErrorRequests: settings[SettingKeyAllowUserViewErrorRequests] == "true",
 	}, nil
 }
 
@@ -1258,6 +1260,17 @@ func (s *SettingService) GetAvailableChannelsRuntime(ctx context.Context) Availa
 	return AvailableChannelsRuntime{
 		Enabled: vals[SettingKeyAvailableChannelsEnabled] == "true",
 	}
+}
+
+// IsUserErrorViewAllowed reads the user-facing error-requests visibility switch
+// directly from the settings store. Fail-closed: on error returns false (opt-in default).
+func (s *SettingService) IsUserErrorViewAllowed(ctx context.Context) bool {
+	vals, err := s.settingRepo.GetMultiple(ctx, []string{SettingKeyAllowUserViewErrorRequests})
+	if err != nil {
+		slog.Warn("failed to get allow_user_view_error_requests setting, defaulting to false", "error", err)
+		return false
+	}
+	return vals[SettingKeyAllowUserViewErrorRequests] == "true"
 }
 
 // GetAntigravityUserAgentVersion 返回 Antigravity 上游请求使用的版本号。
@@ -1488,6 +1501,7 @@ type PublicSettingsInjectionPayload struct {
 	GroupRateDiscount                    *ActiveGroupRateDiscount `json:"group_rate_discount,omitempty"`
 	UpcomingGroupRateDiscount            *ActiveGroupRateDiscount `json:"upcoming_group_rate_discount,omitempty"`
 	RiskControlEnabled                   bool                     `json:"risk_control_enabled"`
+	AllowUserViewErrorRequests           bool                     `json:"allow_user_view_error_requests"`
 }
 
 // GetPublicSettingsForInjection returns public settings in a format suitable for HTML injection.
@@ -1553,6 +1567,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		GroupRateDiscount:                    settings.GroupRateDiscount,
 		UpcomingGroupRateDiscount:            settings.UpcomingGroupRateDiscount,
 		RiskControlEnabled:                   settings.RiskControlEnabled,
+		AllowUserViewErrorRequests:           settings.AllowUserViewErrorRequests,
 	}, nil
 }
 
@@ -2254,6 +2269,8 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		}
 		updates[SettingKeyDefaultPlatformQuotas] = string(blob)
 	}
+
+	updates[SettingKeyAllowUserViewErrorRequests] = strconv.FormatBool(settings.AllowUserViewErrorRequests)
 
 	return updates, nil
 }
@@ -3153,6 +3170,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingPaymentVisibleMethodAlipayEnabled:     "false",
 		SettingPaymentVisibleMethodWxpayEnabled:      "false",
 		openAIAdvancedSchedulerSettingKey:            "false",
+
+		SettingKeyAllowUserViewErrorRequests: "false",
 	}
 
 	return s.settingRepo.SetMultiple(ctx, defaults)
@@ -3711,6 +3730,8 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 			result.DefaultPlatformQuotas = parsed
 		}
 	}
+
+	result.AllowUserViewErrorRequests = settings[SettingKeyAllowUserViewErrorRequests] == "true" // default false
 
 	return result
 }

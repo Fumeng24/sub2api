@@ -91,6 +91,14 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	defer cancel()
 
 	transientBlocked := s.markOpenAITransient5xxCoolingDown(stateCtx, account, statusCode, headers, responseBody)
+
+	if isOpenAIImageRateLimitError(statusCode, responseBody) {
+		if s != nil && s.rateLimitService != nil {
+			_ = s.rateLimitService.HandleOpenAIImageRateLimit(stateCtx, account, statusCode, headers, responseBody)
+		}
+		return false
+	}
+
 	if statusCode == http.StatusTooManyRequests {
 		s.markOpenAIOAuth429RateLimited(stateCtx, account, headers, responseBody)
 	}

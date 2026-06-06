@@ -98,9 +98,10 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 
 		AffiliateEnabled: settings.AffiliateEnabled,
 
-		GroupRateDiscount:         dto.ActiveGroupRateDiscountFromService(settings.GroupRateDiscount),
-		UpcomingGroupRateDiscount: dto.ActiveGroupRateDiscountFromService(settings.UpcomingGroupRateDiscount),
-		RiskControlEnabled:        settings.RiskControlEnabled,
+		GroupRateDiscount:          dto.ActiveGroupRateDiscountFromService(settings.GroupRateDiscount),
+		UpcomingGroupRateDiscount:  dto.ActiveGroupRateDiscountFromService(settings.UpcomingGroupRateDiscount),
+		RiskControlEnabled:         settings.RiskControlEnabled,
+		AllowUserViewErrorRequests: settings.AllowUserViewErrorRequests,
 	})
 }
 

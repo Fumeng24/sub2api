@@ -78,14 +78,22 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 	reqModel := modelResult.String()
-	reqStream := gjson.GetBytes(body, "stream").Bool()
+	reqStream, ok := parseOpenAICompatibleStream(body)
+	if !ok {
+		h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", invalidStreamFieldTypeMessage)
+		return
+	}
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
 	setOpsRequestContext(c, reqModel, reqStream, body)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
+	requestCtx := c.Request.Context()
+	if service.IsImageGenerationIntent("/v1/responses", reqModel, body) {
+		requestCtx = service.WithOpenAIImageGenerationIntent(requestCtx)
+	}
 
 	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
+	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(requestCtx, apiKey.GroupID, reqModel)
 
 	// Claude Code only restriction:
 	// /v1/responses is never a Claude Code endpoint.
@@ -148,9 +156,9 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 2. Re-check billing
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(requestCtx, apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(requestCtx, apiKey)); err != nil {
 		reqLog.Info("gateway.responses.billing_check_failed",
-			billingEligibilityFailureFields(c.Request.Context(), h.billingCacheService, err, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey), body, reqModel, GetInboundEndpoint(c))...)
+			billingEligibilityFailureFields(requestCtx, h.billingCacheService, err, apiKey, apiKey.Group, subscription, service.QuotaPlatform(requestCtx, apiKey), body, reqModel, GetInboundEndpoint(c))...)
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -177,7 +185,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	fs := NewFailoverState(h.maxAccountSwitches, false)
 
 	for {
-		selectionCtx, cancelSelection := failoverAccountSelectionContext(c.Request.Context(), schedulerEndpoint, fs.LastFailoverErr != nil || len(fs.FailedAccountIDs) > 0)
+		selectionCtx, cancelSelection := failoverAccountSelectionContext(requestCtx, schedulerEndpoint, fs.LastFailoverErr != nil || len(fs.FailedAccountIDs) > 0)
 		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(selectionCtx, apiKey.GroupID, sessionHash, reqModel, fs.FailedAccountIDs, "", int64(0))
 		cancelSelection()
 		if err != nil {
@@ -186,7 +194,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 				h.responsesErrorResponse(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error())
 				return
 			}
-			action := fs.HandleSelectionExhausted(c.Request.Context())
+			action := fs.HandleSelectionExhausted(requestCtx)
 			switch action {
 			case FailoverContinue:
 				continue
@@ -234,7 +242,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
-		result, err := h.gatewayService.ForwardAsResponses(openAIForwardContextForSelection(c.Request.Context(), selection), c, account, forwardBody, parsedReq)
+		result, err := h.gatewayService.ForwardAsResponses(openAIForwardContextForSelection(requestCtx, selection), c, account, forwardBody, parsedReq)
 
 		if accountReleaseFunc != nil {
 			accountReleaseFunc()
@@ -248,7 +256,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 					h.handleResponsesFailoverExhausted(c, failoverErr, true)
 					return
 				}
-				actionCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
+				actionCtx := service.WithSchedulerEndpoint(requestCtx, schedulerEndpoint)
 				action := fs.HandleFailoverErrorForRequest(actionCtx, h.gatewayService, account.ID, account.Platform, reqModel, schedulerEndpoint, failoverErr, failoverWriterFields(c.Writer.Size(), writerSizeBeforeForward)...)
 				switch action {
 				case FailoverContinue:

@@ -136,6 +136,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 	}
 
 	sessionHash := h.gatewayService.GenerateExplicitSessionHash(c, body)
+	requestCtx := service.WithOpenAIImageGenerationIntent(c.Request.Context())
 
 	maxAccountSwitches := h.gatewayService.MaxOpenAIAccountSwitches(c.Request.Context(), h.maxAccountSwitches, apiKey.GroupID)
 	switchCount := 0
@@ -146,7 +147,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 
 	for {
 		reqLog.Debug("openai.images.account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
-		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(c.Request.Context(), schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
+		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(requestCtx, schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
 		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForImages(
 			scheduleCtx,
 			apiKey.GroupID,
@@ -204,7 +205,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 					accountReleaseFunc()
 				}
 			}()
-			return h.gatewayService.ForwardImages(openAIForwardContextForSelection(c.Request.Context(), selection), c, account, body, parsed, channelMapping.MappedModel)
+			return h.gatewayService.ForwardImages(openAIForwardContextForSelection(requestCtx, selection), c, account, body, parsed, channelMapping.MappedModel)
 		}()
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
@@ -254,7 +255,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 								zap.Int("retry_count", sameAccountRetryCount[account.ID]),
 							)
 							select {
-							case <-c.Request.Context().Done():
+							case <-requestCtx.Done():
 								return
 							case <-time.After(sameAccountRetryDelay):
 							}
@@ -281,10 +282,15 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 					return
 				}
 				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, parsed.Model, schedulerEndpoint, false, nil)
-				wroteFallback := h.ensureForwardErrorResponse(c, streamStarted)
+				upstreamErrorAlreadyCommunicated := openAIForwardErrorAlreadyCommunicated(c, writerSizeBeforeForward, err)
+				wroteFallback := false
+				if !upstreamErrorAlreadyCommunicated {
+					wroteFallback = h.ensureForwardErrorResponse(c, streamStarted)
+				}
 				fields := []zap.Field{
 					zap.Int64("account_id", account.ID),
 					zap.Bool("fallback_error_response_written", wroteFallback),
+					zap.Bool("upstream_error_response_already_written", upstreamErrorAlreadyCommunicated),
 					zap.Error(err),
 				}
 				if shouldLogOpenAIForwardFailureAsWarn(c, wroteFallback) {
