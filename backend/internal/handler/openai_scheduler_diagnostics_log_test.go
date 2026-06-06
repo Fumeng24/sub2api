@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -48,4 +49,43 @@ func TestOpenAIAccountSelectFailedFields_IncludesPlainDiagnostics(t *testing.T) 
 	require.Contains(t, keys, "group_binding_accounts")
 	require.Contains(t, keys, "skipped_accounts")
 	require.Contains(t, keys, "skip_reason")
+}
+
+func TestOpenAISelectionEmptyErrorResponse_ModelUnsupported(t *testing.T) {
+	status, errType, message := openAISelectionEmptyErrorResponse(service.OpenAIAccountScheduleDecision{
+		Diagnostics: service.OpenAIAccountSelectionDiagnostics{
+			Collected:                true,
+			Model:                    "gpt-5.2",
+			GroupBindingAccountCount: 8,
+			ActiveSchedulableCount:   8,
+			AfterExcludedCount:       8,
+			ModelSupportedCount:      0,
+			FilterReasonCounts:       map[string]int{"model_unsupported": 8},
+		},
+	})
+
+	require.Equal(t, http.StatusBadRequest, status)
+	require.Equal(t, "model_not_supported", errType)
+	require.Contains(t, message, "gpt-5.2")
+}
+
+func TestOpenAISelectionEmptyErrorResponse_ImageGenerationBridgeUnsupported(t *testing.T) {
+	status, errType, message := openAISelectionEmptyErrorResponse(service.OpenAIAccountScheduleDecision{
+		Diagnostics: service.OpenAIAccountSelectionDiagnostics{
+			Collected:                             true,
+			Model:                                 "gpt-5.5",
+			RequireCodexImageGenerationBridge:     true,
+			GroupBindingAccountCount:              8,
+			ActiveSchedulableCount:                8,
+			ModelSupportedCount:                   8,
+			EndpointSupportedCount:                8,
+			ImageGenerationBridgeSupportedCount:   0,
+			ImageGenerationBridgeUnsupportedCount: 8,
+			FilterReasonCounts:                    map[string]int{"image_generation_bridge_unsupported": 8},
+		},
+	})
+
+	require.Equal(t, http.StatusBadRequest, status)
+	require.Equal(t, "image_generation_bridge_not_available", errType)
+	require.Contains(t, message, "image_generation")
 }

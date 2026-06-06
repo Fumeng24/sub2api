@@ -188,6 +188,7 @@ func isOpenAIUpstreamStreamFailoverError(err error) bool {
 		"stream usage incomplete",
 		"missing terminal event",
 		"upstream stream ended without terminal event",
+		"empty_effective_output",
 	}
 	for _, marker := range diagnosticFailoverMarkers {
 		if strings.Contains(msg, marker) {
@@ -212,6 +213,7 @@ func isOpenAIUpstreamStreamCircuitError(err error) bool {
 		"stream usage incomplete",
 		"missing terminal event",
 		"upstream stream ended without terminal event",
+		"empty_effective_output",
 		"client disconnected",
 	}
 	for _, marker := range diagnosticOnlyMarkers {

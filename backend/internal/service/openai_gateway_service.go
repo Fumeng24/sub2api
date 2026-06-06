@@ -66,6 +66,7 @@ const (
 	openAICompactLargeInputTokenThreshold  = 4096
 	openAICompactLargeInputMinOutputTokens = 16
 	openAICompactLargeInputMinOutputRunes  = 80
+	openAIEmptyOutputCode                  = "empty_effective_output"
 )
 
 // OpenAI allowed headers whitelist (for non-passthrough).
@@ -4060,17 +4061,36 @@ func collectOpenAIPassthroughTimeoutHeaders(h http.Header) []string {
 }
 
 type openaiStreamingResultPassthrough struct {
-	usage            *OpenAIUsage
-	firstTokenMs     *int
-	imageCount       int
-	imageOutputSizes []string
+	usage              *OpenAIUsage
+	firstTokenMs       *int
+	imageCount         int
+	imageOutputSizes   []string
+	hasEffectiveOutput bool
 }
 
 type openaiNonStreamingResultPassthrough struct {
 	*OpenAIUsage
-	usage            *OpenAIUsage
-	imageCount       int
-	imageOutputSizes []string
+	usage              *OpenAIUsage
+	imageCount         int
+	imageOutputSizes   []string
+	hasEffectiveOutput bool
+}
+
+type openAIResponseOutputTracker struct {
+	hasOutput bool
+}
+
+func (t *openAIResponseOutputTracker) ObserveSSEData(data []byte) {
+	if t == nil || len(data) == 0 || bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) || !gjson.ValidBytes(data) {
+		return
+	}
+	if openAIResponsePayloadHasEffectiveOutput(gjson.ParseBytes(data)) {
+		t.hasOutput = true
+	}
+}
+
+func (t *openAIResponseOutputTracker) HasOutput() bool {
+	return t != nil && t.hasOutput
 }
 
 func openAIStreamClientOutputStarted(c *gin.Context, localStarted bool) bool {
@@ -4285,6 +4305,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 
 	usage := &OpenAIUsage{}
 	imageCounter := newOpenAIImageOutputCounter()
+	outputTracker := &openAIResponseOutputTracker{}
 	var firstTokenMs *int
 	clientDisconnected := false
 	sawDone := false
@@ -4320,10 +4341,11 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 	needModelReplace := strings.TrimSpace(originalModel) != "" && strings.TrimSpace(mappedModel) != "" && strings.TrimSpace(originalModel) != strings.TrimSpace(mappedModel)
 	resultWithUsage := func() *openaiStreamingResultPassthrough {
 		return &openaiStreamingResultPassthrough{
-			usage:            usage,
-			firstTokenMs:     firstTokenMs,
-			imageCount:       imageCounter.Count(),
-			imageOutputSizes: imageCounter.Sizes(),
+			usage:              usage,
+			firstTokenMs:       firstTokenMs,
+			imageCount:         imageCounter.Count(),
+			imageOutputSizes:   imageCounter.Sizes(),
+			hasEffectiveOutput: outputTracker.HasOutput() || imageCounter.Count() > 0,
 		}
 	}
 
@@ -4361,6 +4383,13 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 				sawTerminalEvent = true
 			}
 			imageCounter.AddSSEData(dataBytes)
+			outputTracker.ObserveSSEData(dataBytes)
+			if openAICompletedPayloadIsEmptyEffectiveOutput(dataBytes, outputTracker.HasOutput() || imageCounter.Count() > 0) {
+				if !openAIStreamClientOutputStarted(c, clientOutputStarted) {
+					return resultWithUsage(), s.newOpenAIEmptyOutputFailoverError(c, account, resp, true, upstreamRequestID)
+				}
+				return resultWithUsage(), fmt.Errorf("stream usage incomplete: %s", openAIEmptyOutputCode)
+			}
 			lineStartsClientOutput = forceFlushFailedEvent || openAIStreamDataStartsClientOutput(trimmedData, eventType)
 			if firstTokenMs == nil && lineStartsClientOutput && trimmedData != "[DONE]" {
 				ms := int(time.Since(startTime).Milliseconds())
@@ -4442,7 +4471,6 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 		}
 		return resultWithUsage(), errors.New("stream usage incomplete: missing terminal event")
 	}
-
 	return resultWithUsage(), nil
 }
 
@@ -4492,12 +4520,16 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	if err := s.validateOpenAICompactResponseForFailover(c, account, resp, body, true); err != nil {
 		return nil, err
 	}
+	if err := s.validateOpenAIEmptyOutputResponseForFailover(c, account, resp, body, true); err != nil {
+		return nil, err
+	}
 	c.Data(resp.StatusCode, contentType, body)
 	return &openaiNonStreamingResultPassthrough{
-		OpenAIUsage:      usage,
-		usage:            usage,
-		imageCount:       countOpenAIResponseImageOutputsFromJSONBytes(body),
-		imageOutputSizes: collectOpenAIResponseImageOutputSizesFromJSONBytes(body),
+		OpenAIUsage:        usage,
+		usage:              usage,
+		imageCount:         countOpenAIResponseImageOutputsFromJSONBytes(body),
+		imageOutputSizes:   collectOpenAIResponseImageOutputSizesFromJSONBytes(body),
+		hasEffectiveOutput: openAIResponseBodyHasEffectiveOutput(body),
 	}, nil
 }
 
@@ -4548,6 +4580,9 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c
 	if err := s.validateOpenAICompactResponseForFailover(c, account, resp, body, true); err != nil {
 		return nil, err
 	}
+	if err := s.validateOpenAIEmptyOutputResponseForFailover(c, account, resp, body, true); err != nil {
+		return nil, err
+	}
 
 	writeOpenAIPassthroughResponseHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 
@@ -4561,10 +4596,11 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c
 	c.Data(resp.StatusCode, contentType, body)
 
 	return &openaiNonStreamingResultPassthrough{
-		OpenAIUsage:      usage,
-		usage:            usage,
-		imageCount:       countOpenAIImageOutputsFromSSEBody(bodyText),
-		imageOutputSizes: collectOpenAIImageOutputSizesFromSSEBody(bodyText),
+		OpenAIUsage:        usage,
+		usage:              usage,
+		imageCount:         countOpenAIImageOutputsFromSSEBody(bodyText),
+		imageOutputSizes:   collectOpenAIImageOutputSizesFromSSEBody(bodyText),
+		hasEffectiveOutput: openAIResponseBodyHasEffectiveOutput(body),
 	}, nil
 }
 
@@ -5055,17 +5091,19 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 
 // openaiStreamingResult streaming response result
 type openaiStreamingResult struct {
-	usage            *OpenAIUsage
-	firstTokenMs     *int
-	imageCount       int
-	imageOutputSizes []string
+	usage              *OpenAIUsage
+	firstTokenMs       *int
+	imageCount         int
+	imageOutputSizes   []string
+	hasEffectiveOutput bool
 }
 
 type openaiNonStreamingResult struct {
 	*OpenAIUsage
-	usage            *OpenAIUsage
-	imageCount       int
-	imageOutputSizes []string
+	usage              *OpenAIUsage
+	imageCount         int
+	imageOutputSizes   []string
+	hasEffectiveOutput bool
 }
 
 func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, startTime time.Time, originalModel, mappedModel string) (*openaiStreamingResult, error) {
@@ -5100,6 +5138,7 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 
 	usage := &OpenAIUsage{}
 	imageCounter := newOpenAIImageOutputCounter()
+	outputTracker := &openAIResponseOutputTracker{}
 	var firstTokenMs *int
 	scanner := bufio.NewScanner(resp.Body)
 	maxLineSize := defaultMaxLineSize
@@ -5181,10 +5220,11 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 	needModelReplace := originalModel != mappedModel
 	resultWithUsage := func() *openaiStreamingResult {
 		return &openaiStreamingResult{
-			usage:            usage,
-			firstTokenMs:     firstTokenMs,
-			imageCount:       imageCounter.Count(),
-			imageOutputSizes: imageCounter.Sizes(),
+			usage:              usage,
+			firstTokenMs:       firstTokenMs,
+			imageCount:         imageCounter.Count(),
+			imageOutputSizes:   imageCounter.Sizes(),
+			hasEffectiveOutput: outputTracker.HasOutput() || imageCounter.Count() > 0,
 		}
 	}
 	finalizeStream := func() (*openaiStreamingResult, error) {
@@ -5290,6 +5330,7 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 				sawFailedEvent = true
 			}
 			imageCounter.AddSSEData(dataBytes)
+			outputTracker.ObserveSSEData(dataBytes)
 
 			// Correct Codex tool calls if needed (apply_patch -> edit, etc.)
 			if correctedData, corrected := s.toolCorrector.CorrectToolCallsInSSEBytes(dataBytes); corrected {
@@ -5297,6 +5338,15 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 				data = string(correctedData)
 				line = "data: " + data
 				eventType = strings.TrimSpace(gjson.GetBytes(dataBytes, "type").String())
+				outputTracker.ObserveSSEData(dataBytes)
+			}
+			if openAICompletedPayloadIsEmptyEffectiveOutput(dataBytes, outputTracker.HasOutput() || imageCounter.Count() > 0) {
+				if !openAIStreamClientOutputStarted(c, clientOutputStarted) {
+					streamFailoverErr = s.newOpenAIEmptyOutputFailoverError(c, account, resp, false, upstreamRequestID)
+				} else {
+					streamFailoverErr = fmt.Errorf("stream usage incomplete: %s", openAIEmptyOutputCode)
+				}
+				return
 			}
 			startsClientOutput := forceFlushFailedEvent || openAIStreamDataStartsClientOutput(data, eventType)
 
@@ -5684,6 +5734,9 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	if err := s.validateOpenAICompactResponseForFailover(c, account, resp, body, false); err != nil {
 		return nil, err
 	}
+	if err := s.validateOpenAIEmptyOutputResponseForFailover(c, account, resp, body, false); err != nil {
+		return nil, err
+	}
 
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 
@@ -5697,10 +5750,11 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	c.Data(resp.StatusCode, contentType, body)
 
 	return &openaiNonStreamingResult{
-		OpenAIUsage:      usage,
-		usage:            usage,
-		imageCount:       countOpenAIResponseImageOutputsFromJSONBytes(body),
-		imageOutputSizes: collectOpenAIResponseImageOutputSizesFromJSONBytes(body),
+		OpenAIUsage:        usage,
+		usage:              usage,
+		imageCount:         countOpenAIResponseImageOutputsFromJSONBytes(body),
+		imageOutputSizes:   collectOpenAIResponseImageOutputSizesFromJSONBytes(body),
+		hasEffectiveOutput: openAIResponseBodyHasEffectiveOutput(body),
 	}, nil
 }
 
@@ -5753,6 +5807,9 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 	if err := s.validateOpenAICompactResponseForFailover(c, nil, resp, body, false); err != nil {
 		return nil, err
 	}
+	if err := s.validateOpenAIEmptyOutputResponseForFailover(c, nil, resp, body, false); err != nil {
+		return nil, err
+	}
 
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 
@@ -5766,10 +5823,11 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 	c.Data(resp.StatusCode, contentType, body)
 
 	return &openaiNonStreamingResult{
-		OpenAIUsage:      usage,
-		usage:            usage,
-		imageCount:       countOpenAIImageOutputsFromSSEBody(bodyText),
-		imageOutputSizes: collectOpenAIImageOutputSizesFromSSEBody(bodyText),
+		OpenAIUsage:        usage,
+		usage:              usage,
+		imageCount:         countOpenAIImageOutputsFromSSEBody(bodyText),
+		imageOutputSizes:   collectOpenAIImageOutputSizesFromSSEBody(bodyText),
+		hasEffectiveOutput: openAIResponseBodyHasEffectiveOutput(body),
 	}, nil
 }
 
@@ -5874,6 +5932,236 @@ func (s *OpenAIGatewayService) validateOpenAICompactResponseForFailover(
 		StatusCode:      http.StatusBadGateway,
 		ResponseBody:    responseBody,
 		ResponseHeaders: headers,
+	}
+}
+
+func (s *OpenAIGatewayService) validateOpenAIEmptyOutputResponseForFailover(
+	c *gin.Context,
+	account *Account,
+	resp *http.Response,
+	body []byte,
+	passthrough bool,
+) error {
+	if reason := openAIEmptyOutputReason(body); reason != "" {
+		return s.newOpenAIEmptyOutputFailoverError(c, account, resp, passthrough, "", reason)
+	}
+	return nil
+}
+
+func (s *OpenAIGatewayService) newOpenAIEmptyOutputFailoverError(
+	c *gin.Context,
+	account *Account,
+	resp *http.Response,
+	passthrough bool,
+	upstreamRequestID string,
+	reasons ...string,
+) *UpstreamFailoverError {
+	reason := openAIEmptyOutputCode
+	for _, candidate := range reasons {
+		if trimmed := strings.TrimSpace(candidate); trimmed != "" {
+			reason = trimmed
+			break
+		}
+	}
+	if upstreamRequestID == "" && resp != nil {
+		upstreamRequestID = strings.TrimSpace(resp.Header.Get("x-request-id"))
+	}
+	message := "OpenAI response completed with empty effective output"
+	if reason != "" && reason != openAIEmptyOutputCode {
+		message += ": " + sanitizeUpstreamErrorMessage(reason)
+	}
+	if c != nil {
+		setOpsUpstreamError(c, http.StatusBadGateway, message, openAIEmptyOutputCode)
+		event := OpsUpstreamErrorEvent{
+			Platform:           PlatformOpenAI,
+			UpstreamStatusCode: http.StatusBadGateway,
+			UpstreamRequestID:  upstreamRequestID,
+			Passthrough:        passthrough,
+			Kind:               "failover",
+			Message:            message,
+			Detail:             openAIEmptyOutputCode,
+			CooldownApplied:    false,
+		}
+		if account != nil {
+			event.Platform = account.Platform
+			event.AccountID = account.ID
+			event.AccountName = account.Name
+		}
+		appendOpsUpstreamError(c, event)
+	}
+	responseBody, _ := json.Marshal(gin.H{
+		"error": gin.H{
+			"type":    "upstream_error",
+			"code":    openAIEmptyOutputCode,
+			"message": message,
+		},
+	})
+	var headers http.Header
+	if resp != nil && resp.Header != nil {
+		headers = resp.Header.Clone()
+	}
+	return &UpstreamFailoverError{
+		StatusCode:      http.StatusBadGateway,
+		ResponseBody:    responseBody,
+		ResponseHeaders: headers,
+	}
+}
+
+func openAICompletedPayloadIsEmptyEffectiveOutput(data []byte, hasEffectiveOutput bool) bool {
+	if hasEffectiveOutput || len(bytes.TrimSpace(data)) == 0 || !gjson.ValidBytes(data) {
+		return false
+	}
+	eventType := strings.TrimSpace(gjson.GetBytes(data, "type").String())
+	if eventType != "response.completed" && eventType != "response.done" {
+		return false
+	}
+	return openAIEmptyOutputReason(data) != ""
+}
+
+func openAIEmptyOutputReason(body []byte) string {
+	if len(bytes.TrimSpace(body)) == 0 || !gjson.ValidBytes(body) {
+		return ""
+	}
+	root := gjson.ParseBytes(body)
+	status := strings.ToLower(strings.TrimSpace(root.Get("status").String()))
+	if status == "" {
+		status = strings.ToLower(strings.TrimSpace(root.Get("response.status").String()))
+	}
+	if status != "" && status != "completed" && status != "done" {
+		return ""
+	}
+	if status == "" && !root.Get("output").Exists() && !root.Get("response.output").Exists() &&
+		!root.Get("output_text").Exists() && !root.Get("response.output_text").Exists() {
+		return ""
+	}
+	if openAIResponsePayloadHasEffectiveOutput(root) {
+		return ""
+	}
+	usage, usageOK := extractOpenAIUsageFromJSONBytes(body)
+	if !usageOK {
+		return "missing_usage_empty_output"
+	}
+	if usage.OutputTokens > 0 || usage.ImageOutputTokens > 0 {
+		return ""
+	}
+	return "zero_output_tokens_empty_output"
+}
+
+func openAIResponseBodyHasEffectiveOutput(body []byte) bool {
+	if len(bytes.TrimSpace(body)) == 0 || !gjson.ValidBytes(body) {
+		return false
+	}
+	return openAIResponsePayloadHasEffectiveOutput(gjson.ParseBytes(body))
+}
+
+func openAIResponsePayloadHasEffectiveOutput(root gjson.Result) bool {
+	if !root.Exists() {
+		return false
+	}
+	eventType := strings.TrimSpace(root.Get("type").String())
+	if strings.HasPrefix(eventType, "response.output_text") || strings.HasPrefix(eventType, "response.refusal") {
+		if strings.TrimSpace(root.Get("delta").String()) != "" || strings.TrimSpace(root.Get("text").String()) != "" {
+			return true
+		}
+	}
+	if strings.Contains(eventType, "function_call_arguments") && strings.TrimSpace(root.Get("delta").String()) != "" {
+		return true
+	}
+	if item := root.Get("item"); item.Exists() && openAIResponseOutputItemHasEffectiveOutput(item) {
+		return true
+	}
+	if openAIResponseObjectHasEffectiveOutput(root) {
+		return true
+	}
+	if response := root.Get("response"); response.Exists() && openAIResponseObjectHasEffectiveOutput(response) {
+		return true
+	}
+	return false
+}
+
+func openAIResponseObjectHasEffectiveOutput(obj gjson.Result) bool {
+	if !obj.Exists() {
+		return false
+	}
+	for _, path := range []string{"output_text", "text", "refusal"} {
+		if strings.TrimSpace(obj.Get(path).String()) != "" {
+			return true
+		}
+	}
+	for _, outputPath := range []string{"output", "response.output"} {
+		output := obj.Get(outputPath)
+		if !output.Exists() || !output.IsArray() {
+			continue
+		}
+		for _, item := range output.Array() {
+			if openAIResponseOutputItemHasEffectiveOutput(item) {
+				return true
+			}
+		}
+	}
+	for _, choice := range obj.Get("choices").Array() {
+		if strings.TrimSpace(choice.Get("message.content").String()) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func openAIResponseOutputItemHasEffectiveOutput(item gjson.Result) bool {
+	if !item.Exists() || !item.IsObject() {
+		return false
+	}
+	itemType := strings.ToLower(strings.TrimSpace(item.Get("type").String()))
+	for _, path := range []string{"text", "output_text", "refusal"} {
+		if strings.TrimSpace(item.Get(path).String()) != "" {
+			return true
+		}
+	}
+	if itemType == "image_generation_call" && strings.TrimSpace(item.Get("result").String()) != "" {
+		return true
+	}
+	if isOpenAIToolOutputItemType(itemType) {
+		for _, path := range []string{"name", "arguments", "call_id", "id", "status"} {
+			if strings.TrimSpace(item.Get(path).String()) != "" {
+				return true
+			}
+		}
+	}
+	content := item.Get("content")
+	if content.IsArray() {
+		for _, part := range content.Array() {
+			if part.Type == gjson.String && strings.TrimSpace(part.String()) != "" {
+				return true
+			}
+			for _, path := range []string{"text", "output_text", "refusal"} {
+				if strings.TrimSpace(part.Get(path).String()) != "" {
+					return true
+				}
+			}
+		}
+	} else if content.Type == gjson.String && strings.TrimSpace(content.String()) != "" {
+		return true
+	}
+	for _, part := range item.Get("summary").Array() {
+		if part.Type == gjson.String && strings.TrimSpace(part.String()) != "" {
+			return true
+		}
+		if strings.TrimSpace(part.Get("text").String()) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func isOpenAIToolOutputItemType(itemType string) bool {
+	if itemType == "" {
+		return false
+	}
+	switch itemType {
+	case "function_call", "custom_tool_call", "tool_call", "web_search_call", "file_search_call", "computer_call", "mcp_call":
+		return true
+	default:
+		return strings.Contains(itemType, "tool") || strings.Contains(itemType, "function_call")
 	}
 }
 

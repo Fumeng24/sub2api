@@ -290,6 +290,7 @@ func (s *accountSchedulerHealthStats) reportFailure(accountID int64, model, endp
 		category == "transient_transport" ||
 		category == "transient_timeout" ||
 		category == "compact_bad_output" ||
+		category == "empty_output" ||
 		category == "model_unsupported" {
 		shouldOpen = true
 	}
@@ -413,6 +414,9 @@ func schedulerFailureCategory(statusCode int, body []byte) string {
 	if isOpenAICompactBadOutputBody(body) {
 		return "compact_bad_output"
 	}
+	if isOpenAIEmptyOutputBody(body) {
+		return "empty_output"
+	}
 	if class := classifyOpenAIUpstreamError(statusCode, "", body); class != openAIUpstreamErrorUnknown {
 		return openAIUpstreamErrorClassSchedulerCategory(class)
 	}
@@ -461,6 +465,18 @@ func isOpenAICompactBadOutputBody(body []byte) bool {
 	}
 	code := strings.ToLower(strings.TrimSpace(extractUpstreamErrorCode(body)))
 	return code == openAICompactBadOutputCode
+}
+
+func isOpenAIEmptyOutputBody(body []byte) bool {
+	text := strings.ToLower(strings.TrimSpace(string(body)))
+	if text == "" {
+		return false
+	}
+	if strings.Contains(text, openAIEmptyOutputCode) {
+		return true
+	}
+	code := strings.ToLower(strings.TrimSpace(extractUpstreamErrorCode(body)))
+	return code == openAIEmptyOutputCode
 }
 
 func schedulerStatusZeroFailureCategory(body []byte) string {
@@ -552,7 +568,7 @@ func schedulerCooldownForCategory(category string, headers http.Header) time.Dur
 		return 90 * time.Second
 	case "transient_transport", "transient_timeout":
 		return openAIRequestErrorCooldown
-	case "compact_bad_output":
+	case "compact_bad_output", "empty_output":
 		return 30 * time.Second
 	default:
 		return 2 * time.Minute

@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"go.uber.org/zap"
 )
@@ -176,4 +179,28 @@ func openAISelectionSkippedAccounts(diag service.OpenAIAccountSelectionDiagnosti
 	add("concurrency_full", diag.ConcurrencySlotFilteredAccountIDs)
 	add("half_open_filtered", diag.HalfOpenFilteredAccountIDs)
 	return skipped
+}
+
+func openAISelectionEmptyErrorResponse(decision service.OpenAIAccountScheduleDecision) (int, string, string) {
+	diag := decision.Diagnostics
+	if !diag.Collected {
+		return http.StatusServiceUnavailable, "api_error", "Service temporarily unavailable"
+	}
+	if diag.GroupBindingAccountCount > 0 && diag.ActiveSchedulableCount > 0 && diag.ModelSupportedCount == 0 {
+		model := strings.TrimSpace(diag.Model)
+		if model == "" {
+			return http.StatusBadRequest, "model_not_supported", "Requested model is not available in this group"
+		}
+		return http.StatusBadRequest, "model_not_supported", "Requested model is not available in this group: " + model
+	}
+	if diag.RequireCodexImageGenerationBridge && diag.ImageGenerationBridgeSupportedCount == 0 && diag.ImageGenerationBridgeUnsupportedCount > 0 {
+		return http.StatusBadRequest, "image_generation_bridge_not_available", "No accounts in this group support Responses image_generation"
+	}
+	if diag.RequireCompact && diag.CompactSupportedCount == 0 && diag.CompactUnsupportedCount > 0 {
+		return http.StatusServiceUnavailable, "compact_not_supported", "No available OpenAI accounts support /responses/compact"
+	}
+	if diag.EndpointSupportedCount == 0 && diag.ModelSupportedCount > 0 {
+		return http.StatusServiceUnavailable, "endpoint_not_supported", "No accounts in this group support the requested endpoint"
+	}
+	return http.StatusServiceUnavailable, "api_error", "No available accounts for the requested model and capability"
 }
