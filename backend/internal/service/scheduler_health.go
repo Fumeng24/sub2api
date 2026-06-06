@@ -805,7 +805,7 @@ func sortSchedulerScores(scores []schedulerAccountScore, preferOAuth bool) {
 
 func schedulerScoresUseGroupOrder(scores []schedulerAccountScore) bool {
 	for _, score := range scores {
-		if score.Config.GroupID > 0 {
+		if score.Config.GroupID > 0 && score.Config.SchedulingConfigured {
 			return true
 		}
 	}
@@ -831,6 +831,17 @@ func schedulerScoreGroupOrderLess(a, b schedulerAccountScore) bool {
 	if a.Config.Priority != b.Config.Priority {
 		return a.Config.Priority < b.Config.Priority
 	}
+	if a.Score != b.Score {
+		return a.Score > b.Score
+	}
+	aLoad := schedulerScoreLoadInfo(a)
+	bLoad := schedulerScoreLoadInfo(b)
+	if aLoad.LoadRate != bLoad.LoadRate {
+		return aLoad.LoadRate < bLoad.LoadRate
+	}
+	if aLoad.WaitingCount != bLoad.WaitingCount {
+		return aLoad.WaitingCount < bLoad.WaitingCount
+	}
 	return accountIDForSchedulerScore(a) < accountIDForSchedulerScore(b)
 }
 
@@ -839,4 +850,11 @@ func accountIDForSchedulerScore(score schedulerAccountScore) int64 {
 		return 0
 	}
 	return score.Account.ID
+}
+
+func schedulerScoreLoadInfo(score schedulerAccountScore) *AccountLoadInfo {
+	if score.LoadInfo != nil {
+		return score.LoadInfo
+	}
+	return &AccountLoadInfo{AccountID: accountIDForSchedulerScore(score)}
 }

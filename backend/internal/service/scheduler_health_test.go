@@ -563,6 +563,55 @@ func TestSchedulerGroupOrderOverridesGlobalPriorityWeightLoadAndLRU(t *testing.T
 	}
 }
 
+func TestSchedulerGroupOrderUsesScoreWithinSameSortBucket(t *testing.T) {
+	groupID := int64(101)
+	a := &Account{
+		ID: 1,
+		AccountGroups: []AccountGroup{{
+			AccountID:            1,
+			GroupID:              groupID,
+			Priority:             10,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               100,
+			SortOrder:            10,
+			SchedulingConfigured: true,
+		}},
+	}
+	b := &Account{
+		ID: 2,
+		AccountGroups: []AccountGroup{{
+			AccountID:            2,
+			GroupID:              groupID,
+			Priority:             10,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               100,
+			SortOrder:            10,
+			SchedulingConfigured: true,
+		}},
+	}
+
+	scores := buildSchedulerAccountScores(
+		[]*Account{a, b},
+		&groupID,
+		"gpt-5.5",
+		"/v1/responses",
+		map[int64]*AccountLoadInfo{
+			a.ID: {AccountID: a.ID, LoadRate: 90, WaitingCount: 3},
+			b.ID: {AccountID: b.ID, LoadRate: 5, WaitingCount: 0},
+		},
+		nil,
+		true,
+	)
+	order := buildRoleAwareSchedulerOrder(scores, true, "group-order-score")
+
+	if len(order) != 2 {
+		t.Fatalf("expected 2 candidates, got %d", len(order))
+	}
+	if order[0].Account.ID != b.ID {
+		t.Fatalf("expected same group order bucket to prefer better score/load, got %#v", accountIDsFromSchedulerScores(order))
+	}
+}
+
 func TestSchedulerGroupOrderIsIndependentPerGroup(t *testing.T) {
 	groupA := int64(100)
 	groupB := int64(200)

@@ -1895,56 +1895,46 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 // least one candidate was filtered out solely because it lacks compact support
 // (only meaningful when requireCompact=true).
 func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *int64, accounts []*Account, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, sessionHash string, bypassSnapshot bool, options OpenAIAccountScheduleOptions) (*Account, bool) {
-	compactBlocked := false
-	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	schedulerEndpoint := s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)
-	allowHalfOpen := options.RequireCodexImageGenerationBridge || isOpenAIImageGenerationSchedulerEndpoint(schedulerEndpoint)
-
-	candidates := make([]*Account, 0, len(accounts))
-	for _, acc := range accounts {
-		// 跳过被排除的账号
-		// Skip excluded accounts
-		if _, excluded := excludedIDs[acc.ID]; excluded {
+	req := OpenAIAccountScheduleRequest{
+		GroupID:                           groupID,
+		SessionHash:                       sessionHash,
+		RequestedModel:                    requestedModel,
+		SchedulerEndpoint:                 schedulerEndpoint,
+		RequiredTransport:                 OpenAIUpstreamTransportAny,
+		RequiredCapability:                requiredCapability,
+		RequireCompact:                    requireCompact,
+		RequireCodexImageGenerationBridge: options.RequireCodexImageGenerationBridge,
+		ExcludedIDs:                       excludedIDs,
+	}
+	scheduler := &defaultOpenAIAccountScheduler{service: s}
+	plan := scheduler.buildOpenAISelectionPlanFromAccounts(ctx, req, s.openAISchedulerGroupForFallback(ctx, groupID), accounts)
+	compactBlocked := plan.compactBlocked || (requireCompact && len(plan.loadPlan.allCandidates) > 0 && len(plan.loadPlan.candidates) == 0)
+	for _, candidate := range plan.loadPlan.selectionOrder {
+		if candidate.account == nil {
 			continue
 		}
-
 		var fresh *Account
 		if bypassSnapshot {
-			fresh = s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, acc, requestedModel, false, nil, requiredCapability, options)
+			fresh = s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, candidate.account, requestedModel, requireCompact, excludedIDs, requiredCapability, options)
 		} else {
-			fresh = s.resolveFreshSchedulableOpenAIAccountForSelection(ctx, acc, requestedModel, false, nil, requiredCapability, options)
-			if fresh == nil {
-				continue
+			fresh = s.resolveFreshSchedulableOpenAIAccountForSelection(ctx, candidate.account, requestedModel, false, nil, requiredCapability, options)
+			if fresh != nil {
+				fresh = s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, fresh, requestedModel, requireCompact, excludedIDs, requiredCapability, options)
 			}
-			fresh = s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, fresh, requestedModel, false, nil, requiredCapability, options)
 		}
 		if fresh == nil {
 			continue
 		}
-		if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, fresh, requestedModel, requireCompact) {
+		if groupID != nil && s.needsUpstreamChannelRestrictionCheck(ctx, groupID) &&
+			s.isUpstreamModelRestrictedByChannel(ctx, *groupID, fresh, requestedModel, requireCompact) {
 			continue
 		}
-		if requireCompact {
-			if !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, fresh, requestedModel) {
-				compactBlocked = true
-				continue
-			}
+		if requireCompact && !openAICompactAccountAllowedForSelection(requireCompact, excludedIDs, fresh, requestedModel) {
+			compactBlocked = true
+			continue
 		}
-		candidates = append(candidates, fresh)
-	}
-
-	if len(candidates) == 0 {
-		return nil, compactBlocked
-	}
-	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, allowHalfOpen)
-	order := buildRoleAwareSchedulerOrder(scores, true, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "best")
-	if requireCompact {
-		order = orderOpenAISchedulerScoresForCompact(order, requestedModel, !openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), s.schedulerSnapshot != nil)
-	}
-	for _, item := range order {
-		if item.Account != nil {
-			return item.Account, compactBlocked
-		}
+		return fresh, compactBlocked
 	}
 	return nil, compactBlocked
 }
