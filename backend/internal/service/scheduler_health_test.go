@@ -1,6 +1,7 @@
 package service
 
 import (
+	"net/http"
 	"testing"
 	"time"
 )
@@ -379,6 +380,22 @@ func TestSchedulerStatusZeroFailureCategoryClassifiesTransportAndTimeout(t *test
 				t.Fatalf("schedulerFailureCategory(0, %q) = %q, want %q", string(tt.body), got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSchedulerFailureCategoryClassifiesCompactContextWindow(t *testing.T) {
+	body := []byte(`{"error":{"type":"invalid_request_error","message":"Your input exceeds the context window."}}`)
+
+	if got := schedulerFailureCategory(http.StatusBadRequest, body); got != "compact_context_window" {
+		t.Fatalf("schedulerFailureCategory(400, %q) = %q, want compact_context_window", string(body), got)
+	}
+}
+
+func TestSchedulerFailureCategoryClassifiesBillingExhaustion(t *testing.T) {
+	body := []byte(`{"error":{"message":"insufficient credit balance"}}`)
+
+	if got := schedulerFailureCategory(http.StatusBadRequest, body); got != "balance" {
+		t.Fatalf("schedulerFailureCategory(400, %q) = %q, want balance", string(body), got)
 	}
 }
 

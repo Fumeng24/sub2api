@@ -1525,9 +1525,15 @@ func (h *GatewayHandler) handleConcurrencyError(c *gin.Context, err error, slotT
 func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *service.UpstreamFailoverError, platform string, streamStarted bool) {
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
+	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
 	if service.IsOpenAISilentRefusalErrorBody(responseBody) {
 		service.SetOpsUpstreamError(c, statusCode, service.OpenAISilentRefusalClientMessage(), "")
 		h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", service.OpenAISilentRefusalClientMessage(), streamStarted)
+		return
+	}
+	if service.IsUpstreamBillingExhaustionError(statusCode, upstreamMsg, responseBody) {
+		service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
+		h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable", streamStarted)
 		return
 	}
 
@@ -1556,7 +1562,6 @@ func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *se
 	}
 
 	// 记录原始上游状态码，以便 ops 错误日志捕获真实的上游错误
-	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
 	service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
 
 	// 使用默认的错误映射
@@ -1575,6 +1580,8 @@ func (h *GatewayHandler) mapUpstreamError(statusCode int) (int, string, string) 
 	switch statusCode {
 	case 401:
 		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
+	case 402:
+		return http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable"
 	case 403:
 		return http.StatusBadGateway, "upstream_error", "Upstream access forbidden, please contact administrator"
 	case 429:
@@ -2069,6 +2076,13 @@ func billingErrorDetails(err error) (status int, code, message string, retryAfte
 		// 错误码用 rate_limit_exceeded 与 OpenAI 兼容客户端一致；细分类型由 ErrCode + window_resets_at metadata 区分。
 		msg := pkgerrors.Message(err)
 		return http.StatusTooManyRequests, "rate_limit_exceeded", msg, extractQuotaResetSeconds(err)
+	}
+	if errors.Is(err, service.ErrInsufficientBalance) || pkgerrors.Reason(err) == "INSUFFICIENT_BALANCE" {
+		msg := pkgerrors.Message(err)
+		if msg == "" {
+			msg = "insufficient balance"
+		}
+		return http.StatusPaymentRequired, "billing_error", msg, 0
 	}
 	msg := pkgerrors.Message(err)
 	if msg == "" {

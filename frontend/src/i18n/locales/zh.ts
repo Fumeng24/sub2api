@@ -2412,10 +2412,12 @@ export default {
         noFallback: '不降级（直接拒绝）'
       },
       openaiMessages: {
-        title: 'OpenAI Messages 调度配置',
-        allowDispatch: '允许 /v1/messages 调度',
-        allowDispatchHint: '启用后，此 OpenAI 分组的 API Key 可以通过 /v1/messages 端点调度请求',
-        familyMappingTitle: '系列默认映射',
+	        title: 'OpenAI Messages 调度配置',
+	        allowDispatch: '允许 /v1/messages 调度',
+	        allowDispatchHint: '启用后，此 OpenAI 分组的 API Key 可以通过 /v1/messages 端点调度请求',
+	        forcePriority: '强制启用 priority',
+	        forcePriorityHint: '启用后，此 OpenAI 分组的 /v1/responses 请求都会以 priority 发往上游，本地计费仍按普通倍率计算。',
+	        familyMappingTitle: '系列默认映射',
         familyMappingHint: '当请求命中 Opus、Sonnet、Haiku 系列时，会优先使用这里配置的目标模型。',
         opusModel: 'Opus 映射模型',
         opusModelPlaceholder: '例如: gpt-5.4',

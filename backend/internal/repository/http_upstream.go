@@ -707,14 +707,25 @@ func (s *httpUpstreamService) resolvePoolSettings(isolation string, accountConcu
 }
 
 func (s *httpUpstreamService) applyProfilePoolSettings(settings poolSettings, profile service.HTTPUpstreamProfile) poolSettings {
-	if profile != service.HTTPUpstreamProfileOpenAI && profile != service.HTTPUpstreamProfileOpenAIWeakFallback {
+	if !isOpenAIHTTPUpstreamProfile(profile) {
 		return settings
 	}
 	settings.responseHeaderTimeout = 0
-	if profile != service.HTTPUpstreamProfileOpenAIWeakFallback && s != nil && s.cfg != nil && s.cfg.Gateway.OpenAIResponseHeaderTimeout > 0 {
+	if profile == service.HTTPUpstreamProfileOpenAI && s != nil && s.cfg != nil && s.cfg.Gateway.OpenAIResponseHeaderTimeout > 0 {
 		settings.responseHeaderTimeout = time.Duration(s.cfg.Gateway.OpenAIResponseHeaderTimeout) * time.Second
 	}
 	return settings
+}
+
+func isOpenAIHTTPUpstreamProfile(profile service.HTTPUpstreamProfile) bool {
+	switch profile {
+	case service.HTTPUpstreamProfileOpenAI,
+		service.HTTPUpstreamProfileOpenAIWeakFallback,
+		service.HTTPUpstreamProfileOpenAINoHeaderTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 // buildPoolKey 构建连接池配置键，用于检测连接池配置变更。
@@ -791,7 +802,7 @@ func (s *httpUpstreamService) resolveOpenAIHTTP2Settings() openAIHTTP2Settings {
 }
 
 func (s *httpUpstreamService) resolveProtocolMode(profile service.HTTPUpstreamProfile, proxyKey string, parsedProxy *url.URL) string {
-	if profile != service.HTTPUpstreamProfileOpenAI && profile != service.HTTPUpstreamProfileOpenAIWeakFallback {
+	if !isOpenAIHTTPUpstreamProfile(profile) {
 		return upstreamProtocolModeDefault
 	}
 	settings := s.resolveOpenAIHTTP2Settings()
@@ -896,7 +907,7 @@ func isUpstreamTimeoutError(err error) bool {
 }
 
 func (s *httpUpstreamService) recordOpenAIHTTP2Failure(profile service.HTTPUpstreamProfile, protocolMode, proxyKey string, err error) {
-	if (profile != service.HTTPUpstreamProfileOpenAI && profile != service.HTTPUpstreamProfileOpenAIWeakFallback) || protocolMode != upstreamProtocolModeOpenAIH2 {
+	if !isOpenAIHTTPUpstreamProfile(profile) || protocolMode != upstreamProtocolModeOpenAIH2 {
 		return
 	}
 	settings := s.resolveOpenAIHTTP2Settings()
@@ -916,7 +927,7 @@ func (s *httpUpstreamService) recordOpenAIHTTP2Failure(profile service.HTTPUpstr
 }
 
 func (s *httpUpstreamService) recordOpenAIHTTP2Success(profile service.HTTPUpstreamProfile, protocolMode, proxyKey string) {
-	if (profile != service.HTTPUpstreamProfileOpenAI && profile != service.HTTPUpstreamProfileOpenAIWeakFallback) || protocolMode != upstreamProtocolModeOpenAIH2 {
+	if !isOpenAIHTTPUpstreamProfile(profile) || protocolMode != upstreamProtocolModeOpenAIH2 {
 		return
 	}
 	if !isHTTPProxyKey(proxyKey) {

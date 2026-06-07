@@ -7477,6 +7477,9 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 	if shouldDisable {
 		return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode, ResponseBody: body}
 	}
+	if isUpstreamBillingExhaustionError(resp.StatusCode, upstreamMsg, body) {
+		return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode, ResponseBody: body}
+	}
 
 	// 记录上游错误响应体摘要便于排障（可选：由配置控制；不回显到客户端）
 	if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
@@ -7524,6 +7527,12 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 
 	switch resp.StatusCode {
 	case 400:
+		if isUpstreamBillingExhaustionError(resp.StatusCode, upstreamMsg, body) {
+			statusCode = http.StatusBadGateway
+			errType = "upstream_error"
+			errMsg = "Upstream service temporarily unavailable"
+			break
+		}
 		c.Data(http.StatusBadRequest, "application/json", body)
 		summary := upstreamMsg
 		if summary == "" {
@@ -7653,31 +7662,47 @@ func (s *GatewayService) handleRetryExhaustedError(ctx context.Context, resp *ht
 		)
 	}
 
-	if status, errType, errMsg, matched := applyErrorPassthroughRule(
-		c,
-		account.Platform,
-		resp.StatusCode,
-		respBody,
-		http.StatusBadGateway,
-		"upstream_error",
-		"Upstream request failed after retries",
-	); matched {
-		c.JSON(status, gin.H{
+	if !isUpstreamBillingExhaustionError(resp.StatusCode, upstreamMsg, respBody) {
+		if status, errType, errMsg, matched := applyErrorPassthroughRule(
+			c,
+			account.Platform,
+			resp.StatusCode,
+			respBody,
+			http.StatusBadGateway,
+			"upstream_error",
+			"Upstream request failed after retries",
+		); matched {
+			c.JSON(status, gin.H{
+				"type": "error",
+				"error": gin.H{
+					"type":    errType,
+					"message": errMsg,
+				},
+			})
+
+			summary := upstreamMsg
+			if summary == "" {
+				summary = errMsg
+			}
+			if summary == "" {
+				return nil, fmt.Errorf("upstream error: %d (retries exhausted, passthrough rule matched)", resp.StatusCode)
+			}
+			return nil, fmt.Errorf("upstream error: %d (retries exhausted, passthrough rule matched) message=%s", resp.StatusCode, summary)
+		}
+	}
+
+	if isUpstreamBillingExhaustionError(resp.StatusCode, upstreamMsg, respBody) {
+		c.JSON(http.StatusBadGateway, gin.H{
 			"type": "error",
 			"error": gin.H{
-				"type":    errType,
-				"message": errMsg,
+				"type":    "upstream_error",
+				"message": "Upstream service temporarily unavailable",
 			},
 		})
-
-		summary := upstreamMsg
-		if summary == "" {
-			summary = errMsg
+		if upstreamMsg == "" {
+			return nil, fmt.Errorf("upstream error: %d (retries exhausted)", resp.StatusCode)
 		}
-		if summary == "" {
-			return nil, fmt.Errorf("upstream error: %d (retries exhausted, passthrough rule matched)", resp.StatusCode)
-		}
-		return nil, fmt.Errorf("upstream error: %d (retries exhausted, passthrough rule matched) message=%s", resp.StatusCode, summary)
+		return nil, fmt.Errorf("upstream error: %d (retries exhausted) message=%s", resp.StatusCode, upstreamMsg)
 	}
 
 	// 返回统一的重试耗尽错误响应

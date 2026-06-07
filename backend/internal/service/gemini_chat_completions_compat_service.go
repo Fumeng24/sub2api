@@ -208,8 +208,12 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 
 	if resp.StatusCode >= 400 {
 		respBody := s.readUpstreamErrorBody(resp)
-		s.handleGeminiUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
 		evBody := unwrapIfNeeded(account.Type == AccountTypeOAuth, respBody)
+		if s.shouldFailoverGeminiBillingExhaustion(ctx, c, account, resp.StatusCode, resp.Header, requestID, respBody, evBody) {
+			return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode, ResponseBody: evBody}
+		}
+
+		s.handleGeminiUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
 
 		if s.shouldFailoverGeminiUpstreamError(resp.StatusCode) {
 			upstreamMsg := sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(evBody)))
@@ -803,6 +807,10 @@ func (s *GeminiMessagesCompatService) writeGeminiChatCompletionsMappedError(
 			Kind:               "http_error",
 			Message:            upstreamMsg,
 		})
+	}
+
+	if isUpstreamBillingExhaustionError(upstreamStatus, upstreamMsg, body) {
+		return s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable")
 	}
 
 	if status, errType, errMsg, matched := applyErrorPassthroughRule(

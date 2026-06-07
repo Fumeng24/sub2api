@@ -477,6 +477,9 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 		_ = s.service.deleteStickySessionAccountID(ctx, req.GroupID, sessionHash)
 		return nil, 0, nil
 	}
+	if !openAICompactStickyHitAllowed(req.RequireCompact, account, req.RequestedModel) {
+		return nil, 0, nil
+	}
 	if !s.isAccountRequestCompatible(ctx, account, req) {
 		return nil, 0, nil
 	}
@@ -498,6 +501,9 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 			"ttft", ttft,
 		)
 		return nil, accountID, nil
+	}
+	if !openAICompactStickyHitAllowed(req.RequireCompact, account, req.RequestedModel) {
+		return nil, 0, nil
 	}
 	if !s.service.isOpenAIAccountSchedulerHealthAllowed(account.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req)) {
 		_ = s.service.deleteStickySessionAccountID(ctx, req.GroupID, sessionHash)

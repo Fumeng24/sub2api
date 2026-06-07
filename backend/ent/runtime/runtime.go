@@ -897,8 +897,12 @@ func init() {
 	groupDescModelsListConfig := groupFields[30].Descriptor()
 	// group.DefaultModelsListConfig holds the default value on creation for the models_list_config field.
 	group.DefaultModelsListConfig = groupDescModelsListConfig.Default.(domain.GroupModelsListConfig)
+	// groupDescForceOpenaiPriority is the schema descriptor for force_openai_priority field.
+	groupDescForceOpenaiPriority := groupFields[31].Descriptor()
+	// group.DefaultForceOpenaiPriority holds the default value on creation for the force_openai_priority field.
+	group.DefaultForceOpenaiPriority = groupDescForceOpenaiPriority.Default.(bool)
 	// groupDescRpmLimit is the schema descriptor for rpm_limit field.
-	groupDescRpmLimit := groupFields[31].Descriptor()
+	groupDescRpmLimit := groupFields[32].Descriptor()
 	// group.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	group.DefaultRpmLimit = groupDescRpmLimit.Default.(int)
 	idempotencyrecordMixin := schema.IdempotencyRecord{}.Mixin()

@@ -618,6 +618,12 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
+	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
+	if service.IsUpstreamBillingExhaustionError(statusCode, upstreamMsg, responseBody) {
+		service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
+		googleError(c, http.StatusBadGateway, "Upstream service temporarily unavailable")
+		return
+	}
 
 	// 先检查透传规则
 	if h.errorPassthroughService != nil && len(responseBody) > 0 {
@@ -644,7 +650,6 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 	}
 
 	// 记录原始上游状态码，以便 ops 错误日志捕获真实的上游错误
-	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
 	service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
 
 	// 使用默认的错误映射
@@ -656,6 +661,8 @@ func mapGeminiUpstreamError(statusCode int) (int, string) {
 	switch statusCode {
 	case 401:
 		return http.StatusBadGateway, "Upstream authentication failed, please contact administrator"
+	case 402:
+		return http.StatusBadGateway, "Upstream service temporarily unavailable"
 	case 403:
 		return http.StatusBadGateway, "Upstream access forbidden, please contact administrator"
 	case 429:

@@ -205,6 +205,11 @@ func DefaultMappedModel(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldDefaultMappedModel, v))
 }
 
+// ForceOpenaiPriority applies equality check predicate on the "force_openai_priority" field. It's identical to ForceOpenaiPriorityEQ.
+func ForceOpenaiPriority(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldForceOpenaiPriority, v))
+}
+
 // RpmLimit applies equality check predicate on the "rpm_limit" field. It's identical to RpmLimitEQ.
 func RpmLimit(v int) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldRpmLimit, v))
@@ -1398,6 +1403,16 @@ func DefaultMappedModelEqualFold(v string) predicate.Group {
 // DefaultMappedModelContainsFold applies the ContainsFold predicate on the "default_mapped_model" field.
 func DefaultMappedModelContainsFold(v string) predicate.Group {
 	return predicate.Group(sql.FieldContainsFold(FieldDefaultMappedModel, v))
+}
+
+// ForceOpenaiPriorityEQ applies the EQ predicate on the "force_openai_priority" field.
+func ForceOpenaiPriorityEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldForceOpenaiPriority, v))
+}
+
+// ForceOpenaiPriorityNEQ applies the NEQ predicate on the "force_openai_priority" field.
+func ForceOpenaiPriorityNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldForceOpenaiPriority, v))
 }
 
 // RpmLimitEQ applies the EQ predicate on the "rpm_limit" field.

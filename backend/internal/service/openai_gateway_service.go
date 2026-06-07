@@ -64,6 +64,7 @@ const (
 	// Codex 限额快照仅用于后台展示/诊断，不需要每个成功请求都立即落库。
 	openAICodexSnapshotPersistMinInterval  = 30 * time.Second
 	openAICompactBadOutputCode             = "compact_bad_output"
+	openAICompactContextWindowFallbackCode = "compact_context_window_fallback"
 	openAICompactMinOutputRunes            = 8
 	openAICompactLargeInputTokenThreshold  = 4096
 	openAICompactLargeInputMinOutputTokens = 16
@@ -1370,6 +1371,13 @@ func openAICompactSupportTierForModel(account *Account, requestedModel string) i
 	return 0
 }
 
+func openAICompactStickyHitAllowed(requireCompact bool, account *Account, requestedModel string) bool {
+	if !requireCompact {
+		return true
+	}
+	return openAICompactSupportTierForModel(account, requestedModel) == 2
+}
+
 func openAICompactMappingMatchesRequest(account *Account, requestedModel string) bool {
 	requestedModel = strings.TrimSpace(requestedModel)
 	if account == nil || requestedModel == "" {
@@ -1878,7 +1886,8 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 
 	// 验证账号是否可用于当前请求
 	// Verify account is usable for current request
-	if !isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, false, nil, requiredCapability, options) {
+	if !openAICompactStickyHitAllowed(requireCompact, account, requestedModel) ||
+		!isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, false, nil, requiredCapability, options) {
 		return nil
 	}
 	if s.isOpenAIAccountRuntimeBlocked(account) {
@@ -2142,7 +2151,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				if clearSticky {
 					_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 				}
-				if !clearSticky && isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, false, nil, requiredCapability, options) {
+				if !clearSticky &&
+					openAICompactStickyHitAllowed(requireCompact, account, requestedModel) &&
+					isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, false, nil, requiredCapability, options) {
 					account = s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability, options)
 					if account == nil {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
@@ -3852,7 +3863,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(WithOpenAIHTTPUpstreamProfile(req.Context()))
+	req = req.WithContext(openAIHTTPUpstreamProfileContextForRequest(req.Context(), c))
 
 	// 透传客户端请求头（安全白名单）。
 	allowTimeoutHeaders := s.isOpenAIPassthroughTimeoutHeadersAllowed()
@@ -3943,7 +3954,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 
 func shouldFailoverOpenAIPassthroughResponse(statusCode int) bool {
 	switch statusCode {
-	case http.StatusTooManyRequests, 529:
+	case http.StatusPaymentRequired, http.StatusTooManyRequests, 529:
 		return true
 	default:
 		return false
@@ -4013,10 +4024,33 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 	}
 	setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, upstreamDetail)
 	logOpenAIInstructionsRequiredDebug(ctx, c, account, resp.StatusCode, upstreamMsg, requestBody, body)
+	if isOpenAIResponsesCompactPath(c) && isOpenAIContextWindowError(upstreamMsg, body) {
+		return s.newOpenAICompactContextWindowFailoverError(c, account, resp, body, true, upstreamMsg, upstreamDetail)
+	}
 	// 透传模式保留原始上游错误响应，但运行态账号状态仍需更新，
 	// 避免粘性路由继续复用刚被限流的账号。
 	reqModel, _, _ := extractOpenAIRequestMetaFromBody(requestBody)
-	_ = s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
+	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
+	if upstreamClass == openAIUpstreamErrorBilling || shouldDisable && openAIUpstreamErrorClassShouldFailover(upstreamClass) {
+		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			Platform:             account.Platform,
+			AccountID:            account.ID,
+			AccountName:          account.Name,
+			UpstreamStatusCode:   resp.StatusCode,
+			UpstreamRequestID:    resp.Header.Get("x-request-id"),
+			Passthrough:          true,
+			Kind:                 "failover",
+			Message:              upstreamMsg,
+			Detail:               upstreamDetail,
+			UpstreamResponseBody: upstreamDetail,
+		})
+		return &UpstreamFailoverError{
+			StatusCode:      resp.StatusCode,
+			ResponseBody:    body,
+			ResponseHeaders: resp.Header.Clone(),
+		}
+	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 		Platform:             account.Platform,
 		AccountID:            account.ID,
@@ -4195,6 +4229,55 @@ func newOpenAIStreamTerminalError(payload []byte, message string) error {
 	class := classifyOpenAIUpstreamError(http.StatusBadRequest, message, payload)
 	statusCode, _, _ := openAIErrorResponseForClass(http.StatusBadRequest, class, message, false)
 	return newUpstreamTerminalError(statusCode, message)
+}
+
+func IsOpenAIContextWindowErrorForTest(text string) bool {
+	return isOpenAIContextWindowError(text, nil)
+}
+
+func isOpenAIContextWindowError(message string, payload []byte) bool {
+	parts := []string{message}
+	if len(payload) > 0 {
+		paths := []string{
+			"response.error.code",
+			"error.code",
+			"response.error.type",
+			"error.type",
+			"response.error.message",
+			"error.message",
+		}
+		for _, path := range paths {
+			if value := strings.TrimSpace(gjson.GetBytes(payload, path).String()); value != "" {
+				parts = append(parts, value)
+			}
+		}
+		raw := string(payload)
+		if len(raw) > 4096 {
+			raw = raw[:4096]
+		}
+		parts = append(parts, raw)
+	}
+	text := strings.ToLower(strings.TrimSpace(strings.Join(parts, " ")))
+	if text == "" {
+		return false
+	}
+	text = strings.NewReplacer("_", " ", "-", " ", "\n", " ", "\r", " ", "\t", " ").Replace(text)
+	text = strings.Join(strings.Fields(text), " ")
+	return containsAnyOpenAIErrorText(text,
+		"context window",
+		"context length",
+		"maximum context",
+		"max context",
+		"input exceeds",
+		"exceeds the context",
+		"too many input tokens",
+		"input too large",
+		"request too large",
+		"token limit exceeded",
+		"tokens exceed",
+		"prompt is too long",
+		"prompt too long",
+	)
 }
 
 func isOpenAIThinkingSignatureInvalidError(payload []byte, message string) bool {
@@ -4397,6 +4480,10 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
 				failedPayload = append(failedPayload[:0], dataBytes...)
 				shouldFailoverFailedEvent := openAIStreamFailedEventShouldFailover(dataBytes, failedMessage)
+				if isOpenAIResponsesCompactPath(c) && !openAIStreamClientOutputStarted(c, clientOutputStarted) && isOpenAIContextWindowError(failedMessage, dataBytes) {
+					return resultWithUsage(),
+						s.newOpenAIStreamFailoverError(c, account, true, upstreamRequestID, dataBytes, failedMessage)
+				}
 				failedEventShouldFailover = failedEventShouldFailover || shouldFailoverFailedEvent
 				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && shouldFailoverFailedEvent {
 					return resultWithUsage(),
@@ -4714,7 +4801,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(WithOpenAIHTTPUpstreamProfile(req.Context()))
+	req = req.WithContext(openAIHTTPUpstreamProfileContextForRequest(req.Context(), c))
 
 	// Set authentication header
 	req.Header.Set("authorization", "Bearer "+token)
@@ -4797,6 +4884,13 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	return req, nil
 }
 
+func openAIHTTPUpstreamProfileContextForRequest(ctx context.Context, c *gin.Context) context.Context {
+	if isOpenAIResponsesCompactPath(c) {
+		ctx = WithOpenAINoHeaderTimeoutUpstream(ctx, true)
+	}
+	return WithOpenAIHTTPUpstreamProfile(ctx)
+}
+
 // overrideBrowserUserAgent 检查请求的最终 user-agent，若为浏览器 UA 则替换为后台配置的 Codex UA。
 // 用于规避 Cloudflare 对浏览器型 UA 在 ChatGPT 内部接口上的访问质询。
 // 影响范围严格限定：仅 OAuth（Codex/ChatGPT 内部接口）账号生效；API Key 等其他账号原样透传。
@@ -4855,6 +4949,37 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		)
 	}
 
+	if isOpenAIResponsesCompactPath(c) && isOpenAIContextWindowError(upstreamMsg, body) {
+		return nil, s.newOpenAICompactContextWindowFailoverError(c, account, resp, body, false, upstreamMsg, upstreamDetail)
+	}
+
+	var reqModel string
+	if len(requestedModel) > 0 {
+		reqModel = strings.TrimSpace(requestedModel[0])
+	}
+	if reqModel == "" {
+		reqModel, _, _ = extractOpenAIRequestMetaFromBody(requestBody)
+	}
+	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+	if upstreamClass == openAIUpstreamErrorBilling {
+		_ = s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
+		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			Platform:           account.Platform,
+			AccountID:          account.ID,
+			AccountName:        account.Name,
+			UpstreamStatusCode: resp.StatusCode,
+			UpstreamRequestID:  resp.Header.Get("x-request-id"),
+			Kind:               "failover",
+			Message:            upstreamMsg,
+			Detail:             upstreamDetail,
+		})
+		return nil, &UpstreamFailoverError{
+			StatusCode:      resp.StatusCode,
+			ResponseBody:    body,
+			ResponseHeaders: resp.Header.Clone(),
+		}
+	}
+
 	if status, errType, errMsg, matched := applyErrorPassthroughRule(
 		c,
 		PlatformOpenAI,
@@ -4876,14 +5001,6 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		return nil, newUpstreamTerminalError(status, upstreamMsg)
 	}
 
-	var reqModel string
-	if len(requestedModel) > 0 {
-		reqModel = strings.TrimSpace(requestedModel[0])
-	}
-	if reqModel == "" {
-		reqModel, _, _ = extractOpenAIRequestMetaFromBody(requestBody)
-	}
-	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
 	shouldFailover := openAIUpstreamErrorClassShouldFailover(upstreamClass)
 	reqCtx := openAIContextFromGin(ctx, c)
 
@@ -4964,7 +5081,7 @@ func openAIErrorResponseForClass(statusCode int, class openAIUpstreamErrorClass,
 	msg := strings.TrimSpace(upstreamMsg)
 	switch class {
 	case openAIUpstreamErrorBilling:
-		return http.StatusPaymentRequired, "billing_error", "Upstream payment required: insufficient balance or billing issue"
+		return http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable"
 	case openAIUpstreamErrorForbidden:
 		return http.StatusForbidden, "forbidden_error", "Upstream access forbidden, please contact administrator"
 	case openAIUpstreamErrorBusiness:
@@ -4993,7 +5110,7 @@ func openAIErrorResponseForClass(statusCode int, class openAIUpstreamErrorClass,
 	case 401:
 		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
 	case 402:
-		return http.StatusPaymentRequired, "billing_error", "Upstream payment required: insufficient balance or billing issue"
+		return http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable"
 	case 403:
 		return http.StatusForbidden, "forbidden_error", "Upstream access forbidden, please contact administrator"
 	case 404:
@@ -5052,6 +5169,34 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 	}
 	setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, upstreamDetail)
 
+	reqCtx := openAIContextFromGin(context.Background(), c)
+	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+	if upstreamClass == openAIUpstreamErrorBilling {
+		modelForCooldown := ""
+		if len(requestedModel) > 0 {
+			modelForCooldown = strings.TrimSpace(requestedModel[0])
+		}
+		_ = s.handleOpenAIAccountUpstreamError(
+			reqCtx, account, resp.StatusCode, resp.Header, body, modelForCooldown,
+		)
+		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			Platform:           account.Platform,
+			AccountID:          account.ID,
+			AccountName:        account.Name,
+			UpstreamStatusCode: resp.StatusCode,
+			UpstreamRequestID:  resp.Header.Get("x-request-id"),
+			Kind:               "failover",
+			Message:            upstreamMsg,
+			Detail:             upstreamDetail,
+		})
+		return nil, &UpstreamFailoverError{
+			StatusCode:             resp.StatusCode,
+			ResponseBody:           body,
+			ResponseHeaders:        resp.Header.Clone(),
+			RetryableOnSameAccount: false,
+		}
+	}
+
 	// Apply error passthrough rules
 	if status, errType, errMsg, matched := applyErrorPassthroughRule(
 		c, account.Platform, resp.StatusCode, body,
@@ -5064,8 +5209,6 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		return nil, newUpstreamTerminalError(status, upstreamMsg)
 	}
 
-	reqCtx := openAIContextFromGin(context.Background(), c)
-	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
 	shouldFailover := openAIUpstreamErrorClassShouldFailover(upstreamClass)
 
 	// Check custom error codes — if the account does not handle this status,
@@ -5357,6 +5500,11 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
 				failedPayload = append(failedPayload[:0], dataBytes...)
 				shouldFailoverFailedEvent := openAIStreamFailedEventShouldFailover(dataBytes, failedMessage)
+				if isOpenAIResponsesCompactPath(c) && !openAIStreamClientOutputStarted(c, clientOutputStarted) && isOpenAIContextWindowError(failedMessage, dataBytes) {
+					sawFailedEvent = true
+					streamFailoverErr = s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, dataBytes, failedMessage)
+					return
+				}
 				failedEventShouldFailover = failedEventShouldFailover || shouldFailoverFailedEvent
 				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && shouldFailoverFailedEvent {
 					sawFailedEvent = true
@@ -6021,6 +6169,53 @@ func (s *OpenAIGatewayService) validateOpenAICompactResponseForFailover(
 	}
 }
 
+func (s *OpenAIGatewayService) newOpenAICompactContextWindowFailoverError(
+	c *gin.Context,
+	account *Account,
+	resp *http.Response,
+	body []byte,
+	passthrough bool,
+	upstreamMsg string,
+	upstreamDetail string,
+) *UpstreamFailoverError {
+	upstreamMsg = sanitizeUpstreamErrorMessage(strings.TrimSpace(upstreamMsg))
+	if upstreamMsg == "" {
+		upstreamMsg = "OpenAI compact input exceeds the context window"
+	}
+	statusCode := http.StatusBadRequest
+	requestID := ""
+	var headers http.Header
+	if resp != nil {
+		statusCode = resp.StatusCode
+		requestID = strings.TrimSpace(resp.Header.Get("x-request-id"))
+		headers = resp.Header.Clone()
+	}
+	if c != nil {
+		event := OpsUpstreamErrorEvent{
+			Platform:             PlatformOpenAI,
+			UpstreamStatusCode:   statusCode,
+			UpstreamRequestID:    requestID,
+			Passthrough:          passthrough,
+			Kind:                 "failover",
+			Message:              upstreamMsg,
+			Detail:               openAICompactContextWindowFallbackCode,
+			UpstreamResponseBody: upstreamDetail,
+			CooldownApplied:      false,
+		}
+		if account != nil {
+			event.Platform = account.Platform
+			event.AccountID = account.ID
+			event.AccountName = account.Name
+		}
+		appendOpsUpstreamError(c, event)
+	}
+	return &UpstreamFailoverError{
+		StatusCode:      statusCode,
+		ResponseBody:    body,
+		ResponseHeaders: headers,
+	}
+}
+
 func (s *OpenAIGatewayService) validateOpenAIEmptyOutputResponseForFailover(
 	c *gin.Context,
 	account *Account,
@@ -6321,6 +6516,7 @@ func extractOpenAICompactOutputText(root gjson.Result) string {
 		for _, item := range output.Array() {
 			add(item.Get("text").String())
 			add(item.Get("output_text").String())
+			add(item.Get("encrypted_content").String())
 			content := item.Get("content")
 			if content.IsArray() {
 				for _, part := range content.Array() {
@@ -6831,6 +7027,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if result.ServiceTier != nil {
 		serviceTier = strings.TrimSpace(*result.ServiceTier)
 	}
+	if forceOpenAIPriorityBillingAsNormal(apiKey) {
+		serviceTier = ""
+	}
 	cost, err = s.calculateOpenAIRecordUsageCost(ctx, result, apiKey, billingModels, multiplier, imageMultiplier, tokens, serviceTier)
 	if err != nil {
 		if !isUsagePricingUnavailableError(err) {
@@ -7022,6 +7221,13 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 		lastErr = errors.New("no non-empty billing model candidates")
 	}
 	return nil, fmt.Errorf("calculate OpenAI usage cost failed for billing models %s: %w", strings.Join(billingModels, ","), lastErr)
+}
+
+func forceOpenAIPriorityBillingAsNormal(apiKey *APIKey) bool {
+	return apiKey != nil &&
+		apiKey.Group != nil &&
+		apiKey.Group.Platform == PlatformOpenAI &&
+		apiKey.Group.ForceOpenAIPriority
 }
 
 func isUsagePricingUnavailableError(err error) bool {

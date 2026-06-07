@@ -169,6 +169,35 @@ func TestOpenAIHandleErrorResponse_AppliesRuleFor422(t *testing.T) {
 	assert.Equal(t, "OpenAI上游失败", errField["message"])
 }
 
+func TestOpenAIHandleErrorResponse_BillingExhaustionBypassesPassthroughRule(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+
+	ruleSvc := &ErrorPassthroughService{}
+	ruleSvc.setLocalCache([]*model.ErrorPassthroughRule{newNonFailoverPassthroughRule(http.StatusPaymentRequired, "insufficient balance", http.StatusPaymentRequired, "上游余额不足")})
+	BindErrorPassthroughService(c, ruleSvc)
+
+	svc := &OpenAIGatewayService{}
+	respBody := []byte(`{"error":{"message":"insufficient balance","type":"billing_error"}}`)
+	resp := &http.Response{
+		StatusCode: http.StatusPaymentRequired,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+		Header:     http.Header{},
+	}
+	account := &Account{ID: 22, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+
+	_, err := svc.handleErrorResponse(context.Background(), resp, c, account, nil)
+
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	assert.Equal(t, http.StatusPaymentRequired, failoverErr.StatusCode)
+	assert.False(t, c.Writer.Written())
+	assert.NotContains(t, rec.Body.String(), "insufficient")
+	assert.NotContains(t, rec.Body.String(), "余额")
+}
+
 func TestGeminiWriteGeminiMappedError_AppliesRuleFor422(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
@@ -192,6 +221,34 @@ func TestGeminiWriteGeminiMappedError_AppliesRuleFor422(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "upstream_error", errField["type"])
 	assert.Equal(t, "Gemini上游失败", errField["message"])
+}
+
+func TestGeminiWriteGeminiMappedError_BillingExhaustionBypassesPassthroughRule(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+
+	ruleSvc := &ErrorPassthroughService{}
+	ruleSvc.setLocalCache([]*model.ErrorPassthroughRule{newNonFailoverPassthroughRule(http.StatusPaymentRequired, "insufficient balance", http.StatusPaymentRequired, "Gemini上游余额不足")})
+	BindErrorPassthroughService(c, ruleSvc)
+
+	svc := &GeminiMessagesCompatService{}
+	respBody := []byte(`{"error":{"code":402,"message":"insufficient balance","status":"PAYMENT_REQUIRED"}}`)
+	account := &Account{ID: 23, Platform: PlatformGemini, Type: AccountTypeAPIKey}
+
+	err := svc.writeGeminiMappedError(c, account, http.StatusPaymentRequired, "req-billing", respBody)
+
+	require.Error(t, err)
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "insufficient")
+	assert.NotContains(t, rec.Body.String(), "余额")
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	errField, ok := payload["error"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "upstream_error", errField["type"])
+	assert.Equal(t, "Upstream service temporarily unavailable", errField["message"])
 }
 
 func TestApplyErrorPassthroughRule_SkipMonitoringSetsContextKey(t *testing.T) {

@@ -498,7 +498,8 @@ const tabs = computed(() => {
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
 const validAmount = computed(() => amount.value ?? 0)
-const quickRechargeBalanceCredits = [0.5, 1, 2, 5, 10, 20, 50, 100, 140] as const
+const quickRechargeBalanceCredits = [2, 3, 5, 7, 10, 15, 20, 30, 50] as const
+const defaultQuickRechargeBalanceCredit = 7
 const balanceRechargeCnyPerCredit = computed(() => {
   const multiplier = checkout.value.balance_recharge_multiplier
   return multiplier > 0 ? multiplier : 6.8
@@ -540,12 +541,7 @@ const selectedLimit = computed(() => visibleMethods.value[selectedMethod.value])
 const selectedCurrency = computed(() => normalizePaymentCurrency(selectedLimit.value?.currency))
 const appliesBalanceRechargeRate = computed(() => selectedCurrency.value === DEFAULT_PAYMENT_CURRENCY)
 const quickRechargeAmounts = computed(() =>
-  quickRechargeBalanceCredits.map((credit) => {
-    const paymentAmount = appliesBalanceRechargeRate.value
-      ? credit * balanceRechargeCnyPerCredit.value
-      : credit
-    return Math.round(paymentAmount * 100) / 100
-  })
+  quickRechargeBalanceCredits.map(paymentAmountForBalanceCredit)
 )
 const showBalanceRechargeRate = computed(() => appliesBalanceRechargeRate.value && balanceRechargeCnyPerCredit.value !== 1)
 const creditedAmount = computed(() => {
@@ -589,6 +585,28 @@ function quickRechargeDisabledReason(value: number): string {
     return t('payment.quickAmountAboveLimit')
   }
   return t('payment.quickAmountUnavailable')
+}
+
+function paymentAmountForBalanceCredit(credit: number): number {
+  const paymentAmount = appliesBalanceRechargeRate.value
+    ? credit * balanceRechargeCnyPerCredit.value
+    : credit
+  return Math.round(paymentAmount * 100) / 100
+}
+
+function applyDefaultRechargeAmount() {
+  if (amount.value !== null || checkout.value.balance_disabled || activeTab.value !== 'recharge' || paymentPhase.value !== 'select') {
+    return
+  }
+  const preferredAmount = paymentAmountForBalanceCredit(defaultQuickRechargeBalanceCredit)
+  if (amountFitsMethod(preferredAmount, selectedMethod.value)) {
+    amount.value = preferredAmount
+    return
+  }
+  const fallbackAmount = quickRechargeAmounts.value.find((value) => amountFitsMethod(value, selectedMethod.value))
+  if (fallbackAmount) {
+    amount.value = fallbackAmount
+  }
 }
 
 function quickRechargeTargetCredit(value: number): number {
@@ -1128,6 +1146,7 @@ onMounted(async () => {
         }
       }
     }
+    applyDefaultRechargeAmount()
   } catch (err: unknown) { appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error'))) }
   finally { loading.value = false }
   // Fetch active subscriptions (uses cache, non-blocking)

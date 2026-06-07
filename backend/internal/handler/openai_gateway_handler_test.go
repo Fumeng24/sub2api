@@ -28,9 +28,10 @@ func TestOpenAIGatewayHandlerMapUpstreamErrorKeepsDeterministicBusinessStatuses(
 	h := &OpenAIGatewayHandler{}
 
 	status, errType, msg := h.mapUpstreamError(http.StatusPaymentRequired)
-	require.Equal(t, http.StatusPaymentRequired, status)
-	require.Equal(t, "billing_error", errType)
-	require.Contains(t, msg, "payment")
+	require.Equal(t, http.StatusBadGateway, status)
+	require.Equal(t, "upstream_error", errType)
+	require.NotContains(t, strings.ToLower(msg), "balance")
+	require.NotContains(t, strings.ToLower(msg), "billing")
 
 	status, errType, msg = h.mapUpstreamError(http.StatusForbidden)
 	require.Equal(t, http.StatusForbidden, status)
@@ -457,6 +458,100 @@ func TestResolveOpenAIMessagesDispatchMappedModel(t *testing.T) {
 		require.Empty(t, resolveOpenAIMessagesDispatchMappedModel(apiKey, "gpt-5.4"))
 		require.Equal(t, "gpt-5.3-codex", resolveOpenAIMessagesDispatchMappedModel(apiKey, "claude-sonnet-4-5-20250929"))
 	})
+}
+
+func TestMaybeForceOpenAIResponsesPriority(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	groupID := int64(24)
+	forcedAPIKey := &service.APIKey{
+		GroupID: &groupID,
+		Group: &service.Group{
+			ID:                  groupID,
+			Platform:            service.PlatformOpenAI,
+			ForceOpenAIPriority: true,
+		},
+	}
+	newContext := func(path string) *gin.Context {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, path, strings.NewReader(""))
+		return c
+	}
+
+	t.Run("forces_priority_for_openai_responses", func(t *testing.T) {
+		body := []byte(`{"model":"gpt-5.4","service_tier":"flex"}`)
+		got, changed, err := maybeForceOpenAIResponsesPriority(newContext("/v1/responses"), forcedAPIKey, body)
+		require.NoError(t, err)
+		require.True(t, changed)
+		require.Equal(t, "priority", gjson.GetBytes(got, "service_tier").String())
+	})
+
+	t.Run("adds_priority_when_missing", func(t *testing.T) {
+		body := []byte(`{"model":"gpt-5.4"}`)
+		got, changed, err := maybeForceOpenAIResponsesPriority(newContext("/v1/responses"), forcedAPIKey, body)
+		require.NoError(t, err)
+		require.True(t, changed)
+		require.Equal(t, "priority", gjson.GetBytes(got, "service_tier").String())
+	})
+
+	t.Run("skips_compact_endpoint", func(t *testing.T) {
+		body := []byte(`{"model":"gpt-5.4","service_tier":"flex"}`)
+		got, changed, err := maybeForceOpenAIResponsesPriority(newContext("/v1/responses/compact"), forcedAPIKey, body)
+		require.NoError(t, err)
+		require.False(t, changed)
+		require.Equal(t, "flex", gjson.GetBytes(got, "service_tier").String())
+	})
+
+	t.Run("skips_non_openai_group", func(t *testing.T) {
+		apiKey := &service.APIKey{
+			GroupID: &groupID,
+			Group: &service.Group{
+				ID:                  groupID,
+				Platform:            service.PlatformAnthropic,
+				ForceOpenAIPriority: true,
+			},
+		}
+		body := []byte(`{"model":"gpt-5.4"}`)
+		got, changed, err := maybeForceOpenAIResponsesPriority(newContext("/v1/responses"), apiKey, body)
+		require.NoError(t, err)
+		require.False(t, changed)
+		require.False(t, gjson.GetBytes(got, "service_tier").Exists())
+	})
+
+	t.Run("does_not_rewrite_existing_priority", func(t *testing.T) {
+		body := []byte(`{"model":"gpt-5.4","service_tier":"priority"}`)
+		got, changed, err := maybeForceOpenAIResponsesPriority(newContext("/v1/responses"), forcedAPIKey, body)
+		require.NoError(t, err)
+		require.False(t, changed)
+		require.Equal(t, body, got)
+	})
+}
+
+func TestShouldFallbackOpenAICompactToModel(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	newContext := func(path string) *gin.Context {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, path, strings.NewReader(""))
+		return c
+	}
+	failoverErr := &service.UpstreamFailoverError{
+		StatusCode:   http.StatusBadRequest,
+		ResponseBody: []byte(`{"error":{"message":"Your input exceeds the context window."}}`),
+	}
+
+	require.True(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.5", false, failoverErr))
+	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses"), "gpt-5.5", false, failoverErr))
+	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.5", true, failoverErr))
+	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), openAICompactFallbackModel, false, failoverErr))
+	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.5", false, &service.UpstreamFailoverError{
+		StatusCode:   http.StatusBadRequest,
+		ResponseBody: []byte(`{"error":{"message":"model not found"}}`),
+	}))
+	require.True(t, isOpenAICompactContextWindowFailover(newContext("/v1/responses/compact"), failoverErr))
+	require.False(t, isOpenAICompactContextWindowFailover(newContext("/v1/responses"), failoverErr))
 }
 
 func TestOpenAIResponses_MissingDependencies_ReturnsServiceUnavailable(t *testing.T) {

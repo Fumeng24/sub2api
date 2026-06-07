@@ -12,6 +12,8 @@ func HTTPStatusToGoogleStatus(status int) string {
 		return "UNAUTHENTICATED"
 	case http.StatusForbidden:
 		return "PERMISSION_DENIED"
+	case http.StatusPaymentRequired:
+		return "FAILED_PRECONDITION"
 	case http.StatusNotFound:
 		return "NOT_FOUND"
 	case http.StatusTooManyRequests:

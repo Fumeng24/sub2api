@@ -2328,10 +2328,12 @@ export default {
         noFallback: 'No Fallback (Reject)'
       },
       openaiMessages: {
-        title: 'OpenAI Messages Dispatch',
-        allowDispatch: 'Allow /v1/messages dispatch',
-        allowDispatchHint: 'When enabled, API keys in this OpenAI group can dispatch requests through /v1/messages endpoint',
-        familyMappingTitle: 'Family Default Mapping',
+	        title: 'OpenAI Messages Dispatch',
+	        allowDispatch: 'Allow /v1/messages dispatch',
+	        allowDispatchHint: 'When enabled, API keys in this OpenAI group can dispatch requests through /v1/messages endpoint',
+	        forcePriority: 'Force priority',
+	        forcePriorityHint: 'When enabled, /v1/responses requests in this OpenAI group are forwarded with priority while local billing stays on the normal group rate.',
+	        familyMappingTitle: 'Family Default Mapping',
         familyMappingHint: 'Requests that match the Opus, Sonnet, or Haiku families will prefer the target model configured here.',
         opusModel: 'Opus Target Model',
         opusModelPlaceholder: 'e.g., gpt-5.4',

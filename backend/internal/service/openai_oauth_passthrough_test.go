@@ -201,6 +201,12 @@ type openAIPassthroughFailoverRepo struct {
 	stubOpenAIAccountRepo
 	rateLimitCalls []time.Time
 	overloadCalls  []time.Time
+	setErrorCalls  []string
+}
+
+func (r *openAIPassthroughFailoverRepo) SetError(_ context.Context, _ int64, errorMsg string) error {
+	r.setErrorCalls = append(r.setErrorCalls, errorMsg)
+	return nil
 }
 
 func (r *openAIPassthroughFailoverRepo) SetRateLimited(_ context.Context, _ int64, resetAt time.Time) error {
@@ -855,6 +861,17 @@ func TestOpenAIGatewayService_OpenAIPassthrough_429And529TriggerFailover(t *test
 			},
 		},
 		{
+			name:        "oauth_402_billing",
+			accountType: AccountTypeOAuth,
+			statusCode:  http.StatusPaymentRequired,
+			body:        `{"error":{"message":"insufficient balance","type":"billing_error"}}`,
+			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
+				require.Empty(t, repo.rateLimitCalls)
+				require.Empty(t, repo.overloadCalls)
+				require.Len(t, repo.setErrorCalls, 1)
+			},
+		},
+		{
 			name:        "apikey_429_rate_limit",
 			accountType: AccountTypeAPIKey,
 			statusCode:  http.StatusTooManyRequests,
@@ -877,6 +894,17 @@ func TestOpenAIGatewayService_OpenAIPassthrough_429And529TriggerFailover(t *test
 				require.Empty(t, repo.rateLimitCalls)
 				require.Len(t, repo.overloadCalls, 1)
 				require.WithinDuration(t, start.Add(10*time.Minute), repo.overloadCalls[0], 5*time.Second)
+			},
+		},
+		{
+			name:        "apikey_402_billing",
+			accountType: AccountTypeAPIKey,
+			statusCode:  http.StatusPaymentRequired,
+			body:        `{"error":{"message":"insufficient balance","type":"billing_error"}}`,
+			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
+				require.Empty(t, repo.rateLimitCalls)
+				require.Empty(t, repo.overloadCalls)
+				require.Len(t, repo.setErrorCalls, 1)
 			},
 		},
 	}

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -123,7 +124,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			}
 		} else {
 			if apiKey.User.Balance <= 0 {
-				abortWithGoogleError(c, 403, "Insufficient account balance")
+				abortWithGoogleError(c, http.StatusPaymentRequired, "Insufficient account balance")
 				return
 			}
 		}

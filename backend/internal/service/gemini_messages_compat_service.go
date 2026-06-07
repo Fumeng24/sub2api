@@ -939,6 +939,16 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 
 	if resp.StatusCode >= 400 {
 		respBody := s.readUpstreamErrorBody(resp)
+		{
+			upstreamReqID := resp.Header.Get(requestIDHeader)
+			if upstreamReqID == "" {
+				upstreamReqID = resp.Header.Get("x-goog-request-id")
+			}
+			evBody := unwrapIfNeeded(account.Type == AccountTypeOAuth, respBody)
+			if s.shouldFailoverGeminiBillingExhaustion(ctx, c, account, resp.StatusCode, resp.Header, upstreamReqID, respBody, evBody) {
+				return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode, ResponseBody: evBody}
+			}
+		}
 		// 统一错误策略：自定义错误码 + 临时不可调度
 		if s.rateLimitService != nil {
 			switch s.rateLimitService.CheckErrorPolicy(ctx, account, resp.StatusCode, respBody) {
@@ -1447,6 +1457,11 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 			}, nil
 		}
 
+		evBody := unwrapIfNeeded(isOAuth, respBody)
+		if s.shouldFailoverGeminiBillingExhaustion(ctx, c, account, resp.StatusCode, resp.Header, requestID, respBody, evBody) {
+			return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode, ResponseBody: evBody}
+		}
+
 		// 统一错误策略：自定义错误码 + 临时不可调度
 		if s.rateLimitService != nil {
 			switch s.rateLimitService.CheckErrorPolicy(ctx, account, resp.StatusCode, respBody) {
@@ -1731,6 +1746,17 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 
 	if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
 		logger.LegacyPrintf("service.gemini_messages_compat", "[Gemini] upstream error %d: %s", upstreamStatus, truncateForLog(body, s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes))
+	}
+
+	if isUpstreamBillingExhaustionError(upstreamStatus, upstreamMsg, body) {
+		c.JSON(http.StatusBadGateway, gin.H{
+			"type":  "error",
+			"error": gin.H{"type": "upstream_error", "message": "Upstream service temporarily unavailable"},
+		})
+		if upstreamMsg == "" {
+			return fmt.Errorf("upstream error: %d", upstreamStatus)
+		}
+		return fmt.Errorf("upstream error: %d message=%s", upstreamStatus, upstreamMsg)
 	}
 
 	if status, errType, errMsg, matched := applyErrorPassthroughRule(
@@ -2277,6 +2303,52 @@ func unwrapIfNeeded(isOAuth bool, raw []byte) []byte {
 		return raw
 	}
 	return inner
+}
+
+func (s *GeminiMessagesCompatService) shouldFailoverGeminiBillingExhaustion(
+	ctx context.Context,
+	c *gin.Context,
+	account *Account,
+	statusCode int,
+	headers http.Header,
+	upstreamRequestID string,
+	rawBody []byte,
+	eventBody []byte,
+) bool {
+	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(eventBody))
+	if upstreamMsg == "" && !bytes.Equal(eventBody, rawBody) {
+		upstreamMsg = strings.TrimSpace(extractUpstreamErrorMessage(rawBody))
+	}
+	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+	if !isUpstreamBillingExhaustionError(statusCode, upstreamMsg, eventBody) &&
+		!isUpstreamBillingExhaustionError(statusCode, upstreamMsg, rawBody) {
+		return false
+	}
+
+	s.handleGeminiUpstreamError(ctx, account, statusCode, headers, rawBody)
+
+	upstreamDetail := ""
+	if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
+		maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
+		if maxBytes <= 0 {
+			maxBytes = 2048
+		}
+		upstreamDetail = truncateString(string(eventBody), maxBytes)
+	}
+	setOpsUpstreamError(c, statusCode, upstreamMsg, upstreamDetail)
+	if account != nil {
+		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			Platform:           account.Platform,
+			AccountID:          account.ID,
+			AccountName:        account.Name,
+			UpstreamStatusCode: statusCode,
+			UpstreamRequestID:  upstreamRequestID,
+			Kind:               "failover",
+			Message:            upstreamMsg,
+			Detail:             upstreamDetail,
+		})
+	}
+	return true
 }
 
 func collectGeminiSSE(body io.Reader, isOAuth bool) (map[string]any, *ClaudeUsage, error) {
@@ -2828,6 +2900,12 @@ func asInt(v any) (int, bool) {
 }
 
 func (s *GeminiMessagesCompatService) handleGeminiUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, body []byte) {
+	if isUpstreamBillingExhaustionError(statusCode, extractUpstreamErrorMessage(body), body) {
+		if s.rateLimitService != nil {
+			s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, headers, body)
+		}
+		return
+	}
 	// 遵守自定义错误码策略：未命中则跳过所有限流处理
 	if !account.ShouldHandleErrorCode(statusCode) {
 		return

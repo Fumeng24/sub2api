@@ -15233,6 +15233,7 @@ type GroupMutation struct {
 	default_mapped_model                    *string
 	messages_dispatch_model_config          *domain.OpenAIMessagesDispatchModelConfig
 	models_list_config                      *domain.GroupModelsListConfig
+	force_openai_priority                   *bool
 	rpm_limit                               *int
 	addrpm_limit                            *int
 	clearedFields                           map[string]struct{}
@@ -16987,6 +16988,42 @@ func (m *GroupMutation) ResetModelsListConfig() {
 	m.models_list_config = nil
 }
 
+// SetForceOpenaiPriority sets the "force_openai_priority" field.
+func (m *GroupMutation) SetForceOpenaiPriority(b bool) {
+	m.force_openai_priority = &b
+}
+
+// ForceOpenaiPriority returns the value of the "force_openai_priority" field in the mutation.
+func (m *GroupMutation) ForceOpenaiPriority() (r bool, exists bool) {
+	v := m.force_openai_priority
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldForceOpenaiPriority returns the old "force_openai_priority" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldForceOpenaiPriority(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldForceOpenaiPriority is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldForceOpenaiPriority requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldForceOpenaiPriority: %w", err)
+	}
+	return oldValue.ForceOpenaiPriority, nil
+}
+
+// ResetForceOpenaiPriority resets all changes to the "force_openai_priority" field.
+func (m *GroupMutation) ResetForceOpenaiPriority() {
+	m.force_openai_priority = nil
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (m *GroupMutation) SetRpmLimit(i int) {
 	m.rpm_limit = &i
@@ -17401,7 +17438,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 35)
+	fields := make([]string, 0, 36)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -17504,6 +17541,9 @@ func (m *GroupMutation) Fields() []string {
 	if m.models_list_config != nil {
 		fields = append(fields, group.FieldModelsListConfig)
 	}
+	if m.force_openai_priority != nil {
+		fields = append(fields, group.FieldForceOpenaiPriority)
+	}
 	if m.rpm_limit != nil {
 		fields = append(fields, group.FieldRpmLimit)
 	}
@@ -17583,6 +17623,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.MessagesDispatchModelConfig()
 	case group.FieldModelsListConfig:
 		return m.ModelsListConfig()
+	case group.FieldForceOpenaiPriority:
+		return m.ForceOpenaiPriority()
 	case group.FieldRpmLimit:
 		return m.RpmLimit()
 	}
@@ -17662,6 +17704,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldMessagesDispatchModelConfig(ctx)
 	case group.FieldModelsListConfig:
 		return m.OldModelsListConfig(ctx)
+	case group.FieldForceOpenaiPriority:
+		return m.OldForceOpenaiPriority(ctx)
 	case group.FieldRpmLimit:
 		return m.OldRpmLimit(ctx)
 	}
@@ -17910,6 +17954,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetModelsListConfig(v)
+		return nil
+	case group.FieldForceOpenaiPriority:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetForceOpenaiPriority(v)
 		return nil
 	case group.FieldRpmLimit:
 		v, ok := value.(int)
@@ -18296,6 +18347,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldModelsListConfig:
 		m.ResetModelsListConfig()
+		return nil
+	case group.FieldForceOpenaiPriority:
+		m.ResetForceOpenaiPriority()
 		return nil
 	case group.FieldRpmLimit:
 		m.ResetRpmLimit()

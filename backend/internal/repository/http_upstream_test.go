@@ -152,6 +152,24 @@ func (s *HTTPUpstreamSuite) TestOpenAIWeakFallbackProfileDisablesHeaderTimeout()
 	require.Equal(s.T(), upstreamProtocolModeOpenAIH2, entry.protocolMode)
 }
 
+func (s *HTTPUpstreamSuite) TestOpenAINoHeaderTimeoutProfileDisablesHeaderTimeout() {
+	s.cfg.Gateway = config.GatewayConfig{
+		ResponseHeaderTimeout:       600,
+		OpenAIResponseHeaderTimeout: 15,
+		OpenAIHTTP2: config.GatewayOpenAIHTTP2Config{
+			Enabled: true,
+		},
+	}
+	svc := s.newService()
+	entry, err := svc.getClientEntry("", 1, 1, service.HTTPUpstreamProfileOpenAINoHeaderTimeout, false, false)
+	require.NoError(s.T(), err)
+	transport, ok := entry.client.Transport.(*http.Transport)
+	require.True(s.T(), ok, "expected *http.Transport")
+	require.Equal(s.T(), time.Duration(0), transport.ResponseHeaderTimeout)
+	require.True(s.T(), transport.ForceAttemptHTTP2, "no-header-timeout profile should keep OpenAI protocol policy")
+	require.Equal(s.T(), upstreamProtocolModeOpenAIH2, entry.protocolMode)
+}
+
 func (s *HTTPUpstreamSuite) TestOpenAIProfileHTTP2DisabledUsesHTTP1Transport() {
 	s.cfg.Gateway = config.GatewayConfig{
 		OpenAIHTTP2: config.GatewayOpenAIHTTP2Config{Enabled: false},

@@ -54,6 +54,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			h.responsesErrorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return
 		}
+		logRequestBodyReadError(c, reqLog, "gateway.responses.request_body_read_failed", err)
 		h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
 		return
 	}

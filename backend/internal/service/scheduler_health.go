@@ -417,6 +417,12 @@ func schedulerFailureCategory(statusCode int, body []byte) string {
 	if isOpenAIEmptyOutputBody(body) {
 		return "empty_output"
 	}
+	if isOpenAICompactContextWindowFallbackBody(body) {
+		return "compact_context_window"
+	}
+	if isUpstreamBillingExhaustionError(statusCode, extractUpstreamErrorMessage(body), body) {
+		return "balance"
+	}
 	if class := classifyOpenAIUpstreamError(statusCode, "", body); class != openAIUpstreamErrorUnknown {
 		return openAIUpstreamErrorClassSchedulerCategory(class)
 	}
@@ -465,6 +471,10 @@ func isOpenAICompactBadOutputBody(body []byte) bool {
 	}
 	code := strings.ToLower(strings.TrimSpace(extractUpstreamErrorCode(body)))
 	return code == openAICompactBadOutputCode
+}
+
+func isOpenAICompactContextWindowFallbackBody(body []byte) bool {
+	return isOpenAIContextWindowError("", body)
 }
 
 func isOpenAIEmptyOutputBody(body []byte) bool {

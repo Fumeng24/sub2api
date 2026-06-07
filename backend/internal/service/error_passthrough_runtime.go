@@ -40,6 +40,9 @@ func applyErrorPassthroughRule(
 	status = defaultStatus
 	errType = defaultErrType
 	errMsg = defaultErrMsg
+	if isUpstreamBillingExhaustionError(upstreamStatus, ExtractUpstreamErrorMessage(responseBody), responseBody) {
+		return status, errType, errMsg, false
+	}
 
 	svc := getBoundErrorPassthroughService(c)
 	if svc == nil {

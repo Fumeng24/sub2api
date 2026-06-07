@@ -43,6 +43,18 @@ func (s *geminiCompatHTTPUpstreamStub) DoWithTLS(req *http.Request, proxyURL str
 	return s.Do(req, proxyURL, accountID, accountConcurrency)
 }
 
+type geminiCompatBillingRepoStub struct {
+	AccountRepository
+	setErrCalls  int
+	lastErrorMsg string
+}
+
+func (r *geminiCompatBillingRepoStub) SetError(_ context.Context, _ int64, errorMsg string) error {
+	r.setErrCalls++
+	r.lastErrorMsg = errorMsg
+	return nil
+}
+
 func TestGeminiForwardAsChatCompletions_UpstreamNetworkErrorReturnsFailover(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -74,6 +86,49 @@ func TestGeminiForwardAsChatCompletions_UpstreamNetworkErrorReturnsFailover(t *t
 	require.False(t, failoverErr.RetryableOnSameAccount)
 	require.Equal(t, geminiMaxRetries, httpStub.calls)
 	require.Equal(t, 0, rec.Body.Len(), "service failover path must not write the client response")
+}
+
+func TestGeminiForwardAsChatCompletions_BillingExhaustionReturnsFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusPaymentRequired,
+			Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"gemini-billing"}},
+			Body:       io.NopCloser(strings.NewReader(`{"error":{"code":402,"message":"insufficient balance","status":"PAYMENT_REQUIRED"}}`)),
+		},
+	}
+	repo := &geminiCompatBillingRepoStub{}
+	svc := &GeminiMessagesCompatService{
+		httpUpstream:     httpStub,
+		rateLimitService: NewRateLimitService(repo, nil, &config.Config{}, nil, nil),
+		cfg:              &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+	}
+	account := &Account{
+		ID:          38803,
+		Platform:    PlatformGemini,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "gemini-key"},
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	body := []byte(`{"model":"gemini-2.5-flash","messages":[{"role":"user","content":"hi"}],"stream":false}`)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+
+	result, err := svc.ForwardAsChatCompletions(context.Background(), c, account, body)
+
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusPaymentRequired, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "insufficient balance")
+	require.Equal(t, 1, httpStub.calls)
+	require.Equal(t, 1, repo.setErrCalls)
+	require.False(t, c.Writer.Written())
+	require.NotContains(t, rec.Body.String(), "insufficient")
+	require.NotContains(t, rec.Body.String(), "balance")
 }
 
 func TestGeminiForwardAsChatCompletions_OAuthRoutesToGeminiAndReturnsChatFormat(t *testing.T) {

@@ -1104,11 +1104,44 @@
               />
             </button>
           </div>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {{ t("admin.groups.openaiMessages.allowDispatchHint") }}
-          </p>
+	          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+	            {{ t("admin.groups.openaiMessages.allowDispatchHint") }}
+	          </p>
 
-          <div v-if="createForm.allow_messages_dispatch" class="mt-3">
+	          <div class="mt-4 flex items-center justify-between">
+	            <div>
+	              <label class="text-sm text-gray-600 dark:text-gray-400">{{
+	                t("admin.groups.openaiMessages.forcePriority")
+	              }}</label>
+	              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+	                {{ t("admin.groups.openaiMessages.forcePriorityHint") }}
+	              </p>
+	            </div>
+	            <button
+	              type="button"
+	              @click="
+	                createForm.force_openai_priority =
+	                  !createForm.force_openai_priority
+	              "
+	              class="relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+	              :class="
+	                createForm.force_openai_priority
+	                  ? 'bg-primary-500'
+	                  : 'bg-gray-300 dark:bg-dark-600'
+	              "
+	            >
+	              <span
+	                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+	                :class="
+	                  createForm.force_openai_priority
+	                    ? 'translate-x-6'
+	                    : 'translate-x-1'
+	                "
+	              />
+	            </button>
+	          </div>
+
+	          <div v-if="createForm.allow_messages_dispatch" class="mt-3">
             <div
               class="relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-600 dark:bg-dark-800"
             >
@@ -2528,11 +2561,44 @@
               />
             </button>
           </div>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {{ t("admin.groups.openaiMessages.allowDispatchHint") }}
-          </p>
+	          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+	            {{ t("admin.groups.openaiMessages.allowDispatchHint") }}
+	          </p>
 
-          <div v-if="editForm.allow_messages_dispatch" class="mt-3">
+	          <div class="mt-4 flex items-center justify-between">
+	            <div>
+	              <label class="text-sm text-gray-600 dark:text-gray-400">{{
+	                t("admin.groups.openaiMessages.forcePriority")
+	              }}</label>
+	              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+	                {{ t("admin.groups.openaiMessages.forcePriorityHint") }}
+	              </p>
+	            </div>
+	            <button
+	              type="button"
+	              @click="
+	                editForm.force_openai_priority =
+	                  !editForm.force_openai_priority
+	              "
+	              class="relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+	              :class="
+	                editForm.force_openai_priority
+	                  ? 'bg-primary-500'
+	                  : 'bg-gray-300 dark:bg-dark-600'
+	              "
+	            >
+	              <span
+	                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+	                :class="
+	                  editForm.force_openai_priority
+	                    ? 'translate-x-6'
+	                    : 'translate-x-1'
+	                "
+	              />
+	            </button>
+	          </div>
+
+	          <div v-if="editForm.allow_messages_dispatch" class="mt-3">
             <div
               class="relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-600 dark:bg-dark-800"
             >
@@ -3710,9 +3776,10 @@ const createForm = reactive({
   claude_code_only: false,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
-  // OpenAI Messages 调度配置（仅 openai 平台使用）
-  allow_messages_dispatch: false,
-  opus_mapped_model: createMessagesDispatchDefaults.opus_mapped_model,
+	  // OpenAI Messages 调度配置（仅 openai 平台使用）
+	  allow_messages_dispatch: false,
+	  force_openai_priority: false,
+	  opus_mapped_model: createMessagesDispatchDefaults.opus_mapped_model,
   sonnet_mapped_model: createMessagesDispatchDefaults.sonnet_mapped_model,
   haiku_mapped_model: createMessagesDispatchDefaults.haiku_mapped_model,
   exact_model_mappings: [] as MessagesDispatchMappingRow[],
@@ -4041,9 +4108,10 @@ const editForm = reactive({
   claude_code_only: false,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
-  // OpenAI Messages 调度配置（仅 openai 平台使用）
-  allow_messages_dispatch: false,
-  default_mapped_model: '',
+	  // OpenAI Messages 调度配置（仅 openai 平台使用）
+	  allow_messages_dispatch: false,
+	  force_openai_priority: false,
+	  default_mapped_model: '',
   opus_mapped_model: editMessagesDispatchDefaults.opus_mapped_model,
   sonnet_mapped_model: editMessagesDispatchDefaults.sonnet_mapped_model,
   haiku_mapped_model: editMessagesDispatchDefaults.haiku_mapped_model,
@@ -4552,8 +4620,9 @@ const closeCreateModal = () => {
   createForm.claude_code_only = false;
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
-  resetMessagesDispatchFormState(createForm);
-  createForm.require_oauth_only = false;
+	  resetMessagesDispatchFormState(createForm);
+	  createForm.force_openai_priority = false;
+	  createForm.require_oauth_only = false;
   createForm.require_privacy_set = false;
   createForm.supported_model_scopes = ["claude", "gemini_text", "gemini_image"];
   createForm.mcp_xml_inject = true;
@@ -4682,10 +4751,11 @@ const handleEdit = async (group: AdminGroup) => {
   const messagesDispatchFormState = messagesDispatchConfigToFormState(
     group.messages_dispatch_model_config,
   );
-  editForm.allow_messages_dispatch =
-    group.allow_messages_dispatch ||
-    messagesDispatchFormState.allow_messages_dispatch;
-  editForm.opus_mapped_model = messagesDispatchFormState.opus_mapped_model;
+	  editForm.allow_messages_dispatch =
+	    group.allow_messages_dispatch ||
+	    messagesDispatchFormState.allow_messages_dispatch;
+	  editForm.force_openai_priority = group.force_openai_priority ?? false;
+	  editForm.opus_mapped_model = messagesDispatchFormState.opus_mapped_model;
   editForm.sonnet_mapped_model = messagesDispatchFormState.sonnet_mapped_model;
   editForm.haiku_mapped_model = messagesDispatchFormState.haiku_mapped_model;
   editForm.exact_model_mappings =
@@ -4866,9 +4936,10 @@ watch(
     if (!["anthropic", "antigravity"].includes(newVal)) {
       createForm.fallback_group_id_on_invalid_request = null;
     }
-    if (newVal !== "openai") {
-      resetMessagesDispatchFormState(createForm);
-    }
+	    if (newVal !== "openai") {
+	      resetMessagesDispatchFormState(createForm);
+	      createForm.force_openai_priority = false;
+	    }
     if (!["openai", "antigravity", "anthropic", "gemini"].includes(newVal)) {
       createForm.require_oauth_only = false;
       createForm.require_privacy_set = false;
@@ -4884,9 +4955,10 @@ watch(
     if (!["anthropic", "antigravity"].includes(newVal)) {
       editForm.fallback_group_id_on_invalid_request = null;
     }
-    if (newVal !== "openai") {
-      resetMessagesDispatchFormState(editForm);
-    }
+	    if (newVal !== "openai") {
+	      resetMessagesDispatchFormState(editForm);
+	      editForm.force_openai_priority = false;
+	    }
     if (!["openai", "antigravity", "anthropic", "gemini"].includes(newVal)) {
       editForm.require_oauth_only = false;
       editForm.require_privacy_set = false;
@@ -4904,10 +4976,11 @@ watch(
     if (!['anthropic', 'antigravity'].includes(newVal)) {
       editForm.fallback_group_id_on_invalid_request = null
     }
-    if (newVal !== 'openai') {
-      editForm.allow_messages_dispatch = false
-      editForm.default_mapped_model = ''
-    }
+	    if (newVal !== 'openai') {
+	      editForm.allow_messages_dispatch = false
+	      editForm.force_openai_priority = false
+	      editForm.default_mapped_model = ''
+	    }
   }
 )
 

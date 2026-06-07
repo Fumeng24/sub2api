@@ -184,18 +184,26 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		return true
 	}
 
+	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(responseBody))
+	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+	if upstreamMsg != "" {
+		upstreamMsg = truncateForLog([]byte(upstreamMsg), 512)
+	}
+	if isUpstreamBillingExhaustionError(statusCode, upstreamMsg, responseBody) {
+		msg := fmt.Sprintf("Upstream billing exhausted (%d): insufficient balance or billing issue", statusCode)
+		if upstreamMsg != "" {
+			msg = fmt.Sprintf("Upstream billing exhausted (%d): %s", statusCode, upstreamMsg)
+		}
+		s.handleAuthError(ctx, account, msg)
+		return true
+	}
+
 	// 先尝试临时不可调度规则（401除外）
 	// 如果匹配成功，直接返回，不执行后续禁用逻辑
 	if statusCode != 401 {
 		if s.tryTempUnschedulable(ctx, account, statusCode, responseBody) {
 			return true
 		}
-	}
-
-	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(responseBody))
-	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
-	if upstreamMsg != "" {
-		upstreamMsg = truncateForLog([]byte(upstreamMsg), 512)
 	}
 
 	switch statusCode {
@@ -345,7 +353,13 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 }
 
 func shouldBypassCustomErrorCodeSkip(account *Account, statusCode int, responseBody []byte) bool {
-	if account == nil || account.Platform != PlatformOpenAI {
+	if account == nil {
+		return false
+	}
+	if isUpstreamBillingExhaustionError(statusCode, extractUpstreamErrorMessage(responseBody), responseBody) {
+		return true
+	}
+	if account.Platform != PlatformOpenAI {
 		return false
 	}
 	switch statusCode {

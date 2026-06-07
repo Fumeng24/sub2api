@@ -1065,6 +1065,47 @@ func TestOpenAIGatewayServiceRecordUsage_ServiceTierPriorityUsesFastPricing(t *t
 	require.InDelta(t, baseCost.TotalCost*2, usageRepo.lastLog.TotalCost, 1e-10)
 }
 
+func TestOpenAIGatewayServiceRecordUsage_ForceOpenAIPriorityBillsAsNormalTier(t *testing.T) {
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	userRepo := &openAIRecordUsageUserRepoStub{}
+	subRepo := &openAIRecordUsageSubRepoStub{}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, nil)
+	serviceTier := "priority"
+	groupID := int64(24)
+	usage := OpenAIUsage{InputTokens: 100, OutputTokens: 50}
+
+	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID:   "resp_force_priority_normal_billing",
+			ServiceTier: &serviceTier,
+			Usage:       usage,
+			Model:       "gpt-5.4",
+			Duration:    time.Second,
+		},
+		APIKey: &APIKey{
+			ID:      1017,
+			GroupID: &groupID,
+			Group: &Group{
+				ID:                  groupID,
+				Platform:            PlatformOpenAI,
+				RateMultiplier:      1,
+				ForceOpenAIPriority: true,
+			},
+		},
+		User:    &User{ID: 2017},
+		Account: &Account{ID: 3017},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.NotNil(t, usageRepo.lastLog.ServiceTier)
+	require.Equal(t, serviceTier, *usageRepo.lastLog.ServiceTier)
+
+	baseCost, calcErr := svc.billingService.CalculateCost("gpt-5.4", UsageTokens{InputTokens: 100, OutputTokens: 50}, 1.0)
+	require.NoError(t, calcErr)
+	require.InDelta(t, baseCost.TotalCost, usageRepo.lastLog.TotalCost, 1e-10)
+}
+
 func TestOpenAIGatewayServiceRecordUsage_ServiceTierFlexHalvesCost(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 	userRepo := &openAIRecordUsageUserRepoStub{}

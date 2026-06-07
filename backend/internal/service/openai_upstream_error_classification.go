@@ -164,7 +164,7 @@ func containsAnyOpenAIErrorText(text string, needles ...string) bool {
 
 func openAIUpstreamErrorClassShouldFailover(class openAIUpstreamErrorClass) bool {
 	switch class {
-	case openAIUpstreamErrorAuth, openAIUpstreamErrorRateLimit, openAIUpstreamErrorTransient, openAIUpstreamErrorModelUnsupported:
+	case openAIUpstreamErrorAuth, openAIUpstreamErrorBilling, openAIUpstreamErrorRateLimit, openAIUpstreamErrorTransient, openAIUpstreamErrorModelUnsupported:
 		return true
 	default:
 		return false

@@ -23,6 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"go.uber.org/zap"
 )
 
@@ -45,6 +46,58 @@ func resolveOpenAIMessagesDispatchMappedModel(apiKey *service.APIKey, requestedM
 		return ""
 	}
 	return strings.TrimSpace(apiKey.Group.ResolveMessagesDispatchModel(requestedModel))
+}
+
+func shouldForceOpenAIResponsesPriority(apiKey *service.APIKey) bool {
+	return apiKey != nil &&
+		apiKey.Group != nil &&
+		apiKey.Group.Platform == service.PlatformOpenAI &&
+		apiKey.Group.ForceOpenAIPriority
+}
+
+func maybeForceOpenAIResponsesPriority(c *gin.Context, apiKey *service.APIKey, body []byte) ([]byte, bool, error) {
+	if len(body) == 0 || service.IsOpenAIResponsesCompactPathForTest(c) || !shouldForceOpenAIResponsesPriority(apiKey) {
+		return body, false, nil
+	}
+	if strings.TrimSpace(gjson.GetBytes(body, "service_tier").String()) == "priority" {
+		return body, false, nil
+	}
+	updated, err := sjson.SetBytes(body, "service_tier", "priority")
+	if err != nil {
+		return body, false, fmt.Errorf("force openai responses priority: %w", err)
+	}
+	return updated, true, nil
+}
+
+const openAICompactFallbackModel = "gpt-5.4"
+
+func shouldFallbackOpenAICompactToModel(c *gin.Context, requestedModel string, fallbackUsed bool, failoverErr *service.UpstreamFailoverError) bool {
+	if fallbackUsed || failoverErr == nil || !isOpenAIRemoteCompactPath(c) {
+		return false
+	}
+	requestedModel = strings.TrimSpace(requestedModel)
+	if requestedModel == "" || strings.EqualFold(requestedModel, openAICompactFallbackModel) {
+		return false
+	}
+	return service.IsOpenAIContextWindowErrorForTest(string(failoverErr.ResponseBody))
+}
+
+func isOpenAICompactContextWindowFailover(c *gin.Context, failoverErr *service.UpstreamFailoverError) bool {
+	return failoverErr != nil &&
+		isOpenAIRemoteCompactPath(c) &&
+		service.IsOpenAIContextWindowErrorForTest(string(failoverErr.ResponseBody))
+}
+
+func replaceOpenAIRequestModel(body []byte, model string) ([]byte, error) {
+	model = strings.TrimSpace(model)
+	if len(body) == 0 || model == "" {
+		return body, nil
+	}
+	updated, err := sjson.SetBytes(body, "model", model)
+	if err != nil {
+		return body, fmt.Errorf("replace openai request model: %w", err)
+	}
+	return updated, nil
 }
 
 func usageRecordContext(parent context.Context, base context.Context) context.Context {
@@ -157,6 +210,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return
 		}
+		logRequestBodyReadError(c, reqLog, "openai.responses.request_body_read_failed", err)
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
 		return
 	}
@@ -188,6 +242,16 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 
+	var forcedPriority bool
+	if updatedBody, changed, forceErr := maybeForceOpenAIResponsesPriority(c, apiKey, body); forceErr != nil {
+		reqLog.Warn("openai.responses.force_priority_failed", zap.Error(forceErr))
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to apply group priority mode")
+		return
+	} else if changed {
+		body = updatedBody
+		forcedPriority = true
+	}
+
 	// 使用 gjson 只读提取字段做校验，避免完整 Unmarshal
 	modelResult := gjson.GetBytes(body, "model")
 	if !modelResult.Exists() || modelResult.Type != gjson.String || modelResult.String() == "" {
@@ -202,6 +266,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
+	if forcedPriority {
+		reqLog = reqLog.With(zap.Bool("force_openai_priority", true))
+	}
 	previousResponseID := strings.TrimSpace(gjson.GetBytes(body, "previous_response_id").String())
 	if previousResponseID != "" {
 		previousResponseIDKind := service.ClassifyOpenAIPreviousResponseIDKind(previousResponseID)
@@ -252,9 +319,6 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		}
 	}
 
-	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
-
 	// 提前校验 function_call_output 是否具备可关联上下文，避免上游 400。
 	if !h.validateFunctionCallOutputRequest(c, body, reqLog) {
 		return
@@ -299,6 +363,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 
 	maxAccountSwitches := h.gatewayService.MaxOpenAIAccountSwitches(c.Request.Context(), h.maxAccountSwitches, apiKey.GroupID)
 	switchCount := 0
+	compactFallbackUsed := false
 	failedAccountIDs := make(map[int64]struct{})
 	sameAccountRetryCount := make(map[int64]int)
 	var lastFailoverErr *service.UpstreamFailoverError
@@ -374,10 +439,12 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		// Forward request
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
 		forwardStart := time.Now()
-		// 应用渠道模型映射到请求体
+		// 应用渠道模型映射到请求体。reqModel 可能在 compact fallback 后变化，
+		// 所以每次尝试都按当前模型重新解析映射。
+		attemptChannelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
 		forwardBody := body
-		if channelMapping.Mapped {
-			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
+		if attemptChannelMapping.Mapped {
+			forwardBody = h.gatewayService.ReplaceModelInBody(body, attemptChannelMapping.MappedModel)
 		}
 		writerSizeBeforeForward := c.Writer.Size()
 		result, err := func() (*service.OpenAIForwardResult, error) {
@@ -410,6 +477,40 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				if errors.As(err, &failoverErr) {
 					if c.Writer.Size() != writerSizeBeforeForward {
 						h.handleFailoverExhausted(c, failoverErr, true)
+						return
+					}
+					if shouldFallbackOpenAICompactToModel(c, reqModel, compactFallbackUsed, failoverErr) {
+						fallbackBody, fallbackErr := replaceOpenAIRequestModel(body, openAICompactFallbackModel)
+						if fallbackErr != nil {
+							reqLog.Warn("openai.compact_model_fallback_failed", zap.Error(fallbackErr))
+						} else {
+							reqLog.Warn("openai.compact_model_fallback",
+								zap.String("from_model", reqModel),
+								zap.String("to_model", openAICompactFallbackModel),
+								zap.Int64("account_id", account.ID),
+								zap.Int("upstream_status", failoverErr.StatusCode),
+							)
+							body = fallbackBody
+							reqModel = openAICompactFallbackModel
+							setOpsRequestContext(c, reqModel, reqStream, body)
+							failedAccountIDs = make(map[int64]struct{})
+							sameAccountRetryCount = make(map[int64]int)
+							lastFailoverErr = nil
+							switchCount = 0
+							compactFallbackUsed = true
+							continue
+						}
+					}
+					if isOpenAICompactContextWindowFailover(c, failoverErr) {
+						msg := strings.TrimSpace(service.ExtractUpstreamErrorMessage(failoverErr.ResponseBody))
+						if msg == "" {
+							msg = "OpenAI compact input exceeds the context window"
+						}
+						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
+						if h.gatewayService != nil {
+							h.gatewayService.ReportOpenAIAccountScheduleTerminal(account.ID, reqModel, schedulerEndpoint)
+						}
+						h.handleStreamingAwareError(c, http.StatusBadRequest, "invalid_request_error", msg, streamStarted)
 						return
 					}
 					h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, reqModel, schedulerEndpoint, failoverErr)
@@ -501,7 +602,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				IPAddress:          clientIP,
 				RequestPayloadHash: requestPayloadHash,
 				APIKeyService:      h.apiKeyService,
-				ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
+				ChannelUsageFields: attemptChannelMapping.ToUsageFields(reqModel, result.UpstreamModel),
 			}); err != nil {
 				logger.L().With(
 					zap.String("component", "handler.openai_gateway.responses"),
@@ -1764,9 +1865,15 @@ func (h *OpenAIGatewayHandler) handleConcurrencyError(c *gin.Context, err error,
 func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *service.UpstreamFailoverError, streamStarted bool) {
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
+	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
 	if service.IsOpenAISilentRefusalErrorBody(responseBody) {
 		service.SetOpsUpstreamError(c, statusCode, service.OpenAISilentRefusalClientMessage(), "")
 		h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", service.OpenAISilentRefusalClientMessage(), streamStarted)
+		return
+	}
+	if service.IsUpstreamBillingExhaustionError(statusCode, upstreamMsg, responseBody) {
+		service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
+		h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable", streamStarted)
 		return
 	}
 
@@ -1795,7 +1902,6 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 	}
 
 	// 记录原始上游状态码，以便 ops 错误日志捕获真实的上游错误
-	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
 	service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
 
 	// 使用默认的错误映射
@@ -1815,7 +1921,7 @@ func (h *OpenAIGatewayHandler) mapUpstreamError(statusCode int) (int, string, st
 	case 401:
 		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
 	case 402:
-		return http.StatusPaymentRequired, "billing_error", "Upstream payment required: insufficient balance or billing issue"
+		return http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable"
 	case 403:
 		return http.StatusForbidden, "forbidden_error", "Upstream access forbidden, please contact administrator"
 	case 429:

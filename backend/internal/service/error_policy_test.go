@@ -67,6 +67,21 @@ func TestCheckErrorPolicy(t *testing.T) {
 			expected:   ErrorPolicySkipped,
 		},
 		{
+			name: "custom_error_codes_miss_billing_exhaustion_returns_matched",
+			account: &Account{
+				ID:       16,
+				Type:     AccountTypeAPIKey,
+				Platform: PlatformGemini,
+				Credentials: map[string]any{
+					"custom_error_codes_enabled": true,
+					"custom_error_codes":         []any{float64(429), float64(500)},
+				},
+			},
+			statusCode: http.StatusPaymentRequired,
+			body:       []byte(`{"error":{"message":"insufficient balance"}}`),
+			expected:   ErrorPolicyMatched,
+		},
+		{
 			name: "temp_unschedulable_hit_returns_temp_unscheduled",
 			account: &Account{
 				ID:       4,
@@ -260,6 +275,27 @@ func TestHandleUpstreamError_PoolModeCustomErrorCodesOverride(t *testing.T) {
 
 		require.True(t, shouldDisable)
 		require.Equal(t, 1, repo.setErrCalls)
+		require.Equal(t, 0, repo.tempCalls)
+	})
+
+	t.Run("billing_exhaustion_bypasses_custom_error_codes", func(t *testing.T) {
+		repo := &errorPolicyRepoStub{}
+		svc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+		account := &Account{
+			ID:       32,
+			Type:     AccountTypeAPIKey,
+			Platform: PlatformGemini,
+			Credentials: map[string]any{
+				"custom_error_codes_enabled": true,
+				"custom_error_codes":         []any{float64(429)},
+			},
+		}
+
+		shouldDisable := svc.HandleUpstreamError(context.Background(), account, http.StatusPaymentRequired, http.Header{}, []byte(`{"error":{"message":"insufficient balance"}}`))
+
+		require.True(t, shouldDisable)
+		require.Equal(t, 1, repo.setErrCalls)
+		require.Contains(t, repo.lastErrorMsg, "Upstream billing exhausted")
 		require.Equal(t, 0, repo.tempCalls)
 	})
 }
