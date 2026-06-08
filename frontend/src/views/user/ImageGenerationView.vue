@@ -301,6 +301,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { keysAPI } from '@/api/keys'
 import userGroupsAPI from '@/api/groups'
 import {
+  MAX_IMAGE_GENERATION_COUNT,
   normalizeOpenAIImageResults,
   submitImageGatewayRequest,
   type OpenAIImageResult,
@@ -393,7 +394,7 @@ const qualityOptions = computed(() => [
   { value: 'high', label: t('imageGeneration.qualityOptions.high') },
 ])
 
-const countOptions = computed(() => Array.from({ length: 10 }, (_, index) => {
+const countOptions = computed(() => Array.from({ length: MAX_IMAGE_GENERATION_COUNT }, (_, index) => {
   const value = index + 1
   return { value, label: t('imageGeneration.pricing.imageCountValue', { count: value }) }
 }))
@@ -508,7 +509,7 @@ function isDataUrl(value: string) {
 
 function normalizeCount(value: unknown) {
   const parsed = Math.floor(Number(value) || 1)
-  return Math.min(10, Math.max(1, parsed))
+  return Math.min(MAX_IMAGE_GENERATION_COUNT, Math.max(1, parsed))
 }
 
 function isImageGroup(group: Group) {

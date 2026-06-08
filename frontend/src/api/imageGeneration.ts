@@ -21,6 +21,8 @@ export interface ImageGatewayRequest {
   signal?: AbortSignal
 }
 
+export const MAX_IMAGE_GENERATION_COUNT = 4
+
 export class ImageGatewayError extends Error {
   status: number
   code?: string
@@ -49,7 +51,7 @@ function gatewayUrl(baseUrl: string | undefined, path: string) {
 }
 
 function addOptionalImageFields(target: Record<string, unknown>, request: ImageGatewayRequest) {
-  const n = Math.max(1, Math.min(10, Math.floor(Number(request.count) || 1)))
+  const n = Math.max(1, Math.min(MAX_IMAGE_GENERATION_COUNT, Math.floor(Number(request.count) || 1)))
   target.model = request.model
   target.prompt = request.prompt
   target.n = n

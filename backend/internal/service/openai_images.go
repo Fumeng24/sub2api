@@ -39,6 +39,7 @@ const (
 	openAIImageBackendUserAgent    = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 	openAIImageMaxDownloadBytes    = 20 << 20 // 20MB per image download
 	openAIImageMaxUploadPartSize   = 20 << 20 // 20MB per multipart upload part
+	openAIImageMaxGenerationCount  = 4
 	openAIImagesResponsesMainModel = "gpt-5.4-mini"
 )
 
@@ -245,6 +246,9 @@ func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {
 		if req.N <= 0 {
 			return fmt.Errorf("n must be greater than 0")
 		}
+		if req.N > openAIImageMaxGenerationCount {
+			return fmt.Errorf("n must be less than or equal to %d", openAIImageMaxGenerationCount)
+		}
 	}
 
 	if sizeResult := gjson.GetBytes(body, "size"); sizeResult.Exists() {
@@ -389,6 +393,9 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 			n, err := strconv.Atoi(value)
 			if err != nil || n <= 0 {
 				return fmt.Errorf("n must be a positive integer")
+			}
+			if n > openAIImageMaxGenerationCount {
+				return fmt.Errorf("n must be less than or equal to %d", openAIImageMaxGenerationCount)
 			}
 			req.N = n
 		case "quality":
