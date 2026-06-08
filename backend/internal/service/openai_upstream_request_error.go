@@ -101,6 +101,8 @@ func isOpenAIUpstreamNetworkFailoverError(err error, safeErr string) bool {
 		"client.timeout exceeded",
 		"timeout awaiting response headers",
 		"tls handshake timeout",
+		"authentication failed",
+		"proxy authentication required",
 		"connection refused",
 		"connection reset by peer",
 		"use of closed network connection",

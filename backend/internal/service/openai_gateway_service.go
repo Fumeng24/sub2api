@@ -1902,7 +1902,7 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 		return nil
 	}
 	account = s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability, options)
-	if account == nil {
+	if account == nil || !openAIStickyAccountMatchesGroup(account, groupID) {
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
 	}
@@ -2157,6 +2157,8 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 					isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, false, nil, requiredCapability, options) {
 					account = s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability, options)
 					if account == nil {
+						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+					} else if !openAIStickyAccountMatchesGroup(account, groupID) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else if s.isOpenAIAccountRuntimeBlocked(account) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)

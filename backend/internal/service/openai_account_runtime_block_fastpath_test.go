@@ -250,6 +250,34 @@ func TestOpenAIRequestErrorFailoversAndCoolsAccount(t *testing.T) {
 	require.Empty(t, events[0].CooldownReason)
 }
 
+func TestOpenAIRequestErrorFailoversOnProxyAuthenticationFailure(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &rateLimitAccountRepoStub{}
+	svc := &OpenAIGatewayService{
+		accountRepo:                     repo,
+		openaiTransientCooldownThrottle: newAccountWriteThrottle(time.Hour),
+	}
+	account := &Account{ID: 117, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	safeErr, failoverErr := svc.handleOpenAIUpstreamRequestError(
+		context.Background(),
+		c,
+		account,
+		errors.New(`Post "https://chatgpt.com/backend-api/codex/responses": socks connect tcp 1.2.3.4:1080->chatgpt.com:443: username/password authentication failed`),
+		"https://api.openai.com/v1/responses",
+		false,
+	)
+
+	require.Contains(t, safeErr, "authentication failed")
+	require.NotNil(t, failoverErr)
+	require.Equal(t, 0, w.Body.Len(), "failover path must not write the response")
+	require.Equal(t, 0, repo.tempCalls)
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+}
+
 func TestOpenAIRequestErrorDoesNotFailoverWhenRequestCanceled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &rateLimitAccountRepoStub{}
