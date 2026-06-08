@@ -498,8 +498,8 @@ const tabs = computed(() => {
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
 const validAmount = computed(() => amount.value ?? 0)
-const quickRechargeBalanceCredits = [2, 3, 5, 7, 10, 15, 20, 30, 50] as const
-const defaultQuickRechargeBalanceCredit = 7
+const quickRechargeBalanceCredits = [5, 10, 20, 50, 100, 200] as const
+const defaultQuickRechargeBalanceCredit = 20
 const balanceRechargeCnyPerCredit = computed(() => {
   const multiplier = checkout.value.balance_recharge_multiplier
   return multiplier > 0 ? multiplier : 6.8

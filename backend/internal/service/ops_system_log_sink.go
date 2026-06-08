@@ -109,12 +109,20 @@ func (s *OpsSystemLogSink) shouldIndex(event *logger.LogEvent) bool {
 		}
 	}
 	if strings.Contains(component, "http.access") {
-		return true
+		return shouldIndexAccessLog(event)
 	}
 	if strings.Contains(component, "audit") {
 		return true
 	}
 	return false
+}
+
+func shouldIndexAccessLog(event *logger.LogEvent) bool {
+	if event == nil || event.Fields == nil {
+		return false
+	}
+	status, ok := asInt64(event.Fields["status_code"])
+	return ok && status >= 400
 }
 
 func (s *OpsSystemLogSink) run() {
@@ -293,43 +301,54 @@ func asString(v any) string {
 }
 
 func asInt64Ptr(v any) *int64 {
+	n, ok := asInt64(v)
+	if !ok || n <= 0 {
+		return nil
+	}
+	return &n
+}
+
+func asInt64(v any) (int64, bool) {
 	switch t := v.(type) {
 	case int:
-		n := int64(t)
-		if n <= 0 {
-			return nil
-		}
-		return &n
+		return int64(t), true
 	case int64:
-		n := t
-		if n <= 0 {
-			return nil
+		return t, true
+	case int32:
+		return int64(t), true
+	case int16:
+		return int64(t), true
+	case int8:
+		return int64(t), true
+	case uint:
+		return int64(t), true
+	case uint64:
+		if t > uint64(^uint64(0)>>1) {
+			return 0, false
 		}
-		return &n
+		return int64(t), true
+	case uint32:
+		return int64(t), true
+	case uint16:
+		return int64(t), true
+	case uint8:
+		return int64(t), true
 	case float64:
-		n := int64(t)
-		if n <= 0 {
-			return nil
-		}
-		return &n
+		return int64(t), true
+	case float32:
+		return int64(t), true
 	case json.Number:
 		if n, err := t.Int64(); err == nil {
-			if n <= 0 {
-				return nil
-			}
-			return &n
+			return n, true
 		}
 	case string:
 		raw := strings.TrimSpace(t)
 		if raw == "" {
-			return nil
+			return 0, false
 		}
 		if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
-			if n <= 0 {
-				return nil
-			}
-			return &n
+			return n, true
 		}
 	}
-	return nil
+	return 0, false
 }

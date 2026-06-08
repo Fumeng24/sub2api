@@ -31,6 +31,7 @@ describe('ccswitchImport utils', () => {
     expect(params.get('app')).toBe('codex')
     expect(params.get('endpoint')).toBe(baseInput.baseUrl)
     expect(params.get('model')).toBe(OPENAI_CC_SWITCH_CODEX_MODEL)
+    expect(params.get('model')).toBe('gpt-5.5')
     expect(atob(params.get('usageScript') || '')).toBe(baseInput.usageScript)
   })
 

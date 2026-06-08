@@ -2333,13 +2333,6 @@ func (s *OpenAIGatewayService) openAIWSSessionStickyTTL() time.Duration {
 	return openaiStickySessionTTL
 }
 
-func (s *OpenAIGatewayService) openAIWSLBTopK() int {
-	if s != nil && s.cfg != nil && s.cfg.Gateway.OpenAIWS.LBTopK > 0 {
-		return s.cfg.Gateway.OpenAIWS.LBTopK
-	}
-	return 7
-}
-
 func (s *OpenAIGatewayService) openAIStickyEscapeConfig() openAIStickyEscapeConfig {
 	if s != nil && s.cfg != nil {
 		cfg := s.cfg.Gateway.OpenAIScheduler

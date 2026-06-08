@@ -262,6 +262,12 @@
               <span class="text-gray-400">{{ t('admin.usage.cacheReadTokens') }}</span>
               <span class="font-medium text-white">{{ tokenTooltipData.cache_read_tokens.toLocaleString() }}</span>
             </div>
+            <div
+              v-if="tokenTooltipData && isOpenAICacheReadOnlyUsage(tokenTooltipData)"
+              class="mt-1 max-w-[18rem] whitespace-normal rounded border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[11px] leading-4 text-sky-100"
+            >
+              {{ t('usage.openaiCacheCreateNote') }}
+            </div>
           </div>
           <div class="flex items-center justify-between gap-6 border-t border-gray-700 pt-1.5">
             <span class="text-gray-400">{{ t('usage.totalTokens') }}</span>
@@ -406,6 +412,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDateTime, formatReasoningEffort } from '@/utils/format'
 import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
+import { isOpenAICacheReadOnlyUsage } from '@/utils/cacheUsage'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { resolveUsageRequestType } from '@/utils/usageRequestType'

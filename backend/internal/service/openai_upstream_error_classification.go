@@ -55,6 +55,7 @@ func classifyOpenAIUpstreamError(statusCode int, upstreamMsg string, upstreamBod
 		"rate limit",
 		"too many requests",
 		"usage limit",
+		"no available image quota",
 	) {
 		return openAIUpstreamErrorRateLimit
 	}

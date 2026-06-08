@@ -62,14 +62,15 @@ const (
 	openAICompactSessionSeedKey        = "openai_compact_session_seed"
 	codexCLIVersion                    = "0.125.0"
 	// Codex 限额快照仅用于后台展示/诊断，不需要每个成功请求都立即落库。
-	openAICodexSnapshotPersistMinInterval  = 30 * time.Second
-	openAICompactBadOutputCode             = "compact_bad_output"
-	openAICompactContextWindowFallbackCode = "compact_context_window_fallback"
-	openAICompactMinOutputRunes            = 8
-	openAICompactLargeInputTokenThreshold  = 4096
-	openAICompactLargeInputMinOutputTokens = 16
-	openAICompactLargeInputMinOutputRunes  = 80
-	openAIEmptyOutputCode                  = "empty_effective_output"
+	openAICodexSnapshotPersistMinInterval    = 30 * time.Second
+	openAICompactBadOutputCode               = "compact_bad_output"
+	openAICompactContextWindowFallbackCode   = "compact_context_window_fallback"
+	openAICompactMinOutputRunes              = 8
+	openAICompactLargeInputTokenThreshold    = 4096
+	openAICompactLargeInputMinOutputTokens   = 16
+	openAICompactLargeInputMinOutputRunes    = 80
+	openAIEmptyOutputCode                    = "empty_effective_output"
+	openAICodexImageBridgeAutoDisableTimeout = 5 * time.Second
 	// 配额自动暂停时，超过该时长仍未刷新的 used% 快照视为陈旧，不再据此暂停账号。
 	// 被暂停的账号收不到流量，其快照永远不会从上游响应头刷新；该兜底让账号在快照
 	// 陈旧时放行一次请求，从而通过正常响应头自愈，而无需等待整个窗口（5h/7d）重置。
@@ -4031,6 +4032,25 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 	// 避免粘性路由继续复用刚被限流的账号。
 	reqModel, _, _ := extractOpenAIRequestMetaFromBody(requestBody)
 	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+	if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, upstreamMsg, body) {
+		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			Platform:             account.Platform,
+			AccountID:            account.ID,
+			AccountName:          account.Name,
+			UpstreamStatusCode:   resp.StatusCode,
+			UpstreamRequestID:    resp.Header.Get("x-request-id"),
+			Passthrough:          true,
+			Kind:                 "failover",
+			Message:              upstreamMsg,
+			Detail:               upstreamDetail,
+			UpstreamResponseBody: upstreamDetail,
+		})
+		return &UpstreamFailoverError{
+			StatusCode:      resp.StatusCode,
+			ResponseBody:    body,
+			ResponseHeaders: resp.Header.Clone(),
+		}
+	}
 	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
 	if upstreamClass == openAIUpstreamErrorBilling || shouldDisable && openAIUpstreamErrorClassShouldFailover(upstreamClass) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -4479,6 +4499,10 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			if eventType == "response.failed" {
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
 				failedPayload = append(failedPayload[:0], dataBytes...)
+				if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, failedMessage, dataBytes) && !openAIStreamClientOutputStarted(c, clientOutputStarted) {
+					return resultWithUsage(),
+						s.newOpenAIStreamFailoverError(c, account, true, upstreamRequestID, dataBytes, failedMessage)
+				}
 				shouldFailoverFailedEvent := openAIStreamFailedEventShouldFailover(dataBytes, failedMessage)
 				if isOpenAIResponsesCompactPath(c) && !openAIStreamClientOutputStarted(c, clientOutputStarted) && isOpenAIContextWindowError(failedMessage, dataBytes) {
 					return resultWithUsage(),
@@ -4611,7 +4635,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	// stream=false was requested. Without this conversion the client would
 	// receive raw SSE text or a terminal event with empty output.
 	if isEventStreamResponse(resp.Header) {
-		return s.handlePassthroughSSEToJSON(resp, c, account, body, originalModel, mappedModel)
+		return s.handlePassthroughSSEToJSON(ctx, resp, c, account, body, originalModel, mappedModel)
 	}
 
 	usage := &OpenAIUsage{}
@@ -4657,7 +4681,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 // response for the passthrough path. It mirrors handleSSEToJSON while
 // preserving passthrough payloads, except compact-only model remapping may
 // rewrite model fields back to the original requested model.
-func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c *gin.Context, account *Account, body []byte, originalModel string, mappedModel string) (*openaiNonStreamingResultPassthrough, error) {
+func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, body []byte, originalModel string, mappedModel string) (*openaiNonStreamingResultPassthrough, error) {
 	bodyText := string(body)
 	finalResponse, ok := extractCodexFinalResponse(bodyText)
 
@@ -4687,6 +4711,9 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c
 			msg := extractOpenAISSEErrorMessage(terminalPayload)
 			if msg == "" {
 				msg = "Upstream compact response failed"
+			}
+			if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, msg, terminalPayload) {
+				return nil, s.newOpenAIStreamFailoverError(c, account, true, resp.Header.Get("x-request-id"), terminalPayload, msg)
 			}
 			return nil, s.writeOpenAINonStreamingProtocolError(resp, c, msg)
 		}
@@ -4915,6 +4942,39 @@ func (s *OpenAIGatewayService) overrideBrowserUserAgent(ctx context.Context, acc
 	req.Header.Set("user-agent", codexUA)
 }
 
+func isOpenAICodexImageBridgeUnsupportedError(message string, payload []byte) bool {
+	text := normalizeOpenAIUpstreamErrorText(message, payload)
+	return containsAnyOpenAIErrorText(text, imageGenerationPermissionMessage)
+}
+
+func (s *OpenAIGatewayService) autoDisableCodexImageBridgeForUnsupportedUpstream(ctx context.Context, account *Account, message string, payload []byte) bool {
+	if !isOpenAICodexImageBridgeUnsupportedError(message, payload) {
+		return false
+	}
+	if s == nil || s.accountRepo == nil || account == nil || account.ID <= 0 || account.Platform != PlatformOpenAI {
+		return false
+	}
+	if override := account.CodexImageGenerationBridgeOverride(); override != nil && !*override {
+		return true
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), openAICodexImageBridgeAutoDisableTimeout)
+	defer cancel()
+
+	if err := s.accountRepo.UpdateExtra(dbCtx, account.ID, map[string]any{featureKeyCodexImageGenerationBridge: false}); err != nil {
+		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Auto-disable Codex image_generation bridge failed: account=%d name=%s err=%v", account.ID, account.Name, err)
+		return true
+	}
+	if account.Extra == nil {
+		account.Extra = make(map[string]any)
+	}
+	account.Extra[featureKeyCodexImageGenerationBridge] = false
+	logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Auto-disabled Codex image_generation bridge after upstream unsupported error: account=%d name=%s", account.ID, account.Name)
+	return true
+}
+
 func (s *OpenAIGatewayService) handleErrorResponse(
 	ctx context.Context,
 	resp *http.Response,
@@ -4961,6 +5021,23 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		reqModel, _, _ = extractOpenAIRequestMetaFromBody(requestBody)
 	}
 	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+	if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, upstreamMsg, body) {
+		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			Platform:           account.Platform,
+			AccountID:          account.ID,
+			AccountName:        account.Name,
+			UpstreamStatusCode: resp.StatusCode,
+			UpstreamRequestID:  resp.Header.Get("x-request-id"),
+			Kind:               "failover",
+			Message:            upstreamMsg,
+			Detail:             upstreamDetail,
+		})
+		return nil, &UpstreamFailoverError{
+			StatusCode:      resp.StatusCode,
+			ResponseBody:    body,
+			ResponseHeaders: resp.Header.Clone(),
+		}
+	}
 	if upstreamClass == openAIUpstreamErrorBilling {
 		_ = s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -5499,6 +5576,11 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 			if eventType == "response.failed" {
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
 				failedPayload = append(failedPayload[:0], dataBytes...)
+				if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, failedMessage, dataBytes) && !openAIStreamClientOutputStarted(c, clientOutputStarted) {
+					sawFailedEvent = true
+					streamFailoverErr = s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, dataBytes, failedMessage)
+					return
+				}
 				shouldFailoverFailedEvent := openAIStreamFailedEventShouldFailover(dataBytes, failedMessage)
 				if isOpenAIResponsesCompactPath(c) && !openAIStreamClientOutputStarted(c, clientOutputStarted) && isOpenAIContextWindowError(failedMessage, dataBytes) {
 					sawFailedEvent = true
@@ -5937,7 +6019,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	// Some OpenAI-compatible upstreams (including other sub2api instances)
 	// may return SSE even when stream=false was requested.
 	if isEventStreamResponse(resp.Header) {
-		return s.handleSSEToJSON(resp, c, body, originalModel, mappedModel)
+		return s.handleSSEToJSON(ctx, resp, c, account, body, originalModel, mappedModel)
 	}
 	bodyLooksLikeSSE := bytes.Contains(body, []byte("data:")) || bytes.Contains(body, []byte("event:"))
 
@@ -5947,13 +6029,13 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	// positives on JSON responses that coincidentally contain "data:" or
 	// "event:" in their text content.
 	if account.Type == AccountTypeOAuth && bodyLooksLikeSSE {
-		return s.handleSSEToJSON(resp, c, body, originalModel, mappedModel)
+		return s.handleSSEToJSON(ctx, resp, c, account, body, originalModel, mappedModel)
 	}
 
 	usageValue, usageOK := extractOpenAIUsageFromJSONBytes(body)
 	if !usageOK {
 		if bodyLooksLikeSSE {
-			return s.handleSSEToJSON(resp, c, body, originalModel, mappedModel)
+			return s.handleSSEToJSON(ctx, resp, c, account, body, originalModel, mappedModel)
 		}
 		return nil, fmt.Errorf("parse response: invalid json response")
 	}
@@ -5996,7 +6078,7 @@ func isEventStreamResponse(header http.Header) bool {
 	return strings.Contains(contentType, "text/event-stream")
 }
 
-func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Context, body []byte, originalModel, mappedModel string) (*openaiNonStreamingResult, error) {
+func (s *OpenAIGatewayService) handleSSEToJSON(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, body []byte, originalModel, mappedModel string) (*openaiNonStreamingResult, error) {
 	bodyText := string(body)
 	finalResponse, ok := extractCodexFinalResponse(bodyText)
 
@@ -6027,6 +6109,9 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 			msg := extractOpenAISSEErrorMessage(terminalPayload)
 			if msg == "" {
 				msg = "Upstream compact response failed"
+			}
+			if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, msg, terminalPayload) {
+				return nil, s.newOpenAIStreamFailoverError(c, account, false, resp.Header.Get("x-request-id"), terminalPayload, msg)
 			}
 			return nil, s.writeOpenAINonStreamingProtocolError(resp, c, msg)
 		}

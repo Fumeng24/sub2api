@@ -4789,7 +4789,7 @@
                 </p>
               </div>
 
-              <!-- Hide CCS Import Button -->
+              <!-- Hide CC Switch Import Button -->
               <div
                 class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
               >

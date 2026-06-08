@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -56,6 +57,13 @@ func TestIsMissingRelationError(t *testing.T) {
 				t.Fatalf("got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestOpsCleanupDeletedCountsStringIncludesSchedulerOutbox(t *testing.T) {
+	got := (opsCleanupDeletedCounts{schedulerOutbox: 12}).String()
+	if !strings.Contains(got, "scheduler_outbox=12") {
+		t.Fatalf("String() = %q, want scheduler_outbox count", got)
 	}
 }
 

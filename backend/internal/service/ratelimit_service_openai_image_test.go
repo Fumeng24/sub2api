@@ -16,11 +16,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type openAIImageQuotaAccountRepoStub struct {
+	modelNotFoundAccountRepoStub
+	setErrorCalls   int
+	rateLimitCalls  int
+	lastSetErrorMsg string
+}
+
+func (r *openAIImageQuotaAccountRepoStub) SetError(_ context.Context, _ int64, errorMsg string) error {
+	r.setErrorCalls++
+	r.lastSetErrorMsg = errorMsg
+	return nil
+}
+
+func (r *openAIImageQuotaAccountRepoStub) SetRateLimited(_ context.Context, _ int64, _ time.Time) error {
+	r.rateLimitCalls++
+	return nil
+}
+
 func TestIsOpenAIImageRateLimitError(t *testing.T) {
 	imageBody := []byte(`{"error":{"message":"Rate limit reached for gpt-image-2-codex (for limit gpt-image) in organization org on input-images per min: Limit 4000, Used 4000. Please try again in 467ms."}}`)
+	imageQuotaBody := []byte(`{"error":{"code":"insufficient_quota","message":"no available image quota","type":"insufficient_quota"}}`)
 	textBody := []byte(`{"error":{"message":"Rate limit reached for gpt-5.4 in organization org on tokens per min: Limit 30000, Used 30000. Please try again in 1s."}}`)
 
 	require.True(t, isOpenAIImageRateLimitError(http.StatusTooManyRequests, imageBody))
+	require.True(t, isOpenAIImageRateLimitError(http.StatusTooManyRequests, imageQuotaBody))
 	require.False(t, isOpenAIImageRateLimitError(http.StatusTooManyRequests, textBody))
 	require.False(t, isOpenAIImageRateLimitError(http.StatusBadRequest, imageBody))
 }
@@ -60,6 +80,22 @@ func TestRateLimitService_HandleOpenAIImageRateLimit_DefaultsToOneMinute(t *test
 	require.WithinDuration(t, before.Add(time.Minute), call.resetAt, time.Second)
 }
 
+func TestRateLimitService_HandleUpstreamError_OpenAIImageQuota429UsesImageRateLimit(t *testing.T) {
+	repo := &openAIImageQuotaAccountRepoStub{}
+	svc := &RateLimitService{accountRepo: repo}
+	account := &Account{ID: 205, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	body := []byte(`{"error":{"code":"insufficient_quota","message":"no available image quota","type":"insufficient_quota"}}`)
+
+	disabled := svc.HandleUpstreamError(context.Background(), account, http.StatusTooManyRequests, http.Header{}, body, "gpt-image-2")
+
+	require.False(t, disabled)
+	require.Zero(t, repo.setErrorCalls)
+	require.Zero(t, repo.rateLimitCalls)
+	require.Len(t, repo.modelRateLimitCalls, 1)
+	require.Equal(t, openAIImageGenerationRateLimitKey, repo.modelRateLimitCalls[0].scope)
+	require.Equal(t, openAIImageRateLimitReason, repo.modelRateLimitCalls[0].reason)
+}
+
 func TestOpenAIGatewayService_HandleOpenAIAccountUpstreamError_ImageRateLimitDoesNotBlockWholeAccount(t *testing.T) {
 	repo := &modelNotFoundAccountRepoStub{}
 	svc := &OpenAIGatewayService{rateLimitService: &RateLimitService{accountRepo: repo}}
@@ -69,6 +105,23 @@ func TestOpenAIGatewayService_HandleOpenAIAccountUpstreamError_ImageRateLimitDoe
 	disabled := svc.handleOpenAIAccountUpstreamError(context.Background(), account, http.StatusTooManyRequests, http.Header{}, body, "gpt-image-2")
 
 	require.False(t, disabled)
+	require.Len(t, repo.modelRateLimitCalls, 1)
+	require.Equal(t, openAIImageGenerationRateLimitKey, repo.modelRateLimitCalls[0].scope)
+	_, wholeAccountBlocked := svc.openaiAccountRuntimeBlockUntil.Load(account.ID)
+	require.False(t, wholeAccountBlocked)
+}
+
+func TestOpenAIGatewayService_HandleOpenAIAccountUpstreamError_ImageQuotaDoesNotDisableAccount(t *testing.T) {
+	repo := &openAIImageQuotaAccountRepoStub{}
+	svc := &OpenAIGatewayService{rateLimitService: &RateLimitService{accountRepo: repo}}
+	account := &Account{ID: 206, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	body := []byte(`{"error":{"code":"insufficient_quota","message":"no available image quota","type":"insufficient_quota"}}`)
+
+	disabled := svc.handleOpenAIAccountUpstreamError(context.Background(), account, http.StatusTooManyRequests, http.Header{}, body, "gpt-image-2")
+
+	require.False(t, disabled)
+	require.Zero(t, repo.setErrorCalls)
+	require.Zero(t, repo.rateLimitCalls)
 	require.Len(t, repo.modelRateLimitCalls, 1)
 	require.Equal(t, openAIImageGenerationRateLimitKey, repo.modelRateLimitCalls[0].scope)
 	_, wholeAccountBlocked := svc.openaiAccountRuntimeBlockUntil.Load(account.ID)

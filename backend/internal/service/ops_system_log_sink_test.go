@@ -32,16 +32,29 @@ func TestOpsSystemLogSink_ShouldIndex(t *testing.T) {
 			want:  true,
 		},
 		{
-			name:  "access component",
-			event: &logger.LogEvent{Level: "info", Component: "http.access"},
-			want:  true,
+			name: "access component success is skipped",
+			event: &logger.LogEvent{
+				Level:     "info",
+				Component: "http.access",
+				Fields:    map[string]any{"status_code": 200},
+			},
+			want: false,
 		},
 		{
-			name: "access component from fields (real zap path)",
+			name: "access component client error is indexed",
 			event: &logger.LogEvent{
 				Level:     "info",
 				Component: "",
-				Fields:    map[string]any{"component": "http.access"},
+				Fields:    map[string]any{"component": "http.access", "status_code": 404},
+			},
+			want: true,
+		},
+		{
+			name: "access component server error is indexed",
+			event: &logger.LogEvent{
+				Level:     "info",
+				Component: "http.access",
+				Fields:    map[string]any{"status_code": json.Number("502")},
 			},
 			want: true,
 		},

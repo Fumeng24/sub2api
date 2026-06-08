@@ -78,10 +78,25 @@
         <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
           <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" :stroke-width="2" />
         </div>
-        <div>
+        <div class="min-w-0 flex-1">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.todayTokens') }}</p>
           <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatTokens(stats?.today_tokens || 0) }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('dashboard.input') }}: {{ formatTokens(stats?.today_input_tokens || 0) }} / {{ t('dashboard.output') }}: {{ formatTokens(stats?.today_output_tokens || 0) }}</p>
+          <div class="space-y-1 text-xs">
+            <p class="flex flex-wrap gap-x-2 gap-y-0.5 text-gray-500 dark:text-gray-400">
+              <span>{{ t('dashboard.input') }}: {{ formatTokens(stats?.today_input_tokens || 0) }}</span>
+              <span>{{ t('dashboard.output') }}: {{ formatTokens(stats?.today_output_tokens || 0) }}</span>
+            </p>
+            <p class="flex flex-wrap gap-x-2 gap-y-0.5">
+              <span class="text-sky-600 dark:text-sky-400">{{ t('usage.cacheHit') }}: {{ formatTokens(stats?.today_cache_read_tokens || 0) }}</span>
+              <span class="cursor-help text-amber-600 dark:text-amber-400" :title="t('usage.openaiCacheCreateNote')">{{ t('usage.cacheCreate') }}: {{ formatTokens(stats?.today_cache_creation_tokens || 0) }}</span>
+            </p>
+            <p class="font-medium text-sky-600 dark:text-sky-400">
+              {{ t('usage.cacheHitRate') }}: {{ todayCacheStats.ratePercent }}
+            </p>
+            <p class="text-[11px] leading-4 text-gray-400 dark:text-dark-400">
+              {{ t('usage.openaiCacheCreateShortNote') }}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -92,10 +107,25 @@
         <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
           <Icon name="database" size="md" class="text-indigo-600 dark:text-indigo-400" :stroke-width="2" />
         </div>
-        <div>
+        <div class="min-w-0 flex-1">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.totalTokens') }}</p>
           <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatTokens(stats?.total_tokens || 0) }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('dashboard.input') }}: {{ formatTokens(stats?.total_input_tokens || 0) }} / {{ t('dashboard.output') }}: {{ formatTokens(stats?.total_output_tokens || 0) }}</p>
+          <div class="space-y-1 text-xs">
+            <p class="flex flex-wrap gap-x-2 gap-y-0.5 text-gray-500 dark:text-gray-400">
+              <span>{{ t('dashboard.input') }}: {{ formatTokens(stats?.total_input_tokens || 0) }}</span>
+              <span>{{ t('dashboard.output') }}: {{ formatTokens(stats?.total_output_tokens || 0) }}</span>
+            </p>
+            <p class="flex flex-wrap gap-x-2 gap-y-0.5">
+              <span class="text-sky-600 dark:text-sky-400">{{ t('usage.cacheHit') }}: {{ formatTokens(stats?.total_cache_read_tokens || 0) }}</span>
+              <span class="cursor-help text-amber-600 dark:text-amber-400" :title="t('usage.openaiCacheCreateNote')">{{ t('usage.cacheCreate') }}: {{ formatTokens(stats?.total_cache_creation_tokens || 0) }}</span>
+            </p>
+            <p class="font-medium text-sky-600 dark:text-sky-400">
+              {{ t('usage.cacheHitRate') }}: {{ totalCacheStats.ratePercent }}
+            </p>
+            <p class="text-[11px] leading-4 text-gray-400 dark:text-dark-400">
+              {{ t('usage.openaiCacheCreateShortNote') }}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -266,6 +296,26 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 
 const platformLabel = (p: string) => PLATFORM_LABELS[p] ?? p
+
+const buildCacheStats = (input: number, cacheCreate: number, cacheRead: number) => {
+  const totalPromptTokens = input + cacheCreate + cacheRead
+  return {
+    totalPromptTokens,
+    ratePercent: totalPromptTokens > 0 ? `${((cacheRead / totalPromptTokens) * 100).toFixed(1)}%` : '-',
+  }
+}
+
+const todayCacheStats = computed(() => buildCacheStats(
+  props.stats?.today_input_tokens ?? 0,
+  props.stats?.today_cache_creation_tokens ?? 0,
+  props.stats?.today_cache_read_tokens ?? 0,
+))
+
+const totalCacheStats = computed(() => buildCacheStats(
+  props.stats?.total_input_tokens ?? 0,
+  props.stats?.total_cache_creation_tokens ?? 0,
+  props.stats?.total_cache_read_tokens ?? 0,
+))
 
 const sortedPlatforms = computed(() => {
   const list = props.stats?.by_platform ?? []

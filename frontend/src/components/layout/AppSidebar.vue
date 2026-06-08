@@ -23,6 +23,25 @@
 
     <!-- Navigation -->
     <nav class="sidebar-nav scrollbar-hide">
+      <a
+        v-if="docUrl"
+        :href="docUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="sidebar-link mb-4 border border-primary-200 bg-primary-50 text-primary-700 shadow-sm ring-1 ring-primary-100 hover:bg-primary-100 hover:text-primary-800 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-900/40 dark:hover:bg-primary-900/50 dark:hover:text-primary-100"
+        :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
+        :title="sidebarCollapsed ? t('nav.docs') : undefined"
+        @click="handleDocsLinkClick"
+      >
+        <BookIcon class="h-5 w-5 flex-shrink-0" />
+        <span class="sidebar-label sidebar-label-flex" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
+          <span class="min-w-0 truncate">{{ t('nav.docs') }}</span>
+          <span class="rounded-full bg-primary-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white dark:bg-primary-400 dark:text-primary-950">
+            {{ t('nav.docsBadge') }}
+          </span>
+        </span>
+      </a>
+
       <!-- Admin View: Admin menu first, then personal menu -->
       <template v-if="canAccessTicketAdmin">
         <!-- Admin Section -->
@@ -259,6 +278,7 @@ const expandedGroups = ref<Set<string>>(new Set())
 const siteName = computed(() => appStore.siteName)
 const siteLogo = computed(() => appStore.siteLogo)
 const siteVersion = computed(() => appStore.siteVersion)
+const docUrl = computed(() => appStore.docUrl)
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 const userTicketBadge = computed(() => ticketStore.userUnreadCount)
 const adminTicketBadge = computed(() => ticketStore.adminUnreadCount)
@@ -509,6 +529,21 @@ const TicketIcon = {
           'stroke-linecap': 'round',
           'stroke-linejoin': 'round',
           d: 'M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z'
+        })
+      ]
+    )
+}
+
+const BookIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25A8.966 8.966 0 0118 3.75c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25'
         })
       ]
     )
@@ -856,6 +891,12 @@ function toggleTheme() {
 
 function closeMobile() {
   appStore.setMobileOpen(false)
+}
+
+function handleDocsLinkClick() {
+  if (mobileOpen.value) {
+    appStore.setMobileOpen(false)
+  }
 }
 
 function handleMenuItemClick(itemPath: string) {

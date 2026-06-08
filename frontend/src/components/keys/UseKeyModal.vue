@@ -422,10 +422,10 @@ const currentFiles = computed((): FileConfig[] => {
       }
       return generateOpenAIFiles(baseUrl, apiKey)
     case 'gemini':
-      return [generateGeminiCliContent(baseUrl, apiKey)]
+      return [generateGeminiCliContent(geminiBase, apiKey)]
     case 'antigravity':
       if (activeClientTab.value === 'gemini') {
-        return [generateGeminiCliContent(`${baseUrl}/antigravity`, apiKey)]
+        return [generateGeminiCliContent(antigravityGeminiBase, apiKey)]
       }
       return generateAnthropicFiles(`${baseUrl}/antigravity`, apiKey)
     default:
@@ -617,22 +617,6 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     }
   }
   const openaiModels = {
-    'gpt-5.2': {
-      name: 'GPT-5.2',
-      limit: {
-        context: 400000,
-        output: 128000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {},
-        xhigh: {}
-      }
-    },
     'gpt-5.5': {
       name: 'GPT-5.5',
       limit: {
@@ -679,53 +663,6 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
         medium: {},
         high: {},
         xhigh: {}
-      }
-    },
-    'gpt-5.3-codex-spark': {
-      name: 'GPT-5.3 Codex Spark',
-      limit: {
-        context: 128000,
-        output: 32000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {},
-        xhigh: {}
-      }
-    },
-    'gpt-5.3-codex': {
-      name: 'GPT-5.3 Codex',
-      limit: {
-        context: 400000,
-        output: 128000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {},
-        xhigh: {}
-      }
-    },
-    'codex-mini-latest': {
-      name: 'Codex Mini',
-      limit: {
-        context: 200000,
-        output: 100000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {}
       }
     }
   }
@@ -1007,6 +944,8 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].models = geminiModels
   } else if (platform === 'anthropic') {
     provider[platform].npm = '@ai-sdk/anthropic'
+    provider[platform].name = 'Tomato Claude'
+    provider[platform].models = claudeModels
   } else if (platform === 'antigravity-claude') {
     provider[platform].npm = '@ai-sdk/anthropic'
     provider[platform].name = 'Antigravity (Claude)'
@@ -1016,6 +955,8 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].name = 'Antigravity (Gemini)'
     provider[platform].models = antigravityGeminiModels
   } else if (platform === 'openai') {
+    provider[platform].npm = '@ai-sdk/openai'
+    provider[platform].name = 'Tomato Codex / GPT'
     provider[platform].models = openaiModels
   }
 
@@ -1023,11 +964,15 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     platform === 'openai'
       ? {
           build: {
+            model: 'openai/gpt-5.5',
+            variant: 'xhigh',
             options: {
               store: false
             }
           },
           plan: {
+            model: 'openai/gpt-5.5',
+            variant: 'xhigh',
             options: {
               store: false
             }
@@ -1037,9 +982,9 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
 
   const content = JSON.stringify(
     {
+      $schema: 'https://opencode.ai/config.json',
       provider,
-      ...(agent ? { agent } : {}),
-      $schema: 'https://opencode.ai/config.json'
+      ...(agent ? { agent } : {})
     },
     null,
     2

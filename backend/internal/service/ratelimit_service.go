@@ -189,7 +189,13 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 	if upstreamMsg != "" {
 		upstreamMsg = truncateForLog([]byte(upstreamMsg), 512)
 	}
-	if isUpstreamBillingExhaustionError(statusCode, upstreamMsg, responseBody) {
+	if account.Platform == PlatformOpenAI && isOpenAIImageRateLimitError(statusCode, responseBody) {
+		if s.HandleOpenAIImageRateLimit(ctx, account, statusCode, headers, responseBody) {
+			return false
+		}
+	}
+	isOpenAIImageQuota429 := account.Platform == PlatformOpenAI && isOpenAIImageQuotaRateLimitError(statusCode, upstreamMsg, responseBody)
+	if !isOpenAIImageQuota429 && isUpstreamBillingExhaustionError(statusCode, upstreamMsg, responseBody) {
 		msg := fmt.Sprintf("Upstream billing exhausted (%d): insufficient balance or billing issue", statusCode)
 		if upstreamMsg != "" {
 			msg = fmt.Sprintf("Upstream billing exhausted (%d): %s", statusCode, upstreamMsg)
@@ -354,6 +360,9 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 
 func shouldBypassCustomErrorCodeSkip(account *Account, statusCode int, responseBody []byte) bool {
 	if account == nil {
+		return false
+	}
+	if account.Platform == PlatformOpenAI && isOpenAIImageQuotaRateLimitError(statusCode, extractUpstreamErrorMessage(responseBody), responseBody) {
 		return false
 	}
 	if isUpstreamBillingExhaustionError(statusCode, extractUpstreamErrorMessage(responseBody), responseBody) {
@@ -1690,6 +1699,9 @@ func isOpenAIImageRateLimitError(statusCode int, body []byte) bool {
 	if statusCode != http.StatusTooManyRequests || len(body) == 0 {
 		return false
 	}
+	if isOpenAIImageQuotaRateLimitError(statusCode, "", body) {
+		return true
+	}
 	lower := strings.ToLower(string(body))
 	for _, marker := range []string{
 		"for limit gpt-image",
@@ -1702,6 +1714,16 @@ func isOpenAIImageRateLimitError(statusCode int, body []byte) bool {
 		}
 	}
 	return false
+}
+
+func isOpenAIImageQuotaRateLimitError(statusCode int, upstreamMsg string, body []byte) bool {
+	if statusCode != http.StatusTooManyRequests {
+		return false
+	}
+	return containsAnyOpenAIErrorText(
+		normalizeOpenAIUpstreamErrorText(upstreamMsg, body),
+		"no available image quota",
+	)
 }
 
 func openAIImageRateLimitResetAt(headers http.Header, body []byte) time.Time {

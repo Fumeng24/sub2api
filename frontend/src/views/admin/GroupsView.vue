@@ -3268,18 +3268,12 @@
               按列表顺序优先调度；失败、满载或冷却时继续尝试下一项。
             </p>
           </div>
-          <div class="grid grid-cols-2 gap-3 text-center text-xs">
+          <div class="grid grid-cols-1 gap-3 text-center text-xs">
             <div>
               <div class="font-semibold text-gray-900 dark:text-white">
                 {{ accountSchedulingTotalCount }}
               </div>
               <div class="text-gray-500 dark:text-gray-400">账号</div>
-            </div>
-            <div>
-              <div class="font-semibold text-emerald-700 dark:text-emerald-300">
-                {{ accountSchedulingWeightTotal }}
-              </div>
-              <div class="text-gray-500 dark:text-gray-400">权重</div>
             </div>
           </div>
         </div>
@@ -3299,12 +3293,24 @@
               <div>
                 <h4 class="text-sm font-semibold text-gray-900 dark:text-white">调度队列</h4>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  优先消耗排在前面的账号；权重保留在后台配置中。
+                  优先消耗排在前面的账号；失败、满载或冷却时继续尝试下一项。
                 </p>
               </div>
-              <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                {{ accountSchedulingWeightTotal }} 权重
-              </span>
+              <div class="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:bg-dark-700"
+                  :disabled="accountSchedulingUpstreamLoading"
+                  @click="refreshAccountSchedulingUpstreamStatuses(true)"
+                >
+                  <Icon
+                    name="refresh"
+                    size="xs"
+                    :class="accountSchedulingUpstreamLoading ? 'animate-spin' : ''"
+                  />
+                  刷新上游
+                </button>
+              </div>
             </div>
             <VueDraggable
               v-model="accountSchedulingAccounts"
@@ -3340,6 +3346,51 @@
                         不参与调度
                       </span>
                     </div>
+                    <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                      <template v-if="schedulingUpstreamStatus(entry)">
+                        <span
+                          :class="[
+                            'inline-flex items-center gap-1 rounded border px-2 py-1',
+                            schedulingUpstreamStatus(entry)?.status === 'ok'
+                              ? 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900/50 dark:bg-cyan-900/20 dark:text-cyan-300'
+                              : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300',
+                          ]"
+                          :title="schedulingUpstreamTitle(entry)"
+                        >
+                          <span
+                            :class="[
+                              'h-1.5 w-1.5 rounded-full',
+                              schedulingUpstreamStatus(entry)?.status === 'ok' ? 'bg-cyan-500' : 'bg-amber-500',
+                            ]"
+                          />
+                          上游倍率 {{ formatSchedulingRate(schedulingUpstreamStatus(entry)?.upstream_group_effective_rate_multiplier) }}
+                        </span>
+                        <span
+                          class="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-gray-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300"
+                          :title="schedulingUpstreamTitle(entry)"
+                        >
+                          钱包 {{ formatSchedulingMoney(schedulingUpstreamStatus(entry)?.user_balance, schedulingUpstreamStatus(entry)?.balance_unit) }}
+                        </span>
+                        <span
+                          class="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-gray-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300"
+                          :title="schedulingUpstreamTitle(entry)"
+                        >
+                          Key剩余 {{ formatSchedulingMoney(schedulingUpstreamStatus(entry)?.key_remaining, schedulingUpstreamStatus(entry)?.balance_unit) }}
+                        </span>
+                      </template>
+                      <span
+                        v-else-if="accountSchedulingUpstreamLoading"
+                        class="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-gray-400 dark:border-dark-600 dark:bg-dark-800"
+                      >
+                        上游状态加载中
+                      </span>
+                      <span
+                        v-else
+                        class="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-gray-400 dark:border-dark-600 dark:bg-dark-800"
+                      >
+                        无上游面板余额
+                      </span>
+                    </div>
                   </div>
                   <div class="flex shrink-0 items-center gap-1">
                     <button
@@ -3359,19 +3410,6 @@
                       <Icon name="arrowDown" size="sm" />
                     </button>
                   </div>
-                </div>
-                <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-                  <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                    权重（后台可见）
-                    <input
-                      v-model.number="entry.weight"
-                      type="number"
-                      min="1"
-                      step="1"
-                      class="input h-8 w-24 py-1 text-sm"
-                      @blur="normalizeSchedulingLists"
-                    />
-                  </label>
                 </div>
               </div>
             </VueDraggable>
@@ -3444,6 +3482,7 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useOnboardingStore } from "@/stores/onboarding";
 import { adminAPI } from "@/api/admin";
+import type { UpstreamSub2APIAccountStatus } from "@/api/admin/accounts";
 import type {
   AdminGroup,
   AccountSchedulingEntry,
@@ -3715,10 +3754,13 @@ const submitting = ref(false);
 const sortSubmitting = ref(false);
 const accountSchedulingLoading = ref(false);
 const accountSchedulingSaving = ref(false);
+const accountSchedulingUpstreamLoading = ref(false);
 const editingGroup = ref<AdminGroup | null>(null);
 const deletingGroup = ref<AdminGroup | null>(null);
 const accountSchedulingGroup = ref<AdminGroup | null>(null);
 const accountSchedulingAccounts = ref<AccountSchedulingEntry[]>([]);
+const accountSchedulingUpstreamStatusMap = ref<Map<number, UpstreamSub2APIAccountStatus>>(new Map());
+const accountSchedulingUpstreamReqSeq = ref(0);
 const showRateMultipliersModal = ref(false);
 const rateMultipliersGroup = ref<AdminGroup | null>(null);
 const showRPMOverridesModal = ref(false);
@@ -3750,9 +3792,6 @@ const accountSchedulingTitle = computed(() =>
 );
 const accountSchedulingTotalCount = computed(
   () => accountSchedulingAccounts.value.length,
-);
-const accountSchedulingWeightTotal = computed(() =>
-  accountSchedulingAccounts.value.reduce((sum, entry) => sum + normalizeSchedulingWeight(entry.weight), 0),
 );
 
 const createForm = reactive({
@@ -4485,6 +4524,55 @@ const schedulingAccountTypeLabel = (entry: AccountSchedulingEntry) => {
   return translated === key ? type : translated;
 };
 
+const schedulingUpstreamStatus = (entry: AccountSchedulingEntry) =>
+  accountSchedulingUpstreamStatusMap.value.get(entry.account_id);
+
+const formatSchedulingRate = (value: number | null | undefined): string => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
+  return `${value.toFixed(3).replace(/\.?0+$/, "")}x`;
+};
+
+const formatSchedulingMoney = (value: number | null | undefined, unit?: string): string => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
+  const formatted = Math.abs(value) >= 100 ? value.toFixed(1) : value.toFixed(2);
+  if (unit && unit.toUpperCase() !== "USD") {
+    return `${formatted} ${unit}`;
+  }
+  return `$${formatted}`;
+};
+
+const schedulingUpstreamTitle = (entry: AccountSchedulingEntry): string => {
+  const status = schedulingUpstreamStatus(entry);
+  if (!status) return "";
+  const lines = [
+    `上游: ${status.base_url}`,
+    `状态: ${status.status}`,
+  ];
+  if (status.upstream_key_name) {
+    lines.push(`Key: ${status.upstream_key_name}`);
+  }
+  if (status.upstream_group_name) {
+    lines.push(`分组: ${status.upstream_group_name}`);
+  }
+  if (typeof status.upstream_group_default_rate_multiplier === "number") {
+    lines.push(`默认倍率: ${formatSchedulingRate(status.upstream_group_default_rate_multiplier)}`);
+  }
+  if (typeof status.upstream_group_effective_rate_multiplier === "number") {
+    lines.push(`实际倍率: ${formatSchedulingRate(status.upstream_group_effective_rate_multiplier)}`);
+  }
+  if (typeof status.user_balance === "number") {
+    lines.push(`钱包余额: ${formatSchedulingMoney(status.user_balance, status.balance_unit)}`);
+  }
+  if (typeof status.key_remaining === "number") {
+    lines.push(`Key剩余: ${formatSchedulingMoney(status.key_remaining, status.balance_unit)}`);
+  }
+  if (status.message) {
+    lines.push(`消息: ${status.message}`);
+  }
+  lines.push(`更新时间: ${formatDateTime(status.fetched_at)}${status.cached ? " (缓存)" : ""}`);
+  return lines.join("\n");
+};
+
 const moveSchedulingEntry = (
   list: AccountSchedulingEntry[],
   fromIndex: number,
@@ -4510,14 +4598,41 @@ const setAccountSchedulingEntries = (entries: AccountSchedulingEntry[]) => {
   normalizeSchedulingLists();
 };
 
+const refreshAccountSchedulingUpstreamStatuses = async (force = false) => {
+  const accountIDs = accountSchedulingAccounts.value.map((entry) => entry.account_id);
+  const reqSeq = ++accountSchedulingUpstreamReqSeq.value;
+  if (accountIDs.length === 0) {
+    accountSchedulingUpstreamStatusMap.value = new Map();
+    accountSchedulingUpstreamLoading.value = false;
+    return;
+  }
+
+  accountSchedulingUpstreamLoading.value = true;
+  try {
+    const statuses = await adminAPI.accounts.getUpstreamSub2APIStatus(accountIDs, force);
+    if (reqSeq !== accountSchedulingUpstreamReqSeq.value) return;
+    accountSchedulingUpstreamStatusMap.value = new Map(statuses.map((status) => [status.account_id, status]));
+  } catch (error) {
+    if (reqSeq !== accountSchedulingUpstreamReqSeq.value) return;
+    accountSchedulingUpstreamStatusMap.value = new Map();
+    console.error("Error loading account scheduling upstream status:", error);
+  } finally {
+    if (reqSeq === accountSchedulingUpstreamReqSeq.value) {
+      accountSchedulingUpstreamLoading.value = false;
+    }
+  }
+};
+
 const handleAccountScheduling = async (group: AdminGroup) => {
   accountSchedulingGroup.value = group;
   showAccountSchedulingModal.value = true;
   accountSchedulingLoading.value = true;
   accountSchedulingAccounts.value = [];
+  accountSchedulingUpstreamStatusMap.value = new Map();
   try {
     const data = await adminAPI.groups.getAccountScheduling(group.id);
     setAccountSchedulingEntries(data.accounts || []);
+    void refreshAccountSchedulingUpstreamStatuses();
   } catch (error: any) {
     appStore.showError(error?.message || "加载账号调度配置失败");
     console.error("Error loading account scheduling:", error);
@@ -4531,6 +4646,7 @@ const closeAccountSchedulingModal = () => {
   showAccountSchedulingModal.value = false;
   accountSchedulingGroup.value = null;
   accountSchedulingAccounts.value = [];
+  accountSchedulingUpstreamStatusMap.value = new Map();
 };
 
 const saveAccountScheduling = async () => {
@@ -4555,6 +4671,7 @@ const saveAccountScheduling = async () => {
     showAccountSchedulingModal.value = false;
     accountSchedulingGroup.value = null;
     accountSchedulingAccounts.value = [];
+    accountSchedulingUpstreamStatusMap.value = new Map();
     loadGroups();
   } catch (error: any) {
     appStore.showError(error?.message || "保存账号调度配置失败");

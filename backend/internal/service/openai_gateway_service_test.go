@@ -1199,6 +1199,101 @@ func TestOpenAIStreamingResponseFailedBeforeOutputReturnsFailover(t *testing.T) 
 	require.Empty(t, rec.Body.String())
 }
 
+func TestOpenAIStreamingResponseFailedImageBridgeUnsupportedAutoDisablesAndFailsOver(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Config{
+		Gateway: config.GatewayConfig{
+			StreamDataIntervalTimeout: 0,
+			StreamKeepaliveInterval:   0,
+			MaxLineSize:               defaultMaxLineSize,
+		},
+	}
+	repo := &snapshotUpdateAccountRepo{updateExtraCalls: make(chan map[string]any, 1)}
+	svc := &OpenAIGatewayService{cfg: cfg, accountRepo: repo}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+
+	account := &Account{
+		ID:       38808,
+		Platform: PlatformOpenAI,
+		Name:     "acc",
+		Extra:    map[string]any{featureKeyCodexImageGenerationBridge: true},
+	}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			"event: response.created",
+			`data: {"type":"response.created","response":{"id":"resp_1"}}`,
+			"",
+			"event: response.failed",
+			`data: {"type":"response.failed","error":{"message":"Image generation is not enabled for this group"}}`,
+			"",
+		}, "\n"))),
+		Header: http.Header{"X-Request-Id": []string{"rid-image-bridge-unsupported"}},
+	}
+
+	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, account, time.Now(), "model", "model")
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "Image generation is not enabled")
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+	require.Equal(t, false, account.Extra[featureKeyCodexImageGenerationBridge])
+
+	select {
+	case updates := <-repo.updateExtraCalls:
+		require.Equal(t, false, updates[featureKeyCodexImageGenerationBridge])
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected UpdateExtra to be called")
+	}
+}
+
+func TestOpenAIHandleErrorResponseImageBridgeUnsupportedAutoDisablesAndFailsOver(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &snapshotUpdateAccountRepo{updateExtraCalls: make(chan map[string]any, 1)}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, accountRepo: repo}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+
+	account := &Account{
+		ID:       38808,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeOAuth,
+		Name:     "acc",
+		Extra:    map[string]any{featureKeyCodexImageGenerationBridge: true},
+	}
+	respBody := []byte(`{"error":{"message":"Image generation is not enabled for this group"}}`)
+	resp := &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+		Header:     http.Header{"X-Request-Id": []string{"rid-image-bridge-http"}},
+	}
+
+	result, err := svc.handleErrorResponse(context.Background(), resp, c, account, []byte(`{"model":"gpt-5.4"}`))
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusForbidden, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "Image generation is not enabled")
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+	require.Equal(t, false, account.Extra[featureKeyCodexImageGenerationBridge])
+
+	select {
+	case updates := <-repo.updateExtraCalls:
+		require.Equal(t, false, updates[featureKeyCodexImageGenerationBridge])
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected UpdateExtra to be called")
+	}
+}
+
 func TestOpenAIStreamingResponseFailedBeforeOutputCapacityErrorReturnsFailover(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{
@@ -1662,6 +1757,57 @@ func TestOpenAIStreamingPassthroughResponseFailedBeforeOutputReturnsFailover(t *
 	require.Empty(t, rec.Body.String())
 }
 
+func TestOpenAIStreamingPassthroughResponseFailedImageBridgeUnsupportedAutoDisablesAndFailsOver(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Config{
+		Gateway: config.GatewayConfig{
+			MaxLineSize: defaultMaxLineSize,
+		},
+	}
+	repo := &snapshotUpdateAccountRepo{updateExtraCalls: make(chan map[string]any, 1)}
+	svc := &OpenAIGatewayService{cfg: cfg, accountRepo: repo}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+
+	account := &Account{
+		ID:       38808,
+		Platform: PlatformOpenAI,
+		Name:     "acc",
+		Extra:    map[string]any{featureKeyCodexImageGenerationBridge: true},
+	}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			"event: response.created",
+			`data: {"type":"response.created","response":{"id":"resp_1"}}`,
+			"",
+			"event: response.failed",
+			`data: {"type":"response.failed","error":{"message":"Image generation is not enabled for this group"}}`,
+			"",
+		}, "\n"))),
+		Header: http.Header{"X-Request-Id": []string{"rid-passthrough-image-bridge-unsupported"}},
+	}
+
+	_, err := svc.handleStreamingResponsePassthrough(c.Request.Context(), resp, c, account, time.Now(), "", "")
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "Image generation is not enabled")
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+	require.Equal(t, false, account.Extra[featureKeyCodexImageGenerationBridge])
+
+	select {
+	case updates := <-repo.updateExtraCalls:
+		require.Equal(t, false, updates[featureKeyCodexImageGenerationBridge])
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected UpdateExtra to be called")
+	}
+}
+
 func TestOpenAIStreamingPassthroughBusinessResponseFailedReturnsTerminal(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{
@@ -1699,10 +1845,10 @@ func TestOpenAIStreamingPassthroughBusinessResponseFailedReturnsTerminal(t *test
 	require.Contains(t, rec.Body.String(), "response.failed")
 }
 
-func TestOpenAIResponseFailedBusinessPayloadDoesNotFailover(t *testing.T) {
+func TestOpenAIResponseFailedInsufficientQuotaPayloadFailsOver(t *testing.T) {
 	payload := []byte(`{"type":"response.failed","error":{"code":"insufficient_quota"}}`)
 
-	require.False(t, openAIStreamFailedEventShouldFailover(payload, ""))
+	require.True(t, openAIStreamFailedEventShouldFailover(payload, ""))
 }
 
 func TestOpenAIStreamingPassthroughResponseDoneWithoutDoneMarkerStillSucceeds(t *testing.T) {
@@ -2563,7 +2709,7 @@ func TestHandleSSEToJSON_CompletedEventReturnsJSON(t *testing.T) {
 		`data: [DONE]`,
 	}, "\n"))
 
-	usage, err := svc.handleSSEToJSON(resp, c, body, "gpt-4o", "gpt-4o")
+	usage, err := svc.handleSSEToJSON(context.Background(), resp, c, nil, body, "gpt-4o", "gpt-4o")
 	require.NoError(t, err)
 	require.NotNil(t, usage)
 	require.Equal(t, 7, usage.InputTokens)
@@ -2621,7 +2767,7 @@ func TestHandleSSEToJSON_ReconstructsImageGenerationOutputItemDone(t *testing.T)
 		`data: [DONE]`,
 	}, "\n"))
 
-	usage, err := svc.handleSSEToJSON(resp, c, body, "gpt-5.4", "gpt-5.4")
+	usage, err := svc.handleSSEToJSON(context.Background(), resp, c, nil, body, "gpt-5.4", "gpt-5.4")
 	require.NoError(t, err)
 	require.NotNil(t, usage)
 	require.Equal(t, 4, usage.ImageOutputTokens)
@@ -2647,7 +2793,7 @@ func TestHandleSSEToJSON_NoFinalResponseKeepsSSEBody(t *testing.T) {
 		`data: [DONE]`,
 	}, "\n"))
 
-	usage, err := svc.handleSSEToJSON(resp, c, body, "gpt-4o", "gpt-4o")
+	usage, err := svc.handleSSEToJSON(context.Background(), resp, c, nil, body, "gpt-4o", "gpt-4o")
 	require.NoError(t, err)
 	require.NotNil(t, usage)
 	require.Equal(t, 0, usage.InputTokens)
@@ -2671,7 +2817,7 @@ func TestHandleSSEToJSON_ResponseFailedReturnsProtocolError(t *testing.T) {
 		`data: [DONE]`,
 	}, "\n"))
 
-	usage, err := svc.handleSSEToJSON(resp, c, body, "gpt-4o", "gpt-4o")
+	usage, err := svc.handleSSEToJSON(context.Background(), resp, c, nil, body, "gpt-4o", "gpt-4o")
 	require.Nil(t, usage)
 	require.Error(t, err)
 	require.Equal(t, http.StatusBadGateway, rec.Code)

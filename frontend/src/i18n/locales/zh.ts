@@ -3,7 +3,8 @@ export default {
   home: {
     viewOnGithub: '在 GitHub 上查看',
     viewDocs: '查看文档',
-    docs: '文档',
+    docs: '教程',
+    docsBadge: '必看',
     switchToLight: '切换到浅色模式',
     switchToDark: '切换到深色模式',
     dashboard: '控制台',
@@ -389,7 +390,8 @@ export default {
     github: 'GitHub',
     mySubscriptions: '我的订阅',
     buySubscription: '充值/订阅',
-    docs: '文档',
+    docs: '教程',
+    docsBadge: '必看',
     myOrders: '我的订单',
     orderManagement: '订单管理',
     paymentDashboard: '支付概览',
@@ -713,7 +715,7 @@ export default {
     created: '创建时间',
     copyToClipboard: '复制到剪贴板',
     copied: '已复制！',
-    importToCcSwitch: '导入到 CCS',
+    importToCcSwitch: '导入到 CC Switch',
     enable: '启用',
     disable: '禁用',
     nameLabel: '名称',
@@ -785,7 +787,7 @@ export default {
       opencode: {
         title: 'OpenCode 配置示例',
         subtitle: 'opencode.json',
-        hint: '配置文件路径：~/.config/opencode/opencode.json（或 opencode.jsonc），不存在需手动创建。可使用默认 provider（openai/anthropic/google）或自定义 provider_id。API Key 支持直接配置或通过客户端 /connect 命令配置。示例仅供参考，模型与选项可按需调整。'
+        hint: '配置文件路径：~/.config/opencode/opencode.json（或 opencode.jsonc），不存在需手动创建。生成内容已包含 apiKey、baseURL、模型 limit/options/variants 等关键参数；API Key 也可改为通过客户端 /connect 命令配置。'
       }
     },
     customKeyLabel: '自定义密钥',
@@ -803,10 +805,10 @@ export default {
     ipBlacklistHint: '每行一个 IP 或 CIDR，这些 IP 将被禁止使用此密钥',
     ipRestrictionEnabled: '已配置 IP 限制',
     ccSwitchNotInstalled:
-      'CC-Switch 未安装或协议处理程序未注册。请先安装 CC-Switch 或手动复制 API 密钥。',
+      'CC Switch 未安装或协议处理程序未注册。请先安装 CC Switch 或手动复制 API 密钥。',
     ccsClientSelect: {
       title: '选择客户端',
-      description: '请选择您要导入到 CC-Switch 的客户端类型：',
+      description: '请选择您要导入到 CC Switch 的客户端类型：',
       claudeCode: 'Claude Code',
       claudeCodeDesc: '导入为 Claude Code 配置',
       geminiCli: 'Gemini CLI',
@@ -981,6 +983,8 @@ export default {
     cacheHit: '缓存命中',
     cacheCreate: '缓存创建',
     cacheHitRate: '缓存命中率',
+    openaiCacheCreateNote: 'GPT/OpenAI 只返回缓存命中 token，不返回“缓存创建”字段；缓存创建为 0 属于正常口径。',
+    openaiCacheCreateShortNote: '提示：GPT/OpenAI 不返回缓存创建字段，显示 0 属正常。',
     inputTokenPrice: '输入单价',
     outputTokenPrice: '输出单价',
     perMillionTokens: '/ 1M Token',
@@ -2423,9 +2427,9 @@ export default {
 	        familyMappingTitle: '系列默认映射',
         familyMappingHint: '当请求命中 Opus、Sonnet、Haiku 系列时，会优先使用这里配置的目标模型。',
         opusModel: 'Opus 映射模型',
-        opusModelPlaceholder: '例如: gpt-5.4',
+        opusModelPlaceholder: '例如: gpt-5.5',
         sonnetModel: 'Sonnet 映射模型',
-        sonnetModelPlaceholder: '例如: gpt-5.3-codex',
+        sonnetModelPlaceholder: '例如: gpt-5.5',
         haikuModel: 'Haiku 映射模型',
         haikuModelPlaceholder: '例如: gpt-5.4-mini',
         exactMappingTitle: '精确模型覆盖',
@@ -2435,7 +2439,7 @@ export default {
         claudeModel: 'Claude 模型',
         claudeModelPlaceholder: '例如: claude-sonnet-4-5-20250929',
         targetModel: '目标模型',
-        targetModelPlaceholder: '例如: gpt-5.4',
+        targetModelPlaceholder: '例如: gpt-5.5',
         removeExactMapping: '删除精确映射'
       },
       invalidRequestFallback: {
@@ -6311,8 +6315,8 @@ export default {
           '自定义首页内容，支持 Markdown/HTML。如果输入的是链接（以 http:// 或 https:// 开头），则会使用该链接作为 iframe 的 src 属性，这允许你设置任意网页作为首页。设置后首页的状态信息将不再显示。',
         homeContentIframeWarning:
           '⚠️ iframe 模式提示：部分网站设置了 X-Frame-Options 或 CSP 安全策略，禁止被嵌入到 iframe 中。如果页面显示空白或报错，请确认目标网站允许被嵌入，或考虑使用 HTML 模式自行构建页面内容。',
-        hideCcsImportButton: '隐藏 CCS 导入按钮',
-        hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮'
+        hideCcsImportButton: '隐藏 CC Switch 导入按钮',
+        hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入到 CC Switch"按钮'
       },
       purchase: {
         title: '充值/订阅页面',
