@@ -4741,7 +4741,7 @@
                 </label>
                 <input
                   v-model="form.doc_url"
-                  type="url"
+                  type="text"
                   class="input font-mono text-sm"
                   :placeholder="t('admin.settings.site.docUrlPlaceholder')"
                 />
@@ -7235,6 +7235,7 @@ import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiErro
 import { useAppStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
 import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
+import { normalizeDocsLinkValue } from "@/utils/docsLink";
 import {
   isRegistrationEmailSuffixDomainValid,
   normalizeRegistrationEmailSuffixDomain,
@@ -9320,7 +9321,7 @@ async function saveSettings() {
     };
     // Optional URL fields: auto-clear invalid values so they don't cause backend 400 errors
     if (!isValidHttpUrl(form.frontend_url)) form.frontend_url = "";
-    if (!isValidHttpUrl(form.doc_url)) form.doc_url = "";
+    form.doc_url = normalizeDocsLinkValue(form.doc_url);
     syncWeChatConnectMode();
     const discountSettings: GroupRateDiscountSettings = {
       enabled: Boolean(form.group_rate_discount_settings.enabled),

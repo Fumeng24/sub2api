@@ -24,10 +24,10 @@
     <!-- Navigation -->
     <nav class="sidebar-nav scrollbar-hide">
       <a
-        v-if="docUrl"
-        :href="docUrl"
-        target="_blank"
-        rel="noopener noreferrer"
+        v-if="docsLink"
+        :href="docsLink.href"
+        :target="docsLink.external ? '_blank' : undefined"
+        :rel="docsLink.external ? 'noopener noreferrer' : undefined"
         class="sidebar-link mb-4 border border-primary-200 bg-primary-50 text-primary-700 shadow-sm ring-1 ring-primary-100 hover:bg-primary-100 hover:text-primary-800 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-900/40 dark:hover:bg-primary-900/50 dark:hover:text-primary-100"
         :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
         :title="sidebarCollapsed ? t('nav.docs') : undefined"
@@ -216,6 +216,7 @@ import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore, u
 import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
+import { resolveDocsLink, shouldUseClientDocsNavigation } from '@/utils/docsLink'
 
 interface NavItem {
   path: string
@@ -278,7 +279,11 @@ const expandedGroups = ref<Set<string>>(new Set())
 const siteName = computed(() => appStore.siteName)
 const siteLogo = computed(() => appStore.siteLogo)
 const siteVersion = computed(() => appStore.siteVersion)
-const docUrl = computed(() => appStore.docUrl)
+const docsCustomMenuItems = computed(() => [
+  ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
+  ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
+])
+const docsLink = computed(() => resolveDocsLink(appStore.docUrl, docsCustomMenuItems.value))
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 const userTicketBadge = computed(() => ticketStore.userUnreadCount)
 const adminTicketBadge = computed(() => ticketStore.adminUnreadCount)
@@ -893,7 +898,12 @@ function closeMobile() {
   appStore.setMobileOpen(false)
 }
 
-function handleDocsLinkClick() {
+function handleDocsLinkClick(event: MouseEvent) {
+  const link = docsLink.value
+  if (shouldUseClientDocsNavigation(event, link)) {
+    event.preventDefault()
+    router.push(link?.route || link?.href || '/')
+  }
   if (mobileOpen.value) {
     appStore.setMobileOpen(false)
   }

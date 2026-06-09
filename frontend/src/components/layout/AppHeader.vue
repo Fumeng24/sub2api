@@ -44,11 +44,12 @@
 
         <!-- Docs Link -->
         <a
-          v-if="docUrl"
-          :href="docUrl"
-          target="_blank"
-          rel="noopener noreferrer"
+          v-if="docsLink"
+          :href="docsLink.href"
+          :target="docsLink.external ? '_blank' : undefined"
+          :rel="docsLink.external ? 'noopener noreferrer' : undefined"
           class="flex items-center gap-1.5 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-700 shadow-sm ring-1 ring-primary-100 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-900/40 dark:hover:bg-primary-900/50"
+          @click="handleDocsLinkClick"
         >
           <Icon name="book" size="sm" />
           <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
@@ -269,6 +270,7 @@ import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMi
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatSettlementCurrencyAmount, setSettlementCnyPerCredit, useSettlementCurrency } from '@/composables/useSettlementCurrency'
+import { resolveDocsLink, shouldUseClientDocsNavigation } from '@/utils/docsLink'
 
 const router = useRouter()
 const route = useRoute()
@@ -290,7 +292,11 @@ const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
-const docUrl = computed(() => appStore.docUrl)
+const docsCustomMenuItems = computed(() => [
+  ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
+  ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
+])
+const docsLink = computed(() => resolveDocsLink(appStore.docUrl, docsCustomMenuItems.value))
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 const ticketLink = computed(() => (authStore.canAccessTicketAdmin ? '/admin/tickets' : '/tickets'))
 const ticketUnreadCount = computed(() => (authStore.canAccessTicketAdmin ? ticketStore.adminUnreadCount : ticketStore.userUnreadCount))
@@ -372,6 +378,13 @@ function toggleDropdown() {
 
 function closeDropdown() {
   dropdownOpen.value = false
+}
+
+function handleDocsLinkClick(event: MouseEvent) {
+  const link = docsLink.value
+  if (!shouldUseClientDocsNavigation(event, link)) return
+  event.preventDefault()
+  router.push(link?.route || link?.href || '/')
 }
 
 async function handleLogout() {

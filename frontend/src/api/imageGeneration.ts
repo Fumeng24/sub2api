@@ -88,14 +88,148 @@ async function readResponse(response: Response) {
   if (!text) {
     return null
   }
+  return parseJSONValue(text) ?? text
+}
+
+function parseJSONValue(text: string): unknown | undefined {
+  const trimmed = text.trim()
+  if (!trimmed) {
+    return undefined
+  }
   try {
-    return JSON.parse(text)
+    return JSON.parse(trimmed)
   } catch {
-    return text
+    return undefined
   }
 }
 
+function parseSSEPayloads(text: string): unknown[] {
+  const events: unknown[] = []
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  let dataLines: string[] = []
+
+  const flush = () => {
+    const data = dataLines.join('\n').trim()
+    dataLines = []
+    if (!data || data === '[DONE]') {
+      return
+    }
+    events.push(parseJSONValue(data) ?? data)
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd()
+    if (line === '') {
+      flush()
+      continue
+    }
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trimStart())
+    }
+  }
+  flush()
+  return events
+}
+
+function normalizeGatewayPayload(payload: unknown): unknown {
+  if (typeof payload !== 'string') {
+    return payload
+  }
+  const parsed = parseJSONValue(payload)
+  if (parsed !== undefined) {
+    return parsed
+  }
+  const events = parseSSEPayloads(payload)
+  return events.length > 0 ? events : payload
+}
+
+function readErrorMessage(value: unknown) {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim()
+  }
+  if (!isRecord(value)) {
+    return ''
+  }
+  for (const key of ['message', 'detail', 'error_description']) {
+    const message = value[key]
+    if (typeof message === 'string' && message.trim()) {
+      return message.trim()
+    }
+  }
+  return ''
+}
+
+function readErrorCode(value: unknown) {
+  if (!isRecord(value)) {
+    return undefined
+  }
+  const code = value.code || value.type
+  return typeof code === 'string' && code.trim() ? code.trim() : undefined
+}
+
+function extractGatewayPayloadError(payload: unknown): { message: string; code?: string } | null {
+  const visited = new WeakSet<object>()
+
+  function fromErrorValue(value: unknown): { message: string; code?: string } | null {
+    const message = readErrorMessage(value)
+    if (!message) {
+      return null
+    }
+    return { message, code: readErrorCode(value) }
+  }
+
+  function walk(value: unknown): { message: string; code?: string } | null {
+    const normalized = normalizeGatewayPayload(value)
+    if (normalized !== value) {
+      return walk(normalized)
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = walk(item)
+        if (found) return found
+      }
+      return null
+    }
+    if (!isRecord(value)) {
+      return null
+    }
+    if (visited.has(value)) {
+      return null
+    }
+    visited.add(value)
+
+    const type = typeof value.type === 'string' ? value.type.toLowerCase() : ''
+    const status = typeof value.status === 'string' ? value.status.toLowerCase() : ''
+
+    if (value.error) {
+      const found = fromErrorValue(value.error)
+      if (found && (type.includes('error') || type === 'response.failed' || status === 'failed' || isRecord(value.error))) {
+        return found
+      }
+    }
+    if (type === 'response.failed' || status === 'failed') {
+      const direct = fromErrorValue(value)
+      if (direct) return direct
+    }
+
+    for (const child of Object.values(value)) {
+      if (Array.isArray(child) || isRecord(child) || typeof child === 'string') {
+        const found = walk(child)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  return walk(payload)
+}
+
 function resolveGatewayErrorMessage(payload: unknown, fallback: string) {
+  const payloadError = extractGatewayPayloadError(payload)
+  if (payloadError?.message) {
+    return payloadError.message
+  }
   if (!payload || typeof payload !== 'object') {
     return fallback
   }
@@ -116,6 +250,10 @@ function resolveGatewayErrorMessage(payload: unknown, fallback: string) {
 }
 
 function resolveGatewayErrorCode(payload: unknown) {
+  const payloadError = extractGatewayPayloadError(payload)
+  if (payloadError?.code) {
+    return payloadError.code
+  }
   if (!payload || typeof payload !== 'object') {
     return undefined
   }
@@ -153,7 +291,7 @@ export async function submitImageGatewayRequest(request: ImageGatewayRequest): P
     body,
     signal: request.signal,
   })
-  const payload = await readResponse(response)
+  const payload = normalizeGatewayPayload(await readResponse(response))
   if (!response.ok) {
     throw new ImageGatewayError(
       resolveGatewayErrorMessage(payload, `Image request failed with HTTP ${response.status}`),
@@ -161,6 +299,10 @@ export async function submitImageGatewayRequest(request: ImageGatewayRequest): P
       resolveGatewayErrorCode(payload),
       payload,
     )
+  }
+  const payloadError = extractGatewayPayloadError(payload)
+  if (payloadError) {
+    throw new ImageGatewayError(payloadError.message, response.status, payloadError.code, payload)
   }
   return payload
 }
@@ -206,15 +348,34 @@ function readImageURL(value: unknown) {
 
 function looksLikeImageGenerationItem(value: Record<string, unknown>) {
   const type = typeof value.type === 'string' ? value.type.toLowerCase() : ''
-  return type.includes('image') || Boolean(value.output_format || value.revised_prompt || value.b64_json || value.url)
+  return type.includes('image') || Boolean(
+    value.output_format ||
+    value.revised_prompt ||
+    value.b64_json ||
+    value.partial_image_b64 ||
+    value.image_b64 ||
+    value.image_base64 ||
+    value.base64_json ||
+    value.url ||
+    value.image_url
+  )
 }
 
 function collectCandidate(value: Record<string, unknown>): Omit<OpenAIImageResult, 'id' | 'src'> | null {
-  const outputFormat = value.output_format
-  const b64 = normalizeBase64(value.b64_json || value.partial_image_b64)
+  const outputFormat = value.output_format || value.format || value.mime_type
+  const b64 = normalizeBase64(
+    value.b64_json ||
+    value.partial_image_b64 ||
+    value.image_b64 ||
+    value.image_base64 ||
+    value.base64_json ||
+    value.base64
+  )
   const result = normalizeBase64(value.result)
+  const imageString = normalizeBase64(value.image)
+  const dataString = typeof value.data === 'string' ? normalizeBase64(value.data) : ''
   const url = readImageURL(value.url || value.image_url || value.download_url)
-  const imageB64 = b64 || (looksLikeImageGenerationItem(value) ? result : '')
+  const imageB64 = b64 || (looksLikeImageGenerationItem(value) ? (result || imageString || dataString) : '')
   const src = url || (imageB64 ? dataUrlFromBase64(imageB64, outputFormat) : '')
   if (!src) {
     return null
@@ -232,6 +393,7 @@ function collectCandidate(value: Record<string, unknown>): Omit<OpenAIImageResul
 export function normalizeOpenAIImageResults(payload: unknown): OpenAIImageResult[] {
   const results: OpenAIImageResult[] = []
   const seen = new Set<string>()
+  const visited = new WeakSet<object>()
 
   function push(candidate: Omit<OpenAIImageResult, 'id' | 'src'> | null) {
     if (!candidate) return
@@ -246,25 +408,31 @@ export function normalizeOpenAIImageResults(payload: unknown): OpenAIImageResult
   }
 
   function walk(value: unknown) {
+    const normalized = normalizeGatewayPayload(value)
+    if (normalized !== value) {
+      walk(normalized)
+      return
+    }
     if (Array.isArray(value)) {
+      if (visited.has(value)) {
+        return
+      }
+      visited.add(value)
       value.forEach(walk)
       return
     }
     if (!isRecord(value)) {
       return
     }
+    if (visited.has(value)) {
+      return
+    }
+    visited.add(value)
     push(collectCandidate(value))
-    if (isRecord(value.response)) {
-      walk(value.response)
-    }
-    if (isRecord(value.item)) {
-      walk(value.item)
-    }
-    if (Array.isArray(value.data)) {
-      walk(value.data)
-    }
-    if (Array.isArray(value.output)) {
-      walk(value.output)
+    for (const child of Object.values(value)) {
+      if (Array.isArray(child) || isRecord(child) || typeof child === 'string') {
+        walk(child)
+      }
     }
   }
 

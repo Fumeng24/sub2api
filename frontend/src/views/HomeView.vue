@@ -53,12 +53,13 @@
 
           <!-- Doc Link -->
           <a
-            v-if="docUrl"
-            :href="docUrl"
-            target="_blank"
-            rel="noopener noreferrer"
+            v-if="docsLink"
+            :href="docsLink.href"
+            :target="docsLink.external ? '_blank' : undefined"
+            :rel="docsLink.external ? 'noopener noreferrer' : undefined"
             class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
             :title="t('home.viewDocs')"
+            @click="handleDocsLinkClick"
           >
             <Icon name="book" size="md" />
           </a>
@@ -382,11 +383,12 @@
         </p>
         <div class="flex items-center gap-4">
           <a
-            v-if="docUrl"
-            :href="docUrl"
-            target="_blank"
-            rel="noopener noreferrer"
+            v-if="docsLink"
+            :href="docsLink.href"
+            :target="docsLink.external ? '_blank' : undefined"
+            :rel="docsLink.external ? 'noopener noreferrer' : undefined"
             class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
+            @click="handleDocsLinkClick"
           >
             {{ t('home.docs') }}
           </a>
@@ -407,11 +409,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { resolveDocsLink, shouldUseClientDocsNavigation } from '@/utils/docsLink'
 
 const { t } = useI18n()
+const router = useRouter()
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -420,7 +425,8 @@ const appStore = useAppStore()
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
-const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
+const rawDocUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
+const docsLink = computed(() => resolveDocsLink(rawDocUrl.value, appStore.cachedPublicSettings?.custom_menu_items ?? []))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 
 // Check if homeContent is a URL (for iframe display)
@@ -453,6 +459,13 @@ function toggleTheme() {
   isDark.value = !isDark.value
   document.documentElement.classList.toggle('dark', isDark.value)
   localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+}
+
+function handleDocsLinkClick(event: MouseEvent) {
+  const link = docsLink.value
+  if (!shouldUseClientDocsNavigation(event, link)) return
+  event.preventDefault()
+  router.push(link?.route || link?.href || '/')
 }
 
 // Initialize theme

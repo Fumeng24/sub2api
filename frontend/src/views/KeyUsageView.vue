@@ -12,12 +12,13 @@
         <div class="flex items-center gap-3">
           <LocaleSwitcher />
           <a
-            v-if="docUrl"
-            :href="docUrl"
-            target="_blank"
-            rel="noopener noreferrer"
+            v-if="docsLink"
+            :href="docsLink.href"
+            :target="docsLink.external ? '_blank' : undefined"
+            :rel="docsLink.external ? 'noopener noreferrer' : undefined"
             class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
             :title="t('home.viewDocs')"
+            @click="handleDocsLinkClick"
           >
             <Icon name="book" size="md" />
           </a>
@@ -408,11 +409,12 @@
         </p>
         <div class="flex items-center gap-4">
           <a
-            v-if="docUrl"
-            :href="docUrl"
-            target="_blank"
-            rel="noopener noreferrer"
+            v-if="docsLink"
+            :href="docsLink.href"
+            :target="docsLink.external ? '_blank' : undefined"
+            :rel="docsLink.external ? 'noopener noreferrer' : undefined"
             class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
+            @click="handleDocsLinkClick"
           >{{ t('home.docs') }}</a>
           <a
             :href="githubUrl"
@@ -429,13 +431,16 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { setSettlementCnyPerCredit, useSettlementCurrency } from '@/composables/useSettlementCurrency'
+import { resolveDocsLink, shouldUseClientDocsNavigation } from '@/utils/docsLink'
 
 const { t, locale } = useI18n()
+const router = useRouter()
 const appStore = useAppStore()
 const {
   settlementCurrency,
@@ -449,7 +454,8 @@ const {
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
-const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
+const rawDocUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
+const docsLink = computed(() => resolveDocsLink(rawDocUrl.value, appStore.cachedPublicSettings?.custom_menu_items ?? []))
 const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
 const publicBalanceCnyPerCredit = computed(() => appStore.cachedPublicSettings?.payment_balance_recharge_multiplier)
 
@@ -469,6 +475,13 @@ function toggleTheme() {
   isDark.value = !isDark.value
   document.documentElement.classList.toggle('dark', isDark.value)
   localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+}
+
+function handleDocsLinkClick(event: MouseEvent) {
+  const link = docsLink.value
+  if (!shouldUseClientDocsNavigation(event, link)) return
+  event.preventDefault()
+  router.push(link?.route || link?.href || '/')
 }
 
 const currentYear = computed(() => new Date().getFullYear())
