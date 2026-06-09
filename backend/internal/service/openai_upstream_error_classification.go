@@ -33,6 +33,10 @@ func classifyOpenAIUpstreamError(statusCode int, upstreamMsg string, upstreamBod
 	detailCode := strings.ToLower(strings.TrimSpace(gjson.GetBytes(upstreamBody, "detail.code").String()))
 	text := normalizeOpenAIUpstreamErrorText(upstreamMsg, upstreamBody)
 
+	if isOpenAIGroupDisabledUpstreamError(statusCode, upstreamMsg, upstreamBody) {
+		return openAIUpstreamErrorAuth
+	}
+
 	if containsAnyOpenAIErrorText(code+" "+errType+" "+detailCode+" "+text,
 		"user_inactive",
 		"token_invalidated",
@@ -135,6 +139,21 @@ func classifyOpenAIUpstreamError(statusCode int, upstreamMsg string, upstreamBod
 		return openAIUpstreamErrorTransient
 	}
 	return openAIUpstreamErrorUnknown
+}
+
+func isOpenAIGroupDisabledUpstreamError(statusCode int, upstreamMsg string, upstreamBody []byte) bool {
+	if statusCode < 400 {
+		return false
+	}
+	code := strings.ToLower(strings.TrimSpace(extractUpstreamErrorCode(upstreamBody)))
+	text := normalizeOpenAIUpstreamErrorText(upstreamMsg, upstreamBody)
+	return containsAnyOpenAIErrorText(code+" "+text,
+		"group_disabled",
+		"group disabled",
+		"api key 所属分组已停用",
+		"所属分组已停用",
+		"分组已停用",
+	)
 }
 
 func normalizeOpenAIUpstreamErrorText(upstreamMsg string, upstreamBody []byte) string {

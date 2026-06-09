@@ -43,6 +43,9 @@ func applyErrorPassthroughRule(
 	if isUpstreamBillingExhaustionError(upstreamStatus, ExtractUpstreamErrorMessage(responseBody), responseBody) {
 		return status, errType, errMsg, false
 	}
+	if platform == PlatformOpenAI && isOpenAIGroupDisabledUpstreamError(upstreamStatus, ExtractUpstreamErrorMessage(responseBody), responseBody) {
+		return status, errType, errMsg, false
+	}
 
 	svc := getBoundErrorPassthroughService(c)
 	if svc == nil {

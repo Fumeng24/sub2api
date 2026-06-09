@@ -907,6 +907,18 @@ func TestOpenAIGatewayService_OpenAIPassthrough_429And529TriggerFailover(t *test
 				require.Len(t, repo.setErrorCalls, 1)
 			},
 		},
+		{
+			name:        "apikey_403_group_disabled",
+			accountType: AccountTypeAPIKey,
+			statusCode:  http.StatusForbidden,
+			body:        `{"code":"GROUP_DISABLED","message":"API Key 所属分组已停用"}`,
+			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
+				require.Empty(t, repo.rateLimitCalls)
+				require.Empty(t, repo.overloadCalls)
+				require.Len(t, repo.setErrorCalls, 1)
+				require.Contains(t, repo.setErrorCalls[0], "API Key 所属分组已停用")
+			},
+		},
 	}
 
 	for _, tc := range testCases {

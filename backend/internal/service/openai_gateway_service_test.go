@@ -1392,6 +1392,93 @@ func TestOpenAIHandleErrorResponseImageBridgeUnsupportedAutoDisablesAndFailsOver
 	}
 }
 
+func TestOpenAIHandleErrorResponseGroupDisabledFailsOver(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &rateLimitAccountRepoStub{}
+	counter := &openAI403CounterCacheStub{counts: []int64{1}}
+	rateLimitSvc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	rateLimitSvc.SetOpenAI403CounterCache(counter)
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, rateLimitService: rateLimitSvc}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/responses", nil)
+
+	account := &Account{
+		ID:       38808,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Name:     "group-disabled",
+	}
+	respBody := []byte(`{"code":"GROUP_DISABLED","message":"API Key 所属分组已停用"}`)
+	resp := &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+		Header:     http.Header{"X-Request-Id": []string{"rid-group-disabled"}},
+	}
+
+	result, err := svc.handleErrorResponse(context.Background(), resp, c, account, []byte(`{"model":"gpt-5.5"}`))
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusForbidden, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "GROUP_DISABLED")
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+	require.Equal(t, 1, repo.tempCalls)
+	require.Zero(t, repo.setErrorCalls)
+	require.Contains(t, repo.lastTempReason, "API Key 所属分组已停用")
+}
+
+func TestOpenAIHandleCompatErrorResponseGroupDisabledFailsOver(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &rateLimitAccountRepoStub{}
+	counter := &openAI403CounterCacheStub{counts: []int64{1}}
+	rateLimitSvc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	rateLimitSvc.SetOpenAI403CounterCache(counter)
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, rateLimitService: rateLimitSvc}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+
+	account := &Account{
+		ID:       38808,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Name:     "group-disabled",
+	}
+	respBody := []byte(`{"code":"GROUP_DISABLED","message":"API Key 所属分组已停用"}`)
+	resp := &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+		Header:     http.Header{"X-Request-Id": []string{"rid-group-disabled-compat"}},
+	}
+	writeCalled := false
+
+	result, err := svc.handleCompatErrorResponse(
+		resp,
+		c,
+		account,
+		func(c *gin.Context, statusCode int, errType, message string) {
+			writeCalled = true
+		},
+		"gpt-5.5",
+	)
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusForbidden, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "GROUP_DISABLED")
+	require.False(t, writeCalled)
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+	require.Equal(t, 1, repo.tempCalls)
+	require.Zero(t, repo.setErrorCalls)
+}
+
 func TestOpenAIStreamingResponseFailedBeforeOutputCapacityErrorReturnsFailover(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{

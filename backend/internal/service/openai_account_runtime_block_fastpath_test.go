@@ -529,6 +529,16 @@ func TestOpenAIForbiddenBusinessErrorDoesNotFailover(t *testing.T) {
 	require.False(t, svc.shouldFailoverOpenAIUpstreamResponseForAccount(context.Background(), account, http.StatusForbidden, "", body))
 }
 
+func TestOpenAIGroupDisabledForbiddenFailsOver(t *testing.T) {
+	account := &Account{ID: 116, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	body := []byte(`{"code":"GROUP_DISABLED","message":"API Key 所属分组已停用"}`)
+	svc := &OpenAIGatewayService{}
+
+	require.Equal(t, "GROUP_DISABLED", extractUpstreamErrorCode(body))
+	require.Equal(t, openAIUpstreamErrorAuth, classifyOpenAIUpstreamError(http.StatusForbidden, "", body))
+	require.True(t, svc.shouldFailoverOpenAIUpstreamResponseForAccount(context.Background(), account, http.StatusForbidden, "", body))
+}
+
 func TestOpenAITransientScheduleFailureUsesScopedSchedulerCooldown(t *testing.T) {
 	svc := &OpenAIGatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
 	accountID := int64(115)
