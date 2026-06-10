@@ -12,12 +12,15 @@ export default {
     getStarted: '立即开始',
     goToDashboard: '进入控制台',
     // 新增：面向用户的价值主张
-    heroSubtitle: '一个密钥，畅用多个 AI 模型',
-    heroDescription: '无需管理多个订阅账号，一站式接入 Claude、GPT、Gemini 等主流 AI 服务',
+    heroSubtitle: 'GPT 自由，不用先被价格劝退',
+    heroDescription: '注册送额度，特价分组适合高频日常使用；支持 GPT、Claude、Gemini 和图像模型，独家调度算法让使用更稳定。',
+    terminal: {
+      scheduling: '独家调度算法匹配稳定线路...'
+    },
     tags: {
-      subscriptionToApi: '订阅转 API',
-      stickySession: '会话保持',
-      realtimeBilling: '按量计费'
+      subscriptionToApi: '注册送额度',
+      stickySession: '独家调度算法',
+      realtimeBilling: '按量计费更省'
     },
     // 用户痛点区块
     painPoints: {
@@ -47,12 +50,12 @@ export default {
       subtitle: '简单三步，开始省心使用 AI'
     },
     features: {
-      unifiedGateway: '一键接入',
-      unifiedGatewayDesc: '获取一个 API 密钥，即可调用所有已接入的 AI 模型，无需分别申请。',
-      multiAccount: '稳定可靠',
-      multiAccountDesc: '智能调度多个上游账号，自动切换和负载均衡，告别频繁报错。',
-      balanceQuota: '用多少付多少',
-      balanceQuotaDesc: '按实际使用量计费，支持设置配额上限，团队用量一目了然。'
+      unifiedGateway: '一把 Key 调多模型',
+      unifiedGatewayDesc: 'GPT、Claude、Gemini 和图像模型统一接入，日常开发、写作和自动化少切换。',
+      multiAccount: '独家调度算法',
+      multiAccountDesc: '按模型、分组和实时状态智能选择可用通道，尽量把不稳定挡在用户感知之外。',
+      balanceQuota: '低成本高频使用',
+      balanceQuotaDesc: '按实际用量扣费，特价分组适合长期使用；余额、请求和 Token 消耗都能在仪表盘看清楚。'
     },
     // 优势对比
     comparison: {
@@ -81,7 +84,7 @@ export default {
         stability: {
           feature: '服务稳定性',
           official: '单账号易触发限制',
-          us: '多账号池，自动切换'
+          us: '独家调度算法，稳定性极佳'
         },
         control: {
           feature: '用量控制',
@@ -92,7 +95,7 @@ export default {
     },
     providers: {
       title: '已支持的 AI 模型',
-      description: '一个 API，多种选择',
+      description: '覆盖常用模型，适合低成本日常高频使用',
       supported: '已支持',
       soon: '即将推出',
       claude: 'Claude',
@@ -412,6 +415,11 @@ export default {
     signingIn: '登录中...',
     createAccount: '创建账户',
     signUpToStart: '注册以开始使用 {siteName}',
+    valueProps: {
+      trial: '注册送额度，先体验再充值',
+      discount: '特价分组适合 GPT 高频使用',
+      stability: '独家调度算法，稳定性极佳'
+    },
     signUp: '注册',
     processing: '处理中...',
     continue: '继续',
@@ -627,6 +635,11 @@ export default {
   dashboard: {
     title: '仪表盘',
     welcomeMessage: '欢迎回来！这是您账户的概览。',
+    loadFailed: '仪表盘加载失败',
+    loadFailedDesc: '可能是网络抖动或登录状态刚刷新失败，请重试一次。',
+    retryLoad: '重新加载',
+    todayOverview: '今日概览',
+    accountSnapshot: '账户状态与用量快照',
     balance: '余额',
     balanceApproxCny: '≈ {amount} CNY',
     apiKeys: 'API 密钥',
@@ -680,7 +693,19 @@ export default {
     viewUsage: '查看使用记录',
     checkDetailedLogs: '查看详细的使用日志',
     redeemCode: '兑换码',
-    addBalanceWithCode: '使用兑换码充值'
+    addBalanceWithCode: '使用兑换码充值',
+    balanceEquivalent: {
+      show: '展开看余额相当于官方多少钱',
+      hide: '收起官方额度换算',
+      title: '相当于官方原价额度',
+      description: '按当前站内余额和每个可用 API 分组的有效倍率，折算成对应官方 API 原价美元额度。生图分组不参与这里的美元额度换算。',
+      rate: '本站 {rate} 倍率',
+      quota: '官方 API 额度',
+      officialQuota: '官方美元额度',
+      officialAmount: '官方 {amount}',
+      apiFormula: '公式：站内余额 {balance} ÷ 有效倍率 {rate} = 对应官方原价额度 {quota}',
+      empty: '暂无可用分组'
+    }
   },
 
   // Groups (shared)
@@ -709,6 +734,16 @@ export default {
     deleteConfirmMessage: "确定要删除 '{name}' 吗？此操作无法撤销。",
     apiKey: 'API 密钥',
     group: '分组',
+    category: '分组平台',
+    categoryLabel: '分组平台',
+    categoryHint: '按所选分组的平台展示，仅用于选择分组。',
+    selectCategory: '选择分组平台',
+    allCategories: '全部平台',
+    categories: {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      other: '其他'
+    },
     noGroup: '无分组',
     searchGroup: '搜索分组...',
     noGroupFound: '未找到匹配的分组',
@@ -859,7 +894,7 @@ export default {
 
   imageGeneration: {
     title: 'AI 生图',
-    description: '选择名称带“生图”的 OpenAI 分组，系统会自动准备对应生图 Key',
+    description: '选择已开启生图能力的 OpenAI 分组，系统会自动准备对应生图 Key',
     apiKey: '生图 Key',
     selectKey: '选择生图 Key',
     noImageKey: '当前没有可用的 OpenAI 生图 Key。',
@@ -894,6 +929,7 @@ export default {
     noImagesReturned: '上游没有返回图片数据',
     generatedSuccess: '图片生成完成',
     generateFailed: '图片生成失败',
+    networkDisconnected: '图片生成耗时较长，浏览器连接已断开。生成可能已经在后端完成；如果用量记录已产生但没有收到图片，请联系管理员处理，也可以稍后重试。',
     cancelled: '已取消生成',
     referenceAdded: '已加入参考图',
     referenceFromResultFailed: '读取结果图失败，无法加入编辑',
@@ -1134,10 +1170,20 @@ export default {
     empty: '暂无可用渠道',
     noModels: '未配置模型',
     noPricing: '未配置定价',
+    channel: '渠道',
+    visible: '可见状态',
+    groupsTitle: '可访问分组',
+    modelsTitle: '支持模型',
     exclusive: '专属',
     public: '公开',
     exclusiveTooltip: '管理员授权给你的专属分组',
     publicTooltip: '对所有用户公开的分组',
+    stats: {
+      channels: '渠道',
+      platforms: '平台',
+      groups: '分组',
+      models: '模型'
+    },
     columns: {
       name: '渠道名',
       description: '描述',
@@ -1164,7 +1210,7 @@ export default {
 
   affiliate: {
     title: '邀请返利',
-    description: '邀请新用户注册，并将返利额度转入账户余额',
+    description: '把真正便宜、好用、少折腾的 AI API 分享给朋友，好友充值后你还能获得返利',
     yourCode: '我的邀请码',
     inviteLink: '邀请链接',
     copyCode: '复制邀请码',
@@ -1206,6 +1252,17 @@ export default {
       line2: '被邀请用户充值后，你可获得 {rate} 的返利额度。',
       line3: '返利额度可随时转入账户余额。',
       line4: '新产生的返利需要经过冻结期后才能提现。'
+    },
+    promo: {
+      kicker: '分享给朋友的现成文案',
+      title: 'GPT 自由，其实没你想的那么贵',
+      description: '本站注册送额度，很多用户用了三天都还没用完。特价分组便宜到离谱，长期用甚至比 DeepSeek 还划算，还支持 GPT、Claude、Gemini 和图像模型。独家调度算法保障稳定性，日常使用少掉线、少折腾。',
+      highlightTrial: '注册送额度，先白嫖体验',
+      highlightCheap: '特价分组很便宜，GPT 也能当日常工具',
+      highlightRouting: '独家调度算法，稳定性极佳',
+      copyButton: '复制宣传文案',
+      copied: '宣传文案已复制',
+      shareText: '我现在基本 GPT 自由了，这个站注册送额度，我用了三天都没用完。特价分组便宜到夸张，长期用甚至比 DeepSeek 还划算，还支持 GPT、Claude、Gemini 和图像模型。独家调度算法稳定性很强，日常用起来少掉线少折腾。用我的链接注册可以先白嫖额度体验一下：{link}'
     }
   },
 
@@ -3433,6 +3490,9 @@ export default {
         thresholdPlaceholder: '输入百分比',
       },
       testConnection: '测试连接',
+      copyAccount: '复制账号',
+      copyAccountSuccess: "已复制账号「{name}」",
+      copyAccountFailed: '复制账号失败',
       reAuthorize: '重新授权',
       refreshToken: '刷新令牌',
       noAccountsYet: '暂无账号',

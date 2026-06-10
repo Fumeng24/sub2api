@@ -12,12 +12,15 @@ export default {
     getStarted: 'Get Started',
     goToDashboard: 'Go to Dashboard',
     // User-focused value proposition
-    heroSubtitle: 'One Key, All AI Models',
-    heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
+    heroSubtitle: 'GPT-level freedom without the sticker shock',
+    heroDescription: 'New users get trial credit, discount groups are built for high-frequency daily use, and a proprietary scheduling algorithm keeps GPT, Claude, Gemini, and image models smooth.',
+    terminal: {
+      scheduling: 'Proprietary scheduler found a stable route...'
+    },
     tags: {
-      subscriptionToApi: 'Subscription to API',
-      stickySession: 'Session Persistence',
-      realtimeBilling: 'Pay As You Go'
+      subscriptionToApi: 'Trial credit included',
+      stickySession: 'Proprietary scheduling',
+      realtimeBilling: 'Pay less as you go'
     },
     // Pain points section
     painPoints: {
@@ -47,12 +50,12 @@ export default {
       subtitle: 'Three simple steps to stress-free AI access'
     },
     features: {
-      unifiedGateway: 'One-Click Access',
-      unifiedGatewayDesc: 'Get a single API key to call all connected AI models. No separate applications needed.',
-      multiAccount: 'Always Reliable',
-      multiAccountDesc: 'Smart routing across multiple upstream accounts with automatic failover. Say goodbye to errors.',
-      balanceQuota: 'Pay What You Use',
-      balanceQuotaDesc: 'Usage-based billing with quota limits. Full visibility into team consumption.'
+      unifiedGateway: 'One key for daily AI',
+      unifiedGatewayDesc: 'Use GPT, Claude, Gemini, and image models from one place for coding, writing, and automation.',
+      multiAccount: 'Proprietary scheduling',
+      multiAccountDesc: 'The routing algorithm picks a healthy path by model, group, and live status so instability is less visible to users.',
+      balanceQuota: 'Built for frequent use',
+      balanceQuotaDesc: 'Usage-based billing and discount groups make daily use cheaper, with balance, requests, and token spend visible on the dashboard.'
     },
     // Comparison section
     comparison: {
@@ -81,7 +84,7 @@ export default {
         stability: {
           feature: 'Stability',
           official: 'Single account rate limits',
-          us: 'Multi-account pool, auto-failover'
+          us: 'Proprietary scheduling with excellent stability'
         },
         control: {
           feature: 'Usage Control',
@@ -92,7 +95,7 @@ export default {
     },
     providers: {
       title: 'Supported AI Models',
-      description: 'One API, Multiple Choices',
+      description: 'Popular models for low-cost daily usage',
       supported: 'Supported',
       soon: 'Soon',
       claude: 'Claude',
@@ -412,6 +415,11 @@ export default {
     signingIn: 'Signing in...',
     createAccount: 'Create Account',
     signUpToStart: 'Sign up to start using {siteName}',
+    valueProps: {
+      trial: 'Trial credit included',
+      discount: 'Discount groups for frequent GPT use',
+      stability: 'Proprietary scheduling, excellent stability'
+    },
     signUp: 'Sign up',
     processing: 'Processing...',
     continue: 'Continue',
@@ -628,6 +636,11 @@ export default {
   dashboard: {
     title: 'Dashboard',
     welcomeMessage: "Welcome back! Here's an overview of your account.",
+    loadFailed: 'Dashboard failed to load',
+    loadFailedDesc: 'This may be a temporary network issue or a session refresh failure. Please retry.',
+    retryLoad: 'Reload',
+    todayOverview: 'Today Overview',
+    accountSnapshot: 'Account status and usage snapshot',
     balance: 'Balance',
     balanceApproxCny: '≈ {amount} CNY',
     apiKeys: 'API Keys',
@@ -681,7 +694,19 @@ export default {
     viewUsage: 'View Usage',
     checkDetailedLogs: 'Check detailed usage logs',
     redeemCode: 'Redeem Code',
-    addBalanceWithCode: 'Add balance with a code'
+    addBalanceWithCode: 'Add balance with a code',
+    balanceEquivalent: {
+      show: 'Show official-value equivalent',
+      hide: 'Hide official-value estimate',
+      title: 'Equivalent official API value',
+      description: 'Converts your site balance by each available API group rate into the equivalent official API list-price USD value. Image-generation groups are not included in this USD-value estimate.',
+      rate: 'Site {rate} rate',
+      quota: 'Official API quota',
+      officialQuota: 'Official USD value',
+      officialAmount: 'Official {amount}',
+      apiFormula: 'Formula: site balance {balance} ÷ effective rate {rate} = equivalent official list-price value {quota}',
+      empty: 'No available groups'
+    }
   },
 
   // Groups (shared)
@@ -710,6 +735,16 @@ export default {
     deleteConfirmMessage: "Are you sure you want to delete '{name}'? This action cannot be undone.",
     apiKey: 'API Key',
     group: 'Group',
+    category: 'Group Platform',
+    categoryLabel: 'Group Platform',
+    categoryHint: 'Shown from the selected group platform. It is only used while choosing a group.',
+    selectCategory: 'Select group platform',
+    allCategories: 'All Platforms',
+    categories: {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      other: 'Other',
+    },
     noGroup: 'No group',
     searchGroup: 'Search groups...',
     noGroupFound: 'No groups found',
@@ -855,7 +890,7 @@ export default {
 
   imageGeneration: {
     title: 'AI Images',
-    description: 'Choose an OpenAI group whose name includes "生图"; the page will prepare the matching image key automatically',
+    description: 'Choose an OpenAI group with image generation enabled; the page will prepare the matching image key automatically',
     apiKey: 'Image Key',
     selectKey: 'Select an image key',
     noImageKey: 'No active OpenAI image key is available.',
@@ -890,6 +925,7 @@ export default {
     noImagesReturned: 'The upstream response did not include image data',
     generatedSuccess: 'Image generation completed',
     generateFailed: 'Image generation failed',
+    networkDisconnected: 'Image generation took too long and the browser connection was interrupted. The request may still have completed on the server; if usage was recorded but no image appeared, contact support or try again later.',
     cancelled: 'Generation cancelled',
     referenceAdded: 'Added as a reference image',
     referenceFromResultFailed: 'Could not read this result image for editing',
@@ -1130,10 +1166,20 @@ export default {
     empty: 'No available channels',
     noModels: 'No models configured',
     noPricing: 'Pricing not configured',
+    channel: 'Channel',
+    visible: 'Visibility',
+    groupsTitle: 'Accessible Groups',
+    modelsTitle: 'Supported Models',
     exclusive: 'Exclusive',
     public: 'Public',
     exclusiveTooltip: 'Exclusive groups granted to you by an admin',
     publicTooltip: 'Groups open to all users',
+    stats: {
+      channels: 'Channels',
+      platforms: 'Platforms',
+      groups: 'Groups',
+      models: 'Models'
+    },
     columns: {
       name: 'Channel',
       description: 'Description',
@@ -1160,7 +1206,7 @@ export default {
 
   affiliate: {
     title: 'Affiliate Rebates',
-    description: 'Invite new users and convert your rebate quota into account balance',
+    description: 'Share a cheaper, smoother AI API experience with friends and earn rebates when they recharge',
     yourCode: 'Your Affiliate Code',
     inviteLink: 'Invite Link',
     copyCode: 'Copy Code',
@@ -1202,6 +1248,17 @@ export default {
       line2: 'When invitees recharge, you receive {rate} of the recharge as rebate quota.',
       line3: 'Transfer rebate quota to balance at any time.',
       line4: 'Newly earned rebates may have a waiting period before they can be transferred.'
+    },
+    promo: {
+      kicker: 'Ready-to-share pitch',
+      title: 'GPT freedom costs less than you think',
+      description: 'New users get trial credit first. The discount groups are built for high-frequency use, often cheaper than expected, with GPT, Claude, Gemini, and image models. A proprietary scheduling algorithm keeps everyday usage highly stable.',
+      highlightTrial: 'Trial credit included',
+      highlightCheap: 'Discount groups for daily GPT usage',
+      highlightRouting: 'Proprietary scheduling, excellent stability',
+      copyButton: 'Copy promo text',
+      copied: 'Promo text copied',
+      shareText: 'I am basically using GPT freely now. This site gives trial credit on signup, and the discount groups are cheap enough for daily use. It supports GPT, Claude, Gemini, and image models, with a proprietary scheduling algorithm that keeps usage highly stable. Try it with my invite link: {link}'
     }
   },
 
@@ -3445,6 +3502,9 @@ export default {
         thresholdPlaceholder: 'Enter percentage',
       },
       testConnection: 'Test Connection',
+      copyAccount: 'Copy Account',
+      copyAccountSuccess: "Account '{name}' copied",
+      copyAccountFailed: 'Failed to copy account',
       reAuthorize: 'Re-Authorize',
       refreshToken: 'Refresh Token',
       noAccountsYet: 'No accounts yet',
