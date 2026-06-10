@@ -1311,6 +1311,13 @@ func (s *OpenAIGatewayService) BindStickySession(ctx context.Context, groupID *i
 	return s.setStickySessionAccountID(ctx, groupID, sessionHash, accountID, ttl)
 }
 
+func (s *OpenAIGatewayService) ClearOpenAIStickySession(ctx context.Context, groupID *int64, sessionHash string) error {
+	if s == nil || strings.TrimSpace(sessionHash) == "" {
+		return nil
+	}
+	return s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+}
+
 // SelectAccount selects an OpenAI account with sticky session support
 func (s *OpenAIGatewayService) SelectAccount(ctx context.Context, groupID *int64, sessionHash string) (*Account, error) {
 	return s.SelectAccountForModel(ctx, groupID, sessionHash, "")
@@ -5104,6 +5111,9 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		})
 		if !shouldFailover {
 			statusCode, errType, errMsg := openAIErrorResponseForClass(resp.StatusCode, upstreamClass, upstreamMsg, false)
+			if msg := openAIContextWindowClientMessageForModel(reqModel, body); msg != "" {
+				statusCode, errType, errMsg = http.StatusBadRequest, "invalid_request_error", msg
+			}
 			c.JSON(statusCode, gin.H{
 				"error": gin.H{
 					"type":    errType,
@@ -5139,6 +5149,9 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	}
 
 	statusCode, errType, errMsg := openAIErrorResponseForClass(resp.StatusCode, upstreamClass, upstreamMsg, false)
+	if msg := openAIContextWindowClientMessageForModel(reqModel, body); msg != "" {
+		statusCode, errType, errMsg = http.StatusBadRequest, "invalid_request_error", msg
+	}
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
 			"type":    errType,
@@ -5216,6 +5229,13 @@ func openAIErrorResponseForClass(statusCode int, class openAIUpstreamErrorClass,
 		return statusCode, "api_error", msg
 	}
 	return http.StatusBadGateway, "upstream_error", "Upstream request failed"
+}
+
+func openAIContextWindowClientMessageForModel(model string, body []byte) string {
+	if strings.EqualFold(strings.TrimSpace(model), "gpt-5.5") && isOpenAIContextWindowError("", body) {
+		return "gpt-5.5 context window is 272k tokens. Your input exceeds this limit; please use gpt-5.4 to compress the context first, then retry with gpt-5.5."
+	}
+	return ""
 }
 
 func clientFacingOpenAI4xxStatus(statusCode int, fallback int) int {

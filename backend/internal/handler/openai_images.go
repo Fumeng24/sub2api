@@ -278,7 +278,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 						manualFailoverSwitchFields(account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches, failedAccountIDs, parsed.Model, schedulerEndpoint, c.Writer.Size(), writerSizeBeforeForward)...)
 					continue
 				}
-				if h.handleOpenAIForwardTerminalError(c, reqLog, account, parsed.Model, schedulerEndpoint, "openai.images.forward_terminal_error", err) {
+				if h.handleOpenAIForwardTerminalError(c, reqLog, account, parsed.Model, schedulerEndpoint, sessionHash, apiKey.GroupID, "openai.images.forward_terminal_error", err) {
 					return
 				}
 				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, parsed.Model, schedulerEndpoint, false, nil)

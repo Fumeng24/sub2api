@@ -70,6 +70,7 @@ func maybeForceOpenAIResponsesPriority(c *gin.Context, apiKey *service.APIKey, b
 }
 
 const openAICompactFallbackModel = "gpt-5.4"
+const openAIGPT55ContextLimitMessage = "gpt-5.5 context window is 272k tokens. Your input exceeds this limit; please use gpt-5.4 to compress the context first, then retry with gpt-5.5."
 
 func shouldFallbackOpenAICompactToModel(c *gin.Context, requestedModel string, fallbackUsed bool, failoverErr *service.UpstreamFailoverError) bool {
 	if fallbackUsed || failoverErr == nil || !isOpenAIRemoteCompactPath(c) {
@@ -86,6 +87,25 @@ func isOpenAICompactContextWindowFailover(c *gin.Context, failoverErr *service.U
 	return failoverErr != nil &&
 		isOpenAIRemoteCompactPath(c) &&
 		service.IsOpenAIContextWindowErrorForTest(string(failoverErr.ResponseBody))
+}
+
+func openAIContextWindowClientMessage(model string, responseBody []byte, fallback string) string {
+	if strings.EqualFold(strings.TrimSpace(model), "gpt-5.5") && service.IsOpenAIContextWindowErrorForTest(string(responseBody)) {
+		return openAIGPT55ContextLimitMessage
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func openAIRequestModelFromContext(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	if model, ok := c.Get(opsModelKey); ok {
+		if value, ok := model.(string); ok {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func replaceOpenAIRequestModel(body []byte, model string) ([]byte, error) {
@@ -549,7 +569,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						manualFailoverSwitchFields(account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches, failedAccountIDs, reqModel, schedulerEndpoint, c.Writer.Size(), writerSizeBeforeForward)...)
 					continue
 				}
-				if h.handleOpenAIForwardTerminalError(c, reqLog, account, reqModel, schedulerEndpoint, "openai.forward_terminal_error", err) {
+				if h.handleOpenAIForwardTerminalError(c, reqLog, account, reqModel, schedulerEndpoint, sessionHash, apiKey.GroupID, "openai.forward_terminal_error", err) {
 					return
 				}
 				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, reqModel, schedulerEndpoint, false, nil)
@@ -965,7 +985,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 					)
 					return
 				}
-				if h.handleOpenAIForwardTerminalError(c, reqLog, account, scheduleModel, schedulerEndpoint, "openai_messages.forward_terminal_error", err) {
+				if h.handleOpenAIForwardTerminalError(c, reqLog, account, scheduleModel, schedulerEndpoint, sessionHash, apiKey.GroupID, "openai_messages.forward_terminal_error", err) {
 					return
 				}
 				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, scheduleModel, schedulerEndpoint, false, nil)
@@ -1878,6 +1898,11 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
 	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
+	if msg := openAIContextWindowClientMessage(openAIRequestModelFromContext(c), responseBody, ""); msg != "" {
+		service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
+		h.handleStreamingAwareError(c, http.StatusBadRequest, "invalid_request_error", msg, streamStarted)
+		return
+	}
 	if service.IsOpenAISilentRefusalErrorBody(responseBody) {
 		service.SetOpsUpstreamError(c, statusCode, service.OpenAISilentRefusalClientMessage(), "")
 		h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", service.OpenAISilentRefusalClientMessage(), streamStarted)
@@ -1999,6 +2024,8 @@ func (h *OpenAIGatewayHandler) handleOpenAIForwardTerminalError(
 	account *service.Account,
 	model string,
 	schedulerEndpoint string,
+	sessionHash string,
+	groupID *int64,
 	eventName string,
 	err error,
 ) bool {
@@ -2008,6 +2035,13 @@ func (h *OpenAIGatewayHandler) handleOpenAIForwardTerminalError(
 	}
 	if h != nil && h.gatewayService != nil && account != nil {
 		h.gatewayService.ReportOpenAIAccountScheduleTerminal(account.ID, model, schedulerEndpoint)
+		if sessionHash != "" {
+			ctx := context.Background()
+			if c != nil && c.Request != nil {
+				ctx = c.Request.Context()
+			}
+			_ = h.gatewayService.ClearOpenAIStickySession(ctx, groupID, sessionHash)
+		}
 	}
 	if reqLog != nil {
 		accountID := int64(0)

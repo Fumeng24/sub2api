@@ -152,8 +152,13 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		if err != nil {
 			reqLog.Warn("openai_chat_completions.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 			if len(failedAccountIDs) == 0 {
-				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-				h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "Service temporarily unavailable", streamStarted)
+				status, errType, message := openAISelectionEmptyErrorResponse(scheduleDecision)
+				if errType == "api_error" {
+					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+				} else {
+					service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
+				}
+				h.handleStreamingAwareError(c, status, errType, message, streamStarted)
 				return
 			} else {
 				if lastFailoverErr != nil {
@@ -257,7 +262,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 						manualFailoverSwitchFields(account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches, failedAccountIDs, reqModel, schedulerEndpoint, c.Writer.Size(), writerSizeBeforeForward)...)
 					continue
 				}
-				if h.handleOpenAIForwardTerminalError(c, reqLog, account, reqModel, schedulerEndpoint, "openai_chat_completions.forward_terminal_error", err) {
+				if h.handleOpenAIForwardTerminalError(c, reqLog, account, reqModel, schedulerEndpoint, sessionHash, apiKey.GroupID, "openai_chat_completions.forward_terminal_error", err) {
 					return
 				}
 				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, reqModel, schedulerEndpoint, false, nil)
