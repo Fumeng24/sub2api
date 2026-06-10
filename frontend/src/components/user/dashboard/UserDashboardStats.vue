@@ -1,169 +1,240 @@
 <template>
-  <!-- Row 1: Core Stats -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <section
+    class="grid gap-4 xl:items-start"
+    :class="isSimple ? 'xl:grid-cols-1' : 'xl:grid-cols-[minmax(300px,0.95fr)_minmax(0,2fr)]'"
+  >
     <!-- Balance -->
-    <div v-if="!isSimple" class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
-          <svg class="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div
+      v-if="!isSimple"
+      class="relative overflow-hidden rounded-[1.75rem] border border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 shadow-card dark:border-emerald-900/40 dark:from-emerald-950/40 dark:via-dark-800/70 dark:to-teal-950/30"
+    >
+      <div class="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-500/10" />
+      <div class="pointer-events-none absolute -bottom-20 left-6 h-36 w-36 rounded-full bg-teal-300/20 blur-3xl dark:bg-teal-500/10" />
+
+      <div class="relative flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:bg-dark-900/70 dark:text-emerald-300 dark:ring-emerald-900/50">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            {{ t('dashboard.balance') }}
+          </div>
+          <p class="truncate text-3xl font-black tracking-tight text-emerald-700 dark:text-emerald-300 sm:text-4xl">
+            {{ formatSettlementAmount(balance, 2) }}
+          </p>
+          <p class="mt-2 text-sm font-semibold text-emerald-700/80 dark:text-emerald-300/80">
+            {{ balanceSubtitle }}
+          </p>
+        </div>
+        <div class="rounded-2xl bg-emerald-600/10 p-3 text-emerald-700 ring-1 ring-emerald-500/10 dark:bg-emerald-400/10 dark:text-emerald-300">
+          <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
           </svg>
         </div>
-        <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.balance') }}</p>
-          <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">{{ formatSettlementAmount(balance, 2) }}</p>
-          <p class="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            {{ balanceSubtitle }}
+      </div>
+
+      <div class="relative mt-5 grid grid-cols-2 gap-2">
+        <div class="rounded-2xl bg-white/75 px-3 py-2 ring-1 ring-emerald-100 dark:bg-dark-900/50 dark:ring-emerald-900/40">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/70 dark:text-emerald-300/70">
+            {{ t('common.status') }}
           </p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('common.available') }}</p>
+          <p class="mt-1 text-sm font-bold text-gray-900 dark:text-white">{{ t('common.available') }}</p>
         </div>
+        <button
+          type="button"
+          class="group flex items-center justify-between gap-2 rounded-2xl bg-emerald-600 px-3 py-2 text-left text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:-translate-y-0.5 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+          @click="balanceEquivalentExpanded = !balanceEquivalentExpanded"
+        >
+          <span class="min-w-0">
+            <span class="block truncate">{{ balanceEquivalentExpanded ? t('dashboard.balanceEquivalent.hide') : t('dashboard.balanceEquivalent.show') }}</span>
+          </span>
+          <Icon
+            name="chevronDown"
+            size="xs"
+            :stroke-width="2.5"
+            class="shrink-0 transition-transform"
+            :class="{ 'rotate-180': balanceEquivalentExpanded }"
+          />
+        </button>
+      </div>
+
+      <div
+        v-if="balanceEquivalentExpanded"
+        class="relative mt-4 rounded-2xl border border-emerald-100 bg-white/80 p-3 backdrop-blur dark:border-emerald-900/40 dark:bg-dark-900/60"
+      >
+        <div class="mb-3 flex items-start gap-2">
+          <div class="rounded-xl bg-emerald-100 p-1.5 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+            <Icon name="sparkles" size="xs" :stroke-width="2" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs font-bold text-gray-900 dark:text-white">
+              {{ t('dashboard.balanceEquivalent.title') }}
+            </p>
+            <p class="mt-0.5 text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+              {{ t('dashboard.balanceEquivalent.description') }}
+            </p>
+          </div>
+        </div>
+        <div v-if="balanceEquivalentItems.length > 0" class="max-h-64 space-y-2 overflow-y-auto pr-1">
+          <div
+            v-for="item in balanceEquivalentItems"
+            :key="item.group.id"
+            class="rounded-xl bg-emerald-50/80 px-3 py-2 text-xs ring-1 ring-emerald-100/70 dark:bg-emerald-950/20 dark:ring-emerald-900/30"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate font-bold text-gray-800 dark:text-gray-100">
+                  {{ item.group.name }}
+                </p>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">
+                  {{ item.metaLabel }}
+                </p>
+              </div>
+              <div class="shrink-0 text-right">
+                <p class="font-mono text-sm font-black text-emerald-700 dark:text-emerald-300">
+                  {{ item.quotaLabel }}
+                </p>
+                <p class="text-[10px] text-gray-400">{{ item.quotaUnitLabel }}</p>
+              </div>
+            </div>
+            <p class="mt-1.5 rounded-lg bg-white/60 px-2 py-1 text-[10px] leading-4 text-emerald-800/80 dark:bg-dark-900/40 dark:text-emerald-200/80">
+              {{ item.formulaLabel }}
+            </p>
+          </div>
+        </div>
+        <p v-else class="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:bg-dark-800 dark:text-gray-400">
+          {{ t('dashboard.balanceEquivalent.empty') }}
+        </p>
       </div>
     </div>
 
-    <!-- API Keys -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-          <Icon name="key" size="md" class="text-blue-600 dark:text-blue-400" :stroke-width="2" />
-        </div>
+    <!-- KPI Matrix -->
+    <div class="rounded-[1.75rem] border border-gray-100 bg-white/85 p-3 shadow-card dark:border-dark-700/60 dark:bg-dark-800/60">
+      <div class="mb-2 flex items-center justify-between px-1">
         <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.apiKeys') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ stats?.total_api_keys || 0 }}</p>
-          <p class="text-xs text-green-600 dark:text-green-400">{{ stats?.active_api_keys || 0 }} {{ t('common.active') }}</p>
+          <p class="text-sm font-bold text-gray-900 dark:text-white">{{ t('dashboard.todayOverview') }}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('dashboard.accountSnapshot') }}</p>
         </div>
+        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-500 dark:bg-dark-700 dark:text-gray-300">
+          {{ t('dashboard.last7Days') }}
+        </span>
       </div>
-    </div>
 
-    <!-- Today Requests -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-          <Icon name="chart" size="md" class="text-green-600 dark:text-green-400" :stroke-width="2" />
+      <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+        <div class="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
+          <div class="mb-3 flex items-center justify-between">
+            <p class="text-xs font-semibold text-blue-700 dark:text-blue-300">{{ t('dashboard.apiKeys') }}</p>
+            <div class="rounded-xl bg-white/80 p-2 text-blue-600 dark:bg-dark-900/60 dark:text-blue-300">
+              <Icon name="key" size="sm" :stroke-width="2" />
+            </div>
+          </div>
+          <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats?.total_api_keys || 0 }}</p>
+          <p class="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">{{ stats?.active_api_keys || 0 }} {{ t('common.active') }}</p>
         </div>
-        <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.todayRequests') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ stats?.today_requests || 0 }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('common.total') }}: {{ formatNumber(stats?.total_requests || 0) }}</p>
-        </div>
-      </div>
-    </div>
 
-    <!-- Today Cost -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
-          <Icon name="dollar" size="md" class="text-purple-600 dark:text-purple-400" :stroke-width="2" />
+        <div class="rounded-2xl border border-green-100 bg-green-50/60 p-4 dark:border-green-900/40 dark:bg-green-950/20">
+          <div class="mb-3 flex items-center justify-between">
+            <p class="text-xs font-semibold text-green-700 dark:text-green-300">{{ t('dashboard.todayRequests') }}</p>
+            <div class="rounded-xl bg-white/80 p-2 text-green-600 dark:bg-dark-900/60 dark:text-green-300">
+              <Icon name="chart" size="sm" :stroke-width="2" />
+            </div>
+          </div>
+          <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats?.today_requests || 0 }}</p>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('common.total') }}: {{ formatNumber(stats?.total_requests || 0) }}</p>
         </div>
-        <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.todayCost') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">
-            <span class="text-purple-600 dark:text-purple-400" :title="t('dashboard.actual')">{{ formatSettlementAmount(stats?.today_actual_cost || 0, 4) }}</span>
-            <span class="text-sm font-normal text-gray-400 dark:text-gray-500" :title="t('dashboard.standard')"> / {{ formatSettlementAmount(stats?.today_cost || 0, 4) }}</span>
+
+        <div class="rounded-2xl border border-fuchsia-100 bg-fuchsia-50/60 p-4 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/20">
+          <div class="mb-3 flex items-center justify-between">
+            <p class="text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">{{ t('dashboard.todayCost') }}</p>
+            <div class="rounded-xl bg-white/80 p-2 text-fuchsia-600 dark:bg-dark-900/60 dark:text-fuchsia-300">
+              <Icon name="dollar" size="sm" :stroke-width="2" />
+            </div>
+          </div>
+          <p class="text-2xl font-black text-gray-900 dark:text-white">
+            <span class="text-fuchsia-700 dark:text-fuchsia-300" :title="t('dashboard.actual')">{{ formatSettlementAmount(stats?.today_actual_cost || 0, 4) }}</span>
+            <span class="text-sm font-semibold text-gray-400 dark:text-gray-500" :title="t('dashboard.standard')"> / {{ formatSettlementAmount(stats?.today_cost || 0, 4) }}</span>
           </p>
-          <p class="text-xs">
+          <p class="mt-1 truncate text-xs">
             <span class="text-gray-500 dark:text-gray-400">{{ t('common.total') }}: </span>
-            <span class="text-purple-600 dark:text-purple-400" :title="t('dashboard.actual')">{{ formatSettlementAmount(stats?.total_actual_cost || 0, 4) }}</span>
+            <span class="font-medium text-fuchsia-700 dark:text-fuchsia-300" :title="t('dashboard.actual')">{{ formatSettlementAmount(stats?.total_actual_cost || 0, 4) }}</span>
             <span class="text-gray-400 dark:text-gray-500" :title="t('dashboard.standard')"> / {{ formatSettlementAmount(stats?.total_cost || 0, 4) }}</span>
           </p>
         </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Row 2: Token Stats -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    <!-- Today Tokens -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
-          <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" :stroke-width="2" />
+        <div class="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+          <div class="mb-3 flex items-center justify-between">
+            <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">{{ t('dashboard.todayTokens') }}</p>
+            <div class="rounded-xl bg-white/80 p-2 text-amber-600 dark:bg-dark-900/60 dark:text-amber-300">
+              <Icon name="cube" size="sm" :stroke-width="2" />
+            </div>
+          </div>
+          <p class="text-2xl font-black text-gray-900 dark:text-white">{{ formatTokens(stats?.today_tokens || 0) }}</p>
+          <p class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+            <span>{{ t('dashboard.input') }}: {{ formatTokens(stats?.today_input_tokens || 0) }}</span>
+            <span>{{ t('dashboard.output') }}: {{ formatTokens(stats?.today_output_tokens || 0) }}</span>
+          </p>
         </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.todayTokens') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatTokens(stats?.today_tokens || 0) }}</p>
-          <div class="space-y-1 text-xs">
-            <p class="flex flex-wrap gap-x-2 gap-y-0.5 text-gray-500 dark:text-gray-400">
-              <span>{{ t('dashboard.input') }}: {{ formatTokens(stats?.today_input_tokens || 0) }}</span>
-              <span>{{ t('dashboard.output') }}: {{ formatTokens(stats?.today_output_tokens || 0) }}</span>
+
+        <div class="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+          <div class="mb-3 flex items-center justify-between">
+            <p class="text-xs font-semibold text-indigo-700 dark:text-indigo-300">{{ t('dashboard.totalTokens') }}</p>
+            <div class="rounded-xl bg-white/80 p-2 text-indigo-600 dark:bg-dark-900/60 dark:text-indigo-300">
+              <Icon name="database" size="sm" :stroke-width="2" />
+            </div>
+          </div>
+          <p class="text-2xl font-black text-gray-900 dark:text-white">{{ formatTokens(stats?.total_tokens || 0) }}</p>
+          <p class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+            <span>{{ t('dashboard.input') }}: {{ formatTokens(stats?.total_input_tokens || 0) }}</span>
+            <span>{{ t('dashboard.output') }}: {{ formatTokens(stats?.total_output_tokens || 0) }}</span>
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 dark:border-sky-900/40 dark:bg-sky-950/20">
+          <div class="mb-3 flex items-center justify-between">
+            <p class="text-xs font-semibold text-sky-700 dark:text-sky-300">{{ t('dashboard.cacheToday') }}</p>
+            <div class="rounded-xl bg-white/80 p-2 text-sky-600 dark:bg-dark-900/60 dark:text-sky-300">
+              <Icon name="database" size="sm" :stroke-width="2" />
+            </div>
+          </div>
+          <p class="text-2xl font-black text-sky-700 dark:text-sky-300">{{ formatTokens(stats?.today_cache_read_tokens || 0) }}</p>
+          <div class="mt-1 space-y-0.5 text-xs">
+            <p class="font-semibold text-sky-700 dark:text-sky-300">{{ t('usage.cacheHit') }}</p>
+            <p class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+              <span>{{ t('usage.cacheCreate') }}: {{ formatTokens(stats?.today_cache_creation_tokens || 0) }}</span>
+              <span
+                class="inline-flex cursor-help items-center text-gray-400 transition-colors hover:text-sky-600 dark:text-gray-500 dark:hover:text-sky-400"
+                :title="t('usage.openaiCacheCreateNote')"
+              >
+                <Icon name="questionCircle" size="xs" :stroke-width="2" />
+              </span>
             </p>
-            <p class="flex flex-wrap gap-x-2 gap-y-0.5">
-              <span class="text-sky-600 dark:text-sky-400">{{ t('usage.cacheHit') }}: {{ formatTokens(stats?.today_cache_read_tokens || 0) }}</span>
-              <span class="cursor-help text-amber-600 dark:text-amber-400" :title="t('usage.openaiCacheCreateNote')">{{ t('usage.cacheCreate') }}: {{ formatTokens(stats?.today_cache_creation_tokens || 0) }}</span>
-            </p>
-            <p class="font-medium text-sky-600 dark:text-sky-400">
-              {{ t('usage.cacheHitRate') }}: {{ todayCacheStats.ratePercent }}
-            </p>
-            <p class="text-[11px] leading-4 text-gray-400 dark:text-dark-400">
-              {{ t('usage.openaiCacheCreateShortNote') }}
-            </p>
+            <p class="font-semibold text-sky-700 dark:text-sky-300">{{ t('usage.cacheHitRate') }}: {{ todayCacheStats.ratePercent }}</p>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-violet-100 bg-violet-50/60 p-4 dark:border-violet-900/40 dark:bg-violet-950/20 sm:col-span-2 2xl:col-span-1">
+          <div class="mb-3 flex items-center justify-between">
+            <p class="text-xs font-semibold text-violet-700 dark:text-violet-300">{{ t('dashboard.performance') }}</p>
+            <div class="rounded-xl bg-white/80 p-2 text-violet-600 dark:bg-dark-900/60 dark:text-violet-300">
+              <Icon name="bolt" size="sm" :stroke-width="2" />
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="rounded-xl bg-white/70 px-2.5 py-2 dark:bg-dark-900/40">
+              <p class="text-[10px] font-bold text-gray-400">RPM</p>
+              <p class="mt-1 font-mono text-lg font-black text-gray-900 dark:text-white">{{ formatTokens(stats?.rpm || 0) }}</p>
+            </div>
+            <div class="rounded-xl bg-white/70 px-2.5 py-2 dark:bg-dark-900/40">
+              <p class="text-[10px] font-bold text-gray-400">TPM</p>
+              <p class="mt-1 font-mono text-lg font-black text-violet-700 dark:text-violet-300">{{ formatTokens(stats?.tpm || 0) }}</p>
+            </div>
+            <div class="rounded-xl bg-white/70 px-2.5 py-2 dark:bg-dark-900/40">
+              <p class="text-[10px] font-bold text-gray-400">{{ t('dashboard.avgResponse') }}</p>
+              <p class="mt-1 font-mono text-lg font-black text-rose-600 dark:text-rose-300">{{ formatDuration(stats?.average_duration_ms || 0) }}</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- Total Tokens -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
-          <Icon name="database" size="md" class="text-indigo-600 dark:text-indigo-400" :stroke-width="2" />
-        </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.totalTokens') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatTokens(stats?.total_tokens || 0) }}</p>
-          <div class="space-y-1 text-xs">
-            <p class="flex flex-wrap gap-x-2 gap-y-0.5 text-gray-500 dark:text-gray-400">
-              <span>{{ t('dashboard.input') }}: {{ formatTokens(stats?.total_input_tokens || 0) }}</span>
-              <span>{{ t('dashboard.output') }}: {{ formatTokens(stats?.total_output_tokens || 0) }}</span>
-            </p>
-            <p class="flex flex-wrap gap-x-2 gap-y-0.5">
-              <span class="text-sky-600 dark:text-sky-400">{{ t('usage.cacheHit') }}: {{ formatTokens(stats?.total_cache_read_tokens || 0) }}</span>
-              <span class="cursor-help text-amber-600 dark:text-amber-400" :title="t('usage.openaiCacheCreateNote')">{{ t('usage.cacheCreate') }}: {{ formatTokens(stats?.total_cache_creation_tokens || 0) }}</span>
-            </p>
-            <p class="font-medium text-sky-600 dark:text-sky-400">
-              {{ t('usage.cacheHitRate') }}: {{ totalCacheStats.ratePercent }}
-            </p>
-            <p class="text-[11px] leading-4 text-gray-400 dark:text-dark-400">
-              {{ t('usage.openaiCacheCreateShortNote') }}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Performance (RPM/TPM) -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-violet-100 p-2 dark:bg-violet-900/30">
-          <Icon name="bolt" size="md" class="text-violet-600 dark:text-violet-400" :stroke-width="2" />
-        </div>
-        <div class="flex-1">
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.performance') }}</p>
-          <div class="flex items-baseline gap-2">
-            <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatTokens(stats?.rpm || 0) }}</p>
-            <span class="text-xs text-gray-500 dark:text-gray-400">RPM</span>
-          </div>
-          <div class="flex items-baseline gap-2">
-            <p class="text-sm font-semibold text-violet-600 dark:text-violet-400">{{ formatTokens(stats?.tpm || 0) }}</p>
-            <span class="text-xs text-gray-500 dark:text-gray-400">TPM</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Avg Response Time -->
-    <div class="card p-4">
-      <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-rose-100 p-2 dark:bg-rose-900/30">
-          <Icon name="clock" size="md" class="text-rose-600 dark:text-rose-400" :stroke-width="2" />
-        </div>
-        <div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.avgResponse') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatDuration(stats?.average_duration_ms || 0) }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('dashboard.averageTime') }}</p>
-        </div>
-      </div>
-    </div>
-  </div>
+  </section>
 
   <!-- Row 3: Per-platform breakdown -->
   <div v-if="!isSimple && platformCards.length > 0" class="card p-4">
@@ -256,12 +327,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { formatSettlementCurrencyAmount, useSettlementCurrency } from '@/composables/useSettlementCurrency'
 import type { UserDashboardStats as UserStatsType } from '@/api/usage'
-import type { PlatformQuotaItem } from '@/types'
+import type { Group, PlatformQuotaItem } from '@/types'
+import { useAppStore } from '@/stores/app'
+import { useMinuteNow } from '@/composables/useMinuteNow'
+import {
+  formatRateMultiplier,
+  resolveGroupDiscountFromGroup,
+  resolvePublicGroupRateDiscount,
+} from '@/utils/groupRateDiscount'
 
 interface FusedPlatformCard {
   platform: string
@@ -273,20 +351,36 @@ interface FusedPlatformCard {
   quota?: PlatformQuotaItem
 }
 
+interface BalanceEquivalentItem {
+  group: Group
+  rate: number
+  rateLabel: string
+  quota: number
+  quotaLabel: string
+  quotaUnitLabel: string
+  metaLabel: string
+  formulaLabel: string
+}
+
 const props = defineProps<{
   stats: UserStatsType
   balance: number
   isSimple: boolean
   platformQuotas?: PlatformQuotaItem[] | null
   balanceCnyPerCredit?: number
+  balanceGroups?: Group[]
+  userGroupRates?: Record<number, number>
 }>()
 const { t } = useI18n()
+const appStore = useAppStore()
+const now = useMinuteNow()
 const {
   settlementCurrency,
   cnyPerCredit,
   formatSettlementAmount,
   formatSettlementAmountPair,
 } = useSettlementCurrency()
+const balanceEquivalentExpanded = ref(false)
 
 const PLATFORM_LABELS: Record<string, string> = {
   anthropic: 'Claude',
@@ -296,6 +390,78 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 
 const platformLabel = (p: string) => PLATFORM_LABELS[p] ?? p
+
+const publicDiscountSummary = computed(() => resolvePublicGroupRateDiscount(
+  appStore.cachedPublicSettings?.group_rate_discount ?? null,
+  appStore.cachedPublicSettings?.upcoming_group_rate_discount ?? null,
+  now.value,
+))
+
+const balanceEquivalentItems = computed<BalanceEquivalentItem[]>(() => {
+  const uniqueGroups = new Map<number, Group>()
+  for (const group of props.balanceGroups ?? []) {
+    if (group.status === 'active') {
+      uniqueGroups.set(group.id, group)
+    }
+  }
+
+  return [...uniqueGroups.values()]
+    .map((group) => {
+      const userRate = props.userGroupRates?.[group.id]
+      const baseRate = Number.isFinite(userRate) ? userRate : group.rate_multiplier
+      const discount = resolveGroupDiscountFromGroup(
+        group,
+        baseRate,
+        publicDiscountSummary.value?.discount ?? null,
+        false,
+        now.value,
+      )
+      const effectiveRate = Number(discount?.discountedRate ?? baseRate)
+      if (!Number.isFinite(effectiveRate)) return null
+      if (isBalanceEquivalentImageGroup(group)) return null
+      if (effectiveRate <= 0) return null
+      return buildApiBalanceEquivalentItem(group, effectiveRate)
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => b.quota - a.quota || a.group.name.localeCompare(b.group.name))
+})
+
+function buildApiBalanceEquivalentItem(group: Group, effectiveRate: number): BalanceEquivalentItem {
+  const quota = props.balance / effectiveRate
+  const rateLabel = `${formatRateMultiplier(effectiveRate)}x`
+  const quotaLabel = t('dashboard.balanceEquivalent.officialAmount', {
+    amount: formatBalanceEquivalentAmount(quota),
+  })
+  return {
+    group,
+    rate: effectiveRate,
+    rateLabel,
+    quota,
+    quotaLabel,
+    quotaUnitLabel: t('dashboard.balanceEquivalent.officialQuota'),
+    metaLabel: `${platformLabel(group.platform)} · ${t('dashboard.balanceEquivalent.rate', { rate: rateLabel })}`,
+    formulaLabel: t('dashboard.balanceEquivalent.apiFormula', {
+      balance: formatBalanceEquivalentAmount(props.balance),
+      rate: rateLabel,
+      quota: quotaLabel,
+    }),
+  }
+}
+
+function isBalanceEquivalentImageGroup(group: Group): boolean {
+  return group.name.includes('生图')
+}
+
+function formatBalanceEquivalentAmount(value: number): string {
+  const amount = Number.isFinite(value) ? Math.max(0, value) : 0
+  return formatSettlementCurrencyAmount(
+    amount,
+    'USD',
+    balanceCnyPerCredit.value,
+    undefined,
+    amount >= 100 ? 0 : { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+  )
+}
 
 const buildCacheStats = (input: number, cacheCreate: number, cacheRead: number) => {
   const totalPromptTokens = input + cacheCreate + cacheRead
@@ -309,12 +475,6 @@ const todayCacheStats = computed(() => buildCacheStats(
   props.stats?.today_input_tokens ?? 0,
   props.stats?.today_cache_creation_tokens ?? 0,
   props.stats?.today_cache_read_tokens ?? 0,
-))
-
-const totalCacheStats = computed(() => buildCacheStats(
-  props.stats?.total_input_tokens ?? 0,
-  props.stats?.total_cache_creation_tokens ?? 0,
-  props.stats?.total_cache_read_tokens ?? 0,
 ))
 
 const sortedPlatforms = computed(() => {

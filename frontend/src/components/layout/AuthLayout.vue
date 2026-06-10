@@ -44,6 +44,34 @@
         </template>
       </div>
 
+      <!-- Value Props -->
+      <div class="mb-4 grid grid-cols-3 gap-2">
+        <div
+          class="rounded-2xl border border-emerald-200/70 bg-white/75 px-2.5 py-2 text-center shadow-sm backdrop-blur-sm dark:border-emerald-900/40 dark:bg-dark-800/60"
+        >
+          <Icon name="gift" size="sm" class="mx-auto mb-1 text-emerald-600 dark:text-emerald-300" />
+          <p class="text-[11px] font-semibold leading-4 text-gray-700 dark:text-dark-200">
+            {{ t('auth.valueProps.trial') }}
+          </p>
+        </div>
+        <div
+          class="rounded-2xl border border-sky-200/70 bg-white/75 px-2.5 py-2 text-center shadow-sm backdrop-blur-sm dark:border-sky-900/40 dark:bg-dark-800/60"
+        >
+          <Icon name="dollar" size="sm" class="mx-auto mb-1 text-sky-600 dark:text-sky-300" />
+          <p class="text-[11px] font-semibold leading-4 text-gray-700 dark:text-dark-200">
+            {{ t('auth.valueProps.discount') }}
+          </p>
+        </div>
+        <div
+          class="rounded-2xl border border-primary-200/70 bg-white/75 px-2.5 py-2 text-center shadow-sm backdrop-blur-sm dark:border-primary-900/40 dark:bg-dark-800/60"
+        >
+          <Icon name="shield" size="sm" class="mx-auto mb-1 text-primary-600 dark:text-primary-300" />
+          <p class="text-[11px] font-semibold leading-4 text-gray-700 dark:text-dark-200">
+            {{ t('auth.valueProps.stability') }}
+          </p>
+        </div>
+      </div>
+
       <!-- Card Container -->
       <div class="card-glass rounded-2xl p-8 shadow-glass">
         <slot />
@@ -64,9 +92,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
+import Icon from '@/components/icons/Icon.vue'
 import { sanitizeUrl } from '@/utils/url'
 
+const { t } = useI18n()
 const appStore = useAppStore()
 
 const siteName = computed(() => appStore.siteName || 'Sub2API')

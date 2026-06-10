@@ -118,17 +118,26 @@
         <div class="mb-12 flex flex-col items-center justify-between gap-12 lg:flex-row lg:gap-16">
           <!-- Left: Text Content -->
           <div class="flex-1 text-center lg:text-left">
+            <div
+              class="mb-5 inline-flex items-center gap-2 rounded-full border border-primary-200/80 bg-white/80 px-4 py-2 text-sm font-bold text-primary-700 shadow-sm backdrop-blur-sm dark:border-primary-800/60 dark:bg-dark-800/70 dark:text-primary-300"
+            >
+              <Icon name="sparkles" size="sm" />
+              {{ t('home.heroSubtitle') }}
+            </div>
             <h1
-              class="mb-4 text-4xl font-bold text-gray-900 dark:text-white md:text-5xl lg:text-6xl"
+              class="mb-4 text-4xl font-black tracking-tight text-gray-900 dark:text-white md:text-5xl lg:text-6xl"
             >
               {{ siteName }}
             </h1>
-            <p class="mb-8 text-lg text-gray-600 dark:text-dark-300 md:text-xl">
+            <p v-if="siteSubtitle" class="mb-3 text-base font-semibold text-gray-500 dark:text-dark-300 md:text-lg">
               {{ siteSubtitle }}
+            </p>
+            <p class="mx-auto mb-8 max-w-2xl text-lg leading-8 text-gray-600 dark:text-dark-300 lg:mx-0">
+              {{ t('home.heroDescription') }}
             </p>
 
             <!-- CTA Button -->
-            <div>
+            <div class="flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
               <router-link
                 :to="isAuthenticated ? dashboardPath : '/login'"
                 class="btn btn-primary px-8 py-3 text-base shadow-lg shadow-primary-500/30"
@@ -136,6 +145,20 @@
                 {{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}
                 <Icon name="arrowRight" size="md" class="ml-2" :stroke-width="2" />
               </router-link>
+              <a
+                v-if="docsLink"
+                :href="docsLink.href"
+                :target="docsLink.external ? '_blank' : undefined"
+                :rel="docsLink.external ? 'noopener noreferrer' : undefined"
+                class="inline-flex items-center gap-2 rounded-xl border border-gray-200/80 bg-white/80 px-5 py-3 text-sm font-bold text-gray-700 shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:text-primary-700 dark:border-dark-700/70 dark:bg-dark-800/70 dark:text-dark-200 dark:hover:border-primary-800 dark:hover:text-primary-300"
+                @click="handleDocsLinkClick"
+              >
+                <Icon name="book" size="sm" />
+                {{ t('home.docs') }}
+                <span class="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
+                  {{ t('home.docsBadge') }}
+                </span>
+              </a>
             </div>
           </div>
 
@@ -161,7 +184,7 @@
                     <span class="code-url">/v1/messages</span>
                   </div>
                   <div class="code-line line-2">
-                    <span class="code-comment"># Routing to upstream...</span>
+                    <span class="code-comment"># {{ t('home.terminal.scheduling') }}</span>
                   </div>
                   <div class="code-line line-3">
                     <span class="code-success">200 OK</span>
@@ -498,11 +521,12 @@ onMounted(() => {
 .terminal-container {
   position: relative;
   display: inline-block;
+  max-width: 100%;
 }
 
 /* Terminal Window */
 .terminal-window {
-  width: 420px;
+  width: min(420px, calc(100vw - 3rem));
   background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
   border-radius: 14px;
   box-shadow:
@@ -653,5 +677,20 @@ onMounted(() => {
     0 0 0 1px rgba(20, 184, 166, 0.2),
     0 0 40px rgba(20, 184, 166, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 640px) {
+  .terminal-body {
+    padding: 16px;
+    font-size: 12px;
+  }
+
+  .terminal-window {
+    transform: none;
+  }
+
+  .terminal-window:hover {
+    transform: translateY(-2px);
+  }
 }
 </style>

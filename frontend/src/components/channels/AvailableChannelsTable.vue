@@ -1,169 +1,208 @@
 <template>
-  <div class="card overflow-hidden">
-    <table class="w-full table-fixed border-collapse text-sm">
-      <thead>
-        <tr class="border-b border-gray-100 bg-gray-50/50 text-xs font-medium uppercase tracking-wide text-gray-500 dark:border-dark-700 dark:bg-dark-800/50 dark:text-gray-400">
-          <th class="w-[180px] px-4 py-3 text-center">{{ columns.name }}</th>
-          <th class="w-[200px] px-4 py-3 text-left">{{ columns.description }}</th>
-          <th class="w-[140px] px-4 py-3 text-left">{{ columns.platform }}</th>
-          <th class="px-4 py-3 text-left">{{ columns.groups }}</th>
-          <th class="px-4 py-3 text-left">{{ columns.supportedModels }}</th>
-        </tr>
-      </thead>
-      <tbody v-if="loading">
-        <tr>
-          <td colspan="5" class="py-10 text-center">
-            <Icon name="refresh" size="lg" class="inline-block animate-spin text-gray-400" />
-          </td>
-        </tr>
-      </tbody>
-      <tbody v-else-if="rows.length === 0">
-        <tr>
-          <td colspan="5" class="py-12 text-center">
-            <Icon name="inbox" size="xl" class="mx-auto mb-3 h-12 w-12 text-gray-400" />
-            <p class="text-sm text-gray-500 dark:text-gray-400">{{ emptyLabel }}</p>
-          </td>
-        </tr>
-      </tbody>
-      <!-- 每个渠道一个 tbody：首行 td rowspan 渠道名，后续行只渲染其余三列。
-           tbody 之间强分隔线表达"渠道边界"，tbody 内部用淡分隔线区分平台。 -->
-      <tbody
-        v-else
-        v-for="(channel, chIdx) in rows"
-        :key="`${channel.name}-${chIdx}`"
-        class="border-b-2 border-gray-200 last:border-b-0 dark:border-dark-600"
-      >
-        <tr
-          v-for="(section, secIdx) in channel.platforms"
-          :key="`${channel.name}-${section.platform}`"
-          class="transition-colors hover:bg-gray-50/40 dark:hover:bg-dark-800/40"
-          :class="{ 'border-t border-gray-100/70 dark:border-dark-700/50': secIdx > 0 }"
+  <div v-if="loading" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div
+      v-for="idx in 6"
+      :key="idx"
+      class="h-56 animate-pulse rounded-[1.5rem] border border-gray-100 bg-white p-5 shadow-card dark:border-dark-700 dark:bg-dark-800/60"
+    >
+      <div class="h-4 w-1/3 rounded bg-gray-200 dark:bg-dark-700" />
+      <div class="mt-4 h-8 w-2/3 rounded bg-gray-200 dark:bg-dark-700" />
+      <div class="mt-6 space-y-3">
+        <div class="h-4 rounded bg-gray-100 dark:bg-dark-700/70" />
+        <div class="h-4 w-5/6 rounded bg-gray-100 dark:bg-dark-700/70" />
+        <div class="h-4 w-3/4 rounded bg-gray-100 dark:bg-dark-700/70" />
+      </div>
+    </div>
+  </div>
+
+  <div v-else-if="rows.length === 0" class="card py-16 text-center">
+    <Icon name="inbox" size="xl" class="mx-auto mb-3 h-12 w-12 text-gray-400" />
+    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ emptyLabel }}</p>
+  </div>
+
+  <div v-else class="space-y-4">
+    <article
+      v-for="(channel, chIdx) in rows"
+      :key="`${channel.name}-${chIdx}`"
+      class="overflow-hidden rounded-[1.5rem] border border-gray-100 bg-white shadow-card dark:border-dark-700/70 dark:bg-dark-800/60"
+    >
+      <div class="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white p-4 dark:border-dark-700 dark:from-dark-800 dark:to-dark-800/50 sm:p-5">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div class="min-w-0">
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+              <span class="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-bold text-white dark:bg-white dark:text-slate-900">
+                {{ t('availableChannels.channel') }}
+              </span>
+              <span class="text-xs font-semibold text-gray-400">
+                {{ channel.platforms.length }} {{ t('availableChannels.stats.platforms') }}
+              </span>
+            </div>
+            <h2 class="break-words text-xl font-black tracking-tight text-gray-900 dark:text-white">
+              {{ channel.name }}
+            </h2>
+            <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
+              <template v-if="channel.description">{{ channel.description }}</template>
+              <span v-else>-</span>
+            </p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:min-w-[280px]">
+            <div class="rounded-2xl bg-gray-100 px-3 py-2 dark:bg-dark-700/70">
+              <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">{{ t('availableChannels.stats.groups') }}</p>
+              <p class="mt-1 text-lg font-black text-gray-900 dark:text-white">{{ channelGroupCount(channel) }}</p>
+            </div>
+            <div class="rounded-2xl bg-gray-100 px-3 py-2 dark:bg-dark-700/70">
+              <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">{{ t('availableChannels.stats.models') }}</p>
+              <p class="mt-1 text-lg font-black text-gray-900 dark:text-white">{{ channelModelCount(channel) }}</p>
+            </div>
+            <div class="col-span-2 rounded-2xl bg-emerald-50 px-3 py-2 dark:bg-emerald-950/30 sm:col-span-1">
+              <p class="text-[10px] font-bold uppercase tracking-wide text-emerald-700/70 dark:text-emerald-300/70">{{ t('availableChannels.visible') }}</p>
+              <p class="mt-1 text-lg font-black text-emerald-700 dark:text-emerald-300">{{ t('common.available') }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid gap-3 p-3 sm:p-4 xl:grid-cols-2 2xl:grid-cols-3">
+        <section
+          v-for="section in channel.platforms"
+          :key="sectionKey(channel, section)"
+          class="relative overflow-hidden rounded-2xl border bg-white p-4 dark:bg-dark-900/40"
+          :class="platformBorderClass(section.platform)"
         >
-          <!-- 渠道名：只在第一行渲染并用 rowspan 纵向合并 -->
-          <td
-            v-if="secIdx === 0"
-            :rowspan="channel.platforms.length"
-            class="px-4 py-3 text-center align-middle font-medium text-gray-900 dark:text-white"
-          >
-            {{ channel.name }}
-          </td>
+          <div class="absolute inset-x-0 top-0 h-1" :class="platformAccentBarClass(section.platform)" />
 
-          <!-- 描述：独立一列，同样用 rowspan 纵向合并 -->
-          <td
-            v-if="secIdx === 0"
-            :rowspan="channel.platforms.length"
-            class="px-4 py-3 align-middle text-xs text-gray-500 dark:text-gray-400"
-          >
-            <template v-if="channel.description">{{ channel.description }}</template>
-            <span v-else class="text-gray-400">-</span>
-          </td>
-
-          <!-- 平台徽章 -->
-          <td class="align-top px-4 py-3">
+          <div class="flex flex-wrap items-start justify-between gap-3">
             <span
               :class="[
-                'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium uppercase',
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold uppercase',
                 platformBadgeClass(section.platform),
               ]"
             >
               <PlatformIcon :platform="section.platform as GroupPlatform" size="xs" />
               {{ section.platform }}
             </span>
-          </td>
-
-          <!-- 分组：专属分组在前（紫色 shield 行），公开分组在后（灰色 globe 行）。 -->
-          <td class="align-top px-4 py-3">
-            <div class="flex flex-col gap-1.5">
-              <div
-                v-if="exclusiveGroups(section).length > 0"
-                class="flex flex-wrap items-center gap-1.5"
-              >
-                <span
-                  class="inline-flex items-center gap-0.5 text-[10px] font-medium uppercase text-purple-600 dark:text-purple-400"
-                  :title="t('availableChannels.exclusiveTooltip')"
-                >
-                  <Icon name="shield" size="xs" class="h-3 w-3" />
-                  {{ t('availableChannels.exclusive') }}
-                </span>
-                <GroupBadge
-                  v-for="g in exclusiveGroups(section)"
-                  :key="`ex-${g.id}`"
-                  :name="g.name"
-                  :platform="g.platform as GroupPlatform"
-                  :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
-                  :group-id="g.id"
-                  :rate-multiplier="g.rate_multiplier"
-                  :user-rate-multiplier="userGroupRates[g.id] ?? null"
-                  :discount-multiplier="g.group_rate_discount_multiplier"
-                  :discounted-rate-multiplier="g.discounted_rate_multiplier"
-                  :discount-name="g.group_rate_discount_name"
-                  :discount-schedule-mode="g.group_rate_discount_schedule_mode"
-                  :discount-start-at="g.group_rate_discount_start_at"
-                  :discount-end-at="g.group_rate_discount_end_at"
-                  :discount-weekdays="g.group_rate_discount_weekdays"
-                  :discount-daily-start-time="g.group_rate_discount_daily_start_time"
-                  :discount-daily-end-time="g.group_rate_discount_daily_end_time"
-                  :discount-timezone="g.group_rate_discount_timezone"
-                  always-show-rate
-                />
-              </div>
-              <div
-                v-if="publicGroups(section).length > 0"
-                class="flex flex-wrap items-center gap-1.5"
-              >
-                <span
-                  class="inline-flex items-center gap-0.5 text-[10px] font-medium uppercase text-gray-500 dark:text-gray-400"
-                  :title="t('availableChannels.publicTooltip')"
-                >
-                  <Icon name="globe" size="xs" class="h-3 w-3" />
-                  {{ t('availableChannels.public') }}
-                </span>
-                <GroupBadge
-                  v-for="g in publicGroups(section)"
-                  :key="`pub-${g.id}`"
-                  :name="g.name"
-                  :platform="g.platform as GroupPlatform"
-                  :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
-                  :group-id="g.id"
-                  :rate-multiplier="g.rate_multiplier"
-                  :user-rate-multiplier="userGroupRates[g.id] ?? null"
-                  :discount-multiplier="g.group_rate_discount_multiplier"
-                  :discounted-rate-multiplier="g.discounted_rate_multiplier"
-                  :discount-name="g.group_rate_discount_name"
-                  :discount-schedule-mode="g.group_rate_discount_schedule_mode"
-                  :discount-start-at="g.group_rate_discount_start_at"
-                  :discount-end-at="g.group_rate_discount_end_at"
-                  :discount-weekdays="g.group_rate_discount_weekdays"
-                  :discount-daily-start-time="g.group_rate_discount_daily_start_time"
-                  :discount-daily-end-time="g.group_rate_discount_daily_end_time"
-                  :discount-timezone="g.group_rate_discount_timezone"
-                  always-show-rate
-                />
-              </div>
-              <span v-if="section.groups.length === 0" class="text-xs text-gray-400">-</span>
+            <div class="flex gap-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+              <span>{{ section.groups.length }} {{ t('availableChannels.stats.groups') }}</span>
+              <span>{{ section.supported_models.length }} {{ t('availableChannels.stats.models') }}</span>
             </div>
-          </td>
+          </div>
 
-          <!-- 支持模型 -->
-          <td class="align-top px-4 py-3">
-            <div class="flex flex-wrap gap-1">
-              <SupportedModelChip
-                v-for="m in section.supported_models"
-                :key="`${section.platform}-${m.name}`"
-                :model="m"
-                :pricing-key-prefix="pricingKeyPrefix"
-                :no-pricing-label="noPricingLabel"
-                :show-platform="false"
-                :platform-hint="section.platform"
-              />
-              <span v-if="section.supported_models.length === 0" class="text-xs text-gray-400">
+          <div class="mt-4 space-y-4">
+            <div class="rounded-2xl bg-gray-50 p-3 dark:bg-dark-800/70">
+              <div class="mb-2 flex items-center justify-between">
+                <p class="text-xs font-bold text-gray-700 dark:text-gray-200">{{ t('availableChannels.groupsTitle') }}</p>
+                <span class="text-[11px] text-gray-400">{{ section.groups.length }}</span>
+              </div>
+
+              <div v-if="section.groups.length > 0" class="space-y-2">
+                <div
+                  v-if="exclusiveGroups(section).length > 0"
+                  class="space-y-1.5"
+                >
+                  <span
+                    class="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase text-purple-600 dark:text-purple-400"
+                    :title="t('availableChannels.exclusiveTooltip')"
+                  >
+                    <Icon name="shield" size="xs" class="h-3 w-3" />
+                    {{ t('availableChannels.exclusive') }}
+                  </span>
+                  <div class="flex flex-wrap gap-1.5">
+                    <GroupBadge
+                      v-for="g in exclusiveGroups(section)"
+                      :key="`ex-${g.id}`"
+                      :name="g.name"
+                      :platform="g.platform as GroupPlatform"
+                      :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
+                      :group-id="g.id"
+                      :rate-multiplier="g.rate_multiplier"
+                      :user-rate-multiplier="userGroupRates[g.id] ?? null"
+                      :discount-multiplier="g.group_rate_discount_multiplier"
+                      :discounted-rate-multiplier="g.discounted_rate_multiplier"
+                      :discount-name="g.group_rate_discount_name"
+                      :discount-schedule-mode="g.group_rate_discount_schedule_mode"
+                      :discount-start-at="g.group_rate_discount_start_at"
+                      :discount-end-at="g.group_rate_discount_end_at"
+                      :discount-weekdays="g.group_rate_discount_weekdays"
+                      :discount-daily-start-time="g.group_rate_discount_daily_start_time"
+                      :discount-daily-end-time="g.group_rate_discount_daily_end_time"
+                      :discount-timezone="g.group_rate_discount_timezone"
+                      always-show-rate
+                    />
+                  </div>
+                </div>
+
+                <div
+                  v-if="publicGroups(section).length > 0"
+                  class="space-y-1.5"
+                >
+                  <span
+                    class="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400"
+                    :title="t('availableChannels.publicTooltip')"
+                  >
+                    <Icon name="globe" size="xs" class="h-3 w-3" />
+                    {{ t('availableChannels.public') }}
+                  </span>
+                  <div class="flex flex-wrap gap-1.5">
+                    <GroupBadge
+                      v-for="g in publicGroups(section)"
+                      :key="`pub-${g.id}`"
+                      :name="g.name"
+                      :platform="g.platform as GroupPlatform"
+                      :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
+                      :group-id="g.id"
+                      :rate-multiplier="g.rate_multiplier"
+                      :user-rate-multiplier="userGroupRates[g.id] ?? null"
+                      :discount-multiplier="g.group_rate_discount_multiplier"
+                      :discounted-rate-multiplier="g.discounted_rate_multiplier"
+                      :discount-name="g.group_rate_discount_name"
+                      :discount-schedule-mode="g.group_rate_discount_schedule_mode"
+                      :discount-start-at="g.group_rate_discount_start_at"
+                      :discount-end-at="g.group_rate_discount_end_at"
+                      :discount-weekdays="g.group_rate_discount_weekdays"
+                      :discount-daily-start-time="g.group_rate_discount_daily_start_time"
+                      :discount-daily-end-time="g.group_rate_discount_daily_end_time"
+                      :discount-timezone="g.group_rate_discount_timezone"
+                      always-show-rate
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <span v-else class="text-xs text-gray-400">-</span>
+            </div>
+
+            <div>
+              <div class="mb-2 flex items-center justify-between">
+                <p class="text-xs font-bold text-gray-700 dark:text-gray-200">{{ t('availableChannels.modelsTitle') }}</p>
+                <span class="text-[11px] text-gray-400">{{ section.supported_models.length }}</span>
+              </div>
+
+              <div
+                v-if="section.supported_models.length > 0"
+                class="max-h-44 overflow-y-auto rounded-2xl border border-gray-100 bg-white/70 p-2 dark:border-dark-700 dark:bg-dark-800/40"
+              >
+                <div class="flex flex-wrap gap-1.5">
+                  <SupportedModelChip
+                    v-for="m in section.supported_models"
+                    :key="`${section.platform}-${m.name}`"
+                    :model="m"
+                    :pricing-key-prefix="pricingKeyPrefix"
+                    :no-pricing-label="noPricingLabel"
+                    :show-platform="false"
+                    :platform-hint="section.platform"
+                  />
+                </div>
+              </div>
+
+              <span v-else class="text-xs text-gray-400">
                 {{ noModelsLabel }}
               </span>
             </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+          </div>
+        </section>
+      </div>
+    </article>
   </div>
 </template>
 
@@ -175,16 +214,9 @@ import GroupBadge from '@/components/common/GroupBadge.vue'
 import SupportedModelChip from './SupportedModelChip.vue'
 import type { UserAvailableChannel, UserAvailableGroup, UserChannelPlatformSection } from '@/api/channels'
 import type { GroupPlatform, SubscriptionType } from '@/types'
-import { platformBadgeClass } from '@/utils/platformColors'
+import { platformAccentBarClass, platformBadgeClass, platformBorderClass } from '@/utils/platformColors'
 
-const props = defineProps<{
-  columns: {
-    name: string
-    description: string
-    platform: string
-    groups: string
-    supportedModels: string
-  }
+defineProps<{
   rows: UserAvailableChannel[]
   loading: boolean
   pricingKeyPrefix: string
@@ -195,11 +227,19 @@ const props = defineProps<{
   userGroupRates: Record<number, number>
 }>()
 
-// Suppress unused warning — props is accessed via template automatically but
-// the explicit reference here keeps the linter from flagging userGroupRates.
-void props.userGroupRates
-
 const { t } = useI18n()
+
+function sectionKey(channel: UserAvailableChannel, section: UserChannelPlatformSection): string {
+  return `${channel.name}-${section.platform}`
+}
+
+function channelGroupCount(channel: UserAvailableChannel): number {
+  return channel.platforms.reduce((sum, section) => sum + section.groups.length, 0)
+}
+
+function channelModelCount(channel: UserAvailableChannel): number {
+  return channel.platforms.reduce((sum, section) => sum + section.supported_models.length, 0)
+}
 
 function exclusiveGroups(section: UserChannelPlatformSection): UserAvailableGroup[] {
   return section.groups.filter((g) => g.is_exclusive)

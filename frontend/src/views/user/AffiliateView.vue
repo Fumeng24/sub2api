@@ -81,6 +81,40 @@
               <li v-if="detail.aff_frozen_quota > 0">4. {{ t('affiliate.tips.line4') }}</li>
             </ul>
           </div>
+
+          <div class="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-lime-50 to-amber-50 p-5 dark:border-emerald-900/50 dark:from-emerald-950/35 dark:via-lime-950/20 dark:to-amber-950/20">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div class="max-w-2xl">
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300">
+                  {{ t('affiliate.promo.kicker') }}
+                </p>
+                <h4 class="mt-2 text-2xl font-black tracking-tight text-gray-950 dark:text-white">
+                  {{ t('affiliate.promo.title') }}
+                </h4>
+                <p class="mt-2 text-sm leading-6 text-gray-700 dark:text-gray-300">
+                  {{ t('affiliate.promo.description') }}
+                </p>
+              </div>
+              <button class="btn btn-primary shrink-0" @click="copyPromoText">
+                <Icon name="copy" size="sm" />
+                <span>{{ t('affiliate.promo.copyButton') }}</span>
+              </button>
+            </div>
+
+            <div class="mt-5 grid gap-3 sm:grid-cols-3">
+              <div
+                v-for="item in promoHighlights"
+                :key="item"
+                class="rounded-xl border border-white/70 bg-white/70 p-3 text-sm font-medium text-gray-800 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-gray-100"
+              >
+                {{ item }}
+              </div>
+            </div>
+
+            <div class="mt-4 rounded-xl border border-emerald-200/80 bg-white/80 p-4 text-sm leading-6 text-gray-700 shadow-sm dark:border-emerald-900/50 dark:bg-dark-950/60 dark:text-gray-300">
+              {{ promoShareText }}
+            </div>
+          </div>
         </div>
 
         <div class="card p-6">
@@ -177,6 +211,16 @@ const formattedRebateRate = computed(() => {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toString()
 })
 
+const promoHighlights = computed(() => [
+  t('affiliate.promo.highlightTrial'),
+  t('affiliate.promo.highlightCheap'),
+  t('affiliate.promo.highlightRouting'),
+])
+
+const promoShareText = computed(() => t('affiliate.promo.shareText', {
+  link: inviteLink.value,
+}))
+
 function formatCount(value: number): string {
   return value.toLocaleString()
 }
@@ -208,6 +252,11 @@ async function copyCode(): Promise<void> {
 async function copyInviteLink(): Promise<void> {
   if (!inviteLink.value) return
   await copyToClipboard(inviteLink.value, t('affiliate.linkCopied'))
+}
+
+async function copyPromoText(): Promise<void> {
+  if (!promoShareText.value) return
+  await copyToClipboard(promoShareText.value, t('affiliate.promo.copied'))
 }
 
 async function transferQuota(): Promise<void> {
