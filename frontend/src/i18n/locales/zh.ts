@@ -1219,14 +1219,33 @@ export default {
     linkCopied: '邀请链接已复制',
     loadFailed: '加载邀请返利数据失败',
     transferFailed: '转入余额失败',
+    bindFailed: '绑定邀请码失败',
     stats: {
       rebateRate: '我的返利比例',
       rebateRateHint: '被邀请用户每次充值后你可获得的返利比例',
       invitedUsers: '邀请人数',
+      invitedUsersHint: '已经通过你的链接注册的用户',
       availableQuota: '可转返利额度',
+      availableQuotaHint: '可以随时转入账户余额继续使用',
       frozenQuota: '冻结中',
       frozenQuotaHint: '新产生的返利正在冻结期中',
-      totalQuota: '历史返利额度'
+      frozenQuotaLine: '另有 {amount} 正在冻结中',
+      totalQuota: '历史返利额度',
+      totalQuotaHint: '累计帮你省下来的使用成本'
+    },
+    hero: {
+      kicker: '推荐给朋友',
+      title: '把你正在用的 AI API 分享给朋友',
+      description: '朋友可以先用注册送额度试试看，觉得合适再充值；你也能在好友充值后获得返利额度，转入余额后继续使用。',
+      pillTrial: '注册送额度，先试再说',
+      pillCheap: '高频使用也不心疼',
+      pillStable: '少掉线，少折腾',
+      shareHint: '适合分享给正在用 Codex、Cursor、Claude、Gemini，或者经常调用 API 的朋友。'
+    },
+    sharePanel: {
+      kicker: '你的专属邀请入口',
+      title: '复制链接就能发，不需要解释一堆配置',
+      description: '把邀请链接或下面的现成文案发给朋友即可。对方注册后可以先用赠送额度体验，绑定成功后你也能获得后续返利。'
     },
     transfer: {
       title: '返利额度转余额',
@@ -1235,6 +1254,28 @@ export default {
       transferring: '转入中...',
       empty: '当前没有可转入额度',
       success: '已转入余额：{amount}'
+    },
+    bind: {
+      title: '已有邀请码？先绑定，再领取礼包',
+      description: '如果你是朋友邀请来的，请在注册 1 天内填写邀请码。绑定成功后可在本页手动领取礼包，每个账号只能绑定一次。',
+      codePlaceholder: '输入邀请码',
+      bonusHint: '绑定成功后可手动领取 {amount}',
+      button: '绑定邀请码',
+      binding: '绑定中...',
+      success: '邀请码绑定成功',
+      successWithBonus: '邀请码绑定成功，请手动领取礼包',
+      claimTitle: '领取绑定礼包',
+      claimDescription: '你已绑定邀请人，并且仍在新用户领取时间内。点击领取后，{amount} 会直接加入账户余额。',
+      claimButton: '领取 {amount}',
+      claiming: '领取中...',
+      claimSuccess: '绑定礼包已领取：{amount}',
+      errors: {
+        AFFILIATE_BIND_WINDOW_EXPIRED: '注册超过 1 天后不能再绑定邀请信息。',
+        AFFILIATE_CODE_INVALID: '邀请码无效，请检查后重试。',
+        AFFILIATE_ALREADY_BOUND: '当前账号已经绑定过邀请人。',
+        AFFILIATE_BIND_BONUS_UNAVAILABLE: '当前没有可领取的绑定礼包。',
+        AFFILIATE_BIND_BONUS_ALREADY_CLAIMED: '绑定礼包已经领取过。'
+      }
     },
     invitees: {
       title: '已邀请用户',
@@ -1246,12 +1287,46 @@ export default {
         joinedAt: '注册时间'
       }
     },
-    tips: {
-      title: '使用说明',
+    rules: {
+      title: '返利规则说明',
       line1: '将邀请码或邀请链接分享给新用户。',
       line2: '被邀请用户充值后，你可获得 {rate} 的返利额度。',
-      line3: '返利额度可随时转入账户余额。',
-      line4: '新产生的返利需要经过冻结期后才能提现。'
+      durationPermanent: '返利有效期：永久有效。好友绑定后，后续充值都会按当前规则产生返利。',
+      durationLimited: '返利有效期：好友注册后 {days} 天内的充值会产生返利，超过后充值不再产生返利。',
+      line4: '返利额度可随时转入账户余额继续使用。',
+      line5: '新产生的返利需要经过冻结期后才能转入余额。'
+    },
+    friendBenefits: {
+      kicker: '朋友能获得什么',
+      title: '发给朋友时，可以直接讲这些好处',
+      description: '不用让朋友先理解复杂配置，先告诉他：可以试、够便宜、模型多、日常使用更省心。',
+      trialTitle: '先试再充值',
+      trialDescription: '新用户注册后有赠送额度，朋友可以先跑起来，再决定是否继续使用。',
+      valueTitle: '长期用更省',
+      valueDescription: '特价分组适合高频使用，写代码、跑工具、日常问答都不会太心疼。',
+      stabilityTitle: '日常更省心',
+      stabilityDescription: '独家调度算法尽量减少不可用和频繁切换，适合持续使用。',
+      rangeTitle: '模型覆盖更全',
+      rangeDescription: 'GPT、Claude、Gemini 和图像模型都能用，朋友不用反复切换多个平台。'
+    },
+    audiences: {
+      kicker: '按场景复制文案',
+      title: '不知道怎么开口，就直接复制这一段',
+      description: '不同朋友的使用场景不一样，选择最接近的一段发出去即可。',
+      copyButton: '复制这段',
+      copied: '分享话术已复制',
+      developerTitle: '给开发者 / Codex 用户',
+      developerDescription: '适合正在用 Codex、Cursor、Cline 或自己接 API 的朋友。',
+      developerCopy: '我最近在用这个 API 站跑 Codex / Cursor，比自己到处配 Key 省心很多。支持 GPT、Claude、Gemini，特价分组高频用也不心疼，注册送额度可以先试：{link}',
+      heavyUserTitle: '给重度 GPT 用户',
+      heavyUserDescription: '适合每天都会用 GPT、Claude 或 Gemini 的朋友。',
+      heavyUserCopy: '如果你现在 GPT 用得很多，可以试试这个站。我自己用了几天，注册送额度还没用完，特价分组比直接硬冲官方划算很多，日常稳定性也不错：{link}',
+      newcomerTitle: '给刚想尝试 AI 的朋友',
+      newcomerDescription: '适合刚想试 GPT / Claude、但不想一上来充值的朋友。',
+      newcomerCopy: '你要是想试 GPT / Claude，可以先用这个，不用一上来充值，注册会送额度。会用普通聊天工具就能开始，用我的邀请链接注册后输入邀请码还能获得更多额度：{link}',
+      groupTitle: '发到群里 / 社区',
+      groupDescription: '适合发到开发者群、工具群或 AI 交流群。',
+      groupCopy: '最近发现一个适合高频 AI 使用的 API 站，注册送额度，特价分组很便宜，支持 GPT / Claude / Gemini / 生图，适合 Codex、Cursor 和各种 API 工具。想试的可以走我的邀请链接：{link}'
     },
     promo: {
       kicker: '分享给朋友的现成文案',
@@ -1260,9 +1335,10 @@ export default {
       highlightTrial: '注册送额度，先白嫖体验',
       highlightCheap: '特价分组很便宜，GPT 也能当日常工具',
       highlightRouting: '独家调度算法，稳定性极佳',
+      previewTitle: '默认分享文案',
       copyButton: '复制宣传文案',
       copied: '宣传文案已复制',
-      shareText: '我现在基本 GPT 自由了，这个站注册送额度，我用了三天都没用完。特价分组便宜到夸张，长期用甚至比 DeepSeek 还划算，还支持 GPT、Claude、Gemini 和图像模型。独家调度算法稳定性很强，日常用起来少掉线少折腾。用我的链接注册可以先白嫖额度体验一下：{link}'
+      shareText: '我最近基本 GPT 自由了。这个站注册送额度，我用了几天都没用完；特价分组便宜到适合长期高频用，比直接硬冲官方省很多，还支持 GPT、Claude、Gemini 和生图。日常用起来少掉线、少折腾。用我的邀请链接注册，输入后获得更多额度：{link}'
     }
   },
 
@@ -6052,6 +6128,8 @@ export default {
           durationDaysDesc: '被邀请用户注册后多少天内的充值产生返利。0 = 永久有效。',
           perInviteeCap: '单人返利上限',
           perInviteeCapDesc: '每个被邀请用户最多产生的返利总额。0 = 无上限。',
+          bindBonusAmount: '绑定礼包领取金额',
+          bindBonusAmountDesc: '用户在注册 1 天内绑定邀请人后，可在邀请返利页手动领取的余额。0 = 不赠送。',
           customUsers: {
             title: '专属用户配置',
             description: '为指定用户设置专属邀请码或专属返利比例。仅展示已设置过专属配置的用户。',

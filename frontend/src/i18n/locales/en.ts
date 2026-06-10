@@ -1215,14 +1215,33 @@ export default {
     linkCopied: 'Invite link copied',
     loadFailed: 'Failed to load affiliate data',
     transferFailed: 'Failed to transfer affiliate quota',
+    bindFailed: 'Failed to bind affiliate code',
     stats: {
       rebateRate: 'My Rebate Rate',
       rebateRateHint: 'What you earn each time an invitee recharges',
       invitedUsers: 'Invited Users',
+      invitedUsersHint: 'Users who registered through your invite',
       availableQuota: 'Available Rebate Quota',
+      availableQuotaHint: 'Can be moved into your balance anytime',
       frozenQuota: 'Frozen',
       frozenQuotaHint: 'Recently earned rebates pending release',
-      totalQuota: 'Historical Rebate Quota'
+      frozenQuotaLine: '{amount} is still pending release',
+      totalQuota: 'Historical Rebate Quota',
+      totalQuotaHint: 'Your accumulated savings from sharing'
+    },
+    hero: {
+      kicker: 'Share with friends',
+      title: 'Share the AI API you are using with friends',
+      description: 'Your friends can use signup credit to try it first, then recharge only if it fits their workflow. When they recharge, you earn rebate quota that can be moved into your balance.',
+      pillTrial: 'Trial credit first',
+      pillCheap: 'Built for frequent use',
+      pillStable: 'Less downtime, less hassle',
+      shareHint: 'Best shared with friends using Codex, Cursor, Claude, Gemini, or API-based AI tools.'
+    },
+    sharePanel: {
+      kicker: 'Your invite entry',
+      title: 'Copy once, send directly',
+      description: 'Send your invite link or one of the ready-made messages below. New users can start with trial credit, and you earn rebates after successful invited recharges.'
     },
     transfer: {
       title: 'Transfer Rebate Quota',
@@ -1231,6 +1250,28 @@ export default {
       transferring: 'Transferring...',
       empty: 'No available rebate quota',
       success: '{amount} has been transferred to your balance'
+    },
+    bind: {
+      title: 'Have an invite code? Bind first, then claim your bonus',
+      description: 'If a friend invited you, enter the invite code within 1 day after registration. After binding, claim the bonus manually on this page. Each account can bind an inviter only once.',
+      codePlaceholder: 'Enter invite code',
+      bonusHint: 'Bind successfully to manually claim {amount}',
+      button: 'Bind Code',
+      binding: 'Binding...',
+      success: 'Invite code bound successfully',
+      successWithBonus: 'Invite code bound successfully. Claim your bonus manually below',
+      claimTitle: 'Claim binding bonus',
+      claimDescription: 'Your inviter is bound and you are still within the new-user claim window. After claiming, {amount} will be added to your balance.',
+      claimButton: 'Claim {amount}',
+      claiming: 'Claiming...',
+      claimSuccess: 'Binding bonus claimed: {amount}',
+      errors: {
+        AFFILIATE_BIND_WINDOW_EXPIRED: 'Invite information can no longer be bound more than 1 day after registration.',
+        AFFILIATE_CODE_INVALID: 'Invalid invite code. Please check and try again.',
+        AFFILIATE_ALREADY_BOUND: 'This account has already bound an inviter.',
+        AFFILIATE_BIND_BONUS_UNAVAILABLE: 'No binding bonus is currently available.',
+        AFFILIATE_BIND_BONUS_ALREADY_CLAIMED: 'The binding bonus has already been claimed.'
+      }
     },
     invitees: {
       title: 'Invited Users',
@@ -1242,12 +1283,46 @@ export default {
         joinedAt: 'Joined At'
       }
     },
-    tips: {
-      title: 'How It Works',
+    rules: {
+      title: 'Rebate Rules',
       line1: 'Share your affiliate code or invite link with new users.',
       line2: 'When invitees recharge, you receive {rate} of the recharge as rebate quota.',
-      line3: 'Transfer rebate quota to balance at any time.',
-      line4: 'Newly earned rebates may have a waiting period before they can be transferred.'
+      durationPermanent: 'Rebate validity: permanent. After a friend binds your invite, their future recharges continue to generate rebates under the current rules.',
+      durationLimited: 'Rebate validity: recharges within {days} days after your friend registers generate rebates. Recharges after that window no longer generate rebates.',
+      line4: 'Transfer available rebate quota into your balance at any time.',
+      line5: 'Newly earned rebates may have a waiting period before they can be transferred.'
+    },
+    friendBenefits: {
+      kicker: 'What friends get',
+      title: 'When sharing, mention these benefits directly',
+      description: 'Your friends do not need to understand every configuration first. Start with the parts they can immediately feel: trial credit, lower cost, more models, and smoother daily usage.',
+      trialTitle: 'Try before recharging',
+      trialDescription: 'New users get trial credit, so friends can test it first and decide later.',
+      valueTitle: 'Cheaper for frequent use',
+      valueDescription: 'Discount groups are suitable for coding, tools, automation, and daily AI usage.',
+      stabilityTitle: 'Less hassle day to day',
+      stabilityDescription: 'Proprietary scheduling helps reduce unavailable routes and repeated manual switching.',
+      rangeTitle: 'More model coverage',
+      rangeDescription: 'GPT, Claude, Gemini, and image models are available in one place.'
+    },
+    audiences: {
+      kicker: 'Copy by situation',
+      title: 'Not sure what to say? Copy one of these',
+      description: 'Choose the message that best matches your friend’s usage scenario.',
+      copyButton: 'Copy this',
+      copied: 'Audience copy copied',
+      developerTitle: 'For developers / Codex users',
+      developerDescription: 'For friends using Codex, Cursor, Cline, or API-based tools.',
+      developerCopy: 'I have been using this API site for Codex / Cursor lately. It is much easier than juggling keys everywhere, supports GPT, Claude, and Gemini, and the discount groups are cheap enough for frequent use. You can register with trial credit and test it first: {link}',
+      heavyUserTitle: 'For heavy GPT users',
+      heavyUserDescription: 'For friends who use GPT, Claude, or Gemini every day.',
+      heavyUserCopy: 'If you use GPT a lot, try this site. I used the signup credit for days, the discount groups are much cheaper for frequent usage, and daily stability has been solid: {link}',
+      newcomerTitle: 'For AI newcomers',
+      newcomerDescription: 'For friends who want to try GPT / Claude without recharging first.',
+      newcomerCopy: 'If you want to try GPT / Claude, this is a low-risk way to start. New users get trial credit, and the setup is simple. Register with my invite link and enter the code to receive more credit: {link}',
+      groupTitle: 'For groups / communities',
+      groupDescription: 'For developer groups, tool groups, or AI communities.',
+      groupCopy: 'Found an API site that works well for frequent AI usage. It includes signup credit, cheap discount groups, GPT / Claude / Gemini / image models, and works with Codex, Cursor, and API tools. If you want to try it, here is my invite link: {link}'
     },
     promo: {
       kicker: 'Ready-to-share pitch',
@@ -1256,9 +1331,10 @@ export default {
       highlightTrial: 'Trial credit included',
       highlightCheap: 'Discount groups for daily GPT usage',
       highlightRouting: 'Proprietary scheduling, excellent stability',
+      previewTitle: 'Default share copy',
       copyButton: 'Copy promo text',
       copied: 'Promo text copied',
-      shareText: 'I am basically using GPT freely now. This site gives trial credit on signup, and the discount groups are cheap enough for daily use. It supports GPT, Claude, Gemini, and image models, with a proprietary scheduling algorithm that keeps usage highly stable. Try it with my invite link: {link}'
+      shareText: 'I have basically reached GPT freedom lately. This site gives trial credit on signup, and I used it for days before running out. The discount groups are cheap enough for long-term frequent use, with GPT, Claude, Gemini, and image generation supported. Daily usage feels stable and much less annoying. Register with my invite link and enter the code to receive more credit: {link}'
     }
   },
 
@@ -5892,6 +5968,8 @@ export default {
           durationDaysDesc: 'Rebate relationship expires after this many days since invitee registration. 0 = permanent.',
           perInviteeCap: 'Per-Invitee Rebate Cap',
           perInviteeCapDesc: 'Maximum total rebate from a single invitee. 0 = no limit.',
+          bindBonusAmount: 'Binding Bonus Claim Amount',
+          bindBonusAmountDesc: 'Balance a user can manually claim on the affiliate page after binding an inviter within 1 day of registration. 0 = disabled.',
           customUsers: {
             title: 'Per-User Overrides',
             description: 'Set a custom invite code or exclusive rebate rate for specific users. Lists only users that have an override applied.',

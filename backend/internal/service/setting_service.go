@@ -2173,6 +2173,10 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		settings.AffiliateRebatePerInviteeCap = AffiliateRebatePerInviteeCapDefault
 	}
 	updates[SettingKeyAffiliateRebatePerInviteeCap] = strconv.FormatFloat(settings.AffiliateRebatePerInviteeCap, 'f', 8, 64)
+	if math.IsNaN(settings.AffiliateBindBonusAmount) || math.IsInf(settings.AffiliateBindBonusAmount, 0) || settings.AffiliateBindBonusAmount < 0 {
+		settings.AffiliateBindBonusAmount = AffiliateBindBonusAmountDefault
+	}
+	updates[SettingKeyAffiliateBindBonusAmount] = strconv.FormatFloat(settings.AffiliateBindBonusAmount, 'f', 8, 64)
 	updates[SettingKeyDefaultUserRPMLimit] = strconv.Itoa(settings.DefaultUserRPMLimit)
 	defaultSubsJSON, err := json.Marshal(settings.DefaultSubscriptions)
 	if err != nil {
@@ -2794,6 +2798,20 @@ func (s *SettingService) GetAffiliateRebatePerInviteeCap(ctx context.Context) fl
 	return cap
 }
 
+// GetAffiliateBindBonusAmount 返回绑定邀请人后可手动领取的礼包金额。
+// 返回 0 表示不赠送。
+func (s *SettingService) GetAffiliateBindBonusAmount(ctx context.Context) float64 {
+	raw, err := s.settingRepo.GetValue(ctx, SettingKeyAffiliateBindBonusAmount)
+	if err != nil {
+		return AffiliateBindBonusAmountDefault
+	}
+	amount, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil || amount < 0 || math.IsNaN(amount) || math.IsInf(amount, 0) {
+		return AffiliateBindBonusAmountDefault
+	}
+	return amount
+}
+
 // IsPasswordResetEnabled 检查是否启用密码重置功能
 // 要求：必须同时开启邮件验证
 func (s *SettingService) IsPasswordResetEnabled(ctx context.Context) bool {
@@ -3150,7 +3168,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyTicketSystemConfig:        defaultTicketSystemSettingsJSON(),
 
 		// Affiliate (邀请返利) feature (default disabled; opt-in)
-		SettingKeyAffiliateEnabled: "false",
+		SettingKeyAffiliateEnabled:         "false",
+		SettingKeyAffiliateBindBonusAmount: strconv.FormatFloat(AffiliateBindBonusAmountDefault, 'f', 8, 64),
 
 		// 风控中心功能（默认关闭，显式启用）
 		SettingKeyRiskControlEnabled: "false",
@@ -3275,6 +3294,9 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 	if perInviteeCap, err := strconv.ParseFloat(settings[SettingKeyAffiliateRebatePerInviteeCap], 64); err == nil && perInviteeCap >= 0 {
 		result.AffiliateRebatePerInviteeCap = perInviteeCap
+	}
+	if bonusAmount, err := strconv.ParseFloat(settings[SettingKeyAffiliateBindBonusAmount], 64); err == nil && bonusAmount >= 0 && !math.IsNaN(bonusAmount) && !math.IsInf(bonusAmount, 0) {
+		result.AffiliateBindBonusAmount = bonusAmount
 	}
 	result.DefaultSubscriptions = parseDefaultSubscriptions(settings[SettingKeyDefaultSubscriptions])
 

@@ -114,6 +114,50 @@ func (r *affiliateRepository) BindInviter(ctx context.Context, userID, inviterID
 	return bound, nil
 }
 
+func (r *affiliateRepository) ClaimBindBonus(ctx context.Context, userID int64, amount float64) (bool, float64, error) {
+	if userID <= 0 {
+		return false, 0, service.ErrUserNotFound
+	}
+	if amount <= 0 {
+		return false, 0, service.ErrAffiliateBindBonusUnavailable
+	}
+
+	var claimed bool
+	var newBalance float64
+	err := r.withTx(ctx, func(txCtx context.Context, txClient *dbent.Client) error {
+		res, err := txClient.ExecContext(txCtx, `
+UPDATE user_affiliates
+SET bind_bonus_claimed_at = NOW(),
+    updated_at = NOW()
+WHERE user_id = $1
+  AND inviter_id IS NOT NULL
+  AND bind_bonus_claimed_at IS NULL`, userID)
+		if err != nil {
+			return fmt.Errorf("mark affiliate bind bonus claimed: %w", err)
+		}
+		affected, _ := res.RowsAffected()
+		if affected == 0 {
+			claimed = false
+			return nil
+		}
+
+		if err := txClient.User.UpdateOneID(userID).AddBalance(amount).Exec(txCtx); err != nil {
+			return fmt.Errorf("apply affiliate bind bonus: %w", err)
+		}
+		balance, err := queryUserBalance(txCtx, txClient, userID)
+		if err != nil {
+			return err
+		}
+		newBalance = balance
+		claimed = true
+		return nil
+	})
+	if err != nil {
+		return false, 0, err
+	}
+	return claimed, newBalance, nil
+}
+
 func (r *affiliateRepository) AccrueQuota(ctx context.Context, inviterID, inviteeUserID int64, amount float64, freezeHours int, sourceOrderID *int64) (bool, error) {
 	if amount <= 0 {
 		return false, nil
@@ -780,19 +824,22 @@ ON CONFLICT (user_id) DO NOTHING`, userID, code)
 
 func queryAffiliateByUserID(ctx context.Context, client affiliateQueryExecer, userID int64) (*service.AffiliateSummary, error) {
 	rows, err := client.QueryContext(ctx, `
-SELECT user_id,
-       aff_code,
-       aff_code_custom,
-       aff_rebate_rate_percent,
-       inviter_id,
-       aff_count,
-       aff_quota::double precision,
-       aff_frozen_quota::double precision,
-       aff_history_quota::double precision,
-       created_at,
-       updated_at
-FROM user_affiliates
-WHERE user_id = $1`, userID)
+	SELECT ua.user_id,
+	       ua.aff_code,
+	       ua.aff_code_custom,
+	       ua.aff_rebate_rate_percent,
+	       ua.inviter_id,
+	       ua.aff_count,
+	       ua.aff_quota::double precision,
+	       ua.aff_frozen_quota::double precision,
+	       ua.aff_history_quota::double precision,
+	       ua.bind_bonus_claimed_at,
+	       ua.created_at,
+	       ua.updated_at,
+	       u.created_at
+	FROM user_affiliates ua
+	JOIN users u ON u.id = ua.user_id
+	WHERE ua.user_id = $1`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -807,6 +854,7 @@ WHERE user_id = $1`, userID)
 	var out service.AffiliateSummary
 	var inviterID sql.NullInt64
 	var rebateRate sql.NullFloat64
+	var bindBonusClaimedAt sql.NullTime
 	if err := rows.Scan(
 		&out.UserID,
 		&out.AffCode,
@@ -817,8 +865,10 @@ WHERE user_id = $1`, userID)
 		&out.AffQuota,
 		&out.AffFrozenQuota,
 		&out.AffHistoryQuota,
+		&bindBonusClaimedAt,
 		&out.CreatedAt,
 		&out.UpdatedAt,
+		&out.UserCreatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -828,26 +878,33 @@ WHERE user_id = $1`, userID)
 	if rebateRate.Valid {
 		v := rebateRate.Float64
 		out.AffRebateRatePercent = &v
+	}
+	if bindBonusClaimedAt.Valid {
+		v := bindBonusClaimedAt.Time
+		out.BindBonusClaimedAt = &v
 	}
 	return &out, nil
 }
 
 func queryAffiliateByCode(ctx context.Context, client affiliateQueryExecer, code string) (*service.AffiliateSummary, error) {
 	rows, err := client.QueryContext(ctx, `
-SELECT user_id,
-       aff_code,
-       aff_code_custom,
-       aff_rebate_rate_percent,
-       inviter_id,
-       aff_count,
-       aff_quota::double precision,
-       aff_frozen_quota::double precision,
-       aff_history_quota::double precision,
-       created_at,
-       updated_at
-FROM user_affiliates
-WHERE aff_code = $1
-LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
+	SELECT ua.user_id,
+	       ua.aff_code,
+	       ua.aff_code_custom,
+	       ua.aff_rebate_rate_percent,
+	       ua.inviter_id,
+	       ua.aff_count,
+	       ua.aff_quota::double precision,
+	       ua.aff_frozen_quota::double precision,
+	       ua.aff_history_quota::double precision,
+	       ua.bind_bonus_claimed_at,
+	       ua.created_at,
+	       ua.updated_at,
+	       u.created_at
+	FROM user_affiliates ua
+	JOIN users u ON u.id = ua.user_id
+	WHERE ua.aff_code = $1
+	LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 	if err != nil {
 		return nil, err
 	}
@@ -863,6 +920,7 @@ LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 	var out service.AffiliateSummary
 	var inviterID sql.NullInt64
 	var rebateRate sql.NullFloat64
+	var bindBonusClaimedAt sql.NullTime
 	if err := rows.Scan(
 		&out.UserID,
 		&out.AffCode,
@@ -873,8 +931,10 @@ LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 		&out.AffQuota,
 		&out.AffFrozenQuota,
 		&out.AffHistoryQuota,
+		&bindBonusClaimedAt,
 		&out.CreatedAt,
 		&out.UpdatedAt,
+		&out.UserCreatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -884,6 +944,10 @@ LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 	if rebateRate.Valid {
 		v := rebateRate.Float64
 		out.AffRebateRatePercent = &v
+	}
+	if bindBonusClaimedAt.Valid {
+		v := bindBonusClaimedAt.Time
+		out.BindBonusClaimedAt = &v
 	}
 	return &out, nil
 }

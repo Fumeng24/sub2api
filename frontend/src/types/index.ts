@@ -144,6 +144,11 @@ export interface UserAffiliateDetail {
   aff_quota: number
   aff_frozen_quota: number
   aff_history_quota: number
+  bind_bonus_amount: number
+  can_bind_inviter: boolean
+  can_claim_bind_bonus: boolean
+  bind_bonus_claimed_at?: string
+  rebate_duration_days: number
   /** 当前用户作为邀请人时实际生效的返利比例（专属覆盖全局）。0-100。 */
   effective_rebate_rate_percent: number
   invitees: AffiliateInvitee[]

@@ -12,15 +12,19 @@ import (
 )
 
 var (
-	ErrAffiliateProfileNotFound = infraerrors.NotFound("AFFILIATE_PROFILE_NOT_FOUND", "affiliate profile not found")
-	ErrAffiliateCodeInvalid     = infraerrors.BadRequest("AFFILIATE_CODE_INVALID", "invalid affiliate code")
-	ErrAffiliateCodeTaken       = infraerrors.Conflict("AFFILIATE_CODE_TAKEN", "affiliate code already in use")
-	ErrAffiliateAlreadyBound    = infraerrors.Conflict("AFFILIATE_ALREADY_BOUND", "affiliate inviter already bound")
-	ErrAffiliateQuotaEmpty      = infraerrors.BadRequest("AFFILIATE_QUOTA_EMPTY", "no affiliate quota available to transfer")
+	ErrAffiliateProfileNotFound      = infraerrors.NotFound("AFFILIATE_PROFILE_NOT_FOUND", "affiliate profile not found")
+	ErrAffiliateCodeInvalid          = infraerrors.BadRequest("AFFILIATE_CODE_INVALID", "invalid affiliate code")
+	ErrAffiliateCodeTaken            = infraerrors.Conflict("AFFILIATE_CODE_TAKEN", "affiliate code already in use")
+	ErrAffiliateAlreadyBound         = infraerrors.Conflict("AFFILIATE_ALREADY_BOUND", "affiliate inviter already bound")
+	ErrAffiliateBindExpired          = infraerrors.BadRequest("AFFILIATE_BIND_WINDOW_EXPIRED", "affiliate inviter can only be bound within 24 hours after registration")
+	ErrAffiliateBindBonusUnavailable = infraerrors.BadRequest("AFFILIATE_BIND_BONUS_UNAVAILABLE", "affiliate bind bonus is not available")
+	ErrAffiliateBindBonusClaimed     = infraerrors.Conflict("AFFILIATE_BIND_BONUS_ALREADY_CLAIMED", "affiliate bind bonus already claimed")
+	ErrAffiliateQuotaEmpty           = infraerrors.BadRequest("AFFILIATE_QUOTA_EMPTY", "no affiliate quota available to transfer")
 )
 
 const (
 	affiliateInviteesLimit = 100
+	affiliateBindWindow    = 24 * time.Hour
 	// AffiliateCodeMinLength / AffiliateCodeMaxLength bound both system-generated
 	// 12-char codes and admin-customized codes (e.g. "VIP2026").
 	AffiliateCodeMinLength = 4
@@ -58,17 +62,19 @@ func isValidAffiliateCodeFormat(code string) bool {
 }
 
 type AffiliateSummary struct {
-	UserID               int64     `json:"user_id"`
-	AffCode              string    `json:"aff_code"`
-	AffCodeCustom        bool      `json:"aff_code_custom"`
-	AffRebateRatePercent *float64  `json:"aff_rebate_rate_percent,omitempty"`
-	InviterID            *int64    `json:"inviter_id,omitempty"`
-	AffCount             int       `json:"aff_count"`
-	AffQuota             float64   `json:"aff_quota"`
-	AffFrozenQuota       float64   `json:"aff_frozen_quota"`
-	AffHistoryQuota      float64   `json:"aff_history_quota"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	UserID               int64      `json:"user_id"`
+	AffCode              string     `json:"aff_code"`
+	AffCodeCustom        bool       `json:"aff_code_custom"`
+	AffRebateRatePercent *float64   `json:"aff_rebate_rate_percent,omitempty"`
+	InviterID            *int64     `json:"inviter_id,omitempty"`
+	AffCount             int        `json:"aff_count"`
+	AffQuota             float64    `json:"aff_quota"`
+	AffFrozenQuota       float64    `json:"aff_frozen_quota"`
+	AffHistoryQuota      float64    `json:"aff_history_quota"`
+	BindBonusClaimedAt   *time.Time `json:"bind_bonus_claimed_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+	UserCreatedAt        time.Time  `json:"user_created_at"`
 }
 
 type AffiliateInvitee struct {
@@ -80,13 +86,18 @@ type AffiliateInvitee struct {
 }
 
 type AffiliateDetail struct {
-	UserID          int64   `json:"user_id"`
-	AffCode         string  `json:"aff_code"`
-	InviterID       *int64  `json:"inviter_id,omitempty"`
-	AffCount        int     `json:"aff_count"`
-	AffQuota        float64 `json:"aff_quota"`
-	AffFrozenQuota  float64 `json:"aff_frozen_quota"`
-	AffHistoryQuota float64 `json:"aff_history_quota"`
+	UserID             int64      `json:"user_id"`
+	AffCode            string     `json:"aff_code"`
+	InviterID          *int64     `json:"inviter_id,omitempty"`
+	AffCount           int        `json:"aff_count"`
+	AffQuota           float64    `json:"aff_quota"`
+	AffFrozenQuota     float64    `json:"aff_frozen_quota"`
+	AffHistoryQuota    float64    `json:"aff_history_quota"`
+	BindBonusAmount    float64    `json:"bind_bonus_amount"`
+	CanBindInviter     bool       `json:"can_bind_inviter"`
+	CanClaimBindBonus  bool       `json:"can_claim_bind_bonus"`
+	BindBonusClaimedAt *time.Time `json:"bind_bonus_claimed_at,omitempty"`
+	RebateDurationDays int        `json:"rebate_duration_days"`
 	// EffectiveRebateRatePercent 是当前用户作为邀请人时实际生效的返利比例：
 	// 优先用户自己的专属比例（aff_rebate_rate_percent），否则回退到全局比例。
 	// 用于在用户的 /affiliate 页面直观展示「分享后能拿到多少」。
@@ -98,6 +109,7 @@ type AffiliateRepository interface {
 	EnsureUserAffiliate(ctx context.Context, userID int64) (*AffiliateSummary, error)
 	GetAffiliateByCode(ctx context.Context, code string) (*AffiliateSummary, error)
 	BindInviter(ctx context.Context, userID, inviterID int64) (bool, error)
+	ClaimBindBonus(ctx context.Context, userID int64, amount float64) (bool, float64, error)
 	AccrueQuota(ctx context.Context, inviterID, inviteeUserID int64, amount float64, freezeHours int, sourceOrderID *int64) (bool, error)
 	GetAccruedRebateFromInvitee(ctx context.Context, inviterID, inviteeUserID int64) (float64, error)
 	ThawFrozenQuota(ctx context.Context, userID int64) (float64, error)
@@ -261,6 +273,11 @@ func (s *AffiliateService) GetAffiliateDetail(ctx context.Context, userID int64)
 		AffQuota:                   summary.AffQuota,
 		AffFrozenQuota:             summary.AffFrozenQuota,
 		AffHistoryQuota:            summary.AffHistoryQuota,
+		BindBonusAmount:            s.resolveBindBonusAmountForSummary(ctx, summary),
+		CanBindInviter:             affiliateCanBindInviter(summary),
+		CanClaimBindBonus:          s.canClaimBindBonus(ctx, summary),
+		BindBonusClaimedAt:         summary.BindBonusClaimedAt,
+		RebateDurationDays:         s.resolveRebateDurationDays(ctx),
 		EffectiveRebateRatePercent: s.resolveRebateRatePercent(ctx, summary),
 		Invitees:                   invitees,
 	}, nil
@@ -289,6 +306,9 @@ func (s *AffiliateService) BindInviterByCode(ctx context.Context, userID int64, 
 	if selfSummary.InviterID != nil {
 		return nil
 	}
+	if !affiliateCanBindInviter(selfSummary) {
+		return ErrAffiliateBindExpired
+	}
 
 	inviterSummary, err := s.repo.GetAffiliateByCode(ctx, code)
 	if err != nil {
@@ -309,6 +329,48 @@ func (s *AffiliateService) BindInviterByCode(ctx context.Context, userID int64, 
 		return ErrAffiliateAlreadyBound
 	}
 	return nil
+}
+
+func (s *AffiliateService) ClaimBindBonus(ctx context.Context, userID int64) (float64, error) {
+	if userID <= 0 {
+		return 0, infraerrors.BadRequest("INVALID_USER", "invalid user")
+	}
+	if s == nil || s.repo == nil {
+		return 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	if !s.IsEnabled(ctx) {
+		return 0, ErrAffiliateBindBonusUnavailable
+	}
+
+	summary, err := s.repo.EnsureUserAffiliate(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	if summary.InviterID == nil || *summary.InviterID <= 0 {
+		return 0, ErrAffiliateBindBonusUnavailable
+	}
+	if summary.BindBonusClaimedAt != nil {
+		return 0, ErrAffiliateBindBonusClaimed
+	}
+	if !affiliateBindWindowOpen(time.Now(), summary.UserCreatedAt) {
+		return 0, ErrAffiliateBindExpired
+	}
+
+	amount := s.resolveBindBonusAmount(ctx)
+	if amount <= 0 || math.IsNaN(amount) || math.IsInf(amount, 0) {
+		return 0, ErrAffiliateBindBonusUnavailable
+	}
+
+	claimed, balance, err := s.repo.ClaimBindBonus(ctx, userID, amount)
+	if err != nil {
+		return 0, err
+	}
+	if !claimed {
+		return 0, ErrAffiliateBindBonusClaimed
+	}
+
+	s.invalidateAffiliateCaches(ctx, userID)
+	return balance, nil
 }
 
 func (s *AffiliateService) AccrueInviteRebate(ctx context.Context, inviteeUserID int64, baseRechargeAmount float64) (float64, error) {
@@ -406,6 +468,52 @@ func (s *AffiliateService) globalRebateRatePercent(ctx context.Context) float64 
 		return AffiliateRebateRateDefault
 	}
 	return s.settingService.GetAffiliateRebateRatePercent(ctx)
+}
+
+func (s *AffiliateService) resolveBindBonusAmount(ctx context.Context) float64 {
+	if s == nil || s.settingService == nil {
+		return AffiliateBindBonusAmountDefault
+	}
+	return s.settingService.GetAffiliateBindBonusAmount(ctx)
+}
+
+func (s *AffiliateService) resolveBindBonusAmountForSummary(ctx context.Context, summary *AffiliateSummary) float64 {
+	if !affiliateCanBindInviter(summary) && !s.canClaimBindBonus(ctx, summary) {
+		return 0
+	}
+	return s.resolveBindBonusAmount(ctx)
+}
+
+func (s *AffiliateService) canClaimBindBonus(ctx context.Context, summary *AffiliateSummary) bool {
+	if summary == nil || summary.InviterID == nil || *summary.InviterID <= 0 || summary.BindBonusClaimedAt != nil {
+		return false
+	}
+	amount := s.resolveBindBonusAmount(ctx)
+	if amount <= 0 || math.IsNaN(amount) || math.IsInf(amount, 0) {
+		return false
+	}
+	return affiliateBindWindowOpen(time.Now(), summary.UserCreatedAt)
+}
+
+func (s *AffiliateService) resolveRebateDurationDays(ctx context.Context) int {
+	if s == nil || s.settingService == nil {
+		return AffiliateRebateDurationDaysDefault
+	}
+	return s.settingService.GetAffiliateRebateDurationDays(ctx)
+}
+
+func affiliateCanBindInviter(summary *AffiliateSummary) bool {
+	if summary == nil || summary.InviterID != nil {
+		return false
+	}
+	return affiliateBindWindowOpen(time.Now(), summary.UserCreatedAt)
+}
+
+func affiliateBindWindowOpen(now, userCreatedAt time.Time) bool {
+	if userCreatedAt.IsZero() {
+		return false
+	}
+	return !now.After(userCreatedAt.Add(affiliateBindWindow))
 }
 
 func (s *AffiliateService) TransferAffiliateQuota(ctx context.Context, userID int64) (float64, float64, error) {
