@@ -513,7 +513,7 @@ function normalizeCount(value: unknown) {
 }
 
 function isImageGroup(group: Group) {
-  return group.platform === 'openai' && group.allow_image_generation && group.name.includes('生图')
+  return group.platform === 'openai' && group.allow_image_generation
 }
 
 function resolvePreferredGroupId(groups: Group[], keys: ApiKey[]) {
@@ -958,7 +958,10 @@ async function ensureKeyForGroup(group: Group | null) {
   autoCreatingKeys.value = true
   autoCreatingGroupId.value = group.id
   try {
-    const created = await keysAPI.create(buildAutoImageKeyName(group), group.id)
+    const created = await keysAPI.create({
+      name: buildAutoImageKeyName(group),
+      group_id: group.id
+    })
     apiKeys.value = [created, ...apiKeys.value.filter((item) => item.id !== created.id)]
     appStore.showSuccess(t('imageGeneration.autoCreatedKey', { group: group.name }))
   } catch {
@@ -1111,6 +1114,30 @@ function updateRun(runId: string, patch: Partial<GenerationRun>) {
   runs.value = runs.value.map((item) => item.id === runId ? { ...item, ...patch } : item)
 }
 
+function isFetchNetworkError(error: unknown) {
+  if (!error) return false
+  const name = error instanceof Error ? error.name.toLowerCase() : ''
+  const message = error instanceof Error ? error.message : String(error)
+  const normalized = message.toLowerCase()
+  const browserNetworkMessages = [
+    'failed to fetch',
+    'load failed',
+    'networkerror',
+    'network request failed',
+    'fetch failed',
+    'connection reset',
+    'broken pipe',
+  ]
+  return name === 'typeerror' && browserNetworkMessages.some((item) => normalized.includes(item))
+}
+
+function resolveImageGenerationErrorMessage(error: unknown) {
+  if (isFetchNetworkError(error)) {
+    return t('imageGeneration.networkDisconnected')
+  }
+  return extractApiErrorMessage(error, t('imageGeneration.generateFailed'))
+}
+
 async function submit() {
   if (!canSubmit.value || !selectedGroup.value || !selectedGroupKey.value) return
   const controller = new AbortController()
@@ -1158,7 +1185,7 @@ async function submit() {
         error: t('imageGeneration.cancelled'),
       })
     } else {
-      const message = extractApiErrorMessage(error, t('imageGeneration.generateFailed'))
+      const message = resolveImageGenerationErrorMessage(error)
       updateRun(run.id, {
         status: 'error',
         error: message,
