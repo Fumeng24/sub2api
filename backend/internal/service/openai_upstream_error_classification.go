@@ -82,14 +82,6 @@ func classifyOpenAIUpstreamError(statusCode int, upstreamMsg string, upstreamBod
 	}
 
 	if containsAnyOpenAIErrorText(text,
-		"upstream access forbidden",
-		"access forbidden",
-		"permission denied",
-	) {
-		return openAIUpstreamErrorForbidden
-	}
-
-	if containsAnyOpenAIErrorText(text,
 		"channel affinity disabled",
 		"channel is disabled",
 		"channel disabled",
@@ -105,6 +97,14 @@ func classifyOpenAIUpstreamError(statusCode int, upstreamMsg string, upstreamBod
 		"endpoint unsupported",
 	) {
 		return openAIUpstreamErrorBusiness
+	}
+
+	if containsAnyOpenAIErrorText(text,
+		"upstream access forbidden",
+		"access forbidden",
+		"permission denied",
+	) {
+		return openAIUpstreamErrorForbidden
 	}
 
 	switch statusCode {
@@ -184,7 +184,16 @@ func containsAnyOpenAIErrorText(text string, needles ...string) bool {
 
 func openAIUpstreamErrorClassShouldFailover(class openAIUpstreamErrorClass) bool {
 	switch class {
-	case openAIUpstreamErrorAuth, openAIUpstreamErrorBilling, openAIUpstreamErrorRateLimit, openAIUpstreamErrorTransient, openAIUpstreamErrorModelUnsupported:
+	case openAIUpstreamErrorAuth, openAIUpstreamErrorBilling, openAIUpstreamErrorForbidden, openAIUpstreamErrorRateLimit, openAIUpstreamErrorTransient, openAIUpstreamErrorModelUnsupported:
+		return true
+	default:
+		return false
+	}
+}
+
+func openAIUpstreamErrorClassImmediateFailover(class openAIUpstreamErrorClass) bool {
+	switch class {
+	case openAIUpstreamErrorBilling, openAIUpstreamErrorForbidden:
 		return true
 	default:
 		return false

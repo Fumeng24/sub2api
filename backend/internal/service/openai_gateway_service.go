@@ -4068,7 +4068,7 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 		}
 	}
 	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
-	if upstreamClass == openAIUpstreamErrorBilling || shouldDisable && openAIUpstreamErrorClassShouldFailover(upstreamClass) {
+	if openAIUpstreamErrorClassImmediateFailover(upstreamClass) || shouldDisable && openAIUpstreamErrorClassShouldFailover(upstreamClass) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:             account.Platform,
 			AccountID:            account.ID,
@@ -5054,7 +5054,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			ResponseHeaders: resp.Header.Clone(),
 		}
 	}
-	if upstreamClass == openAIUpstreamErrorBilling {
+	if openAIUpstreamErrorClassImmediateFailover(upstreamClass) {
 		_ = s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:           account.Platform,
@@ -5277,7 +5277,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 
 	reqCtx := openAIContextFromGin(context.Background(), c)
 	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
-	if upstreamClass == openAIUpstreamErrorBilling {
+	if openAIUpstreamErrorClassImmediateFailover(upstreamClass) {
 		modelForCooldown := ""
 		if len(requestedModel) > 0 {
 			modelForCooldown = strings.TrimSpace(requestedModel[0])

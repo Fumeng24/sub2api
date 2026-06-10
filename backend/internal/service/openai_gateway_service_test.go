@@ -1431,6 +1431,38 @@ func TestOpenAIHandleErrorResponseGroupDisabledFailsOver(t *testing.T) {
 	require.Contains(t, repo.lastTempReason, "API Key 所属分组已停用")
 }
 
+func TestOpenAIHandleErrorResponseUpstreamAccessForbiddenFailsOver(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/responses", nil)
+
+	account := &Account{
+		ID:       38819,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Name:     "forbidden-upstream",
+	}
+	respBody := []byte(`{"error":{"message":"Upstream access forbidden, please contact administrator","type":"upstream_error"}}`)
+	resp := &http.Response{
+		StatusCode: http.StatusBadGateway,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+		Header:     http.Header{"X-Request-Id": []string{"rid-upstream-forbidden"}},
+	}
+
+	result, err := svc.handleErrorResponse(context.Background(), resp, c, account, []byte(`{"model":"gpt-5.4"}`))
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "Upstream access forbidden")
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+}
+
 func TestOpenAIHandleCompatErrorResponseGroupDisabledFailsOver(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &rateLimitAccountRepoStub{}
@@ -1477,6 +1509,48 @@ func TestOpenAIHandleCompatErrorResponseGroupDisabledFailsOver(t *testing.T) {
 	require.Empty(t, rec.Body.String())
 	require.Equal(t, 1, repo.tempCalls)
 	require.Zero(t, repo.setErrorCalls)
+}
+
+func TestOpenAIHandleCompatErrorResponseUpstreamAccessForbiddenFailsOver(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	account := &Account{
+		ID:       38819,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Name:     "forbidden-upstream",
+	}
+	respBody := []byte(`{"error":{"message":"Upstream access forbidden, please contact administrator","type":"upstream_error"}}`)
+	resp := &http.Response{
+		StatusCode: http.StatusBadGateway,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+		Header:     http.Header{"X-Request-Id": []string{"rid-upstream-forbidden-compat"}},
+	}
+	writeCalled := false
+
+	result, err := svc.handleCompatErrorResponse(
+		resp,
+		c,
+		account,
+		func(c *gin.Context, statusCode int, errType, message string) {
+			writeCalled = true
+		},
+		"gpt-5.4",
+	)
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "Upstream access forbidden")
+	require.False(t, writeCalled)
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
 }
 
 func TestOpenAIStreamingResponseFailedBeforeOutputCapacityErrorReturnsFailover(t *testing.T) {
