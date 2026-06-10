@@ -177,6 +177,15 @@ export async function create(accountData: CreateAccountRequest): Promise<Account
 }
 
 /**
+ * Copy an account using server-side export/import semantics.
+ * The backend reads raw credentials so redacted frontend fields are not lost.
+ */
+export async function copyAccount(id: number, payload?: { name?: string }): Promise<Account> {
+  const { data } = await apiClient.post<Account>(`/admin/accounts/${id}/copy`, payload ?? {})
+  return data
+}
+
+/**
  * Update account
  * @param id - Account ID
  * @param updates - Fields to update
@@ -752,6 +761,7 @@ export const accountsAPI = {
   getById,
   getUpstreamSub2APIStatus,
   create,
+  copyAccount,
   update,
   checkMixedChannelRisk,
   delete: deleteAccount,
