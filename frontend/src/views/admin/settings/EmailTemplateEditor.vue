@@ -270,6 +270,14 @@ const fallbackPlaceholders = [
   "{{quota_threshold}}",
   "{{triggered_at}}",
   "{{group_name}}",
+  "{{old_rate_multiplier}}",
+  "{{new_rate_multiplier}}",
+  "{{effective_at}}",
+  "{{window_minutes}}",
+  "{{request_count}}",
+  "{{actual_cost}}",
+  "{{last_used_at}}",
+  "{{admin_message}}",
   "{{moderation_category}}",
   "{{moderation_score}}",
   "{{violation_count}}",
@@ -352,6 +360,11 @@ const eventDisplayMeta: Record<string, EventDisplayMeta> = {
     timing: "余额充值订单支付完成并入账后发送。",
     categoryLabel: "计费",
   },
+  "group.rate_change_notice": {
+    label: "分组费率变更通知",
+    timing: "管理员向近期使用过该分组的用户发送费率调整预告时发送，属于可退订的计费通知。",
+    categoryLabel: "计费",
+  },
   "account.quota_alert": {
     label: "账号限额告警",
     timing: "上游账号的用量达到配置的额度告警阈值时发送给管理员通知邮箱。",
@@ -413,6 +426,11 @@ const eventDisplayMetaEn: Record<string, EventDisplayMeta> = {
   "balance.recharge_success": {
     label: "Balance Recharge Success",
     timing: "Sent after a balance recharge order is paid and credited.",
+    categoryLabel: "Billing",
+  },
+  "group.rate_change_notice": {
+    label: "Group Rate Change Notice",
+    timing: "Sent when an admin notifies recent users before a group rate multiplier change. This is an optional billing notice.",
     categoryLabel: "Billing",
   },
   "account.quota_alert": {
