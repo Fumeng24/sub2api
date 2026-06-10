@@ -25,6 +25,13 @@ const (
 	PlatformAntigravity = "antigravity"
 )
 
+// API key user-facing category constants.
+const (
+	APIKeyCategoryOpenAI    = "openai"
+	APIKeyCategoryAnthropic = "anthropic"
+	APIKeyCategoryOther     = "other"
+)
+
 // Account type constants
 const (
 	AccountTypeOAuth          = "oauth"           // OAuth类型账号（full scope: profile + inference）

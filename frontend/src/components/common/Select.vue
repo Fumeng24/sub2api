@@ -70,6 +70,23 @@
             />
           </div>
 
+          <!-- Horizontal group tabs -->
+          <div v-if="hasGroupTabs" class="select-group-tabs">
+            <button
+              v-for="group in groupTabOptions"
+              :key="String(getGroupKey(group))"
+              type="button"
+              class="select-group-tab"
+              :class="[
+                `select-group-tab-${String(getGroupKey(group))}`,
+                activeGroupKey === getGroupKey(group) && 'select-group-tab-active'
+              ]"
+              @click.stop="activeGroupKey = getGroupKey(group)"
+            >
+              {{ getOptionLabel(group) }}
+            </button>
+          </div>
+
           <!-- Options list -->
           <div class="select-options" ref="optionsListRef">
             <div
@@ -148,6 +165,7 @@ interface Props {
   creatable?: boolean
   creatablePrefix?: string
   clearable?: boolean
+  groupTabs?: boolean
 }
 
 interface Emits {
@@ -162,6 +180,7 @@ const props = withDefaults(defineProps<Props>(), {
   creatable: false,
   creatablePrefix: '',
   clearable: false,
+  groupTabs: false,
   valueKey: 'value',
   labelKey: 'label'
 })
@@ -178,6 +197,7 @@ const dropdownRef = ref<HTMLElement | null>(null)
 const optionsListRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<'bottom' | 'top'>('bottom')
 const triggerRect = ref<DOMRect | null>(null)
+const activeGroupKey = ref<string | number | boolean | null>(null)
 
 // i18n placeholders
 const placeholderText = computed(() => props.placeholder ?? t('common.selectOption'))
@@ -224,13 +244,6 @@ const getOptionLabel = (option: any): string => {
   return String(option ?? '')
 }
 
-const isOptionDisabled = (option: any): boolean => {
-  if (typeof option === 'object' && option !== null) {
-    return !!option.disabled
-  }
-  return false
-}
-
 const isGroupHeaderOption = (option: any): boolean => {
   if (typeof option === 'object' && option !== null) {
     return option.kind === 'group'
@@ -238,9 +251,47 @@ const isGroupHeaderOption = (option: any): boolean => {
   return false
 }
 
+const getGroupKey = (option: any): string | number | boolean | null => {
+  if (typeof option === 'object' && option !== null) {
+    return (option.groupKey ?? option[props.valueKey] ?? null) as string | number | boolean | null
+  }
+  return null
+}
+
+const isOptionDisabled = (option: any): boolean => {
+  if (typeof option === 'object' && option !== null) {
+    return !!option.disabled || isGroupHeaderOption(option)
+  }
+  return false
+}
+
 const selectedOption = computed(() => {
   return props.options.find((opt) => getOptionValue(opt) === props.modelValue) || null
 })
+
+const groupTabOptions = computed(() => (props.options as any[]).filter(isGroupHeaderOption))
+const hasGroupTabs = computed(() => props.groupTabs && groupTabOptions.value.length > 0)
+
+const selectedGroupKey = computed(() => {
+  if (!selectedOption.value) return null
+  return getGroupKey(selectedOption.value)
+})
+
+const ensureActiveGroupKey = () => {
+  if (!hasGroupTabs.value) {
+    activeGroupKey.value = null
+    return
+  }
+  const available = groupTabOptions.value.map(getGroupKey)
+  const selectedKey = selectedGroupKey.value
+  if (selectedKey !== null && available.includes(selectedKey)) {
+    activeGroupKey.value = selectedKey
+    return
+  }
+  if (!available.includes(activeGroupKey.value)) {
+    activeGroupKey.value = available[0] ?? null
+  }
+}
 
 const selectedLabel = computed(() => {
   if (selectedOption.value) {
@@ -259,15 +310,52 @@ const hasValue = computed(
 
 const filteredOptions = computed(() => {
   let opts = props.options as any[]
+  if (hasGroupTabs.value) {
+    opts = opts.filter((opt) => {
+      if (isGroupHeaderOption(opt)) return false
+      return activeGroupKey.value === null || getGroupKey(opt) === activeGroupKey.value
+    })
+  }
   if (isSearchable.value && searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    opts = opts.filter((opt) => {
+    const optionMatches = (opt: any) => {
       // Match label
       if (getOptionLabel(opt).toLowerCase().includes(query)) return true
       // Also match description if present
       if (opt.description && String(opt.description).toLowerCase().includes(query)) return true
       return false
-    })
+    }
+
+    if (!hasGroupTabs.value && opts.some(isGroupHeaderOption)) {
+      const grouped: any[] = []
+      let currentGroup: any | null = null
+      let currentItems: any[] = []
+      let currentGroupMatches = false
+
+      const flushGroup = () => {
+        if (currentItems.length > 0) {
+          if (currentGroup) grouped.push(currentGroup)
+          grouped.push(...currentItems)
+        }
+      }
+
+      for (const opt of opts) {
+        if (isGroupHeaderOption(opt)) {
+          flushGroup()
+          currentGroup = opt
+          currentItems = []
+          currentGroupMatches = optionMatches(opt)
+          continue
+        }
+        if (currentGroupMatches || optionMatches(opt)) {
+          currentItems.push(opt)
+        }
+      }
+      flushGroup()
+      opts = grouped
+    } else {
+      opts = opts.filter(optionMatches)
+    }
     // In creatable mode, always prepend a fuzzy search option
     if (props.creatable && searchQuery.value.trim()) {
       const trimmed = searchQuery.value.trim()
@@ -339,6 +427,7 @@ const toggle = () => {
 
 watch(isOpen, (open) => {
   if (open) {
+    ensureActiveGroupKey()
     calculateDropdownPosition()
     // Reset focused index to current selection or first item
     if (filteredOptions.value.length === 0) {
@@ -364,6 +453,12 @@ watch(isOpen, (open) => {
     window.removeEventListener('resize', calculateDropdownPosition)
   }
 })
+
+watch(
+  () => [props.options, props.modelValue] as const,
+  () => ensureActiveGroupKey(),
+  { deep: true }
+)
 
 const selectOption = (option: any) => {
   const value = getOptionValue(option) ?? null
@@ -514,6 +609,62 @@ onUnmounted(() => {
   @apply text-gray-900 dark:text-gray-100;
   @apply placeholder:text-gray-400 dark:placeholder:text-dark-400;
   @apply focus:outline-none;
+}
+
+.select-dropdown-portal .select-group-tabs {
+  @apply grid grid-cols-3 gap-2.5 border-b border-gray-100 bg-gradient-to-r from-gray-50 via-white to-gray-50 p-2.5 dark:border-dark-700 dark:from-dark-900 dark:via-dark-800 dark:to-dark-900;
+}
+
+.select-dropdown-portal .select-group-tab {
+  @apply relative inline-flex min-h-11 items-center justify-center rounded-xl border-2 px-3 py-2 text-center text-sm font-bold;
+  @apply shadow-sm;
+  @apply transition-all duration-150;
+  @apply hover:-translate-y-0.5 hover:shadow-md;
+}
+
+.select-dropdown-portal .select-group-tab-active {
+  @apply scale-[1.01] shadow-md ring-2 ring-offset-2 ring-offset-white dark:ring-offset-dark-800;
+}
+
+.select-dropdown-portal .select-group-tab::before {
+  content: '';
+  @apply mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle shadow-sm;
+}
+
+.select-dropdown-portal .select-group-tab-openai {
+  @apply border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-300;
+}
+
+.select-dropdown-portal .select-group-tab-openai::before {
+  @apply bg-emerald-500;
+}
+
+.select-dropdown-portal .select-group-tab-openai.select-group-tab-active {
+  @apply border-emerald-400 bg-emerald-100 text-emerald-900 ring-emerald-400 dark:border-emerald-500 dark:bg-emerald-900/50 dark:text-emerald-100;
+}
+
+.select-dropdown-portal .select-group-tab-anthropic {
+  @apply border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/70 dark:bg-orange-950/40 dark:text-orange-300;
+}
+
+.select-dropdown-portal .select-group-tab-anthropic::before {
+  @apply bg-orange-500;
+}
+
+.select-dropdown-portal .select-group-tab-anthropic.select-group-tab-active {
+  @apply border-orange-400 bg-orange-100 text-orange-900 ring-orange-400 dark:border-orange-500 dark:bg-orange-900/50 dark:text-orange-100;
+}
+
+.select-dropdown-portal .select-group-tab-other {
+  @apply border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800/70 dark:bg-sky-950/40 dark:text-sky-300;
+}
+
+.select-dropdown-portal .select-group-tab-other::before {
+  @apply bg-sky-500;
+}
+
+.select-dropdown-portal .select-group-tab-other.select-group-tab-active {
+  @apply border-sky-400 bg-sky-100 text-sky-900 ring-sky-400 dark:border-sky-500 dark:bg-sky-900/50 dark:text-sky-100;
 }
 
 .select-dropdown-portal .select-options {

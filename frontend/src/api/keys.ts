@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from './client'
-import type { ApiKey, CreateApiKeyRequest, UpdateApiKeyRequest, PaginatedResponse } from '@/types'
+import type { ApiKey, ApiKeyCategory, CreateApiKeyRequest, UpdateApiKeyRequest, PaginatedResponse } from '@/types'
 
 /**
  * List all API keys for current user
@@ -20,6 +20,7 @@ export async function list(
   filters?: {
     search?: string
     status?: string
+    category?: string
     group_id?: number | string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
@@ -45,18 +46,13 @@ export async function getById(id: number): Promise<ApiKey> {
   return data
 }
 
+export type CreateApiKeyInput = CreateApiKeyRequest
+
 /**
- * Create new API key
- * @param name - Key name
- * @param groupId - Optional group ID
- * @param customKey - Optional custom key value
- * @param ipWhitelist - Optional IP whitelist
- * @param ipBlacklist - Optional IP blacklist
- * @param quota - Optional quota limit in USD (0 = unlimited)
- * @param expiresInDays - Optional days until expiry (undefined = never expires)
- * @param rateLimitData - Optional rate limit fields
- * @returns Created API key
+ * Create new API key.
+ * Prefer the object form; the positional form is kept for older call sites.
  */
+export async function create(request: CreateApiKeyInput): Promise<ApiKey>
 export async function create(
   name: string,
   groupId?: number | null,
@@ -65,9 +61,30 @@ export async function create(
   ipBlacklist?: string[],
   quota?: number,
   expiresInDays?: number,
-  rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number }
+  rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number },
+  category?: ApiKeyCategory
+): Promise<ApiKey>
+export async function create(
+  requestOrName: CreateApiKeyInput | string,
+  groupId?: number | null,
+  customKey?: string,
+  ipWhitelist?: string[],
+  ipBlacklist?: string[],
+  quota?: number,
+  expiresInDays?: number,
+  rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number },
+  category?: ApiKeyCategory
 ): Promise<ApiKey> {
+  if (typeof requestOrName !== 'string') {
+    const { data } = await apiClient.post<ApiKey>('/keys', requestOrName)
+    return data
+  }
+
+  const name = requestOrName
   const payload: CreateApiKeyRequest = { name }
+  if (category) {
+    payload.category = category
+  }
   if (groupId !== undefined) {
     payload.group_id = groupId
   }

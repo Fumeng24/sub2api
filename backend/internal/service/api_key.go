@@ -3,6 +3,7 @@ package service
 import (
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 )
 
@@ -13,6 +14,25 @@ const (
 	StatusAPIKeyQuotaExhausted = "quota_exhausted"
 	StatusAPIKeyExpired        = "expired"
 )
+
+const (
+	APIKeyCategoryOpenAI    = domain.APIKeyCategoryOpenAI
+	APIKeyCategoryAnthropic = domain.APIKeyCategoryAnthropic
+	APIKeyCategoryOther     = domain.APIKeyCategoryOther
+)
+
+func NormalizeAPIKeyCategory(category string) (string, bool) {
+	switch category {
+	case "", APIKeyCategoryOther:
+		return APIKeyCategoryOther, true
+	case APIKeyCategoryOpenAI:
+		return APIKeyCategoryOpenAI, true
+	case APIKeyCategoryAnthropic:
+		return APIKeyCategoryAnthropic, true
+	default:
+		return "", false
+	}
+}
 
 // Rate limit window durations
 const (
@@ -32,6 +52,7 @@ type APIKey struct {
 	UserID      int64
 	Key         string
 	Name        string
+	Category    string
 	GroupID     *int64
 	Status      string
 	IPWhitelist []string
@@ -137,7 +158,8 @@ func (k *APIKey) EffectiveUsage7d() float64 {
 
 // APIKeyListFilters holds optional filtering parameters for listing API keys.
 type APIKeyListFilters struct {
-	Search  string
-	Status  string
-	GroupID *int64 // nil=不筛选, 0=无分组, >0=指定分组
+	Search   string
+	Status   string
+	Category string
+	GroupID  *int64 // nil=不筛选, 0=无分组, >0=指定分组
 }

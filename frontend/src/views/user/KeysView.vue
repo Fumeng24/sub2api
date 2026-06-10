@@ -439,6 +439,7 @@
             :placeholder="t('keys.selectGroup')"
             :searchable="true"
             :search-placeholder="t('keys.searchGroup')"
+            :group-tabs="true"
             data-tour="key-form-group"
           >
             <template #selected="{ option }">
@@ -1055,6 +1056,17 @@
           </div>
         </div>
         <!-- Group list -->
+        <div class="grid grid-cols-3 gap-2.5 border-b border-gray-100 bg-gradient-to-r from-gray-50 via-white to-gray-50 p-2.5 dark:border-dark-700 dark:from-dark-900 dark:via-dark-800 dark:to-dark-900">
+          <button
+            v-for="tab in groupPlatformTabs"
+            :key="tab.value"
+            type="button"
+            @click.stop="activeGroupPlatformTab = tab.value"
+            :class="groupPlatformTabClasses(tab.value)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
         <div class="max-h-80 overflow-y-auto p-1.5">
           <button
             v-for="option in filteredGroupOptions"
@@ -1135,6 +1147,7 @@ import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform } from '@/types'
+import type { SelectOption } from '@/components/common/Select.vue'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
@@ -1154,7 +1167,7 @@ const formatDateTimeLocal = (isoDate: string): string => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-interface GroupOption {
+interface GroupOption extends SelectOption {
   value: number
   label: string
   description: string | null
@@ -1162,6 +1175,7 @@ interface GroupOption {
   userRate: number | null
   subscriptionType: SubscriptionType
   platform: GroupPlatform
+  groupKey: KeyGroupPlatformTab
   discountMultiplier?: number | null
   discountedRateMultiplier?: number | null
   discountName?: string | null
@@ -1173,6 +1187,18 @@ interface GroupOption {
   discountDailyEndTime?: string | null
   discountTimezone?: string | null
 }
+
+interface GroupTabOption extends SelectOption {
+  value: KeyGroupPlatformTab
+  label: string
+  kind: 'group'
+  disabled: true
+  groupKey: KeyGroupPlatformTab
+}
+
+type KeyGroupPlatformTab = 'openai' | 'anthropic' | 'other'
+
+type KeyGroupSelectOption = GroupOption | GroupTabOption
 
 const appStore = useAppStore()
 const onboardingStore = useOnboardingStore()
@@ -1237,6 +1263,7 @@ const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
+const activeGroupPlatformTab = ref<KeyGroupPlatformTab>('openai')
 const publicSettings = ref<PublicSettings | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
@@ -1300,6 +1327,12 @@ const statusOptions = computed(() => [
   { value: 'inactive', label: t('common.inactive') }
 ])
 
+const groupPlatformTabs = computed<GroupTabOption[]>(() => [
+  { value: 'openai', label: t('keys.categories.openai'), kind: 'group', disabled: true, groupKey: 'openai' },
+  { value: 'anthropic', label: t('keys.categories.anthropic'), kind: 'group', disabled: true, groupKey: 'anthropic' },
+  { value: 'other', label: t('keys.categories.other'), kind: 'group', disabled: true, groupKey: 'other' }
+])
+
 // Filter dropdown options
 const groupFilterOptions = computed(() => [
   { value: '', label: t('keys.allGroups') },
@@ -1330,8 +1363,57 @@ const onStatusFilterChange = (value: string | number | boolean | null) => {
   onFilterChange()
 }
 
+const keyGroupPlatformTab = (platform?: GroupPlatform | string | null): KeyGroupPlatformTab => {
+  if (platform === 'openai') return 'openai'
+  if (platform === 'anthropic') return 'anthropic'
+  return 'other'
+}
+
+const groupPlatformTabClasses = (tab: KeyGroupPlatformTab) => {
+  const active = activeGroupPlatformTab.value === tab
+  const base = [
+    'relative inline-flex min-h-11 items-center justify-center rounded-xl border-2 px-3 py-2 text-center text-sm font-bold shadow-sm transition-all duration-150',
+    'before:mr-1.5 before:inline-block before:h-2.5 before:w-2.5 before:rounded-full before:align-middle before:shadow-sm before:content-[\'\']',
+    'hover:-translate-y-0.5 hover:shadow-md'
+  ]
+  const activeState = active
+    ? ['scale-[1.01] shadow-md ring-2 ring-offset-2 ring-offset-white dark:ring-offset-dark-800']
+    : []
+
+  if (tab === 'openai') {
+    return [
+      ...base,
+      'border-emerald-200 bg-emerald-50 text-emerald-700 before:bg-emerald-500 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-300',
+      active
+        ? 'border-emerald-400 bg-emerald-100 text-emerald-900 ring-emerald-400 dark:border-emerald-500 dark:bg-emerald-900/50 dark:text-emerald-100'
+        : '',
+      ...activeState
+    ]
+  }
+
+  if (tab === 'anthropic') {
+    return [
+      ...base,
+      'border-orange-200 bg-orange-50 text-orange-700 before:bg-orange-500 dark:border-orange-800/70 dark:bg-orange-950/40 dark:text-orange-300',
+      active
+        ? 'border-orange-400 bg-orange-100 text-orange-900 ring-orange-400 dark:border-orange-500 dark:bg-orange-900/50 dark:text-orange-100'
+        : '',
+      ...activeState
+    ]
+  }
+
+  return [
+    ...base,
+    'border-sky-200 bg-sky-50 text-sky-700 before:bg-sky-500 dark:border-sky-800/70 dark:bg-sky-950/40 dark:text-sky-300',
+    active
+      ? 'border-sky-400 bg-sky-100 text-sky-900 ring-sky-400 dark:border-sky-500 dark:bg-sky-900/50 dark:text-sky-100'
+      : '',
+    ...activeState
+  ]
+}
+
 // Convert groups to Select options format with rate multiplier and subscription type
-const groupOptions = computed(() =>
+const rawGroupOptions = computed<GroupOption[]>(() =>
   groups.value.map((group) => ({
     value: group.id,
     label: group.name,
@@ -1340,6 +1422,7 @@ const groupOptions = computed(() =>
     userRate: userGroupRates.value[group.id] ?? null,
     subscriptionType: group.subscription_type,
     platform: group.platform,
+    groupKey: keyGroupPlatformTab(group.platform),
     discountMultiplier: group.group_rate_discount_multiplier,
     discountedRateMultiplier: group.discounted_rate_multiplier,
     discountName: group.group_rate_discount_name,
@@ -1353,12 +1436,18 @@ const groupOptions = computed(() =>
   }))
 )
 
+const groupOptions = computed<KeyGroupSelectOption[]>(() => [
+  ...groupPlatformTabs.value,
+  ...rawGroupOptions.value
+])
+
 // Group dropdown search
 const groupSearchQuery = ref('')
 const filteredGroupOptions = computed(() => {
   const query = groupSearchQuery.value.trim().toLowerCase()
-  if (!query) return groupOptions.value
-  return groupOptions.value.filter((opt) => {
+  const options = rawGroupOptions.value.filter((opt) => opt.groupKey === activeGroupPlatformTab.value)
+  if (!query) return options
+  return options.filter((opt) => {
     return opt.label.toLowerCase().includes(query) ||
       (opt.description && opt.description.toLowerCase().includes(query))
   })
@@ -1605,6 +1694,7 @@ const openGroupSelector = (key: ApiKey) => {
     }
     groupSelectorKeyId.value = key.id
     groupSearchQuery.value = ''
+    activeGroupPlatformTab.value = keyGroupPlatformTab(key.group?.platform)
   }
 }
 
@@ -1708,16 +1798,16 @@ const handleSubmit = async () => {
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
-      await keysAPI.create(
-        formData.value.name,
-        formData.value.group_id,
-        customKey,
-        ipWhitelist,
-        ipBlacklist,
+      await keysAPI.create({
+        name: formData.value.name,
+        group_id: formData.value.group_id,
+        custom_key: customKey,
+        ip_whitelist: ipWhitelist,
+        ip_blacklist: ipBlacklist,
         quota,
-        expiresInDays,
-        rateLimitData
-      )
+        expires_in_days: expiresInDays,
+        ...rateLimitData
+      })
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
       if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {

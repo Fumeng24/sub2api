@@ -39,10 +39,12 @@ func (r *apiKeyRepository) activeQuery() *dbent.APIKeyQuery {
 }
 
 func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) error {
+	category := normalizePersistedAPIKeyCategory(key.Category)
 	builder := r.client.APIKey.Create().
 		SetUserID(key.UserID).
 		SetKey(key.Key).
 		SetName(key.Name).
+		SetCategory(category).
 		SetStatus(key.Status).
 		SetNillableGroupID(key.GroupID).
 		SetNillableLastUsedAt(key.LastUsedAt).
@@ -63,6 +65,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 	created, err := builder.Save(ctx)
 	if err == nil {
 		key.ID = created.ID
+		key.Category = created.Category
 		key.LastUsedAt = created.LastUsedAt
 		key.CreatedAt = created.CreatedAt
 		key.UpdatedAt = created.UpdatedAt
@@ -215,9 +218,11 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) erro
 	// 同时显式设置 updated_at，避免二次查询带来的并发可见性问题。
 	client := clientFromContext(ctx, r.client)
 	now := time.Now()
+	category := normalizePersistedAPIKeyCategory(key.Category)
 	builder := client.APIKey.Update().
 		Where(apikey.IDEQ(key.ID), apikey.DeletedAtIsNil()).
 		SetName(key.Name).
+		SetCategory(category).
 		SetStatus(key.Status).
 		SetQuota(key.Quota).
 		SetQuotaUsed(key.QuotaUsed).
@@ -280,6 +285,7 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) erro
 	}
 
 	// 使用同一时间戳回填，避免并发删除导致二次查询失败。
+	key.Category = category
 	key.UpdatedAt = now
 	return nil
 }
@@ -397,6 +403,9 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 	if filters.Status != "" {
 		q = q.Where(apikey.StatusEQ(filters.Status))
 	}
+	if filters.Category != "" {
+		q = q.Where(apikey.CategoryEQ(filters.Category))
+	}
 	if filters.GroupID != nil {
 		if *filters.GroupID == 0 {
 			q = q.Where(apikey.GroupIDIsNil())
@@ -494,6 +503,8 @@ func apiKeyListOrder(params pagination.PaginationParams) []func(*entsql.Selector
 		field = apikey.FieldName
 	case "status":
 		field = apikey.FieldStatus
+	case "category":
+		field = apikey.FieldCategory
 	case "expires_at":
 		field = apikey.FieldExpiresAt
 	case "last_used_at":
@@ -703,6 +714,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		UserID:        m.UserID,
 		Key:           m.Key,
 		Name:          m.Name,
+		Category:      m.Category,
 		Status:        m.Status,
 		IPWhitelist:   m.IPWhitelist,
 		IPBlacklist:   m.IPBlacklist,
@@ -738,6 +750,13 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		out.Group = groupEntityToService(m.Edges.Group)
 	}
 	return out
+}
+
+func normalizePersistedAPIKeyCategory(category string) string {
+	if normalized, ok := service.NormalizeAPIKeyCategory(category); ok {
+		return normalized
+	}
+	return service.APIKeyCategoryOther
 }
 
 func userEntityToService(u *dbent.User) *service.User {

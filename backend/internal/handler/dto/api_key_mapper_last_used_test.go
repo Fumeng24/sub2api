@@ -38,3 +38,18 @@ func TestAPIKeyFromService_MapsNilLastUsedAt(t *testing.T) {
 	require.NotNil(t, out)
 	require.Nil(t, out.LastUsedAt)
 }
+
+func TestAPIKeyFromService_MapsCategory(t *testing.T) {
+	src := &service.APIKey{
+		ID:       1,
+		UserID:   2,
+		Key:      "sk-map-category",
+		Name:     "MapperCategory",
+		Category: service.APIKeyCategoryOpenAI,
+		Status:   service.StatusActive,
+	}
+
+	out := APIKeyFromService(src)
+	require.NotNil(t, out)
+	require.Equal(t, service.APIKeyCategoryOpenAI, out.Category)
+}
