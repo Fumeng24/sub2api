@@ -84,7 +84,7 @@
 
           <div class="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-lime-50 to-amber-50 p-5 dark:border-emerald-900/50 dark:from-emerald-950/35 dark:via-lime-950/20 dark:to-amber-950/20">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div class="max-w-2xl">
+              <div class="min-w-0 max-w-2xl">
                 <p class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300">
                   {{ t('affiliate.promo.kicker') }}
                 </p>
@@ -95,7 +95,7 @@
                   {{ t('affiliate.promo.description') }}
                 </p>
               </div>
-              <button class="btn btn-primary shrink-0" @click="copyPromoText">
+              <button class="btn btn-primary w-full shrink-0 lg:w-auto" @click="copyPromoText">
                 <Icon name="copy" size="sm" />
                 <span>{{ t('affiliate.promo.copyButton') }}</span>
               </button>
@@ -111,7 +111,7 @@
               </div>
             </div>
 
-            <div class="mt-4 rounded-xl border border-emerald-200/80 bg-white/80 p-4 text-sm leading-6 text-gray-700 shadow-sm dark:border-emerald-900/50 dark:bg-dark-950/60 dark:text-gray-300">
+            <div class="mt-4 break-words rounded-xl border border-emerald-200/80 bg-white/80 p-4 text-sm leading-6 text-gray-700 shadow-sm dark:border-emerald-900/50 dark:bg-dark-950/60 dark:text-gray-300">
               {{ promoShareText }}
             </div>
           </div>
