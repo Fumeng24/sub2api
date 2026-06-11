@@ -606,6 +606,7 @@ type adminServiceImpl struct {
 	userSubRepo          UserSubscriptionRepository
 	privacyClientFactory PrivacyClientFactory
 	runtimeBlocker       AccountRuntimeBlocker
+	gatewayService       *GatewayService
 	usageLogRepo         UsageLogRepository
 	notificationEmailSvc *NotificationEmailService
 }
@@ -638,6 +639,7 @@ func NewAdminService(
 	userSubRepo UserSubscriptionRepository,
 	privacyClientFactory PrivacyClientFactory,
 	runtimeBlocker AccountRuntimeBlocker,
+	gatewayService *GatewayService,
 	usageLogRepo UsageLogRepository,
 	notificationEmailSvc *NotificationEmailService,
 ) AdminService {
@@ -660,6 +662,7 @@ func NewAdminService(
 		userSubRepo:          userSubRepo,
 		privacyClientFactory: privacyClientFactory,
 		runtimeBlocker:       runtimeBlocker,
+		gatewayService:       gatewayService,
 		usageLogRepo:         usageLogRepo,
 		notificationEmailSvc: notificationEmailSvc,
 	}
@@ -3397,6 +3400,9 @@ func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Ac
 	if s.runtimeBlocker != nil {
 		s.runtimeBlocker.ClearAccountSchedulingBlock(id)
 	}
+	if s.gatewayService != nil {
+		s.gatewayService.ClearAccountSchedulerHealth(id)
+	}
 	return s.accountRepo.GetByID(ctx, id)
 }
 
@@ -3407,6 +3413,14 @@ func (s *adminServiceImpl) SetAccountError(ctx context.Context, id int64, errorM
 func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error) {
 	if err := s.accountRepo.SetSchedulable(ctx, id, schedulable); err != nil {
 		return nil, err
+	}
+	if schedulable {
+		if s.runtimeBlocker != nil {
+			s.runtimeBlocker.ClearAccountSchedulingBlock(id)
+		}
+		if s.gatewayService != nil {
+			s.gatewayService.ClearAccountSchedulerHealth(id)
+		}
 	}
 	updated, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {

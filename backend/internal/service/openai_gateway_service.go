@@ -1360,13 +1360,13 @@ func openAICompactSupportTierForModel(account *Account, requestedModel string) i
 	if account == nil || !account.IsOpenAI() {
 		return 0
 	}
+	if openAICompactMappingMatchesRequest(account, requestedModel) {
+		return 2
+	}
 	switch account.GetOpenAICompactMode() {
 	case OpenAICompactModeForceOff:
 		return 0
 	case OpenAICompactModeForceOn:
-		return 2
-	}
-	if openAICompactMappingMatchesRequest(account, requestedModel) {
 		return 2
 	}
 	supported, known := account.OpenAICompactSupportKnown()
@@ -1413,6 +1413,9 @@ func isOpenAIAccountEligibleForRequest(ctx context.Context, account *Account, re
 	if account == nil || !account.IsOpenAI() || !account.IsSchedulableForModelWithContext(ctx, requestedModel) {
 		return false
 	}
+	if _, excluded := excludedIDs[account.ID]; excluded {
+		return false
+	}
 	if paused, reason := shouldAutoPauseOpenAIAccountByQuota(ctx, account); paused {
 		// Debug level: this fires per-candidate on the scheduling hot path, so Info
 		// would amplify into log spam once several accounts cross the threshold.
@@ -1442,6 +1445,9 @@ func isOpenAIAccountEligibleForRequest(ctx context.Context, account *Account, re
 func isOpenAIAccountEligibleForRequestIgnoringCooldown(account *Account, requestedModel string, requireCompact bool, excludedIDs map[int64]struct{}, requiredCapability OpenAIEndpointCapability, options OpenAIAccountScheduleOptions) bool {
 	options = normalizeOpenAIAccountScheduleOptions(requireCompact, options)
 	if account == nil || !account.IsOpenAI() || account.Status != StatusActive || !account.Schedulable {
+		return false
+	}
+	if _, excluded := excludedIDs[account.ID]; excluded {
 		return false
 	}
 	now := time.Now()

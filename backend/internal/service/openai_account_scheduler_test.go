@@ -1034,6 +1034,54 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_AllNormalCandidatesCool
 	}
 }
 
+func TestOpenAIGatewayService_SelectAccountWithScheduler_WeakFallbackSkipsExcludedAccounts(t *testing.T) {
+	ctx := context.Background()
+	rateLimitedUntil := time.Now().Add(30 * time.Minute)
+	accounts := []Account{
+		{
+			ID:               31111,
+			Platform:         PlatformOpenAI,
+			Type:             AccountTypeAPIKey,
+			Status:           StatusActive,
+			Schedulable:      true,
+			Concurrency:      1,
+			Priority:         0,
+			RateLimitResetAt: &rateLimitedUntil,
+		},
+		{
+			ID:               31112,
+			Platform:         PlatformOpenAI,
+			Type:             AccountTypeAPIKey,
+			Status:           StatusActive,
+			Schedulable:      true,
+			Concurrency:      1,
+			Priority:         5,
+			RateLimitResetAt: &rateLimitedUntil,
+		},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, _, err := svc.SelectAccountWithScheduler(
+		ctx,
+		nil,
+		"",
+		"",
+		"gpt-5.1",
+		map[int64]struct{}{31111: {}, 31112: {}},
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.Error(t, err)
+	require.Nil(t, selection)
+	require.Contains(t, err.Error(), "no available OpenAI accounts")
+}
+
 func TestOpenAIGatewayService_SelectAccountWithScheduler_WeakFallbackDoesNotBorrowUnboundAccount(t *testing.T) {
 	ctx := context.Background()
 	groupID := int64(12)

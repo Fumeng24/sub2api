@@ -115,8 +115,9 @@ type Group struct {
 	FallbackGroupIDOnInvalidRequest *int64 `json:"fallback_group_id_on_invalid_request"`
 
 	// OpenAI Messages 调度开关（用户侧需要此字段判断是否展示 Claude Code 教程）
-	AllowMessagesDispatch bool `json:"allow_messages_dispatch"`
-	ForceOpenAIPriority   bool `json:"force_openai_priority"`
+	AllowMessagesDispatch bool                         `json:"allow_messages_dispatch"`
+	ForceOpenAIPriority   bool                         `json:"force_openai_priority"`
+	ModelsListConfig      domain.GroupModelsListConfig `json:"models_list_config"`
 
 	// 账号过滤控制（仅 OpenAI/Antigravity 平台有效）
 	RequireOAuthOnly  bool `json:"require_oauth_only"`

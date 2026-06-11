@@ -2,6 +2,7 @@ package service
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 )
@@ -265,13 +266,9 @@ func TestSchedulerHalfOpenAllowsSingleProbeAfterCooldown(t *testing.T) {
 		health.reportFailure(account.ID, "gpt-5.5", "/v1/responses", "transient", time.Minute)
 	}
 	key := makeAccountSchedulerHealthKey(account.ID, "gpt-5.5", "/v1/responses")
-	value, ok := health.entries.Load(key)
+	entry, ok := health.get(key)
 	if !ok {
 		t.Fatal("expected health entry")
-	}
-	entry, ok := value.(*accountSchedulerHealthEntry)
-	if !ok || entry == nil {
-		t.Fatalf("unexpected health entry type %T", value)
 	}
 	entry.mu.Lock()
 	entry.cooldownUntil = time.Now().Add(-time.Second)
@@ -338,6 +335,48 @@ func TestSchedulerFailureDoesNotExtendAlreadyOpenCooldown(t *testing.T) {
 	second := health.snapshot(accountID, model, endpoint, false)
 	if !second.CooldownUntil.Equal(first.CooldownUntil) {
 		t.Fatalf("expected existing cooldown to remain unchanged, first=%v second=%v", first.CooldownUntil, second.CooldownUntil)
+	}
+}
+
+func TestSchedulerHealthStatsConcurrentAccess(t *testing.T) {
+	health := newAccountSchedulerHealthStats()
+	models := []string{"gpt-5.4", "gpt-5.5"}
+	endpoints := []string{"/v1/responses", "/v1/responses/compact"}
+
+	const (
+		workers    = 16
+		iterations = 500
+	)
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for worker := 0; worker < workers; worker++ {
+		worker := worker
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				accountID := int64((i+worker)%8 + 1)
+				model := models[(i+worker)%len(models)]
+				endpoint := endpoints[(i/3+worker)%len(endpoints)]
+				switch i % 5 {
+				case 0:
+					firstTokenMs := 100 + i%50
+					health.reportSuccess(accountID, model, endpoint, &firstTokenMs)
+				case 1:
+					health.reportFailure(accountID, model, endpoint, "transient", time.Millisecond)
+				case 2:
+					_ = health.snapshot(accountID, model, endpoint, true)
+				case 3:
+					_ = health.tryBeginHalfOpenProbe(accountID, model, endpoint)
+				default:
+					health.clear(accountID, model, endpoint)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	if health.size() < 0 {
+		t.Fatal("health stats size should never be negative")
 	}
 }
 

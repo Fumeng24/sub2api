@@ -200,6 +200,7 @@ type RateLimitCacheInvalidator interface {
 
 type APIKeyService struct {
 	apiKeyRepo            APIKeyRepository
+	accountRepo           AccountRepository
 	userRepo              UserRepository
 	groupRepo             GroupRepository
 	userSubRepo           UserSubscriptionRepository
@@ -223,6 +224,7 @@ func NewAPIKeyService(
 	userGroupRateRepo UserGroupRateRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
+	accountRepos ...AccountRepository,
 ) *APIKeyService {
 	svc := &APIKeyService{
 		apiKeyRepo:        apiKeyRepo,
@@ -232,6 +234,9 @@ func NewAPIKeyService(
 		userGroupRateRepo: userGroupRateRepo,
 		cache:             cache,
 		cfg:               cfg,
+	}
+	if len(accountRepos) > 0 {
+		svc.accountRepo = accountRepos[0]
 	}
 	svc.initAuthCache(cfg)
 	return svc
@@ -788,11 +793,77 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 	availableGroups := make([]Group, 0)
 	for _, group := range allGroups {
 		if s.canUserBindGroupInternal(user, &group, subscribedGroupIDs) {
-			availableGroups = append(availableGroups, group)
+			availableGroups = append(availableGroups, s.filterAvailableImageGroupModels(ctx, group))
 		}
 	}
 
 	return availableGroups, nil
+}
+
+func (s *APIKeyService) filterAvailableImageGroupModels(ctx context.Context, group Group) Group {
+	if s.accountRepo == nil || !isUserVisibleImageGenerationGroup(&group) || len(group.ModelsListConfig.Models) == 0 {
+		return group
+	}
+	accounts, err := s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, group.ID, group.Platform)
+	if err != nil {
+		return group
+	}
+	group.ModelsListConfig.Models = filterImageModelsSupportedByAccounts(group.ModelsListConfig.Models, group.Platform, accounts)
+	return group
+}
+
+func isUserVisibleImageGenerationGroup(group *Group) bool {
+	if group == nil || !group.AllowImageGeneration {
+		return false
+	}
+	platform := strings.ToLower(strings.TrimSpace(group.Platform))
+	if platform != PlatformOpenAI && platform != PlatformGemini {
+		return false
+	}
+	return strings.Contains(group.Name, "生图")
+}
+
+func filterImageModelsSupportedByAccounts(models []string, platform string, accounts []Account) []string {
+	if len(models) == 0 || len(accounts) == 0 {
+		return nil
+	}
+
+	normalizedPlatform := strings.ToLower(strings.TrimSpace(platform))
+	filtered := make([]string, 0, len(models))
+	seen := make(map[string]struct{}, len(models))
+	for _, model := range models {
+		model = strings.TrimSpace(model)
+		if model == "" || !isUserVisibleImageModelName(model) {
+			continue
+		}
+		if _, ok := seen[model]; ok {
+			continue
+		}
+		if imageModelSupportedByAnyAccount(model, normalizedPlatform, accounts) {
+			seen[model] = struct{}{}
+			filtered = append(filtered, model)
+		}
+	}
+	return filtered
+}
+
+func imageModelSupportedByAnyAccount(model, platform string, accounts []Account) bool {
+	for i := range accounts {
+		account := &accounts[i]
+		if strings.ToLower(strings.TrimSpace(account.Platform)) != platform {
+			continue
+		}
+		if account.IsModelSupported(model) {
+			return true
+		}
+	}
+	return false
+}
+
+func isUserVisibleImageModelName(model string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	normalized = strings.TrimPrefix(normalized, "models/")
+	return strings.Contains(normalized, "image")
 }
 
 // canUserBindGroupInternal 内部方法，检查用户是否可以绑定分组（使用预加载的订阅数据）

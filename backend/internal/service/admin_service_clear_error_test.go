@@ -86,3 +86,25 @@ func TestAdminService_ClearAccountError_AlsoClearsRecoverableRuntimeState(t *tes
 	require.Empty(t, updated.TempUnschedulableReason)
 	require.Equal(t, []int64{31}, blocker.clearedIDs)
 }
+
+func TestAdminService_ClearAccountError_ClearsGatewaySchedulerHealth(t *testing.T) {
+	repo := &accountRepoStubForClearAccountError{
+		account: &Account{
+			ID:          38826,
+			Platform:    PlatformGemini,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusError,
+			Schedulable: false,
+		},
+	}
+	gateway := &GatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
+	gateway.schedulerHealth.reportFailure(38826, "gemini-3.5-flash", "/v1beta/models", "transient", time.Minute)
+	gateway.schedulerHealth.reportFailure(38826, "gemini-3.1-pro-preview", "/v1beta/models", "balance", time.Hour)
+	require.Equal(t, 2, gateway.schedulerHealth.size())
+
+	svc := &adminServiceImpl{accountRepo: repo, gatewayService: gateway}
+	updated, err := svc.ClearAccountError(context.Background(), 38826)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	require.Equal(t, 0, gateway.schedulerHealth.size())
+}

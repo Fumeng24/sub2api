@@ -134,12 +134,12 @@ func (s *OpenAIGatewayService) markOpenAITransient5xxCoolingDown(ctx context.Con
 	}
 	until := time.Now().Add(cooldown)
 	s.closeOpenAIAccountIdleConnectionsForCircuit(account.ID, statusCode, "openai_transient_5xx", responseBody)
-	slog.Info("account_circuit_open",
+	slog.Info("openai_account_transport_cooldown",
 		"account_id", account.ID,
 		"status_code", statusCode,
 		"reason", "openai_transient_5xx",
 		"until", until,
-		"scope", "account_model_endpoint",
+		"scope", "account_transport",
 		"persisted", false,
 	)
 	return true
@@ -178,12 +178,12 @@ func (s *OpenAIGatewayService) markOpenAIOAuth429RateLimited(ctx context.Context
 			cooldownUntil = time.Now().Add(cooldown)
 		}
 	}
-	slog.Info("account_circuit_open",
+	slog.Info("openai_account_rate_limit_cooldown",
 		"account_id", account.ID,
 		"status_code", http.StatusTooManyRequests,
 		"reason", "openai_rate_limit",
 		"until", cooldownUntil,
-		"scope", "account_model_endpoint",
+		"scope", "account_rate_limit",
 		"persisted", false,
 	)
 }
@@ -232,6 +232,14 @@ func (s *OpenAIGatewayService) ClearAccountSchedulingBlock(accountID int64) {
 	}
 	s.openaiAccountRuntimeBlockUntil.Delete(accountID)
 	s.openaiAccountCircuitHalfOpen.Delete(accountID)
+	s.ClearAccountSchedulerHealth(accountID)
+}
+
+func (s *OpenAIGatewayService) ClearAccountSchedulerHealth(accountID int64) int {
+	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
+		return 0
+	}
+	return s.schedulerHealth.clearAccount(accountID)
 }
 
 func (s *OpenAIGatewayService) isOpenAIAccountRuntimeBlocked(account *Account) bool {

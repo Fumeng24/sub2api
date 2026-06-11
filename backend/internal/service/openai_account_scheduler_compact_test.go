@@ -347,6 +347,61 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactStrictFailoverAl
 	require.Equal(t, int64(71031), selection.Account.ID, "compact mapping account should remain eligible during strict compact failover")
 }
 
+func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactMappingOverridesForceOffForRequest(t *testing.T) {
+	resetOpenAIAdvancedSchedulerSettingCacheForTest()
+
+	ctx := context.Background()
+	groupID := int64(91008)
+	accounts := []Account{
+		{
+			ID:          71080,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			Priority:    0,
+			Extra:       map[string]any{"openai_compact_supported": true},
+		},
+		{
+			ID:          71081,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			Priority:    0,
+			Credentials: map[string]any{
+				"compact_model_mapping": map[string]any{"gpt-5.5": "gpt-5.5"},
+			},
+			Extra: map[string]any{"openai_compact_mode": OpenAICompactModeForceOff},
+		},
+	}
+	cfg := &config.Config{}
+	cfg.Gateway.Scheduling.LoadBatchEnabled = false
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                cfg,
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, _, err := svc.SelectAccountWithScheduler(
+		ctx,
+		&groupID,
+		"",
+		"",
+		"gpt-5.5",
+		map[int64]struct{}{71080: {}},
+		OpenAIUpstreamTransportAny,
+		true,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, int64(71081), selection.Account.ID)
+}
+
 func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactStrictFailoverAllowsGPT55CompactMappedAccount(t *testing.T) {
 	resetOpenAIAdvancedSchedulerSettingCacheForTest()
 
@@ -455,5 +510,6 @@ func TestOpenAICompactSupportTierForModel_CompactMapping(t *testing.T) {
 		},
 		Extra: map[string]any{"openai_compact_mode": OpenAICompactModeForceOff},
 	}
-	require.Equal(t, 0, openAICompactSupportTierForModel(forceOff, "gpt-5.4"))
+	require.Equal(t, 2, openAICompactSupportTierForModel(forceOff, "gpt-5.4"))
+	require.Equal(t, 0, openAICompactSupportTier(forceOff))
 }

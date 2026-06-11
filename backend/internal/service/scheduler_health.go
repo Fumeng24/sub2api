@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -23,8 +22,8 @@ const (
 )
 
 type accountSchedulerHealthStats struct {
-	entries sync.Map
-	count   atomic.Int64
+	mu      sync.RWMutex
+	entries map[accountSchedulerHealthKey]*accountSchedulerHealthEntry
 }
 
 type accountSchedulerHealthKey struct {
@@ -78,7 +77,9 @@ type schedulerAccountScore struct {
 }
 
 func newAccountSchedulerHealthStats() *accountSchedulerHealthStats {
-	return &accountSchedulerHealthStats{}
+	return &accountSchedulerHealthStats{
+		entries: make(map[accountSchedulerHealthKey]*accountSchedulerHealthEntry),
+	}
 }
 
 func normalizeSchedulerDimension(value, fallback string) string {
@@ -101,27 +102,62 @@ func (s *accountSchedulerHealthStats) loadOrCreate(key accountSchedulerHealthKey
 	if s == nil || key.AccountID <= 0 {
 		return nil
 	}
-	if value, ok := s.entries.Load(key); ok {
-		entry, _ := value.(*accountSchedulerHealthEntry)
-		if entry != nil {
-			return entry
-		}
+	if entry, ok := s.get(key); ok {
+		return entry
 	}
 	entry := &accountSchedulerHealthEntry{
 		successEWMA:  1,
 		circuitState: schedulerCircuitClosed,
 		recent:       make([]bool, 20),
 	}
-	actual, loaded := s.entries.LoadOrStore(key, entry)
-	if !loaded {
-		s.count.Add(1)
-		return entry
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.entries == nil {
+		s.entries = make(map[accountSchedulerHealthKey]*accountSchedulerHealthEntry)
 	}
-	existing, _ := actual.(*accountSchedulerHealthEntry)
-	if existing != nil {
+	if existing := s.entries[key]; existing != nil {
 		return existing
 	}
+	s.entries[key] = entry
 	return entry
+}
+
+func (s *accountSchedulerHealthStats) get(key accountSchedulerHealthKey) (*accountSchedulerHealthEntry, bool) {
+	if s == nil || key.AccountID <= 0 {
+		return nil, false
+	}
+	s.mu.RLock()
+	entry, ok := s.entries[key]
+	s.mu.RUnlock()
+	if !ok || entry == nil {
+		return nil, false
+	}
+	return entry, true
+}
+
+func (s *accountSchedulerHealthStats) delete(key accountSchedulerHealthKey) bool {
+	if s == nil || key.AccountID <= 0 {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.entries == nil {
+		return false
+	}
+	if _, ok := s.entries[key]; !ok {
+		return false
+	}
+	delete(s.entries, key)
+	return true
+}
+
+func (s *accountSchedulerHealthStats) size() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.entries)
 }
 
 func (s *accountSchedulerHealthStats) snapshot(accountID int64, model, endpoint string, allowHalfOpen bool) schedulerHealthSnapshot {
@@ -137,12 +173,8 @@ func (s *accountSchedulerHealthStats) snapshot(accountID int64, model, endpoint 
 	if s == nil || accountID <= 0 {
 		return snap
 	}
-	value, ok := s.entries.Load(key)
+	entry, ok := s.get(key)
 	if !ok {
-		return snap
-	}
-	entry, _ := value.(*accountSchedulerHealthEntry)
-	if entry == nil {
 		return snap
 	}
 
@@ -234,9 +266,27 @@ func (s *accountSchedulerHealthStats) clear(accountID int64, model, endpoint str
 		return
 	}
 	key := makeAccountSchedulerHealthKey(accountID, model, endpoint)
-	if _, deleted := s.entries.LoadAndDelete(key); deleted {
-		s.count.Add(-1)
+	s.delete(key)
+}
+
+func (s *accountSchedulerHealthStats) clearAccount(accountID int64) int {
+	if s == nil || accountID <= 0 {
+		return 0
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.entries == nil {
+		return 0
+	}
+	cleared := 0
+	for key := range s.entries {
+		if key.AccountID != accountID {
+			continue
+		}
+		delete(s.entries, key)
+		cleared++
+	}
+	return cleared
 }
 
 func (s *accountSchedulerHealthStats) reportNeutral(accountID int64, model, endpoint string) {
@@ -244,12 +294,8 @@ func (s *accountSchedulerHealthStats) reportNeutral(accountID int64, model, endp
 	if s == nil || accountID <= 0 {
 		return
 	}
-	value, ok := s.entries.Load(key)
+	entry, ok := s.get(key)
 	if !ok {
-		return
-	}
-	entry, _ := value.(*accountSchedulerHealthEntry)
-	if entry == nil {
 		return
 	}
 
@@ -313,12 +359,8 @@ func (s *accountSchedulerHealthStats) tryBeginHalfOpenProbe(accountID int64, mod
 	if s == nil || accountID <= 0 {
 		return true
 	}
-	value, ok := s.entries.Load(key)
+	entry, ok := s.get(key)
 	if !ok {
-		return true
-	}
-	entry, _ := value.(*accountSchedulerHealthEntry)
-	if entry == nil {
 		return true
 	}
 
@@ -685,7 +727,7 @@ func buildSchedulerAccountScores(
 	health *accountSchedulerHealthStats,
 	allowHalfOpen bool,
 ) []schedulerAccountScore {
-	return buildSchedulerAccountScoresWithOptions(accounts, groupID, model, endpoint, loadMap, health, allowHalfOpen, false)
+	return buildSchedulerAccountScoresWithOptions(accounts, groupID, model, endpoint, loadMap, health, allowHalfOpen, false, false)
 }
 
 func buildSchedulerAccountWaitScores(
@@ -696,7 +738,18 @@ func buildSchedulerAccountWaitScores(
 	loadMap map[int64]*AccountLoadInfo,
 	health *accountSchedulerHealthStats,
 ) []schedulerAccountScore {
-	return buildSchedulerAccountScoresWithOptions(accounts, groupID, model, endpoint, loadMap, health, false, true)
+	return buildSchedulerAccountScoresWithOptions(accounts, groupID, model, endpoint, loadMap, health, false, true, false)
+}
+
+func buildSchedulerAccountCooldownFallbackScores(
+	accounts []*Account,
+	groupID *int64,
+	model string,
+	endpoint string,
+	loadMap map[int64]*AccountLoadInfo,
+	health *accountSchedulerHealthStats,
+) []schedulerAccountScore {
+	return buildSchedulerAccountScoresWithOptions(accounts, groupID, model, endpoint, loadMap, health, true, true, true)
 }
 
 func buildSchedulerAccountScoresWithOptions(
@@ -708,6 +761,7 @@ func buildSchedulerAccountScoresWithOptions(
 	health *accountSchedulerHealthStats,
 	allowHalfOpen bool,
 	includeFullLoad bool,
+	includeCooling bool,
 ) []schedulerAccountScore {
 	scores := make([]schedulerAccountScore, 0, len(accounts))
 	for _, account := range accounts {
@@ -719,10 +773,10 @@ func buildSchedulerAccountScoresWithOptions(
 		if health != nil {
 			snap = health.snapshot(account.ID, model, endpoint, allowHalfOpen)
 		}
-		if snap.CircuitState == schedulerCircuitOpen {
+		if snap.CircuitState == schedulerCircuitOpen && !includeCooling {
 			continue
 		}
-		if snap.CircuitState == schedulerCircuitHalfOpen && !snap.HalfOpenProbe {
+		if snap.CircuitState == schedulerCircuitHalfOpen && !snap.HalfOpenProbe && !includeCooling {
 			continue
 		}
 		loadInfo := loadMap[account.ID]

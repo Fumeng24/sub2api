@@ -382,6 +382,14 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if err != nil {
 			if len(fs.FailedAccountIDs) == 0 {
 				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+				fields := []zap.Field{
+					zap.String("model", modelName),
+					zap.Int64p("group_id", apiKey.GroupID),
+					zap.String("platform", service.PlatformGemini),
+					zap.Error(err),
+				}
+				fields = append(fields, gatewaySelectionDiagnosticZapFields(err)...)
+				reqLog.Warn("gemini.select_account_no_available", fields...)
 				googleError(c, http.StatusServiceUnavailable, "No available Gemini accounts: "+err.Error())
 				return
 			}
