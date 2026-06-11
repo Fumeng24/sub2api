@@ -450,6 +450,7 @@ var (
 		{Name: "primary_model", Type: field.TypeString, Size: 200},
 		{Name: "extra_models", Type: field.TypeJSON},
 		{Name: "group_name", Type: field.TypeString, Nullable: true, Size: 100, Default: ""},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
 		{Name: "enabled", Type: field.TypeBool, Default: true},
 		{Name: "interval_seconds", Type: field.TypeInt},
 		{Name: "last_checked_at", Type: field.TypeTime, Nullable: true},
@@ -468,13 +469,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "channel_monitors_api_keys_api_key",
-				Columns:    []*schema.Column{ChannelMonitorsColumns[18]},
+				Columns:    []*schema.Column{ChannelMonitorsColumns[19]},
 				RefColumns: []*schema.Column{APIKeysColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "channel_monitors_channel_monitor_request_templates_request_template",
-				Columns:    []*schema.Column{ChannelMonitorsColumns[19]},
+				Columns:    []*schema.Column{ChannelMonitorsColumns[20]},
 				RefColumns: []*schema.Column{ChannelMonitorRequestTemplatesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -483,7 +484,7 @@ var (
 			{
 				Name:    "channelmonitor_enabled_last_checked_at",
 				Unique:  false,
-				Columns: []*schema.Column{ChannelMonitorsColumns[11], ChannelMonitorsColumns[13]},
+				Columns: []*schema.Column{ChannelMonitorsColumns[12], ChannelMonitorsColumns[14]},
 			},
 			{
 				Name:    "channelmonitor_provider",
@@ -501,14 +502,19 @@ var (
 				Columns: []*schema.Column{ChannelMonitorsColumns[10]},
 			},
 			{
+				Name:    "channelmonitor_sort_order_id",
+				Unique:  false,
+				Columns: []*schema.Column{ChannelMonitorsColumns[11], ChannelMonitorsColumns[0]},
+			},
+			{
 				Name:    "channelmonitor_template_id",
 				Unique:  false,
-				Columns: []*schema.Column{ChannelMonitorsColumns[19]},
+				Columns: []*schema.Column{ChannelMonitorsColumns[20]},
 			},
 			{
 				Name:    "channelmonitor_api_key_id",
 				Unique:  false,
-				Columns: []*schema.Column{ChannelMonitorsColumns[18]},
+				Columns: []*schema.Column{ChannelMonitorsColumns[19]},
 			},
 		},
 	}

@@ -62,6 +62,9 @@ func (ChannelMonitor) Fields() []ent.Field {
 			Optional().
 			Default("").
 			MaxLen(100),
+		field.Int("sort_order").
+			Default(0).
+			Comment("Display order for channel monitor lists; lower values appear first"),
 		field.Bool("enabled").
 			Default(true),
 		field.Int("interval_seconds").
@@ -118,6 +121,7 @@ func (ChannelMonitor) Indexes() []ent.Index {
 		index.Fields("provider"),
 		index.Fields("provider", "api_mode"),
 		index.Fields("group_name"),
+		index.Fields("sort_order", "id"),
 		index.Fields("template_id"),
 		index.Fields("api_key_id"),
 	}

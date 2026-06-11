@@ -97,6 +97,44 @@ func TestChannelMonitorServiceApplyAPIKeyUpdateBindsMatchingManualKey(t *testing
 	require.Equal(t, "ENC:shared-key", existing.APIKey)
 }
 
+func TestValidateCreateParamsRejectsInvalidSortOrder(t *testing.T) {
+	t.Parallel()
+
+	err := validateCreateParams(ChannelMonitorCreateParams{
+		Name:            "monitor",
+		Provider:        MonitorProviderAnthropic,
+		Endpoint:        "https://example.com",
+		APIKey:          "sk-test",
+		PrimaryModel:    "claude-sonnet",
+		IntervalSeconds: monitorMinIntervalSeconds,
+		SortOrder:       -1,
+	})
+
+	require.ErrorIs(t, err, ErrChannelMonitorInvalidSortOrder)
+}
+
+func TestApplyMonitorUpdateRejectsInvalidSortOrder(t *testing.T) {
+	t.Parallel()
+
+	existing := &ChannelMonitor{
+		Provider:         MonitorProviderAnthropic,
+		APIMode:          MonitorAPIModeChatCompletions,
+		SortOrder:        10,
+		IntervalSeconds:  monitorMinIntervalSeconds,
+		BodyOverrideMode: MonitorBodyOverrideModeOff,
+	}
+	err := applyMonitorUpdate(existing, ChannelMonitorUpdateParams{
+		SortOrder: channelMonitorIntPtr(monitorMaxSortOrder + 1),
+	})
+
+	require.ErrorIs(t, err, ErrChannelMonitorInvalidSortOrder)
+	require.Equal(t, 10, existing.SortOrder)
+}
+
+func channelMonitorIntPtr(v int) *int {
+	return &v
+}
+
 type failingChannelMonitorEncryptor struct{}
 
 func (f failingChannelMonitorEncryptor) Encrypt(string) (string, error) {

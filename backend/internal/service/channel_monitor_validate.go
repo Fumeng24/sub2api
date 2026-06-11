@@ -43,6 +43,14 @@ func validateInterval(sec int) error {
 	return nil
 }
 
+// validateSortOrder 校验渠道监控展示顺序。数值越小越靠前。
+func validateSortOrder(v int) error {
+	if v < monitorMinSortOrder || v > monitorMaxSortOrder {
+		return ErrChannelMonitorInvalidSortOrder
+	}
+	return nil
+}
+
 // validateEndpoint 校验 endpoint：
 //   - scheme 强制 https（拒绝 http，避免明文凭证 + 部分 SSRF 利用面）
 //   - 必须为 origin（无 path/query/fragment），防止用户填 https://api.openai.com/v1

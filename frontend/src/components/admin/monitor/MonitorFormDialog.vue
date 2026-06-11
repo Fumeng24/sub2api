@@ -6,9 +6,16 @@
     @close="$emit('close')"
   >
     <form id="channel-monitor-form" @submit.prevent="handleSubmit" class="space-y-5">
-      <div>
-        <label class="input-label">{{ t('admin.channelMonitor.form.name') }} <span class="text-red-500">*</span></label>
-        <input v-model="form.name" type="text" required class="input" :placeholder="t('admin.channelMonitor.form.namePlaceholder')" />
+      <div class="grid gap-4 sm:grid-cols-[1fr_9rem]">
+        <div>
+          <label class="input-label">{{ t('admin.channelMonitor.form.name') }} <span class="text-red-500">*</span></label>
+          <input v-model="form.name" type="text" required class="input" :placeholder="t('admin.channelMonitor.form.namePlaceholder')" />
+        </div>
+        <div>
+          <label class="input-label">{{ t('admin.channelMonitor.form.sortOrder') }}</label>
+          <input v-model.number="form.sort_order" type="number" min="0" max="100000" class="input" />
+          <p class="mt-1 text-xs text-gray-400">{{ t('admin.channelMonitor.form.sortOrderHint') }}</p>
+        </div>
       </div>
 
       <div>
@@ -260,6 +267,7 @@ interface MonitorForm {
   primary_model: string
   extra_models: string[]
   group_name: string
+  sort_order: number
   interval_seconds: number
   enabled: boolean
   // 高级设置快照
@@ -279,6 +287,7 @@ const form = reactive<MonitorForm>({
   primary_model: '',
   extra_models: [],
   group_name: '',
+  sort_order: 0,
   interval_seconds: systemDefaultInterval.value,
   enabled: true,
   template_id: null,
@@ -428,6 +437,7 @@ function resetForm() {
   form.primary_model = ''
   form.extra_models = []
   form.group_name = ''
+  form.sort_order = 0
   form.interval_seconds = systemDefaultInterval.value
   form.enabled = true
   form.template_id = null
@@ -448,6 +458,7 @@ function loadFromMonitor(m: ChannelMonitor) {
   form.primary_model = m.primary_model
   form.extra_models = [...(m.extra_models || [])]
   form.group_name = m.group_name || ''
+  form.sort_order = m.sort_order ?? 0
   form.interval_seconds = m.interval_seconds || systemDefaultInterval.value
   form.enabled = m.enabled
   form.template_id = m.template_id ?? null
@@ -519,6 +530,7 @@ function buildPayload(): CreateParams {
     primary_model: form.primary_model.trim(),
     extra_models: form.extra_models,
     group_name: form.group_name.trim(),
+    sort_order: Number.isFinite(form.sort_order) ? form.sort_order : 0,
     enabled: form.enabled,
     interval_seconds: form.interval_seconds,
     template_id: form.template_id,

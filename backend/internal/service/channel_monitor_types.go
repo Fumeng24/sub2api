@@ -38,6 +38,7 @@ type ChannelMonitor struct {
 	PrimaryModel    string
 	ExtraModels     []string
 	GroupName       string
+	SortOrder       int
 	Enabled         bool
 	IntervalSeconds int
 	LastCheckedAt   *time.Time
@@ -76,6 +77,7 @@ type ChannelMonitorCreateParams struct {
 	PrimaryModel     string
 	ExtraModels      []string
 	GroupName        string
+	SortOrder        int
 	Enabled          bool
 	IntervalSeconds  int
 	CreatedBy        int64
@@ -97,6 +99,7 @@ type ChannelMonitorUpdateParams struct {
 	PrimaryModel    *string
 	ExtraModels     *[]string
 	GroupName       *string
+	SortOrder       *int
 	Enabled         *bool
 	IntervalSeconds *int
 	// 自定义快照字段：指针为 nil 表示不更新，非 nil 覆盖
@@ -107,6 +110,12 @@ type ChannelMonitorUpdateParams struct {
 	ExtraHeaders     *map[string]string
 	BodyOverrideMode *string
 	BodyOverride     *map[string]any
+}
+
+// ChannelMonitorSortOrderUpdate 批量更新渠道监控展示顺序。
+type ChannelMonitorSortOrderUpdate struct {
+	ID        int64
+	SortOrder int
 }
 
 // CheckResult 单个模型一次检测的结果。

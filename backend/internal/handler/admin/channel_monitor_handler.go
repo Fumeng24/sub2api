@@ -45,6 +45,7 @@ type channelMonitorCreateRequest struct {
 	PrimaryModel     string            `json:"primary_model" binding:"required,max=200"`
 	ExtraModels      []string          `json:"extra_models"`
 	GroupName        string            `json:"group_name" binding:"max=100"`
+	SortOrder        int               `json:"sort_order" binding:"omitempty,min=0,max=100000"`
 	Enabled          *bool             `json:"enabled"`
 	IntervalSeconds  int               `json:"interval_seconds" binding:"required,min=15,max=3600"`
 	TemplateID       *int64            `json:"template_id"`
@@ -64,6 +65,7 @@ type channelMonitorUpdateRequest struct {
 	PrimaryModel     *string            `json:"primary_model" binding:"omitempty,max=200"`
 	ExtraModels      *[]string          `json:"extra_models"`
 	GroupName        *string            `json:"group_name" binding:"omitempty,max=100"`
+	SortOrder        *int               `json:"sort_order" binding:"omitempty,min=0,max=100000"`
 	Enabled          *bool              `json:"enabled"`
 	IntervalSeconds  *int               `json:"interval_seconds" binding:"omitempty,min=15,max=3600"`
 	TemplateID       *int64             `json:"template_id"`
@@ -71,6 +73,13 @@ type channelMonitorUpdateRequest struct {
 	ExtraHeaders     *map[string]string `json:"extra_headers"`
 	BodyOverrideMode *string            `json:"body_override_mode" binding:"omitempty,oneof=off merge replace"`
 	BodyOverride     *map[string]any    `json:"body_override"`
+}
+
+type channelMonitorSortOrderRequest struct {
+	Updates []struct {
+		ID        int64 `json:"id" binding:"required"`
+		SortOrder int   `json:"sort_order" binding:"min=0,max=100000"`
+	} `json:"updates" binding:"required,min=1"`
 }
 
 type channelMonitorResponse struct {
@@ -85,6 +94,7 @@ type channelMonitorResponse struct {
 	PrimaryModel        string                               `json:"primary_model"`
 	ExtraModels         []string                             `json:"extra_models"`
 	GroupName           string                               `json:"group_name"`
+	SortOrder           int                                  `json:"sort_order"`
 	Enabled             bool                                 `json:"enabled"`
 	IntervalSeconds     int                                  `json:"interval_seconds"`
 	LastCheckedAt       *string                              `json:"last_checked_at"`
@@ -153,6 +163,7 @@ func channelMonitorToResponse(m *service.ChannelMonitor) *channelMonitorResponse
 		PrimaryModel:        m.PrimaryModel,
 		ExtraModels:         extras,
 		GroupName:           m.GroupName,
+		SortOrder:           m.SortOrder,
 		Enabled:             m.Enabled,
 		IntervalSeconds:     m.IntervalSeconds,
 		CreatedBy:           m.CreatedBy,
@@ -319,6 +330,7 @@ func (h *ChannelMonitorHandler) Create(c *gin.Context) {
 		PrimaryModel:     req.PrimaryModel,
 		ExtraModels:      req.ExtraModels,
 		GroupName:        req.GroupName,
+		SortOrder:        req.SortOrder,
 		Enabled:          enabled,
 		IntervalSeconds:  req.IntervalSeconds,
 		CreatedBy:        subject.UserID,
@@ -357,6 +369,7 @@ func (h *ChannelMonitorHandler) Update(c *gin.Context) {
 		PrimaryModel:     req.PrimaryModel,
 		ExtraModels:      req.ExtraModels,
 		GroupName:        req.GroupName,
+		SortOrder:        req.SortOrder,
 		Enabled:          req.Enabled,
 		IntervalSeconds:  req.IntervalSeconds,
 		TemplateID:       req.TemplateID,
@@ -370,6 +383,28 @@ func (h *ChannelMonitorHandler) Update(c *gin.Context) {
 		return
 	}
 	response.Success(c, channelMonitorToResponse(m))
+}
+
+// UpdateSortOrder PUT /api/v1/admin/channel-monitors/sort-order
+func (h *ChannelMonitorHandler) UpdateSortOrder(c *gin.Context) {
+	var req channelMonitorSortOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("VALIDATION_ERROR", err.Error()))
+		return
+	}
+
+	updates := make([]service.ChannelMonitorSortOrderUpdate, 0, len(req.Updates))
+	for _, u := range req.Updates {
+		updates = append(updates, service.ChannelMonitorSortOrderUpdate{
+			ID:        u.ID,
+			SortOrder: u.SortOrder,
+		})
+	}
+	if err := h.monitorService.UpdateSortOrders(c.Request.Context(), updates); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "Sort order updated successfully"})
 }
 
 // Delete DELETE /api/v1/admin/channel-monitors/:id

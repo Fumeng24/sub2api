@@ -23,6 +23,7 @@ type ChannelMonitorRepository interface {
 	Update(ctx context.Context, m *ChannelMonitor) error
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, params ChannelMonitorListParams) ([]*ChannelMonitor, int64, error)
+	UpdateSortOrders(ctx context.Context, updates []ChannelMonitorSortOrderUpdate) error
 
 	// 调度器辅助
 	ListEnabled(ctx context.Context) ([]*ChannelMonitor, error)
@@ -134,6 +135,7 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		PrimaryModel:     strings.TrimSpace(p.PrimaryModel),
 		ExtraModels:      normalizeModels(p.ExtraModels),
 		GroupName:        strings.TrimSpace(p.GroupName),
+		SortOrder:        p.SortOrder,
 		Enabled:          p.Enabled,
 		IntervalSeconds:  p.IntervalSeconds,
 		CreatedBy:        p.CreatedBy,
@@ -175,6 +177,9 @@ func validateCreateParams(p ChannelMonitorCreateParams) error {
 		return err
 	}
 	if err := validateInterval(p.IntervalSeconds); err != nil {
+		return err
+	}
+	if err := validateSortOrder(p.SortOrder); err != nil {
 		return err
 	}
 	if err := validateEndpoint(p.Endpoint); err != nil {
@@ -223,6 +228,19 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 		s.scheduler.Schedule(existing)
 	}
 	return existing, nil
+}
+
+// UpdateSortOrders 批量更新渠道监控展示顺序。
+func (s *ChannelMonitorService) UpdateSortOrders(ctx context.Context, updates []ChannelMonitorSortOrderUpdate) error {
+	for _, u := range updates {
+		if u.ID <= 0 {
+			return ErrChannelMonitorNotFound
+		}
+		if err := validateSortOrder(u.SortOrder); err != nil {
+			return err
+		}
+	}
+	return s.repo.UpdateSortOrders(ctx, updates)
 }
 
 // applyAPIKeyUpdate 处理 Update 中的 APIKey 字段：
@@ -663,6 +681,12 @@ func applyMonitorUpdate(existing *ChannelMonitor, p ChannelMonitorUpdateParams) 
 	}
 	if p.GroupName != nil {
 		existing.GroupName = strings.TrimSpace(*p.GroupName)
+	}
+	if p.SortOrder != nil {
+		if err := validateSortOrder(*p.SortOrder); err != nil {
+			return err
+		}
+		existing.SortOrder = *p.SortOrder
 	}
 	if p.Enabled != nil {
 		existing.Enabled = *p.Enabled

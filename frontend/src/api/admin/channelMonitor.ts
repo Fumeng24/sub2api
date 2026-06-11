@@ -27,6 +27,7 @@ export interface ChannelMonitor {
   primary_model: string
   extra_models: string[]
   group_name: string
+  sort_order: number
   enabled: boolean
   interval_seconds: number
   last_checked_at: string | null
@@ -80,6 +81,7 @@ export interface CreateParams {
   primary_model: string
   extra_models?: string[]
   group_name?: string
+  sort_order?: number
   enabled?: boolean
   interval_seconds: number
   template_id?: number | null
@@ -141,6 +143,24 @@ export async function list(
 }
 
 /**
+ * List all channel monitors by walking paginated results.
+ */
+export async function listAll(): Promise<ChannelMonitor[]> {
+  const pageSize = 100
+  let page = 1
+  const items: ChannelMonitor[] = []
+
+  while (true) {
+    const res = await list({ page, page_size: pageSize })
+    items.push(...(res.items || []))
+    if (items.length >= res.total || page >= res.pages || !res.items?.length) break
+    page += 1
+  }
+
+  return items
+}
+
+/**
  * Get a channel monitor by ID
  */
 export async function get(id: number): Promise<ChannelMonitor> {
@@ -162,6 +182,18 @@ export async function create(params: CreateParams): Promise<ChannelMonitor> {
  */
 export async function update(id: number, params: UpdateParams): Promise<ChannelMonitor> {
   const { data } = await apiClient.put<ChannelMonitor>(`/admin/channel-monitors/${id}`, params)
+  return data
+}
+
+/**
+ * Update channel monitor sort orders.
+ */
+export async function updateSortOrder(
+  updates: Array<{ id: number; sort_order: number }>
+): Promise<{ message: string }> {
+  const { data } = await apiClient.put<{ message: string }>('/admin/channel-monitors/sort-order', {
+    updates,
+  })
   return data
 }
 
@@ -197,9 +229,11 @@ export async function listHistory(
 
 export const channelMonitorAPI = {
   list,
+  listAll,
   get,
   create,
   update,
+  updateSortOrder,
   del,
   runNow,
   listHistory,

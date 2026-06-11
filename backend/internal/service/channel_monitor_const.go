@@ -33,6 +33,9 @@ const (
 	// monitorMinIntervalSeconds / monitorMaxIntervalSeconds 用户配置的检测间隔上下限。
 	monitorMinIntervalSeconds = 15
 	monitorMaxIntervalSeconds = 3600
+	// monitorMinSortOrder / monitorMaxSortOrder 用户配置的展示排序上下限。
+	monitorMinSortOrder = 0
+	monitorMaxSortOrder = 100000
 	// monitorMessageMaxBytes message 字段最大字节数（与 schema/migration 一致）。
 	monitorMessageMaxBytes = 500
 	// monitorResponseMaxBytes 单次模型响应最大读取字节，防止 OOM。
@@ -122,6 +125,9 @@ var (
 	)
 	ErrChannelMonitorInvalidInterval = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_INVALID_INTERVAL", "interval_seconds must be in [15, 3600]",
+	)
+	ErrChannelMonitorInvalidSortOrder = infraerrors.BadRequest(
+		"CHANNEL_MONITOR_INVALID_SORT_ORDER", "sort_order must be in [0, 100000]",
 	)
 	ErrChannelMonitorInvalidEndpoint = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_INVALID_ENDPOINT", "endpoint must be a valid https URL",
