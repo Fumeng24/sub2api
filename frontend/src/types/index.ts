@@ -789,6 +789,7 @@ export interface Group {
   force_openai_priority?: boolean
   default_mapped_model?: string
   messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
+  models_list_config?: ModelsListConfig
   require_oauth_only: boolean
   require_privacy_set: boolean
   created_at: string

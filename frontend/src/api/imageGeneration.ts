@@ -21,6 +21,8 @@ export interface ImageGatewayRequest {
   signal?: AbortSignal
 }
 
+export interface GeminiImageGatewayRequest extends ImageGatewayRequest {}
+
 export const MAX_IMAGE_GENERATION_COUNT = 4
 
 export class ImageGatewayError extends Error {
@@ -81,6 +83,95 @@ function buildEditBody(request: ImageGatewayRequest) {
     form.append('image', image, image.name || `reference-${index + 1}.png`)
   }
   return form
+}
+
+function readFileAsDataURL(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+async function fileToGeminiInlineData(file: File) {
+  const dataURL = await readFileAsDataURL(file)
+  const match = dataURL.match(/^data:([^;]+);base64,(.*)$/i)
+  return {
+    inlineData: {
+      mimeType: match?.[1] || file.type || 'image/png',
+      data: match?.[2] || '',
+    },
+  }
+}
+
+function geminiAspectRatioFromSize(size: string | undefined) {
+  switch (size) {
+    case '1024x1536':
+      return '2:3'
+    case '1536x1024':
+      return '3:2'
+    case '1024x1365':
+      return '3:4'
+    case '1365x1024':
+      return '4:3'
+    case '1088x1920':
+      return '9:16'
+    case '1920x1088':
+      return '16:9'
+    case '1024x1024':
+      return '1:1'
+    default:
+      return ''
+  }
+}
+
+function geminiImageSizeFromSize(size: string | undefined) {
+  switch (size) {
+    case '1024x1536':
+    case '1536x1024':
+    case '1024x1365':
+    case '1365x1024':
+    case '1088x1920':
+    case '1920x1088':
+    case '1024x1024':
+    case 'auto':
+      return '1K'
+    default:
+      return ''
+  }
+}
+
+async function buildGeminiImageBody(request: GeminiImageGatewayRequest) {
+  const parts: Array<Record<string, unknown>> = [{ text: request.prompt }]
+  for (const image of request.referenceImages || []) {
+    parts.push(await fileToGeminiInlineData(image))
+  }
+
+  const imageConfig: Record<string, unknown> = {}
+  const aspectRatio = geminiAspectRatioFromSize(request.size)
+  if (aspectRatio) {
+    imageConfig.aspectRatio = aspectRatio
+  }
+  const imageSize = geminiImageSizeFromSize(request.size)
+  if (imageSize) {
+    imageConfig.imageSize = imageSize
+  }
+
+  const generationConfig: Record<string, unknown> = {
+    responseModalities: ['TEXT', 'IMAGE'],
+  }
+  if (Object.keys(imageConfig).length > 0) {
+    generationConfig.imageConfig = imageConfig
+  }
+
+  return {
+    contents: [{
+      role: 'user',
+      parts,
+    }],
+    generationConfig,
+  }
 }
 
 async function readResponse(response: Response) {
@@ -307,6 +398,43 @@ export async function submitImageGatewayRequest(request: ImageGatewayRequest): P
   return payload
 }
 
+export async function submitGeminiImageGatewayRequest(request: GeminiImageGatewayRequest): Promise<unknown> {
+  const model = request.model.trim().replace(/^models\//, '')
+  const url = gatewayUrl(request.baseUrl, `/v1beta/models/${encodeURIComponent(model)}:generateContent`)
+  const headers = new Headers({
+    Authorization: `Bearer ${request.apiKey}`,
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  })
+  const requestedCount = Math.max(1, Math.min(MAX_IMAGE_GENERATION_COUNT, Math.floor(Number(request.count) || 1)))
+  const payloads: unknown[] = []
+
+  for (let index = 0; index < requestedCount; index += 1) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(await buildGeminiImageBody({ ...request, count: 1 })),
+      signal: request.signal,
+    })
+    const payload = normalizeGatewayPayload(await readResponse(response))
+    if (!response.ok) {
+      throw new ImageGatewayError(
+        resolveGatewayErrorMessage(payload, `Gemini image request failed with HTTP ${response.status}`),
+        response.status,
+        resolveGatewayErrorCode(payload),
+        payload,
+      )
+    }
+    const payloadError = extractGatewayPayloadError(payload)
+    if (payloadError) {
+      throw new ImageGatewayError(payloadError.message, response.status, payloadError.code, payload)
+    }
+    payloads.push(payload)
+  }
+
+  return requestedCount === 1 ? payloads[0] : payloads
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
@@ -322,6 +450,9 @@ function normalizeBase64(value: unknown) {
 
 function imageMimeFromFormat(format: unknown) {
   const normalized = typeof format === 'string' ? format.trim().toLowerCase() : ''
+  if (normalized.startsWith('image/')) {
+    return normalized
+  }
   if (normalized === 'jpg') {
     return 'image/jpeg'
   }
@@ -362,7 +493,32 @@ function looksLikeImageGenerationItem(value: Record<string, unknown>) {
 }
 
 function collectCandidate(value: Record<string, unknown>): Omit<OpenAIImageResult, 'id' | 'src'> | null {
-  const outputFormat = value.output_format || value.format || value.mime_type
+  const inlineData = isRecord(value.inlineData)
+    ? value.inlineData
+    : isRecord(value.inline_data)
+      ? value.inline_data
+      : null
+  if (inlineData) {
+    const mimeType = inlineData.mimeType || inlineData.mime_type
+    const data = normalizeBase64(inlineData.data)
+    if (typeof mimeType === 'string' && mimeType.toLowerCase().startsWith('image/') && data) {
+      return {
+        b64_json: data,
+        output_format: mimeType,
+      }
+    }
+  }
+
+  const directMimeType = value.mimeType || value.mime_type
+  const directData = normalizeBase64(value.data)
+  if (typeof directMimeType === 'string' && directMimeType.toLowerCase().startsWith('image/') && directData) {
+    return {
+      b64_json: directData,
+      output_format: directMimeType,
+    }
+  }
+
+  const outputFormat = value.output_format || value.format || value.mime_type || value.mimeType
   const b64 = normalizeBase64(
     value.b64_json ||
     value.partial_image_b64 ||

@@ -3,6 +3,7 @@ import {
   ImageGatewayError,
   MAX_IMAGE_GENERATION_COUNT,
   normalizeOpenAIImageResults,
+  submitGeminiImageGatewayRequest,
   submitImageGatewayRequest,
 } from '@/api/imageGeneration'
 
@@ -106,5 +107,58 @@ describe('imageGeneration API', () => {
       status: 200,
       code: 'invalid_size',
     } satisfies Partial<ImageGatewayError>)
+  })
+
+  it('submits Gemini image generation through the native v1beta endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      candidates: [{
+        content: {
+          parts: [{
+            inlineData: {
+              mimeType: 'image/png',
+              data: 'aGVsbG8=',
+            },
+          }],
+        },
+      }],
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await submitGeminiImageGatewayRequest({
+      apiKey: 'test-key',
+      baseUrl: 'https://ai.example/v1',
+      prompt: 'draw a tomato',
+      model: 'models/gemini-3.1-flash-image',
+      count: 1,
+      size: '1024x1536',
+    })
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://ai.example/v1beta/models/gemini-3.1-flash-image:generateContent')
+    expect(init.headers.get('Authorization')).toBe('Bearer test-key')
+    const body = JSON.parse(init.body as string)
+    expect(body.contents[0].parts[0].text).toBe('draw a tomato')
+    expect(body.generationConfig.responseModalities).toEqual(['TEXT', 'IMAGE'])
+    expect(body.generationConfig.imageConfig.aspectRatio).toBe('2:3')
+    expect(body.generationConfig.imageConfig.imageSize).toBe('1K')
+  })
+
+  it('normalizes Gemini inlineData image responses', () => {
+    const images = normalizeOpenAIImageResults({
+      candidates: [{
+        content: {
+          parts: [{
+            inlineData: {
+              mimeType: 'image/webp',
+              data: 'aGVsbG8=',
+            },
+          }],
+        },
+      }],
+    })
+
+    expect(images).toHaveLength(1)
+    expect(images[0].b64_json).toBe('aGVsbG8=')
+    expect(images[0].src).toBe('data:image/webp;base64,aGVsbG8=')
   })
 })

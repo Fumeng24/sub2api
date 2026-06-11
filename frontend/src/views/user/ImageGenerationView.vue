@@ -47,9 +47,17 @@
 
               <div>
                 <label class="input-label">{{ t('imageGeneration.model') }}</label>
-                <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200">
-                  {{ IMAGE_MODEL }}
-                </div>
+                <Select
+                  :model-value="selectedImageModel"
+                  :options="imageModelOptions"
+                  :placeholder="t('imageGeneration.selectModel')"
+                  :disabled="imageModelOptions.length === 0"
+                  searchable
+                  @update:model-value="onSelectModel"
+                />
+                <p v-if="selectedGroup && imageModelOptions.length === 0" class="input-hint">
+                  {{ t('imageGeneration.noImageModel') }}
+                </p>
               </div>
 
               <div>
@@ -303,12 +311,18 @@ import userGroupsAPI from '@/api/groups'
 import {
   MAX_IMAGE_GENERATION_COUNT,
   normalizeOpenAIImageResults,
+  submitGeminiImageGatewayRequest,
   submitImageGatewayRequest,
   type OpenAIImageResult,
 } from '@/api/imageGeneration'
 import { useAppStore, useAuthStore } from '@/stores'
 import type { ApiKey, Group, PublicSettings } from '@/types'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import {
+  DEFAULT_IMAGE_MODEL,
+  isImageGenerationGroup,
+  resolveSupportedImageModels,
+} from '@/utils/imageGenerationGroups'
 
 type RunStatus = 'loading' | 'success' | 'error'
 
@@ -341,7 +355,6 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
-const IMAGE_MODEL = 'gpt-image-2'
 const STORAGE_PREFIX = 'sub2api:image-generation:'
 const IMAGE_CACHE_DB_NAME = 'sub2api-image-generation'
 const IMAGE_CACHE_STORE_NAME = 'cache'
@@ -360,6 +373,7 @@ const loadingPage = ref(false)
 const autoCreatingKeys = ref(false)
 const autoCreatingGroupId = ref<number | null>(null)
 const selectedGroupId = ref<number | null>(readStoredNumber('groupId'))
+const selectedModelId = ref(localStorage.getItem(`${STORAGE_PREFIX}model`) || '')
 const prompt = ref(localStorage.getItem(`${STORAGE_PREFIX}prompt`) || '')
 const size = ref(localStorage.getItem(`${STORAGE_PREFIX}size`) || '1024x1024')
 const quality = ref(localStorage.getItem(`${STORAGE_PREFIX}quality`) || 'auto')
@@ -399,7 +413,7 @@ const countOptions = computed(() => Array.from({ length: MAX_IMAGE_GENERATION_CO
   return { value, label: t('imageGeneration.pricing.imageCountValue', { count: value }) }
 }))
 
-const imageGroups = computed(() => availableGroups.value.filter(isImageGroup))
+const imageGroups = computed(() => availableGroups.value.filter(isImageGenerationGroup))
 
 const imageGroupOptions = computed(() => imageGroups.value.map((group) => ({
   value: group.id,
@@ -407,6 +421,23 @@ const imageGroupOptions = computed(() => imageGroups.value.map((group) => ({
 })))
 
 const selectedGroup = computed(() => imageGroups.value.find((group) => group.id === selectedGroupId.value) || null)
+
+const imageModelOptions = computed(() => {
+  const group = selectedGroup.value
+  if (!group) return []
+  return resolveSupportedImageModels(group).map((model) => ({
+    value: model,
+    label: model,
+  }))
+})
+
+const selectedImageModel = computed(() => {
+  const current = selectedModelId.value.trim()
+  if (current && imageModelOptions.value.some((option) => option.value === current)) {
+    return current
+  }
+  return String(imageModelOptions.value[0]?.value || '')
+})
 
 const activeImageKeys = computed(() => apiKeys.value.filter((key) => key.status === 'active' && key.group_id !== null))
 
@@ -481,6 +512,7 @@ const canSubmit = computed(() => Boolean(
   !generating.value &&
   selectedGroup.value &&
   selectedGroupKey.value &&
+  selectedImageModel.value &&
   prompt.value.trim() &&
   normalizeCount(count.value) > 0,
 ))
@@ -510,10 +542,6 @@ function isDataUrl(value: string) {
 function normalizeCount(value: unknown) {
   const parsed = Math.floor(Number(value) || 1)
   return Math.min(MAX_IMAGE_GENERATION_COUNT, Math.max(1, parsed))
-}
-
-function isImageGroup(group: Group) {
-  return group.platform === 'openai' && group.allow_image_generation
 }
 
 function resolvePreferredGroupId(groups: Group[], keys: ApiKey[]) {
@@ -604,6 +632,14 @@ function formatMultiplier(value: number) {
 
 function onSelectGroup(value: string | number | boolean | null) {
   selectedGroupId.value = typeof value === 'number' ? value : value ? Number(value) : null
+}
+
+function onSelectModel(value: string | number | boolean | null) {
+  selectedModelId.value = typeof value === 'string' ? value : value ? String(value) : ''
+}
+
+function syncSelectedModel() {
+  selectedModelId.value = selectedImageModel.value
 }
 
 function hasBrowserImageCache() {
@@ -705,7 +741,7 @@ function normalizeCachedRuns(value: unknown) {
       id: typeof run.id === 'string' ? run.id : createId('cached-run'),
       prompt: run.prompt,
       groupName: typeof run.groupName === 'string' ? run.groupName : '',
-      model: typeof run.model === 'string' ? run.model : IMAGE_MODEL,
+      model: typeof run.model === 'string' ? run.model : DEFAULT_IMAGE_MODEL,
       sizeLabel: typeof run.sizeLabel === 'string' ? run.sizeLabel : '',
       requestedCount: normalizeCount(run.requestedCount),
       status: 'success' as const,
@@ -994,9 +1030,10 @@ async function loadInitialData() {
     userGroupRates.value = rates || {}
     publicSettings.value = settings || appStore.cachedPublicSettings
 
-    const targetGroups = availableGroups.value.filter(isImageGroup)
+    const targetGroups = availableGroups.value.filter(isImageGenerationGroup)
     apiKeys.value = keyPage.items || []
     selectedGroupId.value = resolvePreferredGroupId(targetGroups, apiKeys.value)
+    syncSelectedModel()
     await ensureKeyForGroup(selectedGroup.value)
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, t('imageGeneration.loadKeysFailed')))
@@ -1140,6 +1177,8 @@ function resolveImageGenerationErrorMessage(error: unknown) {
 
 async function submit() {
   if (!canSubmit.value || !selectedGroup.value || !selectedGroupKey.value) return
+  const model = selectedImageModel.value
+  if (!model) return
   const controller = new AbortController()
   activeController = controller
   generating.value = true
@@ -1148,7 +1187,7 @@ async function submit() {
     id: createId('run'),
     prompt: prompt.value.trim(),
     groupName: selectedGroup.value.name,
-    model: IMAGE_MODEL,
+    model,
     sizeLabel: selectedSize.value.label,
     requestedCount,
     status: 'loading',
@@ -1157,17 +1196,20 @@ async function submit() {
   runs.value = [run, ...runs.value]
 
   try {
-    const payload = await submitImageGatewayRequest({
+    const request = {
       apiKey: selectedGroupKey.value.key,
       baseUrl: gatewayBaseUrl.value,
       prompt: run.prompt,
-      model: IMAGE_MODEL,
+      model,
       count: requestedCount,
       size: selectedSize.value.value,
       quality: quality.value,
       referenceImages: referenceImages.value.map((image) => image.file),
       signal: controller.signal,
-    })
+    }
+    const payload = selectedGroup.value.platform === 'gemini'
+      ? await submitGeminiImageGatewayRequest(request)
+      : await submitImageGatewayRequest(request)
     const images = normalizeOpenAIImageResults(payload)
     if (images.length === 0) {
       throw new Error(t('imageGeneration.noImagesReturned'))
@@ -1256,7 +1298,7 @@ function downloadImage(image: OpenAIImageResult, run: GenerationRun) {
   document.body.removeChild(link)
 }
 
-watch([selectedGroupId, size, quality, count, prompt], () => {
+watch([selectedGroupId, selectedModelId, size, quality, count, prompt], () => {
   const normalizedCount = normalizeCount(count.value)
   if (count.value !== normalizedCount) {
     count.value = normalizedCount
@@ -1264,6 +1306,9 @@ watch([selectedGroupId, size, quality, count, prompt], () => {
   }
   if (selectedGroupId.value) {
     localStorage.setItem(`${STORAGE_PREFIX}groupId`, String(selectedGroupId.value))
+  }
+  if (selectedImageModel.value) {
+    localStorage.setItem(`${STORAGE_PREFIX}model`, selectedImageModel.value)
   }
   localStorage.setItem(`${STORAGE_PREFIX}size`, size.value)
   localStorage.setItem(`${STORAGE_PREFIX}quality`, quality.value)
@@ -1283,6 +1328,7 @@ watch(selectedGroup, (group) => {
   if (loadingPage.value || !group) {
     return
   }
+  syncSelectedModel()
   void ensureKeyForGroup(group)
 })
 
