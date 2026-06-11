@@ -1876,7 +1876,7 @@ func TestGatewayService_selectAccountWithMixedScheduling(t *testing.T) {
 		require.Contains(t, err.Error(), "supporting model")
 	})
 
-	t.Run("混合调度-Claude单账号熔断返回结构化诊断", func(t *testing.T) {
+	t.Run("混合调度-Claude单账号熔断使用同组弱回退", func(t *testing.T) {
 		groupID := int64(11)
 		accountID := int64(38800)
 		model := "claude-opus-4-7"
@@ -1926,31 +1926,13 @@ func TestGatewayService_selectAccountWithMixedScheduling(t *testing.T) {
 		svc.schedulerHealth.reportFailure(accountID, model, endpoint, "transient_transport", time.Minute)
 
 		acc, err := svc.selectAccountWithMixedScheduling(testCtx, &groupID, "", model, nil, PlatformAnthropic)
-		require.Error(t, err)
-		require.Nil(t, acc)
-		require.ErrorIs(t, err, ErrNoAvailableAccounts)
-		require.Contains(t, err.Error(), "supporting model")
+		require.NoError(t, err)
+		require.NotNil(t, acc)
+		require.Equal(t, accountID, acc.ID)
 
-		var noAvailable *GatewayNoAvailableAccountsError
-		require.True(t, errors.As(err, &noAvailable), "expected structured no-available diagnostics")
-		diag := noAvailable.Diagnostics
-		require.True(t, diag.Collected)
-		require.Equal(t, groupID, diag.GroupID)
-		require.Equal(t, model, diag.Model)
-		require.Equal(t, endpoint, diag.Endpoint)
-		require.Equal(t, PlatformAnthropic, diag.Platform)
-		require.Equal(t, 1, diag.ModelSupportedCount)
-		require.Equal(t, 1, diag.EndpointSupportedCount)
-		require.Equal(t, 1, diag.StateAllowedCount)
-		require.Equal(t, 0, diag.CircuitAllowedCount)
-		require.Equal(t, 0, diag.ConcurrencySlotAllowedCount)
-		require.Equal(t, 0, diag.FinalCandidateCount)
-		require.Equal(t, []int64{accountID}, diag.CircuitFilteredAccountIDs)
-		require.Equal(t, 1, diag.FilterReasonCounts["scheduler_circuit_open"])
-		require.Len(t, diag.SkippedAccounts, 1)
-		require.Equal(t, accountID, diag.SkippedAccounts[0].AccountID)
-		require.Equal(t, endpoint, diag.SkippedAccounts[0].CircuitEndpoint)
-		require.Equal(t, schedulerCircuitOpen, diag.SkippedAccounts[0].CircuitState)
+		snap := svc.schedulerHealth.snapshot(accountID, model, endpoint, false)
+		require.Equal(t, schedulerCircuitOpen, snap.CircuitState)
+		require.Equal(t, "transient_transport", snap.LastFailureReason)
 	})
 
 	t.Run("混合调度-优先未使用账号", func(t *testing.T) {
