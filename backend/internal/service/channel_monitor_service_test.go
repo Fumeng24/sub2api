@@ -179,6 +179,10 @@ func (s *channelMonitorRepoRunCheckStub) List(context.Context, ChannelMonitorLis
 	panic("unexpected List call")
 }
 
+func (s *channelMonitorRepoRunCheckStub) UpdateSortOrders(context.Context, []ChannelMonitorSortOrderUpdate) error {
+	panic("unexpected UpdateSortOrders call")
+}
+
 func (s *channelMonitorRepoRunCheckStub) ListEnabled(context.Context) ([]*ChannelMonitor, error) {
 	panic("unexpected ListEnabled call")
 }
