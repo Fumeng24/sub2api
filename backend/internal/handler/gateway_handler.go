@@ -1577,11 +1577,6 @@ func (h *GatewayHandler) handleFailoverExhaustedSimple(c *gin.Context, statusCod
 	h.handleStreamingAwareError(c, clientErr.Status, clientErr.Type, clientErr.Message, streamStarted)
 }
 
-func (h *GatewayHandler) mapUpstreamError(statusCode int) (int, string, string) {
-	clientErr := upstreamClientErrorForFailoverStatus(statusCode)
-	return clientErr.Status, clientErr.Type, clientErr.Message
-}
-
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
 	message = service.ClientFacingErrorMessage(status, errType, message)

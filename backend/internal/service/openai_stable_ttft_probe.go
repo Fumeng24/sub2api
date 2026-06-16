@@ -348,7 +348,7 @@ func readOpenAIStableTTFTProbeResponse(resp *http.Response, start time.Time) (in
 				if len(line) > remaining {
 					line = line[:remaining]
 				}
-				body.Write(line)
+				_, _ = body.Write(line)
 			}
 			trimmed := strings.TrimSpace(string(line))
 			if strings.HasPrefix(trimmed, "data:") && isOpenAIStableTTFTProbeOutputEvent(strings.TrimSpace(strings.TrimPrefix(trimmed, "data:"))) {

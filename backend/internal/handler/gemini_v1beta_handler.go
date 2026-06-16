@@ -666,11 +666,6 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 	googleError(c, clientErr.Status, clientErr.Message)
 }
 
-func mapGeminiUpstreamError(statusCode int) (int, string) {
-	clientErr := upstreamClientErrorForFailoverStatus(statusCode)
-	return clientErr.Status, clientErr.Message
-}
-
 type pathParseError struct{ msg string }
 
 func (e *pathParseError) Error() string { return e.msg }
