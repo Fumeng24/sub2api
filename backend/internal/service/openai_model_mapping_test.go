@@ -121,6 +121,20 @@ func TestResolveOpenAIForwardModel(t *testing.T) {
 			defaultMappedModel: "gpt-5.4",
 			expectedModel:      "gpt-5.5-openai-compact",
 		},
+		{
+			name: "maps legacy gpt-5.2 to account supported gpt-5.5",
+			account: &Account{
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{
+						"gpt-5.5": "gpt-5.5",
+					},
+				},
+			},
+			requestedModel:     "gpt-5.2",
+			defaultMappedModel: "gpt-5.4",
+			expectedModel:      "gpt-5.5",
+		},
 	}
 
 	for _, tt := range tests {

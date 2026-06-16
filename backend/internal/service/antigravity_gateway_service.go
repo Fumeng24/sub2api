@@ -2447,6 +2447,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 			Detail:             upstreamDetail,
 		})
 		logger.LegacyPrintf("service.antigravity_gateway", "[antigravity-Forward] upstream error status=%d body=%s", resp.StatusCode, truncateForLog(unwrappedForOps, 500))
+		unwrappedForOps = ClientFacingErrorBody(resp.StatusCode, "upstream_error", unwrappedForOps)
 		c.Data(resp.StatusCode, contentType, unwrappedForOps)
 		return nil, fmt.Errorf("antigravity upstream error: %d", resp.StatusCode)
 	}
@@ -3644,6 +3645,7 @@ func mergeTextPartsToResponse(response map[string]any, textParts []string) map[s
 }
 
 func (s *AntigravityGatewayService) writeClaudeError(c *gin.Context, status int, errType, message string) error {
+	message = ClientFacingErrorMessage(status, errType, message)
 	c.JSON(status, gin.H{
 		"type":  "error",
 		"error": gin.H{"type": errType, "message": message},
@@ -3683,10 +3685,7 @@ func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, accou
 		c, account.Platform, upstreamStatus, body,
 		0, "", "",
 	); matched {
-		c.JSON(ptStatus, gin.H{
-			"type":  "error",
-			"error": gin.H{"type": ptErrType, "message": ptErrMsg},
-		})
+		writeClientClaudeError(c, ptStatus, ptErrType, ptErrMsg)
 		if upstreamMsg == "" {
 			return fmt.Errorf("upstream error: %d", upstreamStatus)
 		}
@@ -3723,10 +3722,7 @@ func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, accou
 		errMsg = "Upstream request failed"
 	}
 
-	c.JSON(statusCode, gin.H{
-		"type":  "error",
-		"error": gin.H{"type": errType, "message": errMsg},
-	})
+	writeClientClaudeError(c, statusCode, errType, errMsg)
 	if upstreamMsg == "" {
 		return fmt.Errorf("upstream error: %d", upstreamStatus)
 	}
@@ -3734,6 +3730,7 @@ func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, accou
 }
 
 func (s *AntigravityGatewayService) writeGoogleError(c *gin.Context, status int, message string) error {
+	message = ClientFacingErrorMessage(status, "", message)
 	statusStr := "UNKNOWN"
 	switch status {
 	case 400:
@@ -4337,8 +4334,13 @@ func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.
 			s.handleUpstreamError(ctx, prefix, account, resp.StatusCode, resp.Header, respBody, originalModel, 0, "", false)
 		}
 
-		// 透传上游错误
-		c.Header("Content-Type", resp.Header.Get("Content-Type"))
+		// 透传上游错误结构，但隐藏内部上游/账号细节。
+		respBody = ClientFacingErrorBody(resp.StatusCode, "upstream_error", respBody)
+		contentType := resp.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = "application/json"
+		}
+		c.Header("Content-Type", contentType)
 		c.Status(resp.StatusCode)
 		_, _ = c.Writer.Write(respBody)
 

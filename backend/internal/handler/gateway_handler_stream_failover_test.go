@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 // partialMessageStartSSE 模拟 handleStreamingResponse 已写入的首批 SSE 事件。
@@ -119,4 +120,38 @@ func TestStreamWrittenGuard_NoByteWritten_GuardNotTriggered(t *testing.T) {
 	guardTriggered := c.Writer.Size() != sizeBeforeForward
 	require.False(t, guardTriggered,
 		"未写入任何字节时，守卫条件必须为 false，应允许正常 failover 继续")
+}
+
+func TestGatewayHandlerHandleFailoverExhaustedHidesUpstream429(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+
+	h := &GatewayHandler{}
+	h.handleFailoverExhausted(c, &service.UpstreamFailoverError{
+		StatusCode:   http.StatusTooManyRequests,
+		ResponseBody: []byte(`{"error":{"type":"rate_limit_error","message":"rate limited"}}`),
+	}, service.PlatformAnthropic, false)
+
+	require.Equal(t, http.StatusServiceUnavailable, w.Code)
+	require.Contains(t, w.Body.String(), `"type":"upstream_error"`)
+	require.NotContains(t, strings.ToLower(w.Body.String()), "rate limit")
+}
+
+func TestGatewayHandlerHandleGeminiFailoverExhaustedHidesUpstream429(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-pro:generateContent", nil)
+
+	h := &GatewayHandler{}
+	h.handleGeminiFailoverExhausted(c, &service.UpstreamFailoverError{
+		StatusCode:   http.StatusTooManyRequests,
+		ResponseBody: []byte(`{"error":{"code":429,"message":"rate limited"}}`),
+	})
+
+	require.Equal(t, http.StatusServiceUnavailable, w.Code)
+	require.Equal(t, int64(http.StatusServiceUnavailable), gjson.GetBytes(w.Body.Bytes(), "error.code").Int())
+	require.NotContains(t, strings.ToLower(w.Body.String()), "rate limit")
 }

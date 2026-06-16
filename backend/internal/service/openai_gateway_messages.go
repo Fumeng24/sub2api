@@ -340,6 +340,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: s.retryableOnSameOpenAIAccount(ctx, account, resp.StatusCode, upstreamMsg, respBody),
+				SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, respBody),
 			}
 		}
 		// Non-failover error: return Anthropic-formatted error to client
@@ -1021,6 +1022,7 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 
 // writeAnthropicError writes an error response in Anthropic Messages API format.
 func writeAnthropicError(c *gin.Context, statusCode int, errType, message string) {
+	message = ClientFacingErrorMessage(statusCode, errType, message)
 	c.JSON(statusCode, gin.H{
 		"type": "error",
 		"error": gin.H{

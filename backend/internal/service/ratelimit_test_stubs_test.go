@@ -37,6 +37,7 @@ func (r *rateLimitAccountRepoStub) UpdateCredentials(ctx context.Context, id int
 
 type openAI403CounterCacheStub struct {
 	counts     []int64
+	lastCount  int64
 	resetCalls []int64
 	err        error
 }
@@ -46,10 +47,12 @@ func (s *openAI403CounterCacheStub) IncrementOpenAI403Count(_ context.Context, _
 		return 0, s.err
 	}
 	if len(s.counts) == 0 {
+		s.lastCount = 1
 		return 1, nil
 	}
 	count := s.counts[0]
 	s.counts = s.counts[1:]
+	s.lastCount = count
 	return count, nil
 }
 

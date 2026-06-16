@@ -12,6 +12,7 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveDocumentTitle } from './title'
+import { applyRouteSeo } from '@/utils/seo'
 
 /**
  * Route definitions with lazy loading
@@ -24,7 +25,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/setup/SetupWizardView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'Setup'
+      title: 'Setup',
+      robots: 'noindex,nofollow'
     }
   },
 
@@ -35,7 +37,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/HomeView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'Home'
+      title: 'Home',
+      seoTitle: '大模型 API 聚合平台 - Token 智能调度',
+      description:
+        'Wegoo AI 支持 GPT、Claude、Gemini、Codex 与图像生成 API，兼容 OpenAI 格式，一键迁移，注册送额度，低成本稳定接入。',
+      canonicalPath: '/home'
     }
   },
   {
@@ -45,7 +51,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Login',
-      titleKey: 'common.login'
+      titleKey: 'common.login',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -55,7 +62,11 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Register',
-      titleKey: 'auth.createAccount'
+      titleKey: 'auth.createAccount',
+      seoTitle: '注册 Wegoo AI，免费试用大模型 API 聚合平台',
+      description:
+        '注册后获取赠送额度，低成本试用 ChatGPT API、Claude API、Gemini API、Codex API 和图像生成 API，兼容原有 OpenAI 调用方式。',
+      canonicalPath: '/register'
     }
   },
   {
@@ -64,7 +75,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/auth/EmailVerifyView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'Verify Email'
+      title: 'Verify Email',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -75,7 +87,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'OAuth Callback',
-      titleKey: 'auth.oauthCallbackPageTitle'
+      titleKey: 'auth.oauthCallbackPageTitle',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -85,7 +98,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'LinuxDo OAuth Callback',
-      titleKey: 'auth.linuxdoCallbackPageTitle'
+      titleKey: 'auth.linuxdoCallbackPageTitle',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -95,7 +109,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'WeChat OAuth Callback',
-      titleKey: 'auth.wechatCallbackPageTitle'
+      titleKey: 'auth.wechatCallbackPageTitle',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -105,7 +120,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'WeChat Payment Callback',
-      titleKey: 'auth.wechatPaymentCallbackPageTitle'
+      titleKey: 'auth.wechatPaymentCallbackPageTitle',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -115,7 +131,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'DingTalk OAuth Callback',
-      titleKey: 'auth.dingtalkCallbackPageTitle'
+      titleKey: 'auth.dingtalkCallbackPageTitle',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -124,7 +141,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/auth/DingTalkEmailCompletionView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'DingTalk Email Completion'
+      title: 'DingTalk Email Completion',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -134,7 +152,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'OIDC OAuth Callback',
-      titleKey: 'auth.oidcCallbackPageTitle'
+      titleKey: 'auth.oidcCallbackPageTitle',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -144,7 +163,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Forgot Password',
-      titleKey: 'auth.forgotPasswordTitle'
+      titleKey: 'auth.forgotPasswordTitle',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -153,7 +173,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/auth/ResetPasswordView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'Reset Password'
+      title: 'Reset Password',
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -163,6 +184,10 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Key Usage',
+      seoTitle: 'AI API Key 用量和余额查询 - Wegoo AI',
+      description:
+        '快速查询 API Key 余额、Token 消耗和调用记录，适合开发者、高频用户和团队核对 GPT、Claude、Gemini API 使用成本。',
+      canonicalPath: '/key-usage'
     }
   },
   {
@@ -171,7 +196,9 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/public/LegalDocumentView.vue'),
     meta: {
       requiresAuth: false,
-      title: 'Legal Document'
+      title: 'Legal Document',
+      seoTitle: 'Wegoo AI 服务条款与政策',
+      description: '查看 Wegoo AI 的服务条款、隐私政策、服务地区声明及相关使用规则。'
     }
   },
 
@@ -346,7 +373,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Payment Result',
       titleKey: 'payment.result.success',
-      requiresPayment: false
+      requiresPayment: false,
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -358,7 +386,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Stripe Payment',
       titleKey: 'payment.stripePay',
-      requiresPayment: false
+      requiresPayment: false,
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -370,7 +399,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Airwallex Payment',
       titleKey: 'payment.airwallexPay',
-      requiresPayment: false
+      requiresPayment: false,
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -381,7 +411,8 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: false,
       requiresAdmin: false,
       title: 'Payment',
-      requiresPayment: false
+      requiresPayment: false,
+      robots: 'noindex,nofollow'
     }
   },
   {
@@ -695,7 +726,8 @@ const routes: RouteRecordRaw[] = [
     name: 'NotFound',
     component: () => import('@/views/NotFoundView.vue'),
     meta: {
-      title: '404 Not Found'
+      title: '404 Not Found',
+      robots: 'noindex,nofollow'
     }
   }
 ]
@@ -765,8 +797,9 @@ router.beforeEach(async (to, _from, next) => {
     authInitialized = true
   }
 
-  // Set page title
+  // Set page title and route-level SEO tags.
   const appStore = useAppStore()
+  let documentTitle: string | undefined
   // For custom pages, use menu item label as document title
   if (to.name === 'CustomPage') {
     const id = to.params.id as string
@@ -776,13 +809,14 @@ router.beforeEach(async (to, _from, next) => {
       ?? (authStore.isAdmin ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
     if (menuItem?.label) {
       const siteName = appStore.siteName || 'Sub2API'
-      document.title = `${menuItem.label} - ${siteName}`
+      documentTitle = `${menuItem.label} - ${siteName}`
     } else {
-      document.title = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)
+      documentTitle = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)
     }
   } else {
-    document.title = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)
+    documentTitle = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)
   }
+  applyRouteSeo(to, { siteName: appStore.siteName, title: documentTitle })
 
   // Check if route requires authentication
   const requiresAuth = to.meta.requiresAuth !== false // Default to true

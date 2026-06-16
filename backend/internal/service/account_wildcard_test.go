@@ -197,6 +197,28 @@ func TestAccountIsModelSupported(t *testing.T) {
 			expected:       true,
 		},
 		{
+			name:     "anthropic short haiku alias matches dated mapping",
+			platform: PlatformAnthropic,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
+				},
+			},
+			requestedModel: "claude-haiku-4-5",
+			expected:       true,
+		},
+		{
+			name:     "anthropic dated haiku alias matches short mapping",
+			platform: PlatformAnthropic,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"claude-haiku-4-5": "claude-haiku-4-5-20251001",
+				},
+			},
+			requestedModel: "claude-haiku-4-5-20251001",
+			expected:       true,
+		},
+		{
 			name: "wildcard match not supported",
 			credentials: map[string]any{
 				"model_mapping": map[string]any{
@@ -205,6 +227,28 @@ func TestAccountIsModelSupported(t *testing.T) {
 			},
 			requestedModel: "gemini-3-flash",
 			expected:       false,
+		},
+		{
+			name:     "openai legacy compact alias matches normalized gpt-5.5 mapping",
+			platform: PlatformOpenAI,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"gpt-5.5": "gpt-5.5",
+				},
+			},
+			requestedModel: "gpt-5.2",
+			expected:       true,
+		},
+		{
+			name:     "openai compact suffix matches normalized gpt-5.5 mapping",
+			platform: PlatformOpenAI,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"gpt-5.5": "gpt-5.5",
+				},
+			},
+			requestedModel: "gpt-5.5-openai-compact",
+			expected:       true,
 		},
 	}
 
@@ -304,6 +348,50 @@ func TestAccountGetMappedModel(t *testing.T) {
 			requestedModel: "claude-sonnet-4-5",
 			expected:       "claude-sonnet-4-5",
 		},
+		{
+			name:     "anthropic short haiku alias resolves through dated mapping",
+			platform: PlatformAnthropic,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
+				},
+			},
+			requestedModel: "claude-haiku-4-5",
+			expected:       "claude-haiku-4-5-20251001",
+		},
+		{
+			name:     "anthropic dated haiku alias resolves through short mapping",
+			platform: PlatformAnthropic,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"claude-haiku-4-5": "claude-haiku-4-5-20251001",
+				},
+			},
+			requestedModel: "claude-haiku-4-5-20251001",
+			expected:       "claude-haiku-4-5-20251001",
+		},
+		{
+			name:     "openai legacy compact alias resolves through normalized mapping",
+			platform: PlatformOpenAI,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"gpt-5.5": "gpt-5.5",
+				},
+			},
+			requestedModel: "gpt-5.2",
+			expected:       "gpt-5.5",
+		},
+		{
+			name:     "openai namespaced compact suffix resolves through normalized mapping",
+			platform: PlatformOpenAI,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"gpt-5.5": "gpt-5.5",
+				},
+			},
+			requestedModel: "openai/gpt-5.5-openai-compact",
+			expected:       "gpt-5.5",
+		},
 	}
 
 	for _, tt := range tests {
@@ -393,6 +481,30 @@ func TestAccountResolveMappedModel(t *testing.T) {
 			requestedModel: "gpt-5.4",
 			expectedModel:  "gpt-5.4",
 			expectedMatch:  false,
+		},
+		{
+			name:     "openai legacy compact alias reports normalized match",
+			platform: PlatformOpenAI,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"gpt-5.5": "gpt-5.5",
+				},
+			},
+			requestedModel: "gpt-5.2",
+			expectedModel:  "gpt-5.5",
+			expectedMatch:  true,
+		},
+		{
+			name:     "openai compact suffix reports normalized match",
+			platform: PlatformOpenAI,
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"gpt-5.5": "gpt-5.5",
+				},
+			},
+			requestedModel: "gpt-5.5-openai-compact",
+			expectedModel:  "gpt-5.5",
+			expectedMatch:  true,
 		},
 	}
 

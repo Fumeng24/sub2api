@@ -3,10 +3,78 @@ package service
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 )
+
+type gatewayCircuitProbeUpstreamStub struct {
+	mu       sync.Mutex
+	calls    int
+	callCh   chan int
+	lastReq  *http.Request
+	lastBody string
+}
+
+func (u *gatewayCircuitProbeUpstreamStub) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
+	body := ""
+	if req != nil && req.Body != nil {
+		raw, _ := io.ReadAll(req.Body)
+		body = string(raw)
+		req.Body = io.NopCloser(strings.NewReader(body))
+	}
+	u.mu.Lock()
+	u.calls++
+	call := u.calls
+	u.lastReq = req
+	u.lastBody = body
+	u.mu.Unlock()
+	if u.callCh != nil {
+		select {
+		case u.callCh <- call:
+		default:
+		}
+	}
+	responseBody := "event: content_block_delta\n" +
+		"data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"1\"}}\n\n"
+	if req != nil {
+		reqURL := req.URL.String()
+		if strings.Contains(reqURL, "generativelanguage.googleapis.com") ||
+			strings.Contains(reqURL, "cloudcode-pa.googleapis.com") ||
+			strings.Contains(reqURL, "aiplatform.googleapis.com") {
+			responseBody = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"1\"}]}}]}\n\n"
+		} else if strings.Contains(reqURL, "v1internal:streamGenerateContent") {
+			responseBody = "data: {\"response\":{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"1\"}]}}]}}\n\n"
+		}
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader(responseBody)),
+	}, nil
+}
+
+func (u *gatewayCircuitProbeUpstreamStub) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*http.Response, error) {
+	return u.Do(req, proxyURL, accountID, accountConcurrency)
+}
+
+func (u *gatewayCircuitProbeUpstreamStub) callCount() int {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.calls
+}
+
+func (u *gatewayCircuitProbeUpstreamStub) lastRequest() (*http.Request, string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.lastReq, u.lastBody
+}
 
 func TestCollectSelectionFailureStats(t *testing.T) {
 	svc := &GatewayService{}
@@ -228,4 +296,365 @@ func TestGatewayServiceReportAccountScheduleSuccessForRequestClearsContextEndpoi
 	if snap := svc.schedulerHealth.snapshot(accountID, model, contextEndpoint, true); snap.CircuitState != schedulerCircuitClosed {
 		t.Fatalf("context endpoint circuit=%s want=%s", snap.CircuitState, schedulerCircuitClosed)
 	}
+}
+
+func TestGatewayServiceReportAccountScheduleSuccessForRequestSlowTTFTOpensCircuit(t *testing.T) {
+	oldHealthyTTFT := schedulerHealthyTTFTThreshold
+	schedulerHealthyTTFTThreshold = 15 * time.Millisecond
+	defer func() {
+		schedulerHealthyTTFTThreshold = oldHealthyTTFT
+	}()
+
+	accountID := int64(38801)
+	model := "claude-opus-4-7"
+	explicitEndpoint := PlatformAnthropic
+	contextEndpoint := "/v1/messages"
+	ctx := WithSchedulerEndpoint(context.Background(), contextEndpoint)
+	svc := &GatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
+
+	firstTokenMs := 16
+	svc.ReportAccountScheduleSuccessForRequest(ctx, accountID, model, explicitEndpoint, &firstTokenMs)
+
+	if snap := svc.schedulerHealth.snapshot(accountID, model, explicitEndpoint, true); snap.CircuitState != schedulerCircuitOpen || snap.LastFailureReason != schedulerSlowTTFTCategory {
+		t.Fatalf("explicit endpoint state=%s reason=%s want=%s/%s", snap.CircuitState, snap.LastFailureReason, schedulerCircuitOpen, schedulerSlowTTFTCategory)
+	}
+	if snap := svc.schedulerHealth.snapshot(accountID, model, contextEndpoint, true); snap.CircuitState != schedulerCircuitOpen || snap.LastFailureReason != schedulerSlowTTFTCategory {
+		t.Fatalf("context endpoint state=%s reason=%s want=%s/%s", snap.CircuitState, snap.LastFailureReason, schedulerCircuitOpen, schedulerSlowTTFTCategory)
+	}
+}
+
+func TestGatewayServiceReportAccountScheduleFailureStartsCircuitProbeForRecoverableError(t *testing.T) {
+	oldRetryDelay := gatewayAccountCircuitProbeRetryDelay
+	oldTimeout := gatewayAccountCircuitProbeTimeout
+	oldHealthyTTFT := schedulerHealthyTTFTThreshold
+	gatewayAccountCircuitProbeRetryDelay = 10 * time.Millisecond
+	gatewayAccountCircuitProbeTimeout = time.Second
+	schedulerHealthyTTFTThreshold = time.Second
+	defer func() {
+		gatewayAccountCircuitProbeRetryDelay = oldRetryDelay
+		gatewayAccountCircuitProbeTimeout = oldTimeout
+		schedulerHealthyTTFTThreshold = oldHealthyTTFT
+	}()
+
+	account := Account{
+		ID:          38802,
+		Platform:    PlatformAnthropic,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "anthropic-key"},
+	}
+	upstream := &gatewayCircuitProbeUpstreamStub{callCh: make(chan int, 4)}
+	svc := &GatewayService{
+		accountRepo:     schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cfg:             &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+		httpUpstream:    upstream,
+		schedulerHealth: newAccountSchedulerHealthStats(),
+	}
+	defer svc.stopGatewayAccountCircuitProbe(account.ID, "claude-sonnet-4-5", "/v1/messages")
+
+	svc.ReportAccountScheduleFailure(WithSchedulerEndpoint(context.Background(), "/v1/messages"), account.ID, "claude-sonnet-4-5", "/v1/messages", &UpstreamFailoverError{
+		StatusCode:   http.StatusTooManyRequests,
+		ResponseBody: []byte(`{"error":{"message":"rate limit"}}`),
+	})
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected gateway circuit probe to start")
+	}
+	requireEventuallyGatewayCircuitClosed(t, svc, account.ID, "claude-sonnet-4-5", "/v1/messages")
+}
+
+func TestGatewayServiceReportAccountScheduleFailureDoesNotProbeBusinessForbidden(t *testing.T) {
+	account := Account{
+		ID:          38803,
+		Platform:    PlatformAnthropic,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "anthropic-key"},
+	}
+	upstream := &gatewayCircuitProbeUpstreamStub{callCh: make(chan int, 4)}
+	svc := &GatewayService{
+		accountRepo:     schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cfg:             &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+		httpUpstream:    upstream,
+		schedulerHealth: newAccountSchedulerHealthStats(),
+	}
+	defer svc.stopGatewayAccountCircuitProbe(account.ID, "claude-sonnet-4-5", "/v1/messages")
+
+	svc.ReportAccountScheduleFailure(context.Background(), account.ID, "claude-sonnet-4-5", "/v1/messages", &UpstreamFailoverError{
+		StatusCode:   http.StatusForbidden,
+		ResponseBody: []byte(`{"error":{"message":"forbidden"}}`),
+	})
+
+	select {
+	case <-upstream.callCh:
+		t.Fatal("forbidden business/account errors should not start recovery probes")
+	case <-time.After(50 * time.Millisecond):
+	}
+	if upstream.callCount() != 0 {
+		t.Fatalf("probe calls=%d want=0", upstream.callCount())
+	}
+}
+
+func TestGatewayServiceReportAccountScheduleSuccessStopsCircuitProbe(t *testing.T) {
+	accountID := int64(38804)
+	model := "claude-sonnet-4-5"
+	endpoint := "/v1/messages"
+	svc := &GatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
+	ctx, cancel := context.WithCancel(context.Background())
+	svc.gatewayAccountCircuitProbes.Store(makeAccountSchedulerHealthKey(accountID, model, endpoint), &gatewayAccountCircuitProbe{cancel: cancel})
+	svc.schedulerHealth.reportFailure(accountID, model, endpoint, "rate_limit", time.Minute)
+
+	firstTokenMs := 10
+	svc.ReportAccountScheduleSuccess(accountID, model, endpoint, &firstTokenMs)
+
+	if _, ok := svc.gatewayAccountCircuitProbes.Load(makeAccountSchedulerHealthKey(accountID, model, endpoint)); ok {
+		t.Fatal("expected success to stop gateway circuit probe")
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("expected probe context to be canceled")
+	}
+	if snap := svc.schedulerHealth.snapshot(accountID, model, endpoint, false); snap.CircuitState != schedulerCircuitClosed {
+		t.Fatalf("circuit=%s want=%s", snap.CircuitState, schedulerCircuitClosed)
+	}
+}
+
+func TestGatewayServiceGeminiOAuthAIStudioCircuitProbe(t *testing.T) {
+	account := Account{
+		ID:          38805,
+		Platform:    PlatformGemini,
+		Type:        AccountTypeOAuth,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Credentials: map[string]any{"access_token": "gemini-token"},
+	}
+	upstream := &gatewayCircuitProbeUpstreamStub{callCh: make(chan int, 4)}
+	svc := &GatewayService{
+		accountRepo:         schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cfg:                 &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+		httpUpstream:        upstream,
+		schedulerHealth:     newAccountSchedulerHealthStats(),
+		geminiTokenProvider: NewGeminiTokenProvider(schedulerTestOpenAIAccountRepo{accounts: []Account{account}}, nil, nil),
+	}
+	defer svc.stopGatewayAccountCircuitProbe(account.ID, "gemini-3.1-flash", PlatformGemini)
+
+	svc.ReportAccountScheduleFailure(context.Background(), account.ID, "gemini-3.1-flash", PlatformGemini, &UpstreamFailoverError{
+		StatusCode:   http.StatusTooManyRequests,
+		ResponseBody: []byte(`{"error":{"message":"rate limit"}}`),
+	})
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected gemini oauth probe to start")
+	}
+	req, body := upstream.lastRequest()
+	if req == nil {
+		t.Fatal("expected probe request")
+	}
+	if !strings.Contains(req.URL.String(), "generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:streamGenerateContent?alt=sse") {
+		t.Fatalf("unexpected URL: %s", req.URL.String())
+	}
+	if got := req.Header.Get("Authorization"); got != "Bearer gemini-token" {
+		t.Fatalf("authorization=%q want bearer token", got)
+	}
+	if !strings.Contains(body, "Reply with 1.") {
+		t.Fatalf("unexpected body: %s", body)
+	}
+	requireEventuallyGatewayCircuitClosed(t, svc, account.ID, "gemini-3.1-flash", PlatformGemini)
+}
+
+func TestGatewayServiceGeminiOAuthCodeAssistCircuitProbe(t *testing.T) {
+	account := Account{
+		ID:          38806,
+		Platform:    PlatformGemini,
+		Type:        AccountTypeOAuth,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Credentials: map[string]any{
+			"access_token": "gemini-token",
+			"project_id":   "project-123",
+		},
+	}
+	upstream := &gatewayCircuitProbeUpstreamStub{callCh: make(chan int, 4)}
+	svc := &GatewayService{
+		accountRepo:         schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cfg:                 &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+		httpUpstream:        upstream,
+		schedulerHealth:     newAccountSchedulerHealthStats(),
+		geminiTokenProvider: NewGeminiTokenProvider(schedulerTestOpenAIAccountRepo{accounts: []Account{account}}, nil, nil),
+	}
+	defer svc.stopGatewayAccountCircuitProbe(account.ID, "gemini-3.1-flash", PlatformGemini)
+
+	svc.ReportAccountScheduleFailure(context.Background(), account.ID, "gemini-3.1-flash", PlatformGemini, &UpstreamFailoverError{
+		StatusCode:   http.StatusTooManyRequests,
+		ResponseBody: []byte(`{"error":{"message":"rate limit"}}`),
+	})
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected gemini code assist probe to start")
+	}
+	req, body := upstream.lastRequest()
+	if req == nil {
+		t.Fatal("expected probe request")
+	}
+	if !strings.Contains(req.URL.String(), "cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse") {
+		t.Fatalf("unexpected URL: %s", req.URL.String())
+	}
+	if got := req.Header.Get("Authorization"); got != "Bearer gemini-token" {
+		t.Fatalf("authorization=%q want bearer token", got)
+	}
+	if got := req.Header.Get("User-Agent"); got == "" {
+		t.Fatal("expected gemini cli user-agent")
+	}
+	if !strings.Contains(body, `"project":"project-123"`) || !strings.Contains(body, `"model":"gemini-3.1-flash"`) {
+		t.Fatalf("unexpected code assist body: %s", body)
+	}
+	requireEventuallyGatewayCircuitClosed(t, svc, account.ID, "gemini-3.1-flash", PlatformGemini)
+}
+
+func TestGatewayServiceGeminiServiceAccountCircuitProbe(t *testing.T) {
+	account := Account{
+		ID:          38807,
+		Platform:    PlatformGemini,
+		Type:        AccountTypeServiceAccount,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Credentials: map[string]any{
+			"project_id":           "vertex-project",
+			"location":             "global",
+			"service_account_json": `{"project_id":"vertex-project","client_email":"probe@example.iam.gserviceaccount.com","private_key":"dummy"}`,
+		},
+	}
+	upstream := &gatewayCircuitProbeUpstreamStub{callCh: make(chan int, 4)}
+	svc := &GatewayService{
+		accountRepo:         schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cfg:                 &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+		httpUpstream:        upstream,
+		schedulerHealth:     newAccountSchedulerHealthStats(),
+		geminiTokenProvider: NewGeminiTokenProvider(schedulerTestOpenAIAccountRepo{accounts: []Account{account}}, &gatewayCircuitProbeTokenCache{token: "vertex-token"}, nil),
+	}
+	defer svc.stopGatewayAccountCircuitProbe(account.ID, "gemini-3.1-flash", PlatformGemini)
+
+	svc.ReportAccountScheduleFailure(context.Background(), account.ID, "gemini-3.1-flash", PlatformGemini, &UpstreamFailoverError{
+		StatusCode:   http.StatusTooManyRequests,
+		ResponseBody: []byte(`{"error":{"message":"rate limit"}}`),
+	})
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected gemini vertex probe to start")
+	}
+	req, _ := upstream.lastRequest()
+	if req == nil {
+		t.Fatal("expected probe request")
+	}
+	if !strings.Contains(req.URL.String(), "aiplatform.googleapis.com/v1/projects/vertex-project/locations/global/publishers/google/models/gemini-3.1-flash:streamGenerateContent?alt=sse") {
+		t.Fatalf("unexpected URL: %s", req.URL.String())
+	}
+	if got := req.Header.Get("Authorization"); got != "Bearer vertex-token" {
+		t.Fatalf("authorization=%q want bearer token", got)
+	}
+	requireEventuallyGatewayCircuitClosed(t, svc, account.ID, "gemini-3.1-flash", PlatformGemini)
+}
+
+func TestGatewayServiceAntigravityCircuitProbe(t *testing.T) {
+	account := Account{
+		ID:          38808,
+		Platform:    PlatformAntigravity,
+		Type:        AccountTypeOAuth,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Credentials: map[string]any{
+			"access_token": "ag-token",
+			"project_id":   "ag-project",
+		},
+	}
+	upstream := &gatewayCircuitProbeUpstreamStub{callCh: make(chan int, 4)}
+	repo := schedulerTestOpenAIAccountRepo{accounts: []Account{account}}
+	svc := &GatewayService{
+		accountRepo:              repo,
+		cfg:                      &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+		httpUpstream:             upstream,
+		schedulerHealth:          newAccountSchedulerHealthStats(),
+		antigravityTokenProvider: NewAntigravityTokenProvider(repo, nil, nil),
+	}
+	defer svc.stopGatewayAccountCircuitProbe(account.ID, "gemini-3-flash", PlatformGemini)
+
+	svc.ReportAccountScheduleFailure(context.Background(), account.ID, "gemini-3-flash", PlatformGemini, &UpstreamFailoverError{
+		StatusCode:   http.StatusTooManyRequests,
+		ResponseBody: []byte(`{"error":{"message":"rate limit"}}`),
+	})
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected antigravity probe to start")
+	}
+	req, body := upstream.lastRequest()
+	if req == nil {
+		t.Fatal("expected probe request")
+	}
+	if !strings.Contains(req.URL.String(), "v1internal:streamGenerateContent?alt=sse") {
+		t.Fatalf("unexpected URL: %s", req.URL.String())
+	}
+	if got := req.Header.Get("Authorization"); got != "Bearer ag-token" {
+		t.Fatalf("authorization=%q want bearer token", got)
+	}
+	if !strings.Contains(body, `"project":"ag-project"`) || !strings.Contains(body, `"model":"gemini-3-flash"`) {
+		t.Fatalf("unexpected antigravity body: %s", body)
+	}
+	requireEventuallyGatewayCircuitClosed(t, svc, account.ID, "gemini-3-flash", PlatformGemini)
+}
+
+type gatewayCircuitProbeTokenCache struct {
+	token string
+}
+
+func (c *gatewayCircuitProbeTokenCache) GetAccessToken(context.Context, string) (string, error) {
+	return c.token, nil
+}
+
+func (c *gatewayCircuitProbeTokenCache) SetAccessToken(context.Context, string, string, time.Duration) error {
+	return nil
+}
+
+func (c *gatewayCircuitProbeTokenCache) DeleteAccessToken(context.Context, string) error {
+	return nil
+}
+
+func (c *gatewayCircuitProbeTokenCache) AcquireRefreshLock(context.Context, string, time.Duration) (bool, error) {
+	return false, nil
+}
+
+func (c *gatewayCircuitProbeTokenCache) ReleaseRefreshLock(context.Context, string) error {
+	return nil
+}
+
+func requireEventuallyGatewayCircuitClosed(t *testing.T, svc *GatewayService, accountID int64, model, endpoint string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		snap := svc.schedulerHealth.snapshot(accountID, model, endpoint, false)
+		if snap.CircuitState == schedulerCircuitClosed {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	snap := svc.schedulerHealth.snapshot(accountID, model, endpoint, false)
+	t.Fatalf("circuit=%s reason=%s want=%s", snap.CircuitState, snap.LastFailureReason, schedulerCircuitClosed)
 }

@@ -58,7 +58,7 @@
             ({{ row.fee_rate }}%)
           </span>
           <div v-if="shouldShowCreditedBalance(row)" class="text-xs text-gray-500">
-            {{ t('payment.orders.creditedBalance') }}: {{ formatCreditedBalance(row.amount) }}
+            {{ t('payment.orders.creditedBalance') }}: {{ formatBalanceCreditAmount(row.amount) }}
           </div>
         </div>
       </template>
@@ -144,7 +144,7 @@ import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { statusBadgeClass, canRefund, formatOrderDateTime } from '@/components/payment/orderUtils'
 import {
-  formatCreditedBalance,
+  formatBalanceCreditAmount,
   formatOrderPaymentAmount,
   shouldShowCreditedBalance,
 } from '@/components/payment/orderAmounts'

@@ -19,7 +19,7 @@
           ({{ t('payment.orders.fee') }} {{ row.fee_rate }}%)
         </span>
         <div v-if="shouldShowCreditedBalance(row)" class="text-xs text-gray-500">
-          {{ t('payment.orders.creditedBalance') }}: {{ formatCreditedBalance(row.amount) }}
+          {{ t('payment.orders.creditedBalance') }}: {{ formatBalanceCreditAmount(row.amount) }}
         </div>
       </div>
     </template>
@@ -46,7 +46,7 @@ import type { Column } from '@/components/common/types'
 import DataTable from '@/components/common/DataTable.vue'
 import OrderStatusBadge from '@/components/payment/OrderStatusBadge.vue'
 import {
-  formatCreditedBalance,
+  formatBalanceCreditAmount,
   formatOrderPaymentAmount,
   shouldShowCreditedBalance,
 } from '@/components/payment/orderAmounts'

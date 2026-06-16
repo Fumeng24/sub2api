@@ -80,16 +80,22 @@ func (e *OpenAIImagesUpstreamError) clientErrorType() string {
 }
 
 func (e *OpenAIImagesUpstreamError) clientMessage() string {
+	statusCode := http.StatusBadGateway
+	errType := "upstream_error"
+	if e != nil {
+		statusCode = e.clientStatusCode()
+		errType = e.clientErrorType()
+	}
 	if e == nil {
-		return "Upstream request failed"
+		return ClientFacingErrorMessage(statusCode, errType, "Upstream request failed")
 	}
 	if trimmed := strings.TrimSpace(e.Message); trimmed != "" {
-		return trimmed
+		return ClientFacingErrorMessage(statusCode, errType, trimmed)
 	}
 	if trimmed := strings.TrimSpace(e.Code); trimmed != "" {
-		return trimmed
+		return ClientFacingErrorMessage(statusCode, errType, trimmed)
 	}
-	return "Upstream request failed"
+	return ClientFacingErrorMessage(statusCode, errType, "Upstream request failed")
 }
 
 func openAIResponsesImageResultKey(itemID string, result openAIResponsesImageResult) string {
@@ -740,6 +746,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesErrorResponse(
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,
 			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+			SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
 		}
 	}
 

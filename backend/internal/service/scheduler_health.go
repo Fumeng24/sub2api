@@ -173,8 +173,13 @@ func (s *accountSchedulerHealthStats) snapshot(accountID int64, model, endpoint 
 	if s == nil || accountID <= 0 {
 		return snap
 	}
+	defaultTTFT := schedulerHealthSnapshot{}
+	if model != defaultSchedulerModel || endpoint != defaultSchedulerEndpoint {
+		defaultTTFT = s.defaultTTFTSnapshot(accountID)
+	}
 	entry, ok := s.get(key)
 	if !ok {
+		snap.applyDefaultTTFTFallback(defaultTTFT)
 		return snap
 	}
 
@@ -200,6 +205,7 @@ func (s *accountSchedulerHealthStats) snapshot(accountID int64, model, endpoint 
 		if allowHalfOpen && !entry.halfOpenInFlight {
 			snap.HalfOpenProbe = true
 		}
+		snap.applyDefaultTTFTFallback(defaultTTFT)
 		return snap
 	}
 	if entry.circuitState == schedulerCircuitOpen && entry.cooldownUntil.After(now) {
@@ -213,6 +219,7 @@ func (s *accountSchedulerHealthStats) snapshot(accountID int64, model, endpoint 
 		snap.HasTTFT = entry.hasTTFT
 		snap.ConsecutiveFailed = entry.consecutiveFailure
 		snap.LastFailureReason = entry.lastFailureReason
+		snap.applyDefaultTTFTFallback(defaultTTFT)
 		return snap
 	}
 	if entry.circuitState == schedulerCircuitOpen {
@@ -230,6 +237,7 @@ func (s *accountSchedulerHealthStats) snapshot(accountID int64, model, endpoint 
 	snap.HasTTFT = entry.hasTTFT
 	snap.ConsecutiveFailed = entry.consecutiveFailure
 	snap.LastFailureReason = entry.lastFailureReason
+	snap.applyDefaultTTFTFallback(defaultTTFT)
 	return snap
 }
 
@@ -259,6 +267,33 @@ func (s *accountSchedulerHealthStats) reportSuccess(accountID int64, model, endp
 	entry.halfOpenInFlight = false
 	entry.lastFailureReason = ""
 	entry.updatedAt = time.Now()
+}
+
+func (s *accountSchedulerHealthStats) defaultTTFTSnapshot(accountID int64) schedulerHealthSnapshot {
+	if s == nil || accountID <= 0 {
+		return schedulerHealthSnapshot{}
+	}
+	key := makeAccountSchedulerHealthKey(accountID, defaultSchedulerModel, defaultSchedulerEndpoint)
+	entry, ok := s.get(key)
+	if !ok || entry == nil {
+		return schedulerHealthSnapshot{}
+	}
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	return schedulerHealthSnapshot{
+		Key:      key,
+		TTFTEWMA: entry.ttftEWMA,
+		HasTTFT:  entry.hasTTFT,
+	}
+}
+
+func (s *schedulerHealthSnapshot) applyDefaultTTFTFallback(fallback schedulerHealthSnapshot) {
+	if s == nil || s.HasTTFT || !fallback.HasTTFT || fallback.TTFTEWMA <= 0 {
+		return
+	}
+	s.TTFTEWMA = fallback.TTFTEWMA
+	s.HasTTFT = true
+	s.LatencyScore = latencyScoreFromTTFT(fallback.TTFTEWMA, true)
 }
 
 func (s *accountSchedulerHealthStats) clear(accountID int64, model, endpoint string) {

@@ -98,7 +98,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import OrderTable from '@/components/payment/OrderTable.vue'
-import { formatCreditedBalance, formatOrderPaymentAmount, shouldShowCreditedBalance } from '@/components/payment/orderAmounts'
+import { formatBalanceCreditAmount, formatOrderPaymentAmount, shouldShowCreditedBalance } from '@/components/payment/orderAmounts'
 
 const i18n = useI18n()
 const { t } = i18n
@@ -208,7 +208,7 @@ function localeCode(): string | undefined {
 
 function formatRefundTargetAmount(order: PaymentOrder): string {
   return shouldShowCreditedBalance(order)
-    ? formatCreditedBalance(order.amount)
+    ? formatBalanceCreditAmount(order.amount)
     : formatOrderPaymentAmount(order, order.amount, localeCode())
 }
 

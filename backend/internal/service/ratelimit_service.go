@@ -74,11 +74,7 @@ const (
 
 var openAIImageTryAgainPattern = regexp.MustCompile(`(?i)try again in\s+([0-9]+(?:\.[0-9]+)?)\s*(ms|s|sec|secs|second|seconds|m|min|mins|minute|minutes)`)
 
-const (
-	openAI403CooldownMinutesDefault = 10
-	openAI403DisableThreshold       = 3
-	openAI403CounterWindowMinutes   = 180
-)
+const openAI403CounterWindowMinutes = 180
 
 // NewRateLimitService 创建RateLimitService实例
 func NewRateLimitService(accountRepo AccountRepository, usageRepo UsageLogRepository, cfg *config.Config, geminiQuotaService *GeminiQuotaService, tempUnschedCache TempUnschedCache) *RateLimitService {
@@ -156,7 +152,7 @@ func (s *RateLimitService) CheckErrorPolicy(ctx context.Context, account *Accoun
 	if account.IsPoolMode() {
 		return ErrorPolicySkipped
 	}
-	if s.tryTempUnschedulable(ctx, account, statusCode, responseBody) {
+	if !isOpenAI403ProbeCircuitError(account, statusCode, responseBody) && s.tryTempUnschedulable(ctx, account, statusCode, responseBody) {
 		return ErrorPolicyTempUnscheduled
 	}
 	return ErrorPolicyNone
@@ -204,9 +200,9 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		return true
 	}
 
-	// 先尝试临时不可调度规则（401除外）
+	// 先尝试临时不可调度规则（401 / OpenAI 403 探针类错误除外）
 	// 如果匹配成功，直接返回，不执行后续禁用逻辑
-	if statusCode != 401 {
+	if statusCode != 401 && !isOpenAI403ProbeCircuitError(account, statusCode, responseBody) {
 		if s.tryTempUnschedulable(ctx, account, statusCode, responseBody) {
 			return true
 		}
@@ -811,42 +807,38 @@ func (s *RateLimitService) handleOpenAI403(ctx context.Context, account *Account
 		responseBody,
 		"account may be suspended or lack permissions",
 	)
-
-	if s.openAI403CounterCache == nil {
+	if !isOpenAI403ProbeCircuitBody(account, responseBody) {
 		s.handleAuthError(ctx, account, msg)
 		return true
 	}
 
-	count, err := s.openAI403CounterCache.IncrementOpenAI403Count(ctx, account.ID, openAI403CounterWindowMinutes)
-	if err != nil {
-		slog.Warn("openai_403_increment_failed", "account_id", account.ID, "error", err)
-		s.handleAuthError(ctx, account, msg)
-		return true
-	}
-
-	if count >= openAI403DisableThreshold {
-		msg = fmt.Sprintf("%s | consecutive_403=%d/%d", msg, count, openAI403DisableThreshold)
-		s.handleAuthError(ctx, account, msg)
-		return true
-	}
-
-	until := time.Now().Add(time.Duration(openAI403CooldownMinutesDefault) * time.Minute)
-	reason := fmt.Sprintf("OpenAI 403 temporary cooldown (%d/%d): %s", count, openAI403DisableThreshold, msg)
-	s.notifyAccountSchedulingBlocked(account, until, "openai_403_temp")
-	if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, reason); err != nil {
-		slog.Warn("openai_403_set_temp_unschedulable_failed", "account_id", account.ID, "error", err)
-		s.handleAuthError(ctx, account, msg)
-		return true
+	count := int64(0)
+	if s.openAI403CounterCache != nil {
+		var err error
+		count, err = s.openAI403CounterCache.IncrementOpenAI403Count(ctx, account.ID, openAI403CounterWindowMinutes)
+		if err != nil {
+			slog.Warn("openai_403_increment_failed", "account_id", account.ID, "error", err)
+		}
 	}
 
 	slog.Warn(
-		"openai_403_temp_unschedulable",
+		"openai_403_probe_circuit",
 		"account_id", account.ID,
-		"until", until,
 		"count", count,
-		"threshold", openAI403DisableThreshold,
+		"message", msg,
 	)
 	return true
+}
+
+func isOpenAI403ProbeCircuitError(account *Account, statusCode int, responseBody []byte) bool {
+	return statusCode == http.StatusForbidden && isOpenAI403ProbeCircuitBody(account, responseBody)
+}
+
+func isOpenAI403ProbeCircuitBody(account *Account, responseBody []byte) bool {
+	if account == nil || account.Platform != PlatformOpenAI {
+		return false
+	}
+	return classifyOpenAIUpstreamError(http.StatusForbidden, extractUpstreamErrorMessage(responseBody), responseBody) == openAIUpstreamErrorForbidden
 }
 
 // handleAntigravity403 处理 Antigravity 平台的 403 错误

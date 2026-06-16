@@ -74,7 +74,7 @@ func TestOpenAIHandleStreamingAwareError_ResponsesStreamingEmitsResponseFailed(t
 	id, _ := resp["id"].(string)
 	assert.True(t, strings.HasPrefix(id, "resp_"), "id should start with resp_, got %q", id)
 	assert.Equal(t, "rate_limit_exceeded", errObj["code"])
-	assert.Equal(t, "Concurrency limit exceeded for user, please retry later", errObj["message"])
+	assert.Equal(t, "Service rate limit reached, please retry later", errObj["message"])
 }
 
 // 当 setOpsRequestContext 写过 model，合成事件应回填该字段（与 codebase 已有 makeResponsesCompletedEvent 对齐）。
@@ -122,12 +122,13 @@ func TestOpenAIHandleStreamingAwareError_ResponsesStreamingJSONEscaping(t *testi
 		name    string
 		errType string
 		message string
+		want    string
 	}{
-		{"双引号", "server_error", `upstream returned "invalid" response`},
-		{"反斜杠", "server_error", `path C:\Users\test\file.txt not found`},
-		{"双引号+反斜杠", "upstream_error", `error parsing "key\value": unexpected token`},
-		{"换行与制表", "server_error", "line1\nline2\ttab"},
-		{"普通", "upstream_error", "Upstream service temporarily unavailable"},
+		{"双引号", "server_error", `upstream returned "invalid" response`, "Service temporarily unavailable, please retry later"},
+		{"反斜杠", "server_error", `path C:\Users\test\file.txt not found`, `path C:\Users\test\file.txt not found`},
+		{"双引号+反斜杠", "upstream_error", `error parsing "key\value": unexpected token`, `error parsing "key\value": unexpected token`},
+		{"换行与制表", "server_error", "line1\nline2\ttab", "line1\nline2\ttab"},
+		{"普通", "upstream_error", "Upstream service temporarily unavailable", "Service temporarily unavailable, please retry later"},
 	}
 
 	for _, tc := range cases {
@@ -137,7 +138,7 @@ func TestOpenAIHandleStreamingAwareError_ResponsesStreamingJSONEscaping(t *testi
 			h.handleStreamingAwareError(c, http.StatusBadGateway, tc.errType, tc.message, true)
 
 			_, errObj := parseResponsesFailedSSE(t, w.Body.String())
-			assert.Equal(t, tc.message, errObj["message"], "message 必须被原样还原")
+			assert.Equal(t, tc.want, errObj["message"], "message 必须按客户端脱敏规则输出")
 		})
 	}
 }
@@ -161,7 +162,7 @@ func TestGatewayHandleStreamingAwareError_ResponsesStreamingEmitsResponseFailed(
 
 	_, errObj := parseResponsesFailedSSE(t, w.Body.String())
 	assert.Equal(t, "upstream_error", errObj["code"])
-	assert.Equal(t, "upstream gone", errObj["message"])
+	assert.Equal(t, "Service temporarily unavailable, please retry later", errObj["message"])
 }
 
 // Gateway handler: /v1/messages preserves the legacy data:{type:error,...} format
@@ -224,6 +225,7 @@ func TestOpenAIHandleStreamingAwareError_BareResponsesRouteEmitsResponseFailed(t
 	id, _ := resp["id"].(string)
 	assert.True(t, strings.HasPrefix(id, "resp_"))
 	assert.Equal(t, "rate_limit_exceeded", errObj["code"])
+	assert.Equal(t, "Service rate limit reached, please retry later", errObj["message"])
 }
 
 // Synthesized response.failed id falls back to uuid when no request_id is present.

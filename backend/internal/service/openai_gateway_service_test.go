@@ -480,6 +480,43 @@ func TestOpenAISelectAccountWithLoadAwareness_FiltersUnschedulable(t *testing.T)
 	}
 }
 
+func TestOpenAISelectAccountWithLoadAwareness_LegacyCompactModelMatchesSupportedMapping(t *testing.T) {
+	groupID := int64(1)
+	available := Account{
+		ID:          2,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    1,
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{
+				"gpt-5.5": "gpt-5.5",
+			},
+		},
+	}
+
+	svc := &OpenAIGatewayService{
+		accountRepo:        stubOpenAIAccountRepo{accounts: []Account{available}},
+		concurrencyService: NewConcurrencyService(stubConcurrencyCache{}),
+	}
+
+	selection, err := svc.SelectAccountWithLoadAwareness(context.Background(), &groupID, "", "gpt-5.2", nil)
+	if err != nil {
+		t.Fatalf("SelectAccountWithLoadAwareness error: %v", err)
+	}
+	if selection == nil || selection.Account == nil {
+		t.Fatalf("expected selection with account")
+	}
+	if selection.Account.ID != available.ID {
+		t.Fatalf("expected account %d, got %d", available.ID, selection.Account.ID)
+	}
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
 func TestOpenAISelectAccountWithLoadAwareness_ImageRateLimitSkipsOnlyImageRequests(t *testing.T) {
 	future := time.Now().Add(10 * time.Minute).Format(time.RFC3339)
 	groupID := int64(1)
@@ -1424,11 +1461,52 @@ func TestOpenAIHandleErrorResponseGroupDisabledFailsOver(t *testing.T) {
 	require.ErrorAs(t, err, &failoverErr)
 	require.Equal(t, http.StatusForbidden, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "GROUP_DISABLED")
+	require.Empty(t, failoverErr.SchedulerCategory)
 	require.False(t, c.Writer.Written())
 	require.Empty(t, rec.Body.String())
-	require.Equal(t, 1, repo.tempCalls)
+	require.Zero(t, repo.tempCalls)
+	require.Equal(t, 1, repo.setErrorCalls)
+	require.Contains(t, repo.lastErrorMsg, "API Key 所属分组已停用")
+	require.Zero(t, counter.lastCount)
+}
+
+func TestOpenAIHandleErrorResponseTemporary403UsesProbeCircuit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &rateLimitAccountRepoStub{}
+	counter := &openAI403CounterCacheStub{counts: []int64{1}}
+	rateLimitSvc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	rateLimitSvc.SetOpenAI403CounterCache(counter)
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, rateLimitService: rateLimitSvc}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/responses", nil)
+
+	account := &Account{
+		ID:       38804,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Name:     "temporary-403",
+	}
+	respBody := []byte(`{"error":{"message":"403错误，请稍后再试"}}`)
+	resp := &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+		Header:     http.Header{"X-Request-Id": []string{"rid-temporary-403"}},
+	}
+
+	result, err := svc.handleErrorResponse(context.Background(), resp, c, account, []byte(`{"model":"gpt-5.5"}`))
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusForbidden, failoverErr.StatusCode)
+	require.Equal(t, "transient", failoverErr.SchedulerCategory)
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+	require.Zero(t, repo.tempCalls)
 	require.Zero(t, repo.setErrorCalls)
-	require.Contains(t, repo.lastTempReason, "API Key 所属分组已停用")
+	require.Equal(t, int64(1), counter.lastCount)
 }
 
 func TestOpenAIHandleErrorResponseUpstreamAccessForbiddenFailsOver(t *testing.T) {
@@ -1504,11 +1582,13 @@ func TestOpenAIHandleCompatErrorResponseGroupDisabledFailsOver(t *testing.T) {
 	require.ErrorAs(t, err, &failoverErr)
 	require.Equal(t, http.StatusForbidden, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "GROUP_DISABLED")
+	require.Empty(t, failoverErr.SchedulerCategory)
 	require.False(t, writeCalled)
 	require.False(t, c.Writer.Written())
 	require.Empty(t, rec.Body.String())
-	require.Equal(t, 1, repo.tempCalls)
-	require.Zero(t, repo.setErrorCalls)
+	require.Zero(t, repo.tempCalls)
+	require.Equal(t, 1, repo.setErrorCalls)
+	require.Contains(t, repo.lastErrorMsg, "API Key 所属分组已停用")
 }
 
 func TestOpenAIHandleCompatErrorResponseUpstreamAccessForbiddenFailsOver(t *testing.T) {
@@ -2011,7 +2091,7 @@ func TestOpenAIStreamingPassthroughResponseFailedBeforeOutputReturnsFailover(t *
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
 	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
-	require.Contains(t, string(failoverErr.ResponseBody), "upstream processing failed")
+	require.Contains(t, string(failoverErr.ResponseBody), clientFacingTemporaryUnavailableMessage)
 	require.False(t, c.Writer.Written())
 	require.Empty(t, rec.Body.String())
 }
@@ -3080,7 +3160,7 @@ func TestHandleSSEToJSON_ResponseFailedReturnsProtocolError(t *testing.T) {
 	require.Nil(t, usage)
 	require.Error(t, err)
 	require.Equal(t, http.StatusBadGateway, rec.Code)
-	require.Contains(t, rec.Body.String(), "upstream rejected request")
+	require.Contains(t, rec.Body.String(), clientFacingTemporaryUnavailableMessage)
 	require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
 }
 

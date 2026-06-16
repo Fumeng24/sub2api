@@ -297,6 +297,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: s.retryableOnSameOpenAIAccount(ctx, account, resp.StatusCode, upstreamMsg, respBody),
+				SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, respBody),
 			}
 		}
 		return s.handleChatCompletionsErrorResponse(resp, c, account, billingModel)
@@ -856,6 +857,7 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 // writeChatCompletionsError writes an error response in OpenAI Chat Completions format.
 func writeChatCompletionsError(c *gin.Context, statusCode int, errType, message string) {
+	message = ClientFacingErrorMessage(statusCode, errType, message)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
 			"type":    errType,

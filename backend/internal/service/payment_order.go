@@ -65,7 +65,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 		orderAmount = plan.Price
 		limitAmount = plan.Price
 	} else if req.OrderType == payment.OrderTypeBalance {
-		orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier, methodCurrency)
+		orderAmount = calculateCreditedBalance(req.Amount)
 	}
 	payAmountStr, payAmount, err := calculateCreateOrderPayAmount(limitAmount, feeRate, methodCurrency)
 	if err != nil {
@@ -88,7 +88,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 			return nil, err
 		}
 		if plan == nil && req.OrderType == payment.OrderTypeBalance {
-			orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier, selectedCurrency)
+			orderAmount = calculateCreditedBalance(req.Amount)
 		}
 	}
 	if err := validateSelectedCreateOrderAmountCurrency(payAmountStr, sel); err != nil {

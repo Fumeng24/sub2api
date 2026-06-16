@@ -31,22 +31,12 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 
 	var responsesReq apicompat.ResponsesRequest
 	if err := json.Unmarshal(body, &responsesReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"type":    "invalid_request_error",
-				"message": "Failed to parse request body",
-			},
-		})
+		writeClientOpenAIError(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
 		return nil, fmt.Errorf("parse responses request: %w", err)
 	}
 	originalModel := strings.TrimSpace(responsesReq.Model)
 	if originalModel == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"type":    "invalid_request_error",
-				"message": "model is required",
-			},
-		})
+		writeClientOpenAIError(c, http.StatusBadRequest, "invalid_request_error", "model is required")
 		return nil, fmt.Errorf("missing model in request")
 	}
 
@@ -56,12 +46,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 
 	chatReq, err := apicompat.ResponsesToChatCompletionsRequest(&responsesReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"type":    "invalid_request_error",
-				"message": err.Error(),
-			},
-		})
+		writeClientOpenAIError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, fmt.Errorf("convert responses to chat completions: %w", err)
 	}
 
@@ -146,12 +131,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 		if failoverErr != nil {
 			return nil, failoverErr
 		}
-		c.JSON(http.StatusBadGateway, gin.H{
-			"error": gin.H{
-				"type":    "upstream_error",
-				"message": "Upstream request failed",
-			},
-		})
+		writeClientOpenAIError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed")
 		return nil, fmt.Errorf("upstream request failed: %s", safeErr)
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -187,6 +167,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: s.retryableOnSameOpenAIAccount(ctx, account, resp.StatusCode, upstreamMsg, respBody),
+				SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, respBody),
 			}
 		}
 		return s.handleErrorResponse(ctx, resp, c, account, chatBody, billingModel)
@@ -212,24 +193,14 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponses(
 	respBody, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
 	if err != nil {
 		if !errors.Is(err, ErrUpstreamResponseBodyTooLarge) {
-			c.JSON(http.StatusBadGateway, gin.H{
-				"error": gin.H{
-					"type":    "api_error",
-					"message": "Failed to read upstream response",
-				},
-			})
+			writeClientOpenAIError(c, http.StatusBadGateway, "api_error", "Failed to read upstream response")
 		}
 		return nil, fmt.Errorf("read upstream body: %w", err)
 	}
 
 	var ccResp apicompat.ChatCompletionsResponse
 	if err := json.Unmarshal(respBody, &ccResp); err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{
-			"error": gin.H{
-				"type":    "api_error",
-				"message": "Failed to parse upstream response",
-			},
-		})
+		writeClientOpenAIError(c, http.StatusBadGateway, "api_error", "Failed to parse upstream response")
 		return nil, fmt.Errorf("parse chat completions response: %w", err)
 	}
 	responsesResp := apicompat.ChatCompletionsResponseToResponses(&ccResp, originalModel)

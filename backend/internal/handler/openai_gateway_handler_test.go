@@ -39,36 +39,69 @@ func TestOpenAIGatewayHandlerMapUpstreamErrorKeepsDeterministicBusinessStatuses(
 	require.Contains(t, msg, "forbidden")
 }
 
+func TestOpenAIGatewayHandlerMapUpstreamErrorHidesUpstream429(t *testing.T) {
+	h := &OpenAIGatewayHandler{}
+
+	status, errType, msg := h.mapUpstreamError(http.StatusTooManyRequests)
+
+	require.Equal(t, http.StatusServiceUnavailable, status)
+	require.Equal(t, "upstream_error", errType)
+	require.Equal(t, "Service temporarily unavailable, please retry later", msg)
+}
+
+func TestOpenAIGatewayHandlerHandleFailoverExhaustedHidesUpstream429(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	h := &OpenAIGatewayHandler{}
+	h.handleFailoverExhausted(c, &service.UpstreamFailoverError{
+		StatusCode:   http.StatusTooManyRequests,
+		ResponseBody: []byte(`{"error":{"type":"rate_limit_error","message":"rate limited"}}`),
+	}, false)
+
+	require.Equal(t, http.StatusServiceUnavailable, w.Code)
+	require.Equal(t, "upstream_error", gjson.GetBytes(w.Body.Bytes(), "error.type").String())
+	require.NotContains(t, strings.ToLower(w.Body.String()), "rate limit")
+}
+
 func TestOpenAIHandleStreamingAwareError_JSONEscaping(t *testing.T) {
 	tests := []struct {
 		name    string
 		errType string
 		message string
+		want    string
 	}{
 		{
 			name:    "包含双引号的消息",
 			errType: "server_error",
 			message: `upstream returned "invalid" response`,
+			want:    "Service temporarily unavailable, please retry later",
 		},
 		{
 			name:    "包含反斜杠的消息",
 			errType: "server_error",
 			message: `path C:\Users\test\file.txt not found`,
+			want:    `path C:\Users\test\file.txt not found`,
 		},
 		{
 			name:    "包含双引号和反斜杠的消息",
 			errType: "upstream_error",
 			message: `error parsing "key\value": unexpected token`,
+			want:    `error parsing "key\value": unexpected token`,
 		},
 		{
 			name:    "包含换行符的消息",
 			errType: "server_error",
 			message: "line1\nline2\ttab",
+			want:    "line1\nline2\ttab",
 		},
 		{
 			name:    "普通消息",
 			errType: "upstream_error",
 			message: "Upstream service temporarily unavailable",
+			want:    "Service temporarily unavailable, please retry later",
 		},
 	}
 
@@ -104,7 +137,7 @@ func TestOpenAIHandleStreamingAwareError_JSONEscaping(t *testing.T) {
 			errorObj, ok := parsed["error"].(map[string]any)
 			require.True(t, ok, "应包含 error 对象")
 			assert.Equal(t, tt.errType, errorObj["type"])
-			assert.Equal(t, tt.message, errorObj["message"])
+			assert.Equal(t, tt.want, errorObj["message"])
 		})
 	}
 }
@@ -187,7 +220,7 @@ func TestOpenAIEnsureForwardErrorResponse_WritesFallbackWhenNotWritten(t *testin
 	errorObj, ok := parsed["error"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "upstream_error", errorObj["type"])
-	assert.Equal(t, "Upstream request failed", errorObj["message"])
+	assert.Equal(t, "Service temporarily unavailable, please retry later", errorObj["message"])
 }
 
 // Writer 已写后 ensureForwardErrorResponse 必须仍然把错误信息以 SSE
@@ -231,7 +264,7 @@ func TestOpenAIEnsureForwardErrorResponse_ResponsesRouteAfterWrittenEmitsRespons
 	assert.Contains(t, body, "event: response.failed\n", "appended a Responses terminal event")
 	assert.Contains(t, body, `"type":"response.failed"`)
 	assert.Contains(t, body, `"code":"upstream_error"`)
-	assert.Contains(t, body, "Upstream request failed")
+	assert.Contains(t, body, "Service temporarily unavailable, please retry later")
 }
 
 func TestShouldLogOpenAIForwardFailureAsWarn(t *testing.T) {
@@ -289,7 +322,7 @@ func TestOpenAIRecoverResponsesPanic_WritesFallbackResponse(t *testing.T) {
 	errorObj, ok := parsed["error"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "upstream_error", errorObj["type"])
-	assert.Equal(t, "Upstream request failed", errorObj["message"])
+	assert.Equal(t, "Service temporarily unavailable, please retry later", errorObj["message"])
 }
 
 func TestOpenAIRecoverResponsesPanic_NoPanicNoWrite(t *testing.T) {
@@ -542,7 +575,8 @@ func TestShouldFallbackOpenAICompactToModel(t *testing.T) {
 		ResponseBody: []byte(`{"error":{"message":"Your input exceeds the context window."}}`),
 	}
 
-	require.True(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.5", false, failoverErr))
+	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.5", false, failoverErr))
+	require.True(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.3-codex", false, failoverErr))
 	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses"), "gpt-5.5", false, failoverErr))
 	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.5", true, failoverErr))
 	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), openAICompactFallbackModel, false, failoverErr))

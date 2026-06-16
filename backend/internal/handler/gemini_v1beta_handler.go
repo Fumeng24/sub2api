@@ -652,7 +652,8 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 				c.Set(service.OpsSkipPassthroughKey, true)
 			}
 
-			googleError(c, respCode, msg)
+			clientErr := upstreamClientErrorForPassthroughFailover(respCode, "upstream_error", msg)
+			googleError(c, clientErr.Status, clientErr.Message)
 			return
 		}
 	}
@@ -661,27 +662,13 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 	service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
 
 	// 使用默认的错误映射
-	status, message := mapGeminiUpstreamError(statusCode)
-	googleError(c, status, message)
+	clientErr := upstreamClientErrorForFailoverStatus(statusCode)
+	googleError(c, clientErr.Status, clientErr.Message)
 }
 
 func mapGeminiUpstreamError(statusCode int) (int, string) {
-	switch statusCode {
-	case 401:
-		return http.StatusBadGateway, "Upstream authentication failed, please contact administrator"
-	case 402:
-		return http.StatusBadGateway, "Upstream service temporarily unavailable"
-	case 403:
-		return http.StatusBadGateway, "Upstream access forbidden, please contact administrator"
-	case 429:
-		return http.StatusTooManyRequests, "Upstream rate limit exceeded, please retry later"
-	case 529:
-		return http.StatusServiceUnavailable, "Upstream service overloaded, please retry later"
-	case 500, 502, 503, 504:
-		return http.StatusBadGateway, "Upstream service temporarily unavailable"
-	default:
-		return http.StatusBadGateway, "Upstream request failed"
-	}
+	clientErr := upstreamClientErrorForFailoverStatus(statusCode)
+	return clientErr.Status, clientErr.Message
 }
 
 type pathParseError struct{ msg string }
@@ -689,6 +676,7 @@ type pathParseError struct{ msg string }
 func (e *pathParseError) Error() string { return e.msg }
 
 func googleError(c *gin.Context, status int, message string) {
+	message = service.ClientFacingErrorMessage(status, "", message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,
@@ -715,6 +703,9 @@ func writeUpstreamResponse(c *gin.Context, res *service.UpstreamHTTPResult) {
 	contentType := res.Headers.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/json"
+	}
+	if res.StatusCode >= http.StatusBadRequest {
+		res.Body = service.ClientFacingErrorBody(res.StatusCode, "upstream_error", res.Body)
 	}
 	c.Data(res.StatusCode, contentType, res.Body)
 }

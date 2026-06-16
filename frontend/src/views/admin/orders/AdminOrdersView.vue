@@ -128,7 +128,7 @@ import AdminRefundDialog from '@/components/admin/payment/AdminRefundDialog.vue'
 import OrderStatusBadge from '@/components/payment/OrderStatusBadge.vue'
 import OrderTable from '@/components/payment/OrderTable.vue'
 import {
-  formatCreditedBalance,
+  formatBalanceCreditAmount,
   formatOrderPaymentAmount,
   shouldShowCreditedBalance,
 } from '@/components/payment/orderAmounts'
@@ -258,7 +258,7 @@ function formatGatewayAmount(order: PaymentOrder, amount: number): string {
 }
 
 function formatRefundAmount(order: PaymentOrder, amount: number): string {
-  return shouldShowCreditedBalance(order) ? formatCreditedBalance(amount) : formatGatewayAmount(order, amount)
+  return shouldShowCreditedBalance(order) ? formatBalanceCreditAmount(amount) : formatGatewayAmount(order, amount)
 }
 
 onMounted(() => loadOrders())

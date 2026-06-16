@@ -45,7 +45,7 @@
           </div>
           <div class="flex justify-between">
             <span class="text-gray-500 dark:text-gray-400">{{ paidOrder.order_type === 'balance' ? t('payment.orders.creditedBalance') : t('payment.orders.amount') }}</span>
-            <span class="font-medium text-gray-900 dark:text-white">{{ paidOrder.order_type === 'balance' ? formatCreditedBalance(paidOrder.amount) : formatOrderPaymentAmount(paidOrder, paidOrder.amount) }}</span>
+            <span class="font-medium text-gray-900 dark:text-white">{{ paidOrder.order_type === 'balance' ? formatBalanceCreditAmount(paidOrder.amount) : formatOrderPaymentAmount(paidOrder, paidOrder.amount) }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</span>
@@ -81,7 +81,7 @@ import { paymentAPI } from '@/api/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
 import type { PaymentOrder } from '@/types/payment'
-import { formatCreditedBalance, formatOrderPaymentAmount } from '@/components/payment/orderAmounts'
+import { formatBalanceCreditAmount, formatOrderPaymentAmount } from '@/components/payment/orderAmounts'
 import QRCode from 'qrcode'
 import alipayIcon from '@/assets/icons/alipay.svg'
 import wxpayIcon from '@/assets/icons/wxpay.svg'

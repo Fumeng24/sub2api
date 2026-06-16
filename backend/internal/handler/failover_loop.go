@@ -22,6 +22,21 @@ type AccountScheduleFailureReporter interface {
 	ReportAccountScheduleFailure(ctx context.Context, accountID int64, model, endpoint string, failoverErr *service.UpstreamFailoverError)
 }
 
+// UpstreamClientError describes the client-facing result after all upstream
+// account failover candidates are exhausted. It intentionally models provider
+// account failures, not local user/API-key quota failures.
+type UpstreamClientError struct {
+	Status  int
+	Type    string
+	Message string
+}
+
+type upstreamFailoverClientPolicy struct {
+	ForbiddenStatus int
+	ForbiddenType   string
+	OverloadedType  string
+}
+
 // FailoverAction 表示 failover 错误处理后的下一步动作
 type FailoverAction int
 
@@ -297,6 +312,66 @@ func manualFailoverSwitchFields(
 	}
 	fields = append(fields, failoverWriterFields(currentSize, writerSizeBeforeForward)...)
 	return fields
+}
+
+func upstreamClientErrorForFailoverStatus(statusCode int) UpstreamClientError {
+	return upstreamClientErrorForFailoverStatusWithPolicy(statusCode, upstreamFailoverClientPolicy{})
+}
+
+func upstreamClientErrorForFailoverStatusWithPolicy(statusCode int, policy upstreamFailoverClientPolicy) UpstreamClientError {
+	forbiddenStatus := policy.ForbiddenStatus
+	if forbiddenStatus == 0 {
+		forbiddenStatus = http.StatusBadGateway
+	}
+	forbiddenType := strings.TrimSpace(policy.ForbiddenType)
+	if forbiddenType == "" {
+		forbiddenType = "upstream_error"
+	}
+	overloadedType := strings.TrimSpace(policy.OverloadedType)
+	if overloadedType == "" {
+		overloadedType = "overloaded_error"
+	}
+
+	switch statusCode {
+	case http.StatusUnauthorized:
+		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Upstream authentication failed, please contact administrator"}
+	case http.StatusPaymentRequired:
+		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Upstream service temporarily unavailable"}
+	case http.StatusForbidden:
+		return UpstreamClientError{Status: forbiddenStatus, Type: forbiddenType, Message: "Upstream access forbidden, please contact administrator"}
+	case http.StatusTooManyRequests:
+		return UpstreamClientError{Status: http.StatusServiceUnavailable, Type: "upstream_error", Message: "Service temporarily unavailable, please retry later"}
+	case 529:
+		return UpstreamClientError{Status: http.StatusServiceUnavailable, Type: overloadedType, Message: "Upstream service overloaded, please retry later"}
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Upstream service temporarily unavailable"}
+	default:
+		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Upstream request failed"}
+	}
+}
+
+func applyUpstreamFailoverClientPolicy(err UpstreamClientError) UpstreamClientError {
+	if err.Status == http.StatusTooManyRequests {
+		err.Status = http.StatusServiceUnavailable
+		err.Type = "upstream_error"
+		err.Message = "Service temporarily unavailable, please retry later"
+		return err
+	}
+	if strings.TrimSpace(err.Type) == "" {
+		err.Type = "upstream_error"
+	}
+	if strings.TrimSpace(err.Message) == "" {
+		err.Message = "Upstream request failed"
+	}
+	return err
+}
+
+func upstreamClientErrorForPassthroughFailover(statusCode int, errType, message string) UpstreamClientError {
+	return applyUpstreamFailoverClientPolicy(UpstreamClientError{
+		Status:  statusCode,
+		Type:    errType,
+		Message: message,
+	})
 }
 
 // needForceCacheBilling 判断 failover 时是否需要强制缓存计费。

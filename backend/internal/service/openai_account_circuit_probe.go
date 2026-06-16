@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -16,21 +14,28 @@ import (
 )
 
 const (
-	openAIAccountCircuitProbeTimeout = 15 * time.Second
 	openAIAccountCircuitProbeBodyMax = 4096
 	openAIAccountCircuitProbeModel   = "gpt-4.1-mini"
 )
 
-var openAIAccountCircuitProbeInterval = 5 * time.Second
-
-var errOpenAIAccountCircuitProbeUnschedulable = errors.New("probe account not active or schedulable")
+var (
+	openAIAccountCircuitProbeTimeout    = 30 * time.Second
+	openAIAccountCircuitProbeRetryDelay = 5 * time.Second
+)
 
 type openAIAccountCircuitProbe struct {
 	cancel context.CancelFunc
 }
 
+type openAIAccountCircuitProbeAdapter struct {
+	service *OpenAIGatewayService
+}
+
 func (s *OpenAIGatewayService) maybeStartOpenAIAccountCircuitProbe(accountID int64, model, endpoint, category string) {
 	if s == nil || accountID <= 0 || !shouldStartOpenAIAccountCircuitProbe(model, endpoint, category) {
+		return
+	}
+	if s.accountRepo == nil || s.httpUpstream == nil {
 		return
 	}
 	key := makeAccountSchedulerHealthKey(accountID, model, endpoint)
@@ -44,7 +49,9 @@ func (s *OpenAIGatewayService) maybeStartOpenAIAccountCircuitProbe(accountID int
 		"account_id", accountID,
 		"model", key.Model,
 		"endpoint", key.Endpoint,
-		"interval", openAIAccountCircuitProbeInterval.String(),
+		"timeout", openAIAccountCircuitProbeTimeout.String(),
+		"retry_delay", openAIAccountCircuitProbeRetryDelay.String(),
+		"healthy_ttft", schedulerHealthyTTFTThreshold.String(),
 		"category", category,
 	)
 	go s.runOpenAIAccountCircuitProbe(ctx, key, category)
@@ -52,7 +59,7 @@ func (s *OpenAIGatewayService) maybeStartOpenAIAccountCircuitProbe(accountID int
 
 func shouldStartOpenAIAccountCircuitProbe(model, endpoint, category string) bool {
 	switch strings.TrimSpace(category) {
-	case "transient", "transient_transport", "transient_timeout", "unknown":
+	case "rate_limit", "transient", "transient_transport", "transient_timeout", "unknown":
 	default:
 		return false
 	}
@@ -61,7 +68,7 @@ func shouldStartOpenAIAccountCircuitProbe(model, endpoint, category string) bool
 		return false
 	}
 	endpoint = normalizeSchedulerDimension(endpoint, defaultSchedulerEndpoint)
-	return endpoint == "/v1/chat/completions" || endpoint == "/v1/responses" || endpoint == defaultSchedulerEndpoint
+	return schedulerTTFTPolicyEndpointAllowed(endpoint)
 }
 
 func (s *OpenAIGatewayService) stopOpenAIAccountCircuitProbe(accountID int64, model, endpoint string) {
@@ -78,124 +85,89 @@ func (s *OpenAIGatewayService) stopOpenAIAccountCircuitProbe(accountID int64, mo
 
 func (s *OpenAIGatewayService) runOpenAIAccountCircuitProbe(ctx context.Context, key accountSchedulerHealthKey, initialCategory string) {
 	defer s.openaiAccountCircuitProbes.Delete(key)
+	runner := schedulerProbeRunner{
+		health:     s.schedulerHealth,
+		classifier: schedulerClassifierForPlatform(PlatformOpenAI),
+		adapter:    openAIAccountCircuitProbeAdapter{service: s},
+		timeout:    openAIAccountCircuitProbeTimeout,
+		retryDelay: openAIAccountCircuitProbeRetryDelay,
+	}
+	runner.run(ctx, key, initialCategory)
+}
 
-	timer := time.NewTimer(openAIAccountCircuitProbeInterval)
-	defer timer.Stop()
+func (a openAIAccountCircuitProbeAdapter) Probe(ctx context.Context, key schedulerProbeKey) (int, []byte, int, error) {
+	if a.service == nil {
+		return 0, nil, 0, fmt.Errorf("openai circuit probe dependencies unavailable")
+	}
+	return a.service.probeOpenAIAccountCircuit(ctx, key)
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		}
-
-		statusCode, body, err := s.probeOpenAIAccountCircuit(ctx, key)
-		if errors.Is(err, errOpenAIAccountCircuitProbeUnschedulable) {
-			if s.schedulerHealth != nil {
-				s.schedulerHealth.clear(key.AccountID, key.Model, key.Endpoint)
-			}
-			s.recoverOpenAIAccountCircuit(key.AccountID)
-			slog.Info("account_circuit_probe_stopped",
-				"account_id", key.AccountID,
-				"model", key.Model,
-				"endpoint", key.Endpoint,
-				"category", "manual_unschedulable",
-				"error", err,
-			)
-			return
-		}
-		if err == nil && statusCode >= 200 && statusCode < 400 {
-			if s.schedulerHealth != nil {
-				s.schedulerHealth.clear(key.AccountID, key.Model, key.Endpoint)
-			}
-			s.recoverOpenAIAccountCircuit(key.AccountID)
-			slog.Info("account_circuit_probe_recovered",
-				"account_id", key.AccountID,
-				"model", key.Model,
-				"endpoint", key.Endpoint,
-				"status_code", statusCode,
-			)
-			return
-		}
-
-		category := schedulerFailureCategory(statusCode, body)
-		if err != nil && statusCode == 0 {
-			category = schedulerFailureCategory(0, []byte(err.Error()))
-		}
-		if category == "" || category == "unknown" {
-			category = strings.TrimSpace(initialCategory)
-			if category == "" || category == "unknown" {
-				category = "error"
-			}
-		}
-		if s.schedulerHealth != nil {
-			s.schedulerHealth.reportFailure(key.AccountID, key.Model, key.Endpoint, category, schedulerCooldownForCategory(category, nil))
-		}
-
-		slog.Warn("account_circuit_probe_failed",
-			"account_id", key.AccountID,
-			"model", key.Model,
-			"endpoint", key.Endpoint,
-			"status_code", statusCode,
-			"category", category,
-			"error", err,
-		)
-
-		if !shouldStartOpenAIAccountCircuitProbe(key.Model, key.Endpoint, category) {
-			slog.Info("account_circuit_probe_stopped",
-				"account_id", key.AccountID,
-				"model", key.Model,
-				"endpoint", key.Endpoint,
-				"category", category,
-			)
-			return
-		}
-
-		timer.Reset(openAIAccountCircuitProbeInterval)
+func (a openAIAccountCircuitProbeAdapter) OnRecovered(key schedulerProbeKey) {
+	if a.service != nil {
+		a.service.recoverOpenAIAccountCircuit(key.AccountID)
 	}
 }
 
-func (s *OpenAIGatewayService) probeOpenAIAccountCircuit(ctx context.Context, key accountSchedulerHealthKey) (int, []byte, error) {
+func (a openAIAccountCircuitProbeAdapter) OnUnschedulable(key schedulerProbeKey) {
+	if a.service != nil {
+		a.service.recoverOpenAIAccountCircuit(key.AccountID)
+	}
+}
+
+func (a openAIAccountCircuitProbeAdapter) ShouldContinue(key schedulerProbeKey, category string) bool {
+	return shouldStartOpenAIAccountCircuitProbe(key.Model, key.Endpoint, category)
+}
+
+func (a openAIAccountCircuitProbeAdapter) LogAttrs(key schedulerProbeKey) []any {
+	return []any{
+		"account_id", key.AccountID,
+		"model", key.Model,
+		"endpoint", key.Endpoint,
+	}
+}
+
+func (s *OpenAIGatewayService) probeOpenAIAccountCircuit(ctx context.Context, key accountSchedulerHealthKey) (int, []byte, int, error) {
 	if s == nil || s.accountRepo == nil || s.httpUpstream == nil {
-		return 0, nil, fmt.Errorf("openai circuit probe dependencies unavailable")
+		return 0, nil, 0, fmt.Errorf("openai circuit probe dependencies unavailable")
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, openAIAccountCircuitProbeTimeout)
 	defer cancel()
 
 	account, err := s.accountRepo.GetByID(probeCtx, key.AccountID)
 	if err != nil {
-		return 0, nil, fmt.Errorf("load probe account: %w", err)
+		return 0, nil, 0, fmt.Errorf("load probe account: %w", err)
 	}
 	if account == nil {
-		return 0, nil, fmt.Errorf("probe account not found")
+		return 0, nil, 0, fmt.Errorf("probe account not found")
 	}
 	if account.Platform != PlatformOpenAI || account.Status != StatusActive || !account.Schedulable {
-		return 0, nil, fmt.Errorf("%w: status=%s schedulable=%t", errOpenAIAccountCircuitProbeUnschedulable, account.Status, account.Schedulable)
+		return 0, nil, 0, fmt.Errorf("%w: status=%s schedulable=%t", errSchedulerProbeUnschedulable, account.Status, account.Schedulable)
 	}
 
 	token, _, err := s.GetAccessToken(probeCtx, account)
 	if err != nil {
-		return 0, nil, fmt.Errorf("get probe token: %w", err)
+		return 0, nil, 0, fmt.Errorf("get probe token: %w", err)
 	}
 	req, err := s.buildOpenAIAccountCircuitProbeRequest(probeCtx, account, key.Model, key.Endpoint, token)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, 0, err
 	}
 
 	proxyURL := ""
 	if account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
+	start := time.Now()
 	resp, err := s.httpUpstream.Do(req, proxyURL, account.ID, account.Concurrency)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, 0, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, openAIAccountCircuitProbeBodyMax))
+	ttftMs, body, readErr := readOpenAIStableTTFTProbeResponse(resp, start)
 	if resp.StatusCode >= 400 {
-		return resp.StatusCode, body, fmt.Errorf("probe upstream HTTP %d", resp.StatusCode)
+		return resp.StatusCode, body, ttftMs, fmt.Errorf("probe upstream HTTP %d", resp.StatusCode)
 	}
-	return resp.StatusCode, body, nil
+	return resp.StatusCode, body, ttftMs, readErr
 }
 
 func (s *OpenAIGatewayService) buildOpenAIAccountCircuitProbeRequest(ctx context.Context, account *Account, model, endpoint, token string) (*http.Request, error) {
@@ -217,7 +189,7 @@ func (s *OpenAIGatewayService) buildOpenAIAccountCircuitChatProbeRequest(ctx con
 		"model":      model,
 		"messages":   []map[string]string{{"role": "user", "content": "Reply with 1."}},
 		"max_tokens": 1,
-		"stream":     false,
+		"stream":     true,
 	})
 	if err != nil {
 		return nil, err
@@ -237,7 +209,7 @@ func (s *OpenAIGatewayService) buildOpenAIAccountCircuitChatProbeRequest(ctx con
 	req = req.WithContext(WithHTTPUpstreamProfile(req.Context(), HTTPUpstreamProfileOpenAI))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
 	if ua := account.GetOpenAIUserAgent(); ua != "" {
 		req.Header.Set("User-Agent", ua)
 	}
@@ -248,9 +220,9 @@ func (s *OpenAIGatewayService) buildOpenAIAccountCircuitResponsesProbeRequest(ct
 	reqBody := map[string]any{
 		"model":             model,
 		"instructions":      "Health check. Reply with 1.",
-		"input":             "Reply with 1.",
+		"input":             openAIProbeInputMessage("Reply with 1."),
 		"max_output_tokens": 1,
-		"stream":            false,
+		"stream":            true,
 	}
 	if account.Type == AccountTypeOAuth {
 		applyCodexOAuthTransform(reqBody, true, false)
@@ -278,6 +250,7 @@ func (s *OpenAIGatewayService) buildOpenAIAccountCircuitResponsesProbeRequest(ct
 	req = req.WithContext(WithHTTPUpstreamProfile(req.Context(), HTTPUpstreamProfileOpenAI))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
 	if account.Type == AccountTypeOAuth {
 		req.Host = "chatgpt.com"
 		if chatgptAccountID := account.GetChatGPTAccountID(); chatgptAccountID != "" {
@@ -286,9 +259,7 @@ func (s *OpenAIGatewayService) buildOpenAIAccountCircuitResponsesProbeRequest(ct
 		req.Header.Set("OpenAI-Beta", "responses=experimental")
 		req.Header.Set("originator", "codex_cli_rs")
 		req.Header.Set("User-Agent", codexCLIUserAgent)
-		req.Header.Set("Accept", "text/event-stream")
 	} else {
-		req.Header.Set("Accept", "application/json")
 		if ua := account.GetOpenAIUserAgent(); ua != "" {
 			req.Header.Set("User-Agent", ua)
 		}

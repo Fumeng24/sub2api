@@ -1151,6 +1151,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	// Some Gemini upstreams validate tool call parts strictly; ensure any `functionCall` part includes a
 	// `thoughtSignature` to avoid frequent INVALID_ARGUMENT 400s.
 	body = ensureGeminiFunctionCallThoughtSignatures(body)
+	body = ensureGeminiMixedToolConfigBytes(body)
 
 	mappedModel := originalModel
 	if account.Type == AccountTypeAPIKey || account.Type == AccountTypeServiceAccount {
@@ -1471,6 +1472,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 				if contentType == "" {
 					contentType = "application/json"
 				}
+				respBody = ClientFacingErrorBody(http.StatusInternalServerError, "upstream_error", respBody)
 				c.Data(http.StatusInternalServerError, contentType, respBody)
 				return nil, fmt.Errorf("gemini upstream error: %d (skipped by error policy)", resp.StatusCode)
 			case ErrorPolicyMatched, ErrorPolicyTempUnscheduled:
@@ -1583,6 +1585,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 		if contentType == "" {
 			contentType = "application/json"
 		}
+		respBody = ClientFacingErrorBody(resp.StatusCode, "upstream_error", respBody)
 		c.Data(resp.StatusCode, contentType, respBody)
 		if upstreamMsg == "" {
 			return nil, fmt.Errorf("gemini upstream error: %d", resp.StatusCode)
@@ -1749,10 +1752,7 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 	}
 
 	if isUpstreamBillingExhaustionError(upstreamStatus, upstreamMsg, body) {
-		c.JSON(http.StatusBadGateway, gin.H{
-			"type":  "error",
-			"error": gin.H{"type": "upstream_error", "message": "Upstream service temporarily unavailable"},
-		})
+		writeClientClaudeError(c, http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable")
 		if upstreamMsg == "" {
 			return fmt.Errorf("upstream error: %d", upstreamStatus)
 		}
@@ -1768,10 +1768,7 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 		"upstream_error",
 		"Upstream request failed",
 	); matched {
-		c.JSON(status, gin.H{
-			"type":  "error",
-			"error": gin.H{"type": errType, "message": errMsg},
-		})
+		writeClientClaudeError(c, status, errType, errMsg)
 		if upstreamMsg == "" {
 			upstreamMsg = errMsg
 		}
@@ -1884,10 +1881,7 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 		}
 	}
 
-	c.JSON(statusCode, gin.H{
-		"type":  "error",
-		"error": gin.H{"type": errType, "message": errMsg},
-	})
+	writeClientClaudeError(c, statusCode, errType, errMsg)
 	if upstreamMsg == "" {
 		return fmt.Errorf("upstream error: %d", upstreamStatus)
 	}
@@ -2276,6 +2270,7 @@ func randomHex(nBytes int) string {
 }
 
 func (s *GeminiMessagesCompatService) writeClaudeError(c *gin.Context, status int, errType, message string) error {
+	message = ClientFacingErrorMessage(status, errType, message)
 	c.JSON(status, gin.H{
 		"type":  "error",
 		"error": gin.H{"type": errType, "message": message},
@@ -2284,6 +2279,7 @@ func (s *GeminiMessagesCompatService) writeClaudeError(c *gin.Context, status in
 }
 
 func (s *GeminiMessagesCompatService) writeGoogleError(c *gin.Context, status int, message string) error {
+	message = ClientFacingErrorMessage(status, "", message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,
@@ -2599,6 +2595,9 @@ func (s *GeminiMessagesCompatService) handleNativeNonStreamingResponse(c *gin.Co
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/json"
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		respBody = ClientFacingErrorBody(resp.StatusCode, "upstream_error", respBody)
 	}
 	c.Data(resp.StatusCode, contentType, respBody)
 
@@ -3155,6 +3154,7 @@ func convertClaudeMessagesToGeminiGenerateContent(body []byte) ([]byte, error) {
 	if tools := convertClaudeToolsToGeminiTools(req["tools"]); tools != nil {
 		out["tools"] = tools
 	}
+	ensureGeminiMixedToolConfig(out)
 
 	generationConfig := convertClaudeGenerationConfig(req)
 	if generationConfig != nil {
@@ -3435,12 +3435,20 @@ func normalizeGeminiRequestForAIStudio(body []byte) []byte {
 		return body
 	}
 
+	modified := ensureGeminiMixedToolConfig(payload)
+
 	tools, ok := payload["tools"].([]any)
 	if !ok || len(tools) == 0 {
-		return body
+		if !modified {
+			return body
+		}
+		normalized, err := json.Marshal(payload)
+		if err != nil {
+			return body
+		}
+		return normalized
 	}
 
-	modified := false
 	for _, rawTool := range tools {
 		tool, ok := rawTool.(map[string]any)
 		if !ok {
@@ -3467,6 +3475,105 @@ func normalizeGeminiRequestForAIStudio(body []byte) []byte {
 		return body
 	}
 	return normalized
+}
+
+func ensureGeminiMixedToolConfigBytes(body []byte) []byte {
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return body
+	}
+	if !ensureGeminiMixedToolConfig(payload) {
+		return body
+	}
+	updated, err := json.Marshal(payload)
+	if err != nil {
+		return body
+	}
+	return updated
+}
+
+func ensureGeminiMixedToolConfig(payload map[string]any) bool {
+	if payload == nil || !geminiToolsMixFunctionAndServerSide(payload["tools"]) {
+		return false
+	}
+
+	if snakeConfig, ok := payload["tool_config"].(map[string]any); ok {
+		if snakeConfig["include_server_side_tool_invocations"] == true {
+			return false
+		}
+		snakeConfig["include_server_side_tool_invocations"] = true
+		return true
+	}
+
+	toolConfig, ok := payload["toolConfig"].(map[string]any)
+	if !ok {
+		toolConfig = make(map[string]any)
+		payload["toolConfig"] = toolConfig
+	}
+	if toolConfig["includeServerSideToolInvocations"] == true {
+		return false
+	}
+	toolConfig["includeServerSideToolInvocations"] = true
+	return true
+}
+
+func geminiToolsMixFunctionAndServerSide(rawTools any) bool {
+	tools, ok := rawTools.([]any)
+	if !ok || len(tools) == 0 {
+		return false
+	}
+
+	hasFunctionDeclarations := false
+	hasServerSideTool := false
+	for _, rawTool := range tools {
+		tool, ok := rawTool.(map[string]any)
+		if !ok {
+			continue
+		}
+		if geminiToolHasFunctionDeclarations(tool) {
+			hasFunctionDeclarations = true
+		}
+		if geminiToolHasServerSideTool(tool) {
+			hasServerSideTool = true
+		}
+		if hasFunctionDeclarations && hasServerSideTool {
+			return true
+		}
+	}
+	return false
+}
+
+func geminiToolHasFunctionDeclarations(tool map[string]any) bool {
+	if hasNonEmptyJSONArray(tool["functionDeclarations"]) {
+		return true
+	}
+	return hasNonEmptyJSONArray(tool["function_declarations"])
+}
+
+func geminiToolHasServerSideTool(tool map[string]any) bool {
+	for _, key := range []string{
+		"googleSearch",
+		"google_search",
+		"googleSearchRetrieval",
+		"google_search_retrieval",
+		"codeExecution",
+		"code_execution",
+		"urlContext",
+		"url_context",
+		"retrieval",
+		"enterpriseWebSearch",
+		"enterprise_web_search",
+	} {
+		if _, ok := tool[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func hasNonEmptyJSONArray(v any) bool {
+	arr, ok := v.([]any)
+	return ok && len(arr) > 0
 }
 
 func isClaudeWebSearchToolMap(tool map[string]any) bool {

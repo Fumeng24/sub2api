@@ -121,6 +121,18 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	return transientBlocked || shouldDisable
 }
 
+func (s *OpenAIGatewayService) schedulerCategoryOverrideForOpenAIUpstreamError(ctx context.Context, account *Account, statusCode int, responseBody []byte) string {
+	if s == nil || account == nil || account.Platform != PlatformOpenAI || statusCode != http.StatusForbidden {
+		return ""
+	}
+	class := classifyOpenAIUpstreamError(statusCode, extractUpstreamErrorMessage(responseBody), responseBody)
+	if class != openAIUpstreamErrorForbidden {
+		return ""
+	}
+	_ = ctx
+	return "transient"
+}
+
 func (s *OpenAIGatewayService) markOpenAITransient5xxCoolingDown(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte) bool {
 	if s == nil || !isOpenAIAccount(account) || !isOpenAITransient5xxStatus(statusCode) {
 		return false

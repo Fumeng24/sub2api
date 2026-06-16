@@ -31,7 +31,7 @@
         </div>
         <div v-if="shouldShowCreditedBalance(order)">
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('payment.orders.creditedBalance') }}</p>
-          <p class="text-sm font-medium text-gray-900 dark:text-white">{{ formatCreditedBalance(order.amount) }}</p>
+          <p class="text-sm font-medium text-gray-900 dark:text-white">{{ formatBalanceCreditAmount(order.amount) }}</p>
         </div>
         <div>
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('payment.orders.paymentMethod') }}</p>
@@ -120,7 +120,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import type { PaymentOrder } from '@/types/payment'
 import { statusBadgeClass, canRefund as canRefundStatus, formatOrderDateTime } from '@/components/payment/orderUtils'
 import {
-  formatCreditedBalance,
+  formatBalanceCreditAmount,
   formatOrderPaymentAmount,
   shouldShowCreditedBalance,
 } from '@/components/payment/orderAmounts'
@@ -178,7 +178,7 @@ function formatOrderAmount(amount: number): string {
 }
 
 function formatRefundAmount(amount: number): string {
-  if (!props.order) return formatCreditedBalance(amount)
-  return shouldShowCreditedBalance(props.order) ? formatCreditedBalance(amount) : formatOrderAmount(amount)
+  if (!props.order) return formatBalanceCreditAmount(amount)
+  return shouldShowCreditedBalance(props.order) ? formatBalanceCreditAmount(amount) : formatOrderAmount(amount)
 }
 </script>

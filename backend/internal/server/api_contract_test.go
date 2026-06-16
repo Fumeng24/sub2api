@@ -658,6 +658,9 @@ func TestAPIContracts(t *testing.T) {
 					service.SettingKeyContactInfo:  "support",
 					service.SettingKeyDocURL:       "https://docs.example.com",
 
+					service.SettingKeyLoginAgreementUpdatedAt: "2026-03-31",
+					service.SettingKeyLoginAgreementDocuments: `[{"id":"terms","title":"服务条款","content_md":"terms test"},{"id":"usage-policy","title":"使用政策","content_md":"usage test"},{"id":"supported-regions","title":"支持的国家和地区","content_md":"regions test"},{"id":"service-specific-terms","title":"服务特定条款","content_md":"specific test"}]`,
+
 					service.SettingKeyDefaultConcurrency:   "5",
 					service.SettingKeyDefaultBalance:       "1.25",
 					service.SettingKeyTableDefaultPageSize: "20",
@@ -693,10 +696,10 @@ func TestAPIContracts(t *testing.T) {
 						"login_agreement_mode": "modal",
 						"login_agreement_updated_at": "2026-03-31",
 						"login_agreement_documents": [
-							{"id": "terms", "title": "服务条款", "content_md": ""},
-							{"id": "usage-policy", "title": "使用政策", "content_md": ""},
-							{"id": "supported-regions", "title": "支持的国家和地区", "content_md": ""},
-							{"id": "service-specific-terms", "title": "服务特定条款", "content_md": ""}
+							{"id": "terms", "title": "服务条款", "content_md": "terms test"},
+							{"id": "usage-policy", "title": "使用政策", "content_md": "usage test"},
+							{"id": "supported-regions", "title": "支持的国家和地区", "content_md": "regions test"},
+							{"id": "service-specific-terms", "title": "服务特定条款", "content_md": "specific test"}
 						],
 						"smtp_host": "smtp.example.com",
 						"smtp_port": 587,
@@ -1045,6 +1048,8 @@ func TestAPIContracts(t *testing.T) {
 					service.SettingKeyRegistrationEnabled:              "true",
 					service.SettingKeyEmailVerifyEnabled:               "false",
 					service.SettingKeyRegistrationEmailSuffixWhitelist: "[]",
+					service.SettingKeyLoginAgreementUpdatedAt:          "2026-03-31",
+					service.SettingKeyLoginAgreementDocuments:          `[{"id":"terms","title":"服务条款","content_md":"terms test"},{"id":"usage-policy","title":"使用政策","content_md":"usage test"},{"id":"supported-regions","title":"支持的国家和地区","content_md":"regions test"},{"id":"service-specific-terms","title":"服务特定条款","content_md":"specific test"}]`,
 				})
 			},
 			method:     http.MethodGet,
@@ -1067,10 +1072,10 @@ func TestAPIContracts(t *testing.T) {
 						"login_agreement_mode": "modal",
 						"login_agreement_updated_at": "2026-03-31",
 						"login_agreement_documents": [
-							{"id": "terms", "title": "服务条款", "content_md": ""},
-							{"id": "usage-policy", "title": "使用政策", "content_md": ""},
-							{"id": "supported-regions", "title": "支持的国家和地区", "content_md": ""},
-							{"id": "service-specific-terms", "title": "服务特定条款", "content_md": ""}
+							{"id": "terms", "title": "服务条款", "content_md": "terms test"},
+							{"id": "usage-policy", "title": "使用政策", "content_md": "usage test"},
+							{"id": "supported-regions", "title": "支持的国家和地区", "content_md": "regions test"},
+							{"id": "service-specific-terms", "title": "服务特定条款", "content_md": "specific test"}
 						],
 						"smtp_host": "",
 						"smtp_port": 587,

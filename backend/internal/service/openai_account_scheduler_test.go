@@ -1034,6 +1034,51 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_AllNormalCandidatesCool
 	}
 }
 
+func TestOpenAIGatewayService_SlowStreamingTTFTOpensCircuitButAllowsWeakFallback(t *testing.T) {
+	oldHealthyTTFT := schedulerHealthyTTFTThreshold
+	schedulerHealthyTTFTThreshold = 15 * time.Millisecond
+	defer func() {
+		schedulerHealthyTTFTThreshold = oldHealthyTTFT
+	}()
+
+	ctx := context.Background()
+	account := Account{
+		ID:          31105,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    0,
+		Credentials: map[string]any{"api_key": "sk-test"},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+
+	slowTTFT := 16
+	svc.ReportOpenAIAccountScheduleResultForRequest(account.ID, "gpt-5.5", "/v1/responses", true, &slowTTFT)
+
+	snap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.5", "/v1/responses", false)
+	require.Equal(t, schedulerCircuitOpen, snap.CircuitState)
+	require.Equal(t, schedulerSlowTTFTCategory, snap.LastFailureReason)
+
+	selection, decision, err := svc.SelectAccountWithScheduler(ctx, nil, "", "", "gpt-5.5", nil, OpenAIUpstreamTransportAny, false)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, account.ID, selection.Account.ID)
+	require.True(t, selection.WeakFallback)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
 func TestOpenAIGatewayService_SelectAccountWithScheduler_WeakFallbackSkipsExcludedAccounts(t *testing.T) {
 	ctx := context.Background()
 	rateLimitedUntil := time.Now().Add(30 * time.Minute)
@@ -3114,4 +3159,100 @@ func TestDefaultOpenAIAccountScheduler_IsAccountTransportCompatible_Branches(t *
 		},
 	}
 	require.True(t, scheduler.isAccountTransportCompatible(account, OpenAIUpstreamTransportResponsesWebsocketV2))
+}
+
+func TestOpenAIStableLowTTFTGroupDetection(t *testing.T) {
+	require.True(t, isOpenAIStableLowTTFTGroup(&Group{Name: "Codex(稳定)", Platform: PlatformOpenAI}))
+	require.False(t, isOpenAIStableLowTTFTGroup(&Group{Name: "Codex(特价)", Platform: PlatformOpenAI}))
+	require.False(t, isOpenAIStableLowTTFTGroup(&Group{Name: "Claude(稳定)", Platform: PlatformAnthropic}))
+	require.False(t, isOpenAIStableLowTTFTGroup(nil))
+}
+
+func TestOpenAIStableLowTTFTSelectionOrderColdStartRotatesUnknownAccounts(t *testing.T) {
+	pool := []openAIAccountCandidateScore{
+		stableLowTTFTCandidateForTest(1, 10, 0, false),
+		stableLowTTFTCandidateForTest(2, 20, 0, false),
+		stableLowTTFTCandidateForTest(3, 30, 0, false),
+	}
+
+	first := buildOpenAIStableLowTTFTSelectionOrder(pool, 0)
+	second := buildOpenAIStableLowTTFTSelectionOrder(pool, 1)
+	third := buildOpenAIStableLowTTFTSelectionOrder(pool, 2)
+
+	require.Equal(t, []int64{1, 2, 3}, openAIStableLowTTFTCandidateIDs(first))
+	require.Equal(t, []int64{2, 3, 1}, openAIStableLowTTFTCandidateIDs(second))
+	require.Equal(t, []int64{3, 1, 2}, openAIStableLowTTFTCandidateIDs(third))
+}
+
+func TestOpenAIStableLowTTFTSelectionOrderPrefersLowestKnownTTFT(t *testing.T) {
+	pool := []openAIAccountCandidateScore{
+		stableLowTTFTCandidateForTest(1, 10, 1800, true),
+		stableLowTTFTCandidateForTest(2, 20, 350, true),
+		stableLowTTFTCandidateForTest(3, 30, 0, false),
+	}
+
+	normal := buildOpenAIStableLowTTFTSelectionOrder(pool, 1)
+	later := buildOpenAIStableLowTTFTSelectionOrder(pool, 8)
+
+	require.Equal(t, []int64{2, 1, 3}, openAIStableLowTTFTCandidateIDs(normal))
+	require.Equal(t, []int64{2, 1, 3}, openAIStableLowTTFTCandidateIDs(later))
+}
+
+func TestOpenAIStableLowTTFTSelectionUsesDefaultProbeTTFTFallback(t *testing.T) {
+	health := newAccountSchedulerHealthStats()
+	health.reportSuccess(1, defaultSchedulerModel, defaultSchedulerEndpoint, intPtrForTest(1800))
+	health.reportSuccess(2, defaultSchedulerModel, defaultSchedulerEndpoint, intPtrForTest(350))
+
+	groupID := int64(10)
+	accounts := []*Account{
+		{ID: 1, Platform: PlatformOpenAI, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 1},
+		{ID: 2, Platform: PlatformOpenAI, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 2},
+	}
+	scores := buildSchedulerAccountScores(accounts, &groupID, "gpt-5.5", "/v1/responses", nil, health, false)
+	pool := openAIAccountCandidatesFromSchedulerScores(scores)
+	order := buildOpenAIStableLowTTFTSelectionOrder(pool, 1)
+
+	require.Equal(t, []int64{2, 1}, openAIStableLowTTFTCandidateIDs(order))
+	require.True(t, order[0].hasTTFT)
+	require.Equal(t, float64(350), order[0].ttft)
+}
+
+func TestResolveOpenAIStableTTFTProbeModelOnlyUsesConfiguredModels(t *testing.T) {
+	allModels := &Account{
+		Platform:    PlatformOpenAI,
+		Credentials: map[string]any{"model_mapping": map[string]any{"gpt-5.4-mini": "gpt-5.4-mini", "gpt-5.4": "gpt-5.4"}},
+	}
+	require.Equal(t, "gpt-5.4-mini", resolveOpenAIStableTTFTProbeModel(allModels))
+
+	withoutMini := &Account{
+		Platform:    PlatformOpenAI,
+		Credentials: map[string]any{"model_mapping": map[string]any{"gpt-5.5": "gpt-5.5", "gpt-5.4": "gpt-5.4"}},
+	}
+	require.Equal(t, "gpt-5.5", resolveOpenAIStableTTFTProbeModel(withoutMini))
+
+	unsupported := &Account{
+		Platform:    PlatformOpenAI,
+		Credentials: map[string]any{"model_mapping": map[string]any{"gpt-5.1": "gpt-5.1", "gpt-5": "gpt-5"}},
+	}
+	require.Empty(t, resolveOpenAIStableTTFTProbeModel(unsupported))
+}
+
+func stableLowTTFTCandidateForTest(id int64, sortOrder int, ttft float64, hasTTFT bool) openAIAccountCandidateScore {
+	return openAIAccountCandidateScore{
+		account:   &Account{ID: id, Priority: sortOrder},
+		score:     1,
+		ttft:      ttft,
+		hasTTFT:   hasTTFT,
+		sortOrder: sortOrder,
+		groupPrio: sortOrder,
+		loadInfo:  &AccountLoadInfo{AccountID: id},
+	}
+}
+
+func openAIStableLowTTFTCandidateIDs(candidates []openAIAccountCandidateScore) []int64 {
+	ids := make([]int64, 0, len(candidates))
+	for _, candidate := range candidates {
+		ids = append(ids, openAIAccountCandidateID(candidate))
+	}
+	return ids
 }

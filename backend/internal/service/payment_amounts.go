@@ -16,23 +16,8 @@ func normalizeBalanceRechargeMultiplier(multiplier float64) float64 {
 	return multiplier
 }
 
-func calculateCreditedBalance(paymentAmount, cnyPerBalanceCredit float64, currency string) float64 {
-	amount := decimal.NewFromFloat(paymentAmount)
-	if !shouldApplyCNYBalanceRechargeRate(currency) {
-		return amount.Round(2).InexactFloat64()
-	}
-	return amount.
-		Div(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(cnyPerBalanceCredit))).
-		Round(2).
-		InexactFloat64()
-}
-
-func shouldApplyCNYBalanceRechargeRate(currency string) bool {
-	normalized, err := payment.NormalizePaymentCurrency(currency)
-	if err != nil {
-		normalized = payment.DefaultPaymentCurrency
-	}
-	return normalized == payment.DefaultPaymentCurrency
+func calculateCreditedBalance(paymentAmount float64) float64 {
+	return decimal.NewFromFloat(paymentAmount).Round(2).InexactFloat64()
 }
 
 func calculateGatewayRefundAmount(orderAmount, payAmount, refundAmount float64, currency string) float64 {

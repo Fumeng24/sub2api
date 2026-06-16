@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -39,6 +40,32 @@ func newTestFailoverErr(statusCode int, retryable, forceBilling bool) *service.U
 		RetryableOnSameAccount: retryable,
 		ForceCacheBilling:      forceBilling,
 	}
+}
+
+func TestUpstreamClientErrorForFailoverStatus_HidesUpstream429(t *testing.T) {
+	clientErr := upstreamClientErrorForFailoverStatus(http.StatusTooManyRequests)
+
+	require.Equal(t, http.StatusServiceUnavailable, clientErr.Status)
+	require.Equal(t, "upstream_error", clientErr.Type)
+	require.NotContains(t, clientErr.Message, "rate limit")
+}
+
+func TestUpstreamClientErrorForPassthroughFailover_HidesPassthrough429(t *testing.T) {
+	clientErr := upstreamClientErrorForPassthroughFailover(http.StatusTooManyRequests, "rate_limit_error", "Upstream rate limit exceeded")
+
+	require.Equal(t, http.StatusServiceUnavailable, clientErr.Status)
+	require.Equal(t, "upstream_error", clientErr.Type)
+	require.Equal(t, "Service temporarily unavailable, please retry later", clientErr.Message)
+}
+
+func TestUpstreamClientErrorForFailoverStatus_PreservesProtocolOverrides(t *testing.T) {
+	clientErr := upstreamClientErrorForFailoverStatusWithPolicy(http.StatusForbidden, upstreamFailoverClientPolicy{
+		ForbiddenStatus: http.StatusForbidden,
+		ForbiddenType:   "forbidden_error",
+	})
+
+	require.Equal(t, http.StatusForbidden, clientErr.Status)
+	require.Equal(t, "forbidden_error", clientErr.Type)
 }
 
 // ---------------------------------------------------------------------------

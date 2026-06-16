@@ -130,7 +130,7 @@
 
           <template #cell-value="{ value, row }">
             <span class="text-sm font-medium text-gray-900 dark:text-white">
-              <template v-if="row.type === 'balance'">${{ value.toFixed(2) }}</template>
+              <template v-if="row.type === 'balance'">{{ value.toFixed(2) }} 余额</template>
               <template v-else-if="row.type === 'subscription'">
                 {{ row.validity_days || 30 }} {{ t('admin.redeem.days') }}
                 <span v-if="row.group" class="ml-1 text-xs text-gray-500 dark:text-gray-400"
@@ -304,6 +304,13 @@
                 required
                 class="input"
               />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{
+                  generateForm.type === 'balance'
+                    ? t('admin.redeem.form.balanceHint')
+                    : t('admin.redeem.form.concurrencyHint')
+                }}
+              </p>
             </div>
             <!-- 邀请码类型：显示提示信息 -->
             <div v-if="generateForm.type === 'invitation'" class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">

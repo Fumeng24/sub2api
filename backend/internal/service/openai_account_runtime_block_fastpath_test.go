@@ -558,6 +558,36 @@ func TestOpenAITransientScheduleFailureUsesScopedSchedulerCooldown(t *testing.T)
 	require.Equal(t, schedulerCircuitClosed, otherModel.CircuitState)
 }
 
+func TestOpenAI403ScheduleFailureOverrideUsesTransientProbeCircuit(t *testing.T) {
+	svc := &OpenAIGatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
+	accountID := int64(117)
+	model := "gpt-5.5"
+	endpoint := "/v1/responses"
+	failoverErr := &UpstreamFailoverError{
+		StatusCode:        http.StatusForbidden,
+		ResponseBody:      []byte(`{"error":{"message":"403错误，请稍后再试"}}`),
+		SchedulerCategory: "transient",
+	}
+
+	svc.ReportOpenAIAccountScheduleFailure(accountID, model, endpoint, failoverErr)
+
+	snap := svc.schedulerHealth.snapshot(accountID, model, endpoint, false)
+	require.Equal(t, schedulerCircuitOpen, snap.CircuitState)
+	require.Equal(t, "transient", snap.LastFailureReason)
+	require.Less(t, time.Until(snap.CooldownUntil), 2*time.Minute)
+	require.Greater(t, time.Until(snap.CooldownUntil), 10*time.Second)
+}
+
+func TestOpenAI403ScheduleFailureOverrideIgnoresBusinessForbidden(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 118, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	body := []byte(`{"code":"GROUP_DISABLED","message":"API Key 所属分组已停用"}`)
+
+	category := svc.schedulerCategoryOverrideForOpenAIUpstreamError(context.Background(), account, http.StatusForbidden, body)
+
+	require.Empty(t, category)
+}
+
 func TestOpenAITerminalScheduleResultDoesNotRecoverHalfOpenCircuit(t *testing.T) {
 	svc := &OpenAIGatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
 	accountID := int64(116)

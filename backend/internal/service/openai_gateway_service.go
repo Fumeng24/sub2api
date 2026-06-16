@@ -370,12 +370,17 @@ type OpenAIGatewayService struct {
 	openaiWSStateStoreOnce        sync.Once
 	openaiSchedulerOnce           sync.Once
 	openaiWSPassthroughDialerOnce sync.Once
+	openaiStableTTFTProbeOnce     sync.Once
+	openaiStableTTFTProbeStopOnce sync.Once
 	openaiWSPool                  *openAIWSConnPool
 	openaiWSStateStore            OpenAIWSStateStore
 	openaiScheduler               OpenAIAccountScheduler
 	openaiWSPassthroughDialer     openAIWSClientDialer
 	openaiAccountStats            *openAIAccountRuntimeStats
 	schedulerHealth               *accountSchedulerHealthStats
+	openaiStableTTFTProbeCancel   context.CancelFunc
+	openaiStableTTFTProbeStopCh   chan struct{}
+	openaiStableTTFTProbeWG       sync.WaitGroup
 
 	openaiWSFallbackUntil               sync.Map // key: int64(accountID), value: time.Time
 	openaiAccountRuntimeBlockUntil      sync.Map // key: int64(accountID), value: time.Time
@@ -790,12 +795,7 @@ func (s *OpenAIGatewayService) writeOpenAIWSFallbackErrorResponse(c *gin.Context
 			Message:            upstreamMessage,
 		})
 	}
-	c.JSON(statusCode, gin.H{
-		"error": gin.H{
-			"type":    errType,
-			"message": clientMessage,
-		},
-	})
+	writeClientOpenAIError(c, statusCode, errType, clientMessage)
 	return true
 }
 
@@ -2798,12 +2798,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	logCodexCLIOnlyDetection(ctx, c, account, apiKeyID, restrictionResult, body)
 	if restrictionResult.Enabled && !restrictionResult.Matched {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalPolicyDenied)
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": gin.H{
-				"type":    "forbidden_error",
-				"message": "This account only allows Codex official clients",
-			},
-		})
+		writeClientOpenAIError(c, http.StatusForbidden, "forbidden_error", "This API key only allows Codex official clients")
 		return nil, errors.New("codex_cli_only restriction: only codex official clients are allowed")
 	}
 
@@ -2843,12 +2838,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	if wsDecision.Transport == OpenAIUpstreamTransportResponsesWebsocket {
 		if c != nil {
 			MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": gin.H{
-					"type":    "invalid_request_error",
-					"message": "OpenAI WSv1 is temporarily unsupported. Please enable responses_websockets_v2.",
-				},
-			})
+			writeClientOpenAIError(c, http.StatusBadRequest, "invalid_request_error", "OpenAI WSv1 is temporarily unsupported. Please enable responses_websockets_v2.")
 		}
 		return nil, errors.New("openai ws v1 is temporarily unsupported; use ws v2")
 	}
@@ -2919,7 +2909,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	imageIntent := IsImageGenerationIntent(openAIResponsesEndpoint, reqModel, body)
 	if imageIntent && !imageGenerationAllowed {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
-		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"type": "permission_error", "message": ImageGenerationPermissionMessage()}})
+		writeClientOpenAIError(c, http.StatusForbidden, "permission_error", ImageGenerationPermissionMessage())
 		return nil, errors.New("image generation disabled for group")
 	}
 
@@ -2929,7 +2919,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		markPatchSet("instructions", defaultCodexSynthInstructions(reqModel))
 	}
 
-	billingModel := account.GetMappedModel(reqModel)
+	billingModel := resolveOpenAIForwardModel(account, reqModel, "")
 	accountMappingApplied := billingModel != reqModel
 	if accountMappingApplied {
 		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Model mapping applied: %s -> %s (account: %s, isCodexCLI: %v)", reqModel, billingModel, account.Name, isCodexCLI)
@@ -2973,7 +2963,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	imageIntent = imageIntent || IsImageGenerationIntent(openAIResponsesEndpoint, reqModel, nil) || isOpenAIImageGenerationModel(upstreamModel)
 	if imageIntent && !imageGenerationAllowed {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
-		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"type": "permission_error", "message": ImageGenerationPermissionMessage()}})
+		writeClientOpenAIError(c, http.StatusForbidden, "permission_error", ImageGenerationPermissionMessage())
 		return nil, errors.New("image generation disabled for group")
 	}
 
@@ -2999,7 +2989,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		}
 		if err := validateOpenAIResponsesImageModel(decoded, upstreamModel); err != nil {
 			setOpsUpstreamError(c, http.StatusBadRequest, err.Error(), "")
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": err.Error(), "param": "model"}})
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": ClientFacingErrorMessage(http.StatusBadRequest, "invalid_request_error", err.Error()), "param": "model"}})
 			return nil, err
 		}
 		if hasOpenAIImageGenerationTool(decoded) {
@@ -3022,7 +3012,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		}
 		if err := validateCodexSparkInput(decoded, upstreamModel); err != nil {
 			setOpsUpstreamError(c, http.StatusBadRequest, err.Error(), "")
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": err.Error(), "param": "input"}})
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": ClientFacingErrorMessage(http.StatusBadRequest, "invalid_request_error", err.Error()), "param": "input"}})
 			return nil, err
 		}
 	}
@@ -3162,7 +3152,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		}
 		if imageCfgErr != nil {
 			setOpsUpstreamError(c, http.StatusBadRequest, imageCfgErr.Error(), "")
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": imageCfgErr.Error(), "param": "size"}})
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": ClientFacingErrorMessage(http.StatusBadRequest, "invalid_request_error", imageCfgErr.Error()), "param": "size"}})
 			return nil, imageCfgErr
 		}
 		imageBillingModel = imageCfg.Model
@@ -3416,12 +3406,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			if failoverErr != nil {
 				return nil, failoverErr
 			}
-			c.JSON(http.StatusBadGateway, gin.H{
-				"error": gin.H{
-					"type":    "upstream_error",
-					"message": "Upstream request failed",
-				},
-			})
+			writeClientOpenAIError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed")
 			return nil, fmt.Errorf("upstream request failed: %s", safeErr)
 		}
 
@@ -3475,6 +3460,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 					StatusCode:             resp.StatusCode,
 					ResponseBody:           respBody,
 					RetryableOnSameAccount: s.retryableOnSameOpenAIAccount(ctx, account, resp.StatusCode, upstreamMsg, respBody),
+					SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, respBody),
 				}
 			}
 			return s.handleErrorResponse(ctx, resp, c, account, body, billingModel)
@@ -3593,12 +3579,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 			rejectMsg := "OpenAI codex passthrough requires a non-empty instructions field"
 			MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalPolicyDenied)
 			logOpenAIPassthroughInstructionsRejected(ctx, c, account, reqModel, rejectReason, body)
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": gin.H{
-					"type":    "forbidden_error",
-					"message": rejectMsg,
-				},
-			})
+			writeClientOpenAIError(c, http.StatusForbidden, "forbidden_error", rejectMsg)
 			return nil, fmt.Errorf("openai passthrough rejected before upstream: %s", rejectReason)
 		}
 
@@ -3643,12 +3624,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	apiKey := getAPIKeyFromContext(c)
 	if IsImageGenerationIntent(openAIResponsesEndpoint, reqModel, body) && !GroupAllowsImageGeneration(apiKeyGroup(apiKey)) {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": gin.H{
-				"type":    "permission_error",
-				"message": ImageGenerationPermissionMessage(),
-			},
-		})
+		writeClientOpenAIError(c, http.StatusForbidden, "permission_error", ImageGenerationPermissionMessage())
 		return nil, errors.New("image generation disabled for group")
 	}
 	imageBillingModel := ""
@@ -3662,7 +3638,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": gin.H{
 					"type":    "invalid_request_error",
-					"message": imageCfgErr.Error(),
+					"message": ClientFacingErrorMessage(http.StatusBadRequest, "invalid_request_error", imageCfgErr.Error()),
 					"param":   "size",
 				},
 			})
@@ -3726,12 +3702,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 		if failoverErr != nil {
 			return nil, failoverErr
 		}
-		c.JSON(http.StatusBadGateway, gin.H{
-			"error": gin.H{
-				"type":    "upstream_error",
-				"message": "Upstream request failed",
-			},
-		})
+		writeClientOpenAIError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed")
 		return nil, fmt.Errorf("upstream request failed: %s", safeErr)
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -4020,9 +3991,10 @@ func (s *OpenAIGatewayService) handleFailoverErrorResponsePassthrough(
 		UpstreamResponseBody: upstreamDetail,
 	})
 	return &UpstreamFailoverError{
-		StatusCode:      resp.StatusCode,
-		ResponseBody:    body,
-		ResponseHeaders: resp.Header.Clone(),
+		StatusCode:        resp.StatusCode,
+		ResponseBody:      body,
+		ResponseHeaders:   resp.Header.Clone(),
+		SchedulerCategory: s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
 	}
 }
 
@@ -4068,9 +4040,10 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 			UpstreamResponseBody: upstreamDetail,
 		})
 		return &UpstreamFailoverError{
-			StatusCode:      resp.StatusCode,
-			ResponseBody:    body,
-			ResponseHeaders: resp.Header.Clone(),
+			StatusCode:        resp.StatusCode,
+			ResponseBody:      body,
+			ResponseHeaders:   resp.Header.Clone(),
+			SchedulerCategory: s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
 		}
 	}
 	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
@@ -4088,9 +4061,10 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 			UpstreamResponseBody: upstreamDetail,
 		})
 		return &UpstreamFailoverError{
-			StatusCode:      resp.StatusCode,
-			ResponseBody:    body,
-			ResponseHeaders: resp.Header.Clone(),
+			StatusCode:        resp.StatusCode,
+			ResponseBody:      body,
+			ResponseHeaders:   resp.Header.Clone(),
+			SchedulerCategory: s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
 		}
 	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -4111,6 +4085,7 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 	if contentType == "" {
 		contentType = "application/json"
 	}
+	body = ClientFacingErrorBody(resp.StatusCode, "upstream_error", body)
 	c.Data(resp.StatusCode, contentType, body)
 
 	if upstreamMsg == "" {
@@ -4399,7 +4374,7 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 	body, _ := json.Marshal(gin.H{
 		"error": gin.H{
 			"type":    "upstream_error",
-			"message": message,
+			"message": ClientFacingErrorMessage(http.StatusBadGateway, "upstream_error", message),
 		},
 	})
 	return &UpstreamFailoverError{
@@ -5055,9 +5030,10 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			Detail:             upstreamDetail,
 		})
 		return nil, &UpstreamFailoverError{
-			StatusCode:      resp.StatusCode,
-			ResponseBody:    body,
-			ResponseHeaders: resp.Header.Clone(),
+			StatusCode:        resp.StatusCode,
+			ResponseBody:      body,
+			ResponseHeaders:   resp.Header.Clone(),
+			SchedulerCategory: s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
 		}
 	}
 	if openAIUpstreamErrorClassImmediateFailover(upstreamClass) {
@@ -5073,9 +5049,10 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			Detail:             upstreamDetail,
 		})
 		return nil, &UpstreamFailoverError{
-			StatusCode:      resp.StatusCode,
-			ResponseBody:    body,
-			ResponseHeaders: resp.Header.Clone(),
+			StatusCode:        resp.StatusCode,
+			ResponseBody:      body,
+			ResponseHeaders:   resp.Header.Clone(),
+			SchedulerCategory: s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
 		}
 	}
 
@@ -5088,12 +5065,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		"upstream_error",
 		"Upstream request failed",
 	); matched {
-		c.JSON(status, gin.H{
-			"error": gin.H{
-				"type":    errType,
-				"message": errMsg,
-			},
-		})
+		writeClientOpenAIError(c, status, errType, errMsg)
 		if upstreamMsg == "" {
 			upstreamMsg = errMsg
 		}
@@ -5120,12 +5092,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			if msg := openAIContextWindowClientMessageForModel(reqModel, body); msg != "" {
 				statusCode, errType, errMsg = http.StatusBadRequest, "invalid_request_error", msg
 			}
-			c.JSON(statusCode, gin.H{
-				"error": gin.H{
-					"type":    errType,
-					"message": errMsg,
-				},
-			})
+			writeClientOpenAIError(c, statusCode, errType, errMsg)
 			return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
 		}
 	}
@@ -5151,6 +5118,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,
 			RetryableOnSameAccount: s.retryableOnSameOpenAIAccountStatus(reqCtx, account, resp.StatusCode),
+			SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(reqCtx, account, resp.StatusCode, body),
 		}
 	}
 
@@ -5158,12 +5126,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	if msg := openAIContextWindowClientMessageForModel(reqModel, body); msg != "" {
 		statusCode, errType, errMsg = http.StatusBadRequest, "invalid_request_error", msg
 	}
-	c.JSON(statusCode, gin.H{
-		"error": gin.H{
-			"type":    errType,
-			"message": errMsg,
-		},
-	})
+	writeClientOpenAIError(c, statusCode, errType, errMsg)
 
 	return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
 }
@@ -5306,6 +5269,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 			ResponseBody:           body,
 			ResponseHeaders:        resp.Header.Clone(),
 			RetryableOnSameAccount: false,
+			SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(reqCtx, account, resp.StatusCode, body),
 		}
 	}
 
@@ -5370,6 +5334,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,
 			RetryableOnSameAccount: s.retryableOnSameOpenAIAccountStatus(reqCtx, account, resp.StatusCode),
+			SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(reqCtx, account, resp.StatusCode, body),
 		}
 	}
 
@@ -6225,12 +6190,7 @@ func (s *OpenAIGatewayService) writeOpenAINonStreamingProtocolError(resp *http.R
 	setOpsUpstreamError(c, http.StatusBadGateway, message, "")
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-	c.JSON(http.StatusBadGateway, gin.H{
-		"error": gin.H{
-			"type":    "upstream_error",
-			"message": message,
-		},
-	})
+	writeClientOpenAIError(c, http.StatusBadGateway, "upstream_error", message)
 	return fmt.Errorf("non-streaming openai protocol error: %s", message)
 }
 
@@ -6275,7 +6235,7 @@ func (s *OpenAIGatewayService) validateOpenAICompactResponseForFailover(
 		"error": gin.H{
 			"type":    "upstream_error",
 			"code":    openAICompactBadOutputCode,
-			"message": message,
+			"message": ClientFacingErrorMessage(http.StatusBadGateway, "upstream_error", message),
 		},
 	})
 	var headers http.Header
@@ -6394,7 +6354,7 @@ func (s *OpenAIGatewayService) newOpenAIEmptyOutputFailoverError(
 		"error": gin.H{
 			"type":    "upstream_error",
 			"code":    openAIEmptyOutputCode,
-			"message": message,
+			"message": ClientFacingErrorMessage(http.StatusBadGateway, "upstream_error", message),
 		},
 	})
 	var headers http.Header
@@ -8156,12 +8116,7 @@ func writeOpenAIFastPolicyBlockedResponse(c *gin.Context, err *OpenAIFastBlocked
 		return
 	}
 	MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalPolicyDenied)
-	c.JSON(http.StatusForbidden, gin.H{
-		"error": gin.H{
-			"type":    "permission_error",
-			"message": err.Message,
-		},
-	})
+	writeClientOpenAIError(c, http.StatusForbidden, "permission_error", err.Message)
 }
 
 // applyOpenAIFastPolicyToWSResponseCreate evaluates the OpenAI fast policy
@@ -8291,7 +8246,7 @@ func buildOpenAIFastPolicyBlockedWSEvent(err *OpenAIFastBlockedError) []byte {
 		"error": map[string]any{
 			"type":    "invalid_request_error",
 			"code":    "policy_violation",
-			"message": err.Message,
+			"message": ClientFacingErrorMessage(http.StatusForbidden, "invalid_request_error", err.Message),
 		},
 	})
 	if mErr != nil {

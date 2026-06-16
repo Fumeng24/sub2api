@@ -291,7 +291,9 @@ func TestNormalizedCodexLimits_OnlyPrimaryData(t *testing.T) {
 
 func TestRateLimitService_HandleUpstreamError_403PreservesOriginalUpstreamMessage(t *testing.T) {
 	repo := &rateLimitAccountRepoStub{}
+	counter := &openAI403CounterCacheStub{counts: []int64{1}}
 	service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	service.SetOpenAI403CounterCache(counter)
 	account := &Account{
 		ID:       201,
 		Platform: PlatformOpenAI,
@@ -307,14 +309,16 @@ func TestRateLimitService_HandleUpstreamError_403PreservesOriginalUpstreamMessag
 	)
 
 	require.True(t, shouldDisable)
-	require.Equal(t, 1, repo.setErrorCalls)
-	require.Contains(t, repo.lastErrorMsg, "workspace forbidden by policy")
-	require.NotContains(t, repo.lastErrorMsg, "account may be suspended or lack permissions")
+	require.Equal(t, 0, repo.setErrorCalls)
+	require.Equal(t, int64(1), counter.lastCount)
+	require.Empty(t, repo.lastErrorMsg)
 }
 
 func TestRateLimitService_HandleUpstreamError_403FallsBackToRawBody(t *testing.T) {
 	repo := &rateLimitAccountRepoStub{}
+	counter := &openAI403CounterCacheStub{counts: []int64{1}}
 	service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	service.SetOpenAI403CounterCache(counter)
 	account := &Account{
 		ID:       202,
 		Platform: PlatformOpenAI,
@@ -330,10 +334,9 @@ func TestRateLimitService_HandleUpstreamError_403FallsBackToRawBody(t *testing.T
 	)
 
 	require.True(t, shouldDisable)
-	require.Equal(t, 1, repo.setErrorCalls)
-	require.Contains(t, repo.lastErrorMsg, `"access_denied"`)
-	require.Contains(t, repo.lastErrorMsg, `"ip_blocked"`)
-	require.NotContains(t, repo.lastErrorMsg, "account may be suspended or lack permissions")
+	require.Equal(t, 0, repo.setErrorCalls)
+	require.Equal(t, int64(1), counter.lastCount)
+	require.Empty(t, repo.lastErrorMsg)
 }
 
 func TestNormalizedCodexLimits_OnlySecondaryData(t *testing.T) {

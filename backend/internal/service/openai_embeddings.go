@@ -128,6 +128,7 @@ func (s *OpenAIGatewayService) ForwardEmbeddings(
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: s.retryableOnSameOpenAIAccountStatus(ctx, account, resp.StatusCode),
+				SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, respBody),
 			}
 		}
 		writeOpenAIEmbeddingsUpstreamResponse(c, resp, respBody, s.responseHeaderFilter)
@@ -170,11 +171,15 @@ func writeOpenAIEmbeddingsUpstreamResponse(c *gin.Context, resp *http.Response, 
 	} else {
 		c.Writer.Header().Set("Content-Type", "application/json")
 	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		body = ClientFacingErrorBody(resp.StatusCode, "upstream_error", body)
+	}
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, _ = c.Writer.Write(body)
 }
 
 func writeOpenAIEmbeddingsError(c *gin.Context, statusCode int, errType, message string) {
+	message = ClientFacingErrorMessage(statusCode, errType, message)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
 			"type":    errType,

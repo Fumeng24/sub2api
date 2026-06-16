@@ -14,6 +14,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 )
 
 type Account struct {
@@ -607,6 +608,43 @@ func normalizeRequestedModelForLookup(platform, requestedModel string) string {
 	return trimmed
 }
 
+func requestedModelLookupCandidates(platform, requestedModel string) []string {
+	trimmed := strings.TrimSpace(requestedModel)
+	if trimmed == "" {
+		return nil
+	}
+	candidates := make([]string, 0, 3)
+	seen := make(map[string]struct{}, 3)
+	add := func(candidate string) {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			return
+		}
+		key := strings.ToLower(candidate)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		candidates = append(candidates, candidate)
+	}
+
+	add(trimmed)
+	add(normalizeRequestedModelForLookup(platform, trimmed))
+	if platform == PlatformAnthropic {
+		add(claude.NormalizeModelID(trimmed))
+		add(claude.DenormalizeModelID(trimmed))
+	}
+	if platform == PlatformOpenAI {
+		if normalized := normalizeKnownOpenAICodexModel(trimmed); normalized != "" {
+			add(normalized)
+		}
+	}
+	if platform == PlatformOpenAI {
+		add(normalizeOpenAIForwardModelAlias(trimmed))
+	}
+	return candidates
+}
+
 func mappingSupportsRequestedModel(mapping map[string]string, requestedModel string) bool {
 	if requestedModel == "" {
 		return false
@@ -639,11 +677,12 @@ func (a *Account) IsModelSupported(requestedModel string) bool {
 	if len(mapping) == 0 {
 		return true // 无映射 = 允许所有
 	}
-	if mappingSupportsRequestedModel(mapping, requestedModel) {
-		return true
+	for _, candidate := range requestedModelLookupCandidates(a.Platform, requestedModel) {
+		if mappingSupportsRequestedModel(mapping, candidate) {
+			return true
+		}
 	}
-	normalized := normalizeRequestedModelForLookup(a.Platform, requestedModel)
-	return normalized != requestedModel && mappingSupportsRequestedModel(mapping, normalized)
+	return false
 }
 
 // GetMappedModel 获取映射后的模型名（支持通配符，最长优先匹配）
@@ -660,12 +699,8 @@ func (a *Account) ResolveMappedModel(requestedModel string) (mappedModel string,
 	if len(mapping) == 0 {
 		return requestedModel, false
 	}
-	if mappedModel, matched := resolveRequestedModelInMapping(mapping, requestedModel); matched {
-		return mappedModel, true
-	}
-	normalized := normalizeRequestedModelForLookup(a.Platform, requestedModel)
-	if normalized != requestedModel {
-		if mappedModel, matched := resolveRequestedModelInMapping(mapping, normalized); matched {
+	for _, candidate := range requestedModelLookupCandidates(a.Platform, requestedModel) {
+		if mappedModel, matched := resolveRequestedModelInMapping(mapping, candidate); matched {
 			return mappedModel, true
 		}
 	}

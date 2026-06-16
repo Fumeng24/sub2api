@@ -2290,17 +2290,18 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 			}
 			statusCode := openAIWSErrorHTTPStatusFromRaw(errCodeRaw, errTypeRaw)
 			setOpsUpstreamError(c, statusCode, errMsg, "")
+			clientErrMsg := ClientFacingErrorMessage(statusCode, "upstream_error", errMsg)
+			if clientErrMsg != errMsg {
+				if next, setErr := sjson.SetBytes(message, "error.message", clientErrMsg); setErr == nil {
+					message = next
+				}
+			}
 			if reqStream && !clientDisconnected {
 				flushBufferedStreamEvents("error_event")
 				emitStreamMessage(message, true)
 			}
 			if !reqStream {
-				c.JSON(statusCode, gin.H{
-					"error": gin.H{
-						"type":    "upstream_error",
-						"message": errMsg,
-					},
-				})
+				writeClientOpenAIError(c, statusCode, "upstream_error", clientErrMsg)
 			}
 			return nil, fmt.Errorf("openai ws error event: %s", errMsg)
 		}

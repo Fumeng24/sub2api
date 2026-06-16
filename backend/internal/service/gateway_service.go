@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -688,6 +689,7 @@ type UpstreamFailoverError struct {
 	ResponseHeaders        http.Header // 上游响应头，用于透传 cf-ray/cf-mitigated/content-type 等诊断信息
 	ForceCacheBilling      bool        // Antigravity 粘性会话切换时设为 true
 	RetryableOnSameAccount bool        // 临时性错误（如 Google 间歇性 400、空响应），应在同一账号上重试 N 次再切换
+	SchedulerCategory      string      // 可选：覆盖调度健康分类，避免临时边缘错误被归为长期权限错误
 }
 
 func (e *UpstreamFailoverError) Error() string {
@@ -743,7 +745,18 @@ func (s *GatewayService) ReportAccountScheduleSuccess(accountID int64, model, en
 	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
 		return
 	}
-	s.schedulerHealth.reportSuccess(accountID, model, endpoint, firstTokenMs)
+	outcome := s.gatewaySchedulerReporter().report(schedulerResultReport{
+		AccountID:    accountID,
+		Model:        model,
+		Endpoint:     endpoint,
+		Success:      true,
+		FirstTokenMs: firstTokenMs,
+	})
+	if outcome.SlowStreamingSuccess {
+		s.maybeStartGatewayAccountCircuitProbe(accountID, model, endpoint, schedulerSlowTTFTCategory)
+		return
+	}
+	s.stopGatewayAccountCircuitProbe(accountID, model, endpoint)
 }
 
 func (s *GatewayService) ReportAccountScheduleSuccessForRequest(ctx context.Context, accountID int64, model, endpoint string, firstTokenMs *int) {
@@ -762,7 +775,18 @@ func (s *GatewayService) ReportAccountScheduleSuccessForRequest(ctx context.Cont
 			continue
 		}
 		seen[key] = struct{}{}
-		s.schedulerHealth.reportSuccess(accountID, model, schedulerEndpoint, firstTokenMs)
+		outcome := s.gatewaySchedulerReporter().report(schedulerResultReport{
+			AccountID:    accountID,
+			Model:        model,
+			Endpoint:     schedulerEndpoint,
+			Success:      true,
+			FirstTokenMs: firstTokenMs,
+		})
+		if outcome.SlowStreamingSuccess {
+			s.maybeStartGatewayAccountCircuitProbe(accountID, model, schedulerEndpoint, schedulerSlowTTFTCategory)
+			continue
+		}
+		s.stopGatewayAccountCircuitProbe(accountID, model, schedulerEndpoint)
 	}
 }
 
@@ -770,20 +794,32 @@ func (s *GatewayService) ReportAccountScheduleFailure(ctx context.Context, accou
 	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
 		return
 	}
-	statusCode := 0
-	var body []byte
-	var headers http.Header
-	if failoverErr != nil {
-		statusCode = failoverErr.StatusCode
-		body = failoverErr.ResponseBody
-		headers = failoverErr.ResponseHeaders
-	}
-	category := schedulerFailureCategory(statusCode, body)
-	cooldown := schedulerCooldownForCategory(category, headers)
-	s.schedulerHealth.reportFailure(accountID, model, endpoint, category, cooldown)
+	reporter := s.gatewaySchedulerReporter()
+	outcome := reporter.report(schedulerResultReport{
+		AccountID:   accountID,
+		Model:       model,
+		Endpoint:    endpoint,
+		Success:     false,
+		FailoverErr: failoverErr,
+	})
+	s.maybeStartGatewayAccountCircuitProbe(accountID, model, endpoint, outcome.FailureCategory)
 	if ctxEndpoint := schedulerEndpointFromContext(ctx, ""); ctxEndpoint != "" && !strings.EqualFold(ctxEndpoint, endpoint) {
-		s.schedulerHealth.reportFailure(accountID, model, ctxEndpoint, category, cooldown)
+		ctxOutcome := reporter.report(schedulerResultReport{
+			AccountID:   accountID,
+			Model:       model,
+			Endpoint:    ctxEndpoint,
+			Success:     false,
+			FailoverErr: failoverErr,
+		})
+		s.maybeStartGatewayAccountCircuitProbe(accountID, model, ctxEndpoint, ctxOutcome.FailureCategory)
 	}
+}
+
+func (s *GatewayService) gatewaySchedulerReporter() schedulerResultReporter {
+	if s == nil {
+		return schedulerResultReporter{source: "gateway"}
+	}
+	return schedulerResultReporter{health: s.schedulerHealth, source: "gateway"}
 }
 
 func (s *GatewayService) ClearAccountSchedulerHealth(accountID int64) int {
@@ -795,44 +831,47 @@ func (s *GatewayService) ClearAccountSchedulerHealth(accountID int64) int {
 
 // GatewayService handles API gateway operations
 type GatewayService struct {
-	accountRepo           AccountRepository
-	groupRepo             GroupRepository
-	usageLogRepo          UsageLogRepository
-	usageBillingRepo      UsageBillingRepository
-	userRepo              UserRepository
-	userSubRepo           UserSubscriptionRepository
-	userGroupRateRepo     UserGroupRateRepository
-	cache                 GatewayCache
-	digestStore           *DigestSessionStore
-	cfg                   *config.Config
-	schedulerSnapshot     *SchedulerSnapshotService
-	billingService        *BillingService
-	rateLimitService      *RateLimitService
-	billingCacheService   *BillingCacheService
-	identityService       *IdentityService
-	httpUpstream          HTTPUpstream
-	deferredService       *DeferredService
-	concurrencyService    *ConcurrencyService
-	slotPoolService       SlotPoolService
-	claudeTokenProvider   *ClaudeTokenProvider
-	sessionLimitCache     SessionLimitCache // 会话数量限制缓存（仅 Anthropic OAuth/SetupToken）
-	rpmCache              RPMCache          // RPM 计数缓存（仅 Anthropic OAuth/SetupToken）
-	userGroupRateResolver *userGroupRateResolver
-	userGroupRateCache    *gocache.Cache
-	userGroupRateSF       singleflight.Group
-	modelsListCache       *gocache.Cache
-	modelsListCacheTTL    time.Duration
-	settingService        *SettingService
-	responseHeaderFilter  *responseheaders.CompiledHeaderFilter
-	debugModelRouting     atomic.Bool
-	debugClaudeMimic      atomic.Bool
-	channelService        *ChannelService
-	resolver              *ModelPricingResolver
-	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
-	tlsFPProfileService   *TLSFingerprintProfileService
-	balanceNotifyService  *BalanceNotifyService
-	userPlatformQuotaRepo UserPlatformQuotaRepository
-	schedulerHealth       *accountSchedulerHealthStats
+	accountRepo                 AccountRepository
+	groupRepo                   GroupRepository
+	usageLogRepo                UsageLogRepository
+	usageBillingRepo            UsageBillingRepository
+	userRepo                    UserRepository
+	userSubRepo                 UserSubscriptionRepository
+	userGroupRateRepo           UserGroupRateRepository
+	cache                       GatewayCache
+	digestStore                 *DigestSessionStore
+	cfg                         *config.Config
+	schedulerSnapshot           *SchedulerSnapshotService
+	billingService              *BillingService
+	rateLimitService            *RateLimitService
+	billingCacheService         *BillingCacheService
+	identityService             *IdentityService
+	httpUpstream                HTTPUpstream
+	deferredService             *DeferredService
+	concurrencyService          *ConcurrencyService
+	slotPoolService             SlotPoolService
+	claudeTokenProvider         *ClaudeTokenProvider
+	geminiTokenProvider         *GeminiTokenProvider
+	antigravityTokenProvider    *AntigravityTokenProvider
+	sessionLimitCache           SessionLimitCache // 会话数量限制缓存（仅 Anthropic OAuth/SetupToken）
+	rpmCache                    RPMCache          // RPM 计数缓存（仅 Anthropic OAuth/SetupToken）
+	userGroupRateResolver       *userGroupRateResolver
+	userGroupRateCache          *gocache.Cache
+	userGroupRateSF             singleflight.Group
+	modelsListCache             *gocache.Cache
+	modelsListCacheTTL          time.Duration
+	settingService              *SettingService
+	responseHeaderFilter        *responseheaders.CompiledHeaderFilter
+	debugModelRouting           atomic.Bool
+	debugClaudeMimic            atomic.Bool
+	channelService              *ChannelService
+	resolver                    *ModelPricingResolver
+	debugGatewayBodyFile        atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
+	tlsFPProfileService         *TLSFingerprintProfileService
+	balanceNotifyService        *BalanceNotifyService
+	userPlatformQuotaRepo       UserPlatformQuotaRepository
+	schedulerHealth             *accountSchedulerHealthStats
+	gatewayAccountCircuitProbes sync.Map // key: accountSchedulerHealthKey, value: *gatewayAccountCircuitProbe
 }
 
 // NewGatewayService creates a new GatewayService
@@ -865,6 +904,7 @@ func NewGatewayService(
 	resolver *ModelPricingResolver,
 	balanceNotifyService *BalanceNotifyService,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
+	optionalGeminiTokenProvider ...*GeminiTokenProvider,
 ) *GatewayService {
 	userGroupRateTTL := resolveUserGroupRateCacheTTL(cfg)
 	modelsListTTL := resolveModelsListCacheTTL(cfg)
@@ -904,6 +944,9 @@ func NewGatewayService(
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
 		schedulerHealth:       newAccountSchedulerHealthStats(),
 	}
+	if len(optionalGeminiTokenProvider) > 0 {
+		svc.geminiTokenProvider = optionalGeminiTokenProvider[0]
+	}
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		userGroupRateRepo,
 		svc.userGroupRateCache,
@@ -917,6 +960,13 @@ func NewGatewayService(
 		svc.initDebugGatewayBodyFile(path)
 	}
 	return svc
+}
+
+func (s *GatewayService) SetAntigravityTokenProvider(provider *AntigravityTokenProvider) {
+	if s == nil {
+		return
+	}
+	s.antigravityTokenProvider = provider
 }
 
 // GenerateSessionHash 从预解析请求计算粘性会话 hash
@@ -6199,6 +6249,9 @@ func (s *GatewayService) handleNonStreamingResponseAnthropicAPIKeyPassthrough(
 		contentType = "application/json"
 	}
 	body = reverseToolNamesIfPresent(c, body)
+	if resp.StatusCode >= http.StatusBadRequest {
+		body = ClientFacingErrorBody(resp.StatusCode, "upstream_error", body)
+	}
 	c.Data(resp.StatusCode, contentType, body)
 	return usage, nil
 }
@@ -6591,6 +6644,9 @@ func (s *GatewayService) handleBedrockNonStreamingResponse(
 	c.Header("Content-Type", "application/json")
 	if v := resp.Header.Get("x-amzn-requestid"); v != "" {
 		c.Header("x-request-id", v)
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		body = ClientFacingErrorBody(resp.StatusCode, "upstream_error", body)
 	}
 	c.Data(resp.StatusCode, "application/json", body)
 	return usage, nil
@@ -7740,13 +7796,7 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 		"upstream_error",
 		"Upstream request failed",
 	); matched {
-		c.JSON(status, gin.H{
-			"type": "error",
-			"error": gin.H{
-				"type":    errType,
-				"message": errMsg,
-			},
-		})
+		writeClientClaudeError(c, status, errType, errMsg)
 
 		summary := upstreamMsg
 		if summary == "" {
@@ -7770,7 +7820,13 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 			errMsg = "Upstream service temporarily unavailable"
 			break
 		}
-		c.Data(http.StatusBadRequest, "application/json", body)
+		statusCode = http.StatusBadRequest
+		errType = "invalid_request_error"
+		errMsg = upstreamMsg
+		if errMsg == "" {
+			errMsg = "Invalid request"
+		}
+		writeClientClaudeError(c, statusCode, errType, errMsg)
 		summary := upstreamMsg
 		if summary == "" {
 			summary = truncateForLog(body, 512)
@@ -7806,13 +7862,7 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 	}
 
 	// 返回自定义错误响应
-	c.JSON(statusCode, gin.H{
-		"type": "error",
-		"error": gin.H{
-			"type":    errType,
-			"message": errMsg,
-		},
-	})
+	writeClientClaudeError(c, statusCode, errType, errMsg)
 
 	if upstreamMsg == "" {
 		return nil, fmt.Errorf("upstream error: %d", resp.StatusCode)
@@ -7909,13 +7959,7 @@ func (s *GatewayService) handleRetryExhaustedError(ctx context.Context, resp *ht
 			"upstream_error",
 			"Upstream request failed after retries",
 		); matched {
-			c.JSON(status, gin.H{
-				"type": "error",
-				"error": gin.H{
-					"type":    errType,
-					"message": errMsg,
-				},
-			})
+			writeClientClaudeError(c, status, errType, errMsg)
 
 			summary := upstreamMsg
 			if summary == "" {
@@ -7929,13 +7973,7 @@ func (s *GatewayService) handleRetryExhaustedError(ctx context.Context, resp *ht
 	}
 
 	if isUpstreamBillingExhaustionError(resp.StatusCode, upstreamMsg, respBody) {
-		c.JSON(http.StatusBadGateway, gin.H{
-			"type": "error",
-			"error": gin.H{
-				"type":    "upstream_error",
-				"message": "Upstream service temporarily unavailable",
-			},
-		})
+		writeClientClaudeError(c, http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable")
 		if upstreamMsg == "" {
 			return nil, fmt.Errorf("upstream error: %d (retries exhausted)", resp.StatusCode)
 		}
@@ -7943,13 +7981,7 @@ func (s *GatewayService) handleRetryExhaustedError(ctx context.Context, resp *ht
 	}
 
 	// 返回统一的重试耗尽错误响应
-	c.JSON(http.StatusBadGateway, gin.H{
-		"type": "error",
-		"error": gin.H{
-			"type":    "upstream_error",
-			"message": "Upstream request failed after retries",
-		},
-	})
+	writeClientClaudeError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed after retries")
 
 	if upstreamMsg == "" {
 		return nil, fmt.Errorf("upstream error: %d (retries exhausted)", resp.StatusCode)
@@ -8076,6 +8108,7 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 		if message == "" {
 			message = reason
 		}
+		message = ClientFacingErrorMessage(http.StatusBadGateway, reason, message)
 		body, err := json.Marshal(map[string]any{
 			"type": "error",
 			"error": map[string]string{
@@ -8651,6 +8684,9 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 	}
 
 	body = reverseToolNamesIfPresent(c, body)
+	if resp.StatusCode >= http.StatusBadRequest {
+		body = ClientFacingErrorBody(resp.StatusCode, "upstream_error", body)
+	}
 
 	// 写入响应
 	c.Data(resp.StatusCode, contentType, body)
@@ -10334,13 +10370,7 @@ func sanitizeCountTokensRequestBody(body []byte) []byte {
 
 // countTokensError 返回 count_tokens 错误响应
 func (s *GatewayService) countTokensError(c *gin.Context, status int, errType, message string) {
-	c.JSON(status, gin.H{
-		"type": "error",
-		"error": gin.H{
-			"type":    errType,
-			"message": message,
-		},
-	})
+	writeClientClaudeError(c, status, errType, message)
 }
 
 // buildCustomRelayURL 构建自定义中继转发 URL

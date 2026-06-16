@@ -20,9 +20,46 @@ declare module 'vue-router' {
     requiresAdmin?: boolean
 
     /**
+     * Whether this route requires support/admin ticket access
+     * @default false
+     */
+    requiresSupport?: boolean
+
+    /**
      * Page title for this route
      */
     title?: string
+
+    /**
+     * Search/share title. Falls back to title/titleKey when omitted.
+     */
+    seoTitle?: string
+
+    /**
+     * Search/share description. Falls back to descriptionKey/default site description when omitted.
+     */
+    description?: string
+
+    /**
+     * Search engine robots directive, for example "index,follow" or "noindex,nofollow".
+     */
+    robots?: string
+
+    /**
+     * Canonical path without host. Useful for aliases and redirects.
+     */
+    canonicalPath?: string
+
+    /**
+     * Open Graph type for social previews.
+     * @default website
+     */
+    ogType?: string
+
+    /**
+     * Open Graph/Twitter preview image.
+     */
+    ogImage?: string
 
     /**
      * Optional breadcrumb items for navigation

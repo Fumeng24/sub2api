@@ -28,6 +28,10 @@ export function formatCreditedBalance(amount: number): string {
   )
 }
 
+export function formatBalanceCreditAmount(amount: number): string {
+  return `${(Number.isFinite(amount) ? amount : 0).toFixed(2)} 余额`
+}
+
 export function shouldShowCreditedBalance(order: Pick<PaymentOrder, 'order_type'>): boolean {
   return order.order_type === 'balance'
 }

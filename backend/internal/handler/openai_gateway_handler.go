@@ -80,6 +80,9 @@ func shouldFallbackOpenAICompactToModel(c *gin.Context, requestedModel string, f
 	if requestedModel == "" || strings.EqualFold(requestedModel, openAICompactFallbackModel) {
 		return false
 	}
+	if strings.EqualFold(requestedModel, "gpt-5.5") {
+		return false
+	}
 	return service.IsOpenAIContextWindowErrorForTest(string(failoverErr.ResponseBody))
 }
 
@@ -526,6 +529,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						if msg == "" {
 							msg = "OpenAI compact input exceeds the context window"
 						}
+						msg = openAIContextWindowClientMessage(reqModel, failoverErr.ResponseBody, msg)
 						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 						if h.gatewayService != nil {
 							h.gatewayService.ReportOpenAIAccountScheduleTerminal(account.ID, reqModel, schedulerEndpoint)
@@ -1059,6 +1063,7 @@ func resolveOpenAIMessagesMetadataSession(sessionHash, promptCacheKey, reqModel 
 
 // anthropicErrorResponse writes an error in Anthropic Messages API format.
 func (h *OpenAIGatewayHandler) anthropicErrorResponse(c *gin.Context, status int, errType, message string) {
+	message = service.ClientFacingErrorMessage(status, errType, message)
 	c.JSON(status, gin.H{
 		"type": "error",
 		"error": gin.H{
@@ -1071,6 +1076,7 @@ func (h *OpenAIGatewayHandler) anthropicErrorResponse(c *gin.Context, status int
 // anthropicStreamingAwareError handles errors that may occur during streaming,
 // using Anthropic SSE error format.
 func (h *OpenAIGatewayHandler) anthropicStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
+	message = service.ClientFacingErrorMessage(status, errType, message)
 	if streamStarted {
 		flusher, ok := c.Writer.(http.Flusher)
 		if ok {
@@ -1933,7 +1939,8 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 				c.Set(service.OpsSkipPassthroughKey, true)
 			}
 
-			h.handleStreamingAwareError(c, respCode, "upstream_error", msg, streamStarted)
+			clientErr := upstreamClientErrorForPassthroughFailover(respCode, "upstream_error", msg)
+			h.handleStreamingAwareError(c, clientErr.Status, clientErr.Type, clientErr.Message, streamStarted)
 			return
 		}
 	}
@@ -1942,38 +1949,33 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 	service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
 
 	// 使用默认的错误映射
-	status, errType, errMsg := h.mapUpstreamError(statusCode)
-	h.handleStreamingAwareError(c, status, errType, errMsg, streamStarted)
+	clientErr := upstreamClientErrorForOpenAIFailoverStatus(statusCode)
+	h.handleStreamingAwareError(c, clientErr.Status, clientErr.Type, clientErr.Message, streamStarted)
 }
 
 // handleFailoverExhaustedSimple 简化版本，用于没有响应体的情况
 func (h *OpenAIGatewayHandler) handleFailoverExhaustedSimple(c *gin.Context, statusCode int, streamStarted bool) {
-	status, errType, errMsg := h.mapUpstreamError(statusCode)
-	service.SetOpsUpstreamError(c, statusCode, errMsg, "")
-	h.handleStreamingAwareError(c, status, errType, errMsg, streamStarted)
+	clientErr := upstreamClientErrorForOpenAIFailoverStatus(statusCode)
+	service.SetOpsUpstreamError(c, statusCode, clientErr.Message, "")
+	h.handleStreamingAwareError(c, clientErr.Status, clientErr.Type, clientErr.Message, streamStarted)
 }
 
 func (h *OpenAIGatewayHandler) mapUpstreamError(statusCode int) (int, string, string) {
-	switch statusCode {
-	case 401:
-		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
-	case 402:
-		return http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable"
-	case 403:
-		return http.StatusForbidden, "forbidden_error", "Upstream access forbidden, please contact administrator"
-	case 429:
-		return http.StatusTooManyRequests, "rate_limit_error", "Upstream rate limit exceeded, please retry later"
-	case 529:
-		return http.StatusServiceUnavailable, "upstream_error", "Upstream service overloaded, please retry later"
-	case 500, 502, 503, 504:
-		return http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable"
-	default:
-		return http.StatusBadGateway, "upstream_error", "Upstream request failed"
-	}
+	clientErr := upstreamClientErrorForOpenAIFailoverStatus(statusCode)
+	return clientErr.Status, clientErr.Type, clientErr.Message
+}
+
+func upstreamClientErrorForOpenAIFailoverStatus(statusCode int) UpstreamClientError {
+	return upstreamClientErrorForFailoverStatusWithPolicy(statusCode, upstreamFailoverClientPolicy{
+		ForbiddenStatus: http.StatusForbidden,
+		ForbiddenType:   "forbidden_error",
+		OverloadedType:  "upstream_error",
+	})
 }
 
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *OpenAIGatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
+	message = service.ClientFacingErrorMessage(status, errType, message)
 	if streamStarted {
 		// /v1/responses 的严格 SDK（Codex CLI）要求终止事件必须属于
 		// response.completed/failed/incomplete/cancelled 集合。
@@ -2100,6 +2102,7 @@ func openAIForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForwa
 
 // errorResponse returns OpenAI API format error response
 func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
+	message = service.ClientFacingErrorMessage(status, errType, message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"type":    errType,

@@ -75,9 +75,9 @@
                   <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
                   <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatSelectedPaymentAmount(totalAmount) }}</span>
                 </div>
-                <div v-if="showBalanceRechargeRate" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
+                <div class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.creditedBalance') }}</span>
-                  <span class="text-gray-900 dark:text-white">{{ formatCreditedBalance(creditedAmount) }}</span>
+                  <span class="text-gray-900 dark:text-white">{{ formatBalanceCreditAmount(creditedAmount) }}</span>
                 </div>
                 <p v-if="showBalanceRechargeRate" class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
                   {{ t('payment.rechargeRatePreview', { cny: balanceRechargeCnyPerCredit.toFixed(2) }) }}
@@ -283,7 +283,7 @@ import Icon from '@/components/icons/Icon.vue'
 import { DEFAULT_PAYMENT_CURRENCY, formatPaymentAmount, normalizePaymentCurrency, paymentAmountPrefix } from '@/components/payment/currency'
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
-import { formatCreditedBalance } from '@/components/payment/orderAmounts'
+import { formatBalanceCreditAmount, formatCreditedBalance } from '@/components/payment/orderAmounts'
 import { hasWechatResumeQuery, parseWechatResumeRoute, stripWechatResumeQuery } from './paymentWechatResume'
 
 const i18n = useI18n()
@@ -541,14 +541,11 @@ const selectedLimit = computed(() => visibleMethods.value[selectedMethod.value])
 const selectedCurrency = computed(() => normalizePaymentCurrency(selectedLimit.value?.currency))
 const appliesBalanceRechargeRate = computed(() => selectedCurrency.value === DEFAULT_PAYMENT_CURRENCY)
 const quickRechargeAmounts = computed(() =>
-  quickRechargeBalanceCredits.map(paymentAmountForBalanceCredit)
+  quickRechargeBalanceCredits.map((value) => value)
 )
 const showBalanceRechargeRate = computed(() => appliesBalanceRechargeRate.value && balanceRechargeCnyPerCredit.value !== 1)
 const creditedAmount = computed(() => {
-  const amount = appliesBalanceRechargeRate.value
-    ? validAmount.value / balanceRechargeCnyPerCredit.value
-    : validAmount.value
-  return Math.round(amount * 100) / 100
+  return Math.round(validAmount.value * 100) / 100
 })
 const selectedPaymentInputPrefix = computed(() => paymentAmountPrefix(selectedCurrency.value))
 const localeCode = computed(() => {
@@ -565,8 +562,7 @@ function formatSelectedPaymentAmount(value: number): string {
 }
 
 function formatQuickRechargeAmountLabel(value: number): string {
-  const credit = quickRechargeTargetCredit(value)
-  return formatCreditedBalance(Math.round(credit * 100) / 100)
+  return formatBalanceCreditAmount(value)
 }
 
 function formatQuickRechargeAmountDescription(value: number): string {
@@ -588,10 +584,7 @@ function quickRechargeDisabledReason(value: number): string {
 }
 
 function paymentAmountForBalanceCredit(credit: number): number {
-  const paymentAmount = appliesBalanceRechargeRate.value
-    ? credit * balanceRechargeCnyPerCredit.value
-    : credit
-  return Math.round(paymentAmount * 100) / 100
+  return Math.round(credit * 100) / 100
 }
 
 function applyDefaultRechargeAmount() {
@@ -607,16 +600,6 @@ function applyDefaultRechargeAmount() {
   if (fallbackAmount) {
     amount.value = fallbackAmount
   }
-}
-
-function quickRechargeTargetCredit(value: number): number {
-  const index = quickRechargeAmounts.value.findIndex((amount) => amount === value)
-  if (index >= 0) {
-    return quickRechargeBalanceCredits[index]
-  }
-  return appliesBalanceRechargeRate.value
-    ? value / balanceRechargeCnyPerCredit.value
-    : value
 }
 
 const methodOptions = computed<PaymentMethodOption[]>(() =>

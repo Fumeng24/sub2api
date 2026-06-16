@@ -90,6 +90,36 @@ func normalizeKnownOpenAICodexModel(model string) string {
 	}
 }
 
+// normalizeOpenAIForwardModelAlias returns the supported upstream model that
+// should be used for legacy/compact Codex model aliases. This is intentionally
+// separate from normalizeKnownOpenAICodexModel because pricing and historical
+// display may still need the exact legacy model family. Legacy gpt-5.2 traffic
+// is routed to gpt-5.5 so scheduler support checks can land on the current
+// supported OpenAI family.
+func normalizeOpenAIForwardModelAlias(model string) string {
+	trimmed := strings.TrimSpace(model)
+	if trimmed == "" {
+		return ""
+	}
+	canonical := canonicalizeOpenAIModelAliasSpelling(trimmed)
+	if canonical == "" {
+		return ""
+	}
+	normalized := normalizeKnownOpenAICodexModel(model)
+	if normalized == "" {
+		return ""
+	}
+	switch normalized {
+	case "gpt-5.2":
+		return "gpt-5.5"
+	default:
+		if strings.EqualFold(canonical, normalized) {
+			return ""
+		}
+		return normalized
+	}
+}
+
 func appendUsageBillingModelCandidate(candidates []string, seen map[string]struct{}, model string) []string {
 	trimmed := strings.TrimSpace(model)
 	if trimmed == "" {

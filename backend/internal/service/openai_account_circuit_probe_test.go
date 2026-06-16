@@ -18,6 +18,8 @@ import (
 type openAIAccountCircuitProbeUpstreamStub struct {
 	mu          sync.Mutex
 	statuses    []int
+	delays      []time.Duration
+	emptyStream []bool
 	calls       int
 	bodies      [][]byte
 	callCh      chan int
@@ -40,6 +42,16 @@ func (u *openAIAccountCircuitProbeUpstreamStub) Do(req *http.Request, proxyURL s
 		status = u.statuses[0]
 		u.statuses = u.statuses[1:]
 	}
+	delay := time.Duration(0)
+	if len(u.delays) > 0 {
+		delay = u.delays[0]
+		u.delays = u.delays[1:]
+	}
+	emptyStream := false
+	if len(u.emptyStream) > 0 {
+		emptyStream = u.emptyStream[0]
+		u.emptyStream = u.emptyStream[1:]
+	}
 	u.bodies = append(u.bodies, append([]byte(nil), body...))
 	u.mu.Unlock()
 
@@ -50,14 +62,27 @@ func (u *openAIAccountCircuitProbeUpstreamStub) Do(req *http.Request, proxyURL s
 	if call == 2 && u.allowSecond != nil {
 		<-u.allowSecond
 	}
+	if delay > 0 {
+		select {
+		case <-req.Context().Done():
+			return nil, req.Context().Err()
+		case <-time.After(delay):
+		}
+	}
 
-	respBody := `{"id":"probe-ok"}`
+	respBody := "event: response.output_text.delta\n" +
+		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"1\"}\n\n"
+	contentType := "text/event-stream"
+	if emptyStream {
+		respBody = "data: [DONE]\n\n"
+	}
 	if status >= 400 {
 		respBody = `{"error":{"message":"bad gateway"}}`
+		contentType = "application/json"
 	}
 	return &http.Response{
 		StatusCode: status,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Header:     http.Header{"Content-Type": []string{contentType}},
 		Body:       io.NopCloser(strings.NewReader(respBody)),
 	}, nil
 }
@@ -73,9 +98,17 @@ func (u *openAIAccountCircuitProbeUpstreamStub) callCount() int {
 }
 
 func TestOpenAIAccountCircuitProbe_RecoveryRequiresSuccessfulProbe(t *testing.T) {
-	oldInterval := openAIAccountCircuitProbeInterval
-	openAIAccountCircuitProbeInterval = 10 * time.Millisecond
-	defer func() { openAIAccountCircuitProbeInterval = oldInterval }()
+	oldRetryDelay := openAIAccountCircuitProbeRetryDelay
+	oldTimeout := openAIAccountCircuitProbeTimeout
+	oldHealthyTTFT := schedulerHealthyTTFTThreshold
+	openAIAccountCircuitProbeRetryDelay = 10 * time.Millisecond
+	openAIAccountCircuitProbeTimeout = time.Second
+	schedulerHealthyTTFTThreshold = time.Second
+	defer func() {
+		openAIAccountCircuitProbeRetryDelay = oldRetryDelay
+		openAIAccountCircuitProbeTimeout = oldTimeout
+		schedulerHealthyTTFTThreshold = oldHealthyTTFT
+	}()
 
 	account := Account{
 		ID:          9001,
@@ -145,10 +178,85 @@ func TestOpenAIAccountCircuitProbe_RecoveryRequiresSuccessfulProbe(t *testing.T)
 	}
 }
 
+func TestShouldStartOpenAIAccountCircuitProbe_StartsForRateLimit(t *testing.T) {
+	require.True(t, shouldStartOpenAIAccountCircuitProbe("gpt-5.5", "/v1/responses", "rate_limit"))
+	require.True(t, shouldStartOpenAIAccountCircuitProbe("gpt-5.4", "/v1/chat/completions", "rate_limit"))
+	require.False(t, shouldStartOpenAIAccountCircuitProbe("gpt-image-2", "/v1/responses", "rate_limit"))
+}
+
+func TestOpenAIAccountCircuitProbe_FailedProbeWaitsRetryDelayBeforeNextAttempt(t *testing.T) {
+	oldRetryDelay := openAIAccountCircuitProbeRetryDelay
+	oldTimeout := openAIAccountCircuitProbeTimeout
+	oldHealthyTTFT := schedulerHealthyTTFTThreshold
+	openAIAccountCircuitProbeRetryDelay = 80 * time.Millisecond
+	openAIAccountCircuitProbeTimeout = time.Second
+	schedulerHealthyTTFTThreshold = time.Second
+	defer func() {
+		openAIAccountCircuitProbeRetryDelay = oldRetryDelay
+		openAIAccountCircuitProbeTimeout = oldTimeout
+		schedulerHealthyTTFTThreshold = oldHealthyTTFT
+	}()
+
+	account := Account{
+		ID:          9003,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "sk-test"},
+	}
+	upstream := &openAIAccountCircuitProbeUpstreamStub{
+		statuses: []int{http.StatusTooManyRequests, http.StatusOK},
+		callCh:   make(chan int, 4),
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:     schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cfg:             &config.Config{},
+		httpUpstream:    upstream,
+		schedulerHealth: newAccountSchedulerHealthStats(),
+	}
+	defer svc.stopOpenAIAccountCircuitProbe(account.ID, "gpt-5.5", "/v1/responses")
+
+	started := time.Now()
+	svc.ReportOpenAIAccountScheduleFailure(account.ID, "gpt-5.5", "/v1/responses", &UpstreamFailoverError{
+		StatusCode:   http.StatusTooManyRequests,
+		ResponseBody: []byte(`{"error":{"type":"rate_limit_error","message":"slow down"}}`),
+	})
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected first probe to start immediately")
+	}
+	require.Less(t, time.Since(started), 50*time.Millisecond)
+
+	select {
+	case <-upstream.callCh:
+		t.Fatal("second probe ran before retry delay elapsed")
+	case <-time.After(40 * time.Millisecond):
+	}
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected second probe after retry delay")
+	}
+	require.GreaterOrEqual(t, time.Since(started), 70*time.Millisecond)
+}
+
 func TestOpenAIAccountCircuitProbe_StopsWhenAccountManuallyUnschedulable(t *testing.T) {
-	oldInterval := openAIAccountCircuitProbeInterval
-	openAIAccountCircuitProbeInterval = 10 * time.Millisecond
-	defer func() { openAIAccountCircuitProbeInterval = oldInterval }()
+	oldRetryDelay := openAIAccountCircuitProbeRetryDelay
+	oldTimeout := openAIAccountCircuitProbeTimeout
+	oldHealthyTTFT := schedulerHealthyTTFTThreshold
+	openAIAccountCircuitProbeRetryDelay = 10 * time.Millisecond
+	openAIAccountCircuitProbeTimeout = time.Second
+	schedulerHealthyTTFTThreshold = time.Second
+	defer func() {
+		openAIAccountCircuitProbeRetryDelay = oldRetryDelay
+		openAIAccountCircuitProbeTimeout = oldTimeout
+		schedulerHealthyTTFTThreshold = oldHealthyTTFT
+	}()
 
 	account := Account{
 		ID:          9002,
@@ -170,9 +278,6 @@ func TestOpenAIAccountCircuitProbe_StopsWhenAccountManuallyUnschedulable(t *test
 	defer svc.stopOpenAIAccountCircuitProbe(account.ID, "gpt-5.4", "/v1/responses")
 
 	svc.ReportOpenAIAccountScheduleFailure(account.ID, "gpt-5.4", "/v1/responses", newNetworkUpstreamFailoverError("openai_request_error: use of closed network connection"))
-	openSnap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.4", "/v1/responses", false)
-	require.Equal(t, schedulerCircuitOpen, openSnap.CircuitState)
-	require.Equal(t, "transient_transport", openSnap.LastFailureReason)
 
 	require.Eventually(t, func() bool {
 		snap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.4", "/v1/responses", false)
@@ -180,4 +285,124 @@ func TestOpenAIAccountCircuitProbe_StopsWhenAccountManuallyUnschedulable(t *test
 		return snap.CircuitState == schedulerCircuitClosed && !probeRunning
 	}, time.Second, time.Millisecond)
 	require.Zero(t, upstream.callCount(), "manual unschedulable accounts must not be probed upstream")
+}
+
+func TestOpenAIAccountCircuitProbe_SlowTTFTDoesNotRecover(t *testing.T) {
+	oldRetryDelay := openAIAccountCircuitProbeRetryDelay
+	oldTimeout := openAIAccountCircuitProbeTimeout
+	oldHealthyTTFT := schedulerHealthyTTFTThreshold
+	openAIAccountCircuitProbeRetryDelay = 20 * time.Millisecond
+	openAIAccountCircuitProbeTimeout = time.Second
+	schedulerHealthyTTFTThreshold = 15 * time.Millisecond
+	defer func() {
+		openAIAccountCircuitProbeRetryDelay = oldRetryDelay
+		openAIAccountCircuitProbeTimeout = oldTimeout
+		schedulerHealthyTTFTThreshold = oldHealthyTTFT
+	}()
+
+	account := Account{
+		ID:          9004,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "sk-test"},
+	}
+	upstream := &openAIAccountCircuitProbeUpstreamStub{
+		statuses: []int{http.StatusOK, http.StatusOK},
+		delays:   []time.Duration{30 * time.Millisecond, 30 * time.Millisecond},
+		callCh:   make(chan int, 4),
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:     schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cfg:             &config.Config{},
+		httpUpstream:    upstream,
+		schedulerHealth: newAccountSchedulerHealthStats(),
+	}
+	defer svc.stopOpenAIAccountCircuitProbe(account.ID, "gpt-5.5", "/v1/responses")
+
+	svc.ReportOpenAIAccountScheduleFailure(account.ID, "gpt-5.5", "/v1/responses", &UpstreamFailoverError{
+		StatusCode:   http.StatusGatewayTimeout,
+		ResponseBody: []byte(`{"error":{"message":"timeout"}}`),
+	})
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected first probe")
+	}
+	require.Eventually(t, func() bool {
+		snap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.5", "/v1/responses", false)
+		return snap.CircuitState == schedulerCircuitOpen && snap.LastFailureReason == "transient_timeout"
+	}, time.Second, time.Millisecond)
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected slow probe to retry")
+	}
+	snap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.5", "/v1/responses", false)
+	require.Equal(t, schedulerCircuitOpen, snap.CircuitState)
+}
+
+func TestOpenAIAccountCircuitProbe_EmptyStreamDoesNotStopProbe(t *testing.T) {
+	oldRetryDelay := openAIAccountCircuitProbeRetryDelay
+	oldTimeout := openAIAccountCircuitProbeTimeout
+	oldHealthyTTFT := schedulerHealthyTTFTThreshold
+	openAIAccountCircuitProbeRetryDelay = 20 * time.Millisecond
+	openAIAccountCircuitProbeTimeout = time.Second
+	schedulerHealthyTTFTThreshold = time.Second
+	defer func() {
+		openAIAccountCircuitProbeRetryDelay = oldRetryDelay
+		openAIAccountCircuitProbeTimeout = oldTimeout
+		schedulerHealthyTTFTThreshold = oldHealthyTTFT
+	}()
+
+	account := Account{
+		ID:          9005,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "sk-test"},
+	}
+	upstream := &openAIAccountCircuitProbeUpstreamStub{
+		statuses:    []int{http.StatusOK, http.StatusOK},
+		emptyStream: []bool{true, false},
+		callCh:      make(chan int, 4),
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:     schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cfg:             &config.Config{},
+		httpUpstream:    upstream,
+		schedulerHealth: newAccountSchedulerHealthStats(),
+	}
+	defer svc.stopOpenAIAccountCircuitProbe(account.ID, "gpt-5.5", "/v1/responses")
+
+	svc.ReportOpenAIAccountScheduleFailure(account.ID, "gpt-5.5", "/v1/responses", &UpstreamFailoverError{
+		StatusCode:   http.StatusGatewayTimeout,
+		ResponseBody: []byte(`{"error":{"message":"timeout"}}`),
+	})
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected first probe")
+	}
+	require.Eventually(t, func() bool {
+		snap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.5", "/v1/responses", false)
+		return snap.CircuitState == schedulerCircuitOpen && snap.LastFailureReason == "transient_timeout"
+	}, time.Second, time.Millisecond)
+
+	select {
+	case <-upstream.callCh:
+	case <-time.After(time.Second):
+		t.Fatal("expected retry after empty stream")
+	}
+	require.Eventually(t, func() bool {
+		snap := svc.schedulerHealth.snapshot(account.ID, "gpt-5.5", "/v1/responses", false)
+		return snap.CircuitState == schedulerCircuitClosed
+	}, time.Second, time.Millisecond)
 }

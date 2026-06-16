@@ -174,6 +174,13 @@ func (s *SchedulerSnapshotService) GetGroupByID(ctx context.Context, groupID int
 	return s.groupRepo.GetByID(ctx, groupID)
 }
 
+func (s *SchedulerSnapshotService) ListActiveGroupsByPlatform(ctx context.Context, platform string) ([]Group, error) {
+	if s == nil || s.groupRepo == nil {
+		return nil, nil
+	}
+	return s.groupRepo.ListActiveByPlatform(ctx, platform)
+}
+
 // UpdateAccountInCache 立即更新 Redis 中单个账号的数据（用于模型限流后立即生效）
 func (s *SchedulerSnapshotService) UpdateAccountInCache(ctx context.Context, account *Account) error {
 	if s.cache == nil || account == nil {

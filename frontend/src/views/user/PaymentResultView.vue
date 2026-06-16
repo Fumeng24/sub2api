@@ -57,7 +57,7 @@
             </div>
             <div v-if="shouldShowCreditedBalance(order)" class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.creditedBalance') }}</span>
-              <span class="font-medium text-gray-900 dark:text-white">{{ formatCreditedBalance(order.amount) }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ formatBalanceCreditAmount(order.amount) }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.paymentMethod') }}</span>
@@ -111,7 +111,7 @@ import { paymentAPI } from '@/api/payment'
 import { authAPI } from '@/api/auth'
 import type { PaymentOrder } from '@/types/payment'
 import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
-import { formatCreditedBalance, shouldShowCreditedBalance } from '@/components/payment/orderAmounts'
+import { formatBalanceCreditAmount, shouldShowCreditedBalance } from '@/components/payment/orderAmounts'
 import { setSettlementCnyPerCredit } from '@/composables/useSettlementCurrency'
 import { normalizePaymentMethodForDisplay, paymentMethodI18nKey } from './paymentUx'
 

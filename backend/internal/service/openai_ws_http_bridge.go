@@ -126,6 +126,7 @@ func buildOpenAIWSHTTPBridgeErrorEvent(statusCode int, message string) []byte {
 	if message == "" {
 		message = "upstream request failed"
 	}
+	message = ClientFacingErrorMessage(statusCode, "upstream_error", message)
 	event := map[string]any{
 		"type":   "error",
 		"status": statusCode,

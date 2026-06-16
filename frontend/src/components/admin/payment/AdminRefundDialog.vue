@@ -170,6 +170,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import type { PaymentOrder } from '@/types/payment'
 import { formatOrderDateTime } from '@/components/payment/orderUtils'
 import {
+  formatBalanceCreditAmount,
   formatCreditedBalance,
   formatOrderPaymentAmount,
   shouldShowCreditedBalance,
@@ -261,7 +262,7 @@ function formatGatewayAmount(amount: number): string {
 }
 
 function formatRefundAmount(amount: number): string {
-  if (!props.order || shouldShowCreditedBalance(props.order)) return formatCreditedBalance(amount)
+  if (!props.order || shouldShowCreditedBalance(props.order)) return formatBalanceCreditAmount(amount)
   return formatGatewayAmount(amount)
 }
 

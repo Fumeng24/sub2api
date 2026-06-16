@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -170,6 +169,8 @@ type openAIAccountLoadPlan struct {
 	candidateCount            int
 	topK                      int
 	loadSkew                  float64
+	stableLowTTFT             bool
+	stableLowTTFTSeq          uint64
 }
 
 type openAISelectionPlan struct {
@@ -181,6 +182,7 @@ type openAISelectionPlan struct {
 	loadPlan          openAIAccountLoadPlan
 	diagnostics       OpenAIAccountSelectionDiagnostics
 	compactBlocked    bool
+	schedGroup        *Group
 }
 
 func (m *openAIAccountSchedulerMetrics) recordSelect(decision OpenAIAccountScheduleDecision) {
@@ -319,6 +321,8 @@ type defaultOpenAIAccountScheduler struct {
 	service *OpenAIGatewayService
 	metrics openAIAccountSchedulerMetrics
 	stats   *openAIAccountRuntimeStats
+
+	stableLowTTFTSeq atomic.Uint64
 }
 
 type openAIStickyEscapeConfig struct {
@@ -984,7 +988,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlanFromAccounts(
 		ExcludedAccountIDs:                openAIAccountIDsFromMap(req.ExcludedIDs),
 		FilterReasonCounts:                make(map[string]int),
 	}
-	plan := openAISelectionPlan{diagnostics: diag}
+	plan := openAISelectionPlan{diagnostics: diag, schedGroup: schedGroup}
 	if s == nil || s.service == nil {
 		plan.diagnostics.Collected = false
 		return plan
@@ -1133,7 +1137,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlanFromAccounts(
 	if req.RequireCompact {
 		plan.compactBlocked = diag.CompactUnsupportedCount > 0 && diag.CompactSupportedCount == 0
 	}
-	plan.loadPlan = s.buildOpenAIAccountLoadPlan(req, candidateAccounts, circuitAllowed, loadMap)
+	plan.loadPlan = s.buildOpenAIAccountLoadPlan(req, schedGroup, candidateAccounts, circuitAllowed, loadMap)
 	for _, candidate := range plan.loadPlan.selectionOrder {
 		diag.OrderedCandidateAccountIDs = appendOpenAIAccountID(diag.OrderedCandidateAccountIDs, candidate.account)
 		if len(diag.OrderedCandidateAccountIDs) >= 10 {
@@ -1192,6 +1196,7 @@ func buildOpenAIOrderedSelectionOrder(candidates []openAIAccountCandidateScore) 
 
 func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	req OpenAIAccountScheduleRequest,
+	schedGroup *Group,
 	candidatePool []*Account,
 	waitPool []*Account,
 	loadMap map[int64]*AccountLoadInfo,
@@ -1223,6 +1228,10 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		candidates:                candidates,
 		staleSnapshotCompactRetry: staleSnapshotCompactRetry,
 		candidateCount:            len(candidates),
+		stableLowTTFT:             isOpenAIStableLowTTFTGroup(schedGroup),
+	}
+	if plan.stableLowTTFT {
+		plan.stableLowTTFTSeq = s.stableLowTTFTSeq.Add(1)
 	}
 	plan.topK = len(candidates)
 	if plan.topK <= 0 {
@@ -1570,7 +1579,7 @@ func (s *defaultOpenAIAccountScheduler) refreshOpenAISelectionPlanLoad(
 	}
 	base.loadMap = freshLoadMap
 	base.candidateAccounts = openAIAccountsWithAvailableConcurrency(base.circuitAllowed, freshLoadMap)
-	base.loadPlan = s.buildOpenAIAccountLoadPlan(req, base.candidateAccounts, base.circuitAllowed, freshLoadMap)
+	base.loadPlan = s.buildOpenAIAccountLoadPlan(req, base.schedGroup, base.candidateAccounts, base.circuitAllowed, freshLoadMap)
 	return base, true
 }
 
@@ -1644,6 +1653,9 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionOrder(
 		if len(pool) == 0 {
 			return nil
 		}
+		if plan.stableLowTTFT {
+			return buildOpenAIStableLowTTFTSelectionOrder(pool, plan.stableLowTTFTSeq)
+		}
 		return buildOpenAIOrderedSelectionOrder(pool)
 	}
 
@@ -1663,6 +1675,77 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionOrder(
 	selectionOrder := make([]openAIAccountCandidateScore, 0, len(plan.candidates))
 	selectionOrder = append(selectionOrder, buildSelectionOrder(plan.candidates)...)
 	return selectionOrder
+}
+
+func isOpenAIStableLowTTFTGroup(group *Group) bool {
+	if group == nil || !strings.EqualFold(strings.TrimSpace(group.Platform), PlatformOpenAI) {
+		return false
+	}
+	return strings.Contains(group.Name, "稳定")
+}
+
+func buildOpenAIStableLowTTFTSelectionOrder(pool []openAIAccountCandidateScore, seq uint64) []openAIAccountCandidateScore {
+	known := make([]openAIAccountCandidateScore, 0, len(pool))
+	unknown := make([]openAIAccountCandidateScore, 0, len(pool))
+	for _, candidate := range pool {
+		if candidate.hasTTFT && candidate.ttft > 0 {
+			known = append(known, candidate)
+			continue
+		}
+		unknown = append(unknown, candidate)
+	}
+
+	sortOpenAIStableLowTTFTKnown(known)
+	unknown = rotateOpenAIStableLowTTFTUnknown(unknown, seq)
+	if len(known) == 0 {
+		return unknown
+	}
+	return append(known, unknown...)
+}
+
+func sortOpenAIStableLowTTFTKnown(scores []openAIAccountCandidateScore) {
+	sort.SliceStable(scores, func(i, j int) bool {
+		a, b := scores[i], scores[j]
+		if a.cooldown != b.cooldown {
+			return !a.cooldown
+		}
+		if a.halfOpen != b.halfOpen {
+			return !a.halfOpen
+		}
+		if a.ttft != b.ttft {
+			return a.ttft < b.ttft
+		}
+		aLoad := openAIAccountCandidateLoadInfo(a)
+		bLoad := openAIAccountCandidateLoadInfo(b)
+		if aLoad.LoadRate != bLoad.LoadRate {
+			return aLoad.LoadRate < bLoad.LoadRate
+		}
+		if aLoad.WaitingCount != bLoad.WaitingCount {
+			return aLoad.WaitingCount < bLoad.WaitingCount
+		}
+		if a.score != b.score {
+			return a.score > b.score
+		}
+		if a.sortOrder != b.sortOrder {
+			return a.sortOrder < b.sortOrder
+		}
+		if a.groupPrio != b.groupPrio {
+			return a.groupPrio < b.groupPrio
+		}
+		return openAIAccountCandidateID(a) < openAIAccountCandidateID(b)
+	})
+}
+
+func rotateOpenAIStableLowTTFTUnknown(scores []openAIAccountCandidateScore, seq uint64) []openAIAccountCandidateScore {
+	ordered := buildOpenAIOrderedSelectionOrder(scores)
+	if len(ordered) <= 1 {
+		return ordered
+	}
+	shift := int(seq % uint64(len(ordered)))
+	if shift == 0 {
+		return ordered
+	}
+	return append(ordered[shift:], ordered[:shift]...)
 }
 
 func splitOpenAICompactCandidates(candidates []openAIAccountCandidateScore, requestedModel string) (supported []openAIAccountCandidateScore, unknown []openAIAccountCandidateScore) {
@@ -2246,9 +2329,13 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResultForRequest(accou
 	if s == nil || accountID <= 0 {
 		return
 	}
+	outcome := schedulerResultReportOutcome{}
+	slowStreamingSuccess := success && schedulerStreamingTTFTIsSlow(endpoint, firstTokenMs)
 	if success {
-		s.recoverOpenAIAccountCircuit(accountID)
-		s.stopOpenAIAccountCircuitProbe(accountID, model, endpoint)
+		if !slowStreamingSuccess {
+			s.recoverOpenAIAccountCircuit(accountID)
+			s.stopOpenAIAccountCircuitProbe(accountID, model, endpoint)
+		}
 	} else {
 		if s.isOpenAIAccountCircuitHalfOpenInFlight(accountID, time.Now()) {
 			// Non-failover errors (for example a user 400) still prove the
@@ -2259,12 +2346,16 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResultForRequest(accou
 		}
 	}
 	if s.schedulerHealth != nil {
-		if success {
-			s.schedulerHealth.reportSuccess(accountID, model, endpoint, firstTokenMs)
-		} else {
-			category := schedulerFailureCategory(0, nil)
-			s.schedulerHealth.reportFailure(accountID, model, endpoint, category, schedulerCooldownForCategory(category, nil))
-		}
+		outcome = s.openAISchedulerReporter().report(schedulerResultReport{
+			AccountID:    accountID,
+			Model:        model,
+			Endpoint:     endpoint,
+			Success:      success,
+			FirstTokenMs: firstTokenMs,
+		})
+	}
+	if outcome.SlowStreamingSuccess {
+		s.maybeStartOpenAIAccountCircuitProbe(accountID, model, endpoint, schedulerSlowTTFTCategory)
 	}
 	scheduler := s.getOpenAIAccountScheduler(context.Background())
 	if scheduler != nil {
@@ -2286,22 +2377,19 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleFailure(accountID int6
 	if s == nil || accountID <= 0 {
 		return
 	}
-	statusCode := 0
-	var body []byte
-	var headers http.Header
-	if failoverErr != nil {
-		statusCode = failoverErr.StatusCode
-		body = failoverErr.ResponseBody
-		headers = failoverErr.ResponseHeaders
-	}
-	category := schedulerFailureCategory(statusCode, body)
-	cooldown := schedulerCooldownForCategory(category, headers)
+	statusCode, _, _ := schedulerFailureInputs(failoverErr)
+	outcome := s.openAISchedulerReporter().report(schedulerResultReport{
+		AccountID:   accountID,
+		Model:       model,
+		Endpoint:    endpoint,
+		Success:     false,
+		FailoverErr: failoverErr,
+	})
+	category := outcome.FailureCategory
+	cooldown := outcome.Cooldown
 	if category == "auth" {
 		reason := "openai_auth_error"
 		s.reopenOpenAIAccountCircuit(accountID, reason, cooldown)
-	}
-	if s.schedulerHealth != nil {
-		s.schedulerHealth.reportFailure(accountID, model, endpoint, category, cooldown)
 	}
 	s.maybeStartOpenAIAccountCircuitProbe(accountID, model, endpoint, category)
 	if category == "transient" || category == "transient_transport" || category == "transient_timeout" || category == "compact_bad_output" || category == "empty_output" || category == "rate_limit" || category == "model_unsupported" {
@@ -2336,6 +2424,13 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleFailure(accountID int6
 	if scheduler != nil {
 		scheduler.ReportResult(accountID, false, nil)
 	}
+}
+
+func (s *OpenAIGatewayService) openAISchedulerReporter() schedulerResultReporter {
+	if s == nil {
+		return schedulerResultReporter{source: PlatformOpenAI}
+	}
+	return schedulerResultReporter{health: s.schedulerHealth, source: PlatformOpenAI}
 }
 
 func (s *OpenAIGatewayService) RecordOpenAIAccountSwitch() {
