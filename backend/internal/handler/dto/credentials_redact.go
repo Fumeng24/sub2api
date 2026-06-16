@@ -28,6 +28,39 @@ func RedactCredentials(in map[string]any) (out map[string]any, status map[string
 	return out, status
 }
 
+// RedactSensitiveMap 复制一份任意响应 map，并递归剥离常见敏感凭据键。
+//
+// Account.Extra 理论上只保存展示/调度配置，但管理员接口允许传入任意 JSON；
+// 这里作为响应层兜底，避免误把 token、cookie、私钥等放进 Extra 后被列表接口带回前端。
+func RedactSensitiveMap(in map[string]any) map[string]any {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]any, len(in))
+	for k, v := range in {
+		if service.IsSensitiveCredentialKey(k) {
+			continue
+		}
+		out[k] = redactSensitiveValue(v)
+	}
+	return out
+}
+
+func redactSensitiveValue(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		return RedactSensitiveMap(x)
+	case []any:
+		out := make([]any, len(x))
+		for i := range x {
+			out[i] = redactSensitiveValue(x[i])
+		}
+		return out
+	default:
+		return v
+	}
+}
+
 // isCredentialValuePresent 判断值是否"存在且非零"。空字符串、nil、false 均视为未配置；
 // 其余非零类型（数字、对象、字符串等）视为已配置。
 func isCredentialValuePresent(v any) bool {

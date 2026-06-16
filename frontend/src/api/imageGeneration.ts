@@ -94,32 +94,35 @@ function readFileAsDataURL(file: File) {
   })
 }
 
-async function fileToGeminiInlineData(file: File) {
-  const dataURL = await readFileAsDataURL(file)
-  const match = dataURL.match(/^data:([^;]+);base64,(.*)$/i)
-  return {
-    inlineData: {
-      mimeType: match?.[1] || file.type || 'image/png',
-      data: match?.[2] || '',
-    },
-  }
-}
-
 function geminiAspectRatioFromSize(size: string | undefined) {
   switch (size) {
     case '1024x1536':
+    case '2048x3072':
+    case '4096x6144':
       return '2:3'
     case '1536x1024':
+    case '3072x2048':
+    case '6144x4096':
       return '3:2'
     case '1024x1365':
+    case '2048x2730':
+    case '4096x5460':
       return '3:4'
     case '1365x1024':
+    case '2730x2048':
+    case '5460x4096':
       return '4:3'
     case '1088x1920':
+    case '2176x3840':
+    case '4352x7680':
       return '9:16'
     case '1920x1088':
+    case '3840x2176':
+    case '7680x4352':
       return '16:9'
     case '1024x1024':
+    case '2048x2048':
+    case '4096x4096':
       return '1:1'
     default:
       return ''
@@ -137,41 +140,87 @@ function geminiImageSizeFromSize(size: string | undefined) {
     case '1024x1024':
     case 'auto':
       return '1K'
+    case '2048x3072':
+    case '3072x2048':
+    case '2048x2730':
+    case '2730x2048':
+    case '2176x3840':
+    case '3840x2176':
+    case '2048x2048':
+      return '2K'
+    case '4096x6144':
+    case '6144x4096':
+    case '4096x5460':
+    case '5460x4096':
+    case '4352x7680':
+    case '7680x4352':
+    case '4096x4096':
+      return '4K'
     default:
       return ''
   }
 }
 
-async function buildGeminiImageBody(request: GeminiImageGatewayRequest) {
-  const parts: Array<Record<string, unknown>> = [{ text: request.prompt }]
-  for (const image of request.referenceImages || []) {
-    parts.push(await fileToGeminiInlineData(image))
-  }
-
-  const imageConfig: Record<string, unknown> = {}
-  const aspectRatio = geminiAspectRatioFromSize(request.size)
-  if (aspectRatio) {
-    imageConfig.aspectRatio = aspectRatio
-  }
-  const imageSize = geminiImageSizeFromSize(request.size)
-  if (imageSize) {
-    imageConfig.imageSize = imageSize
-  }
-
-  const generationConfig: Record<string, unknown> = {
-    responseModalities: ['TEXT', 'IMAGE'],
-  }
-  if (Object.keys(imageConfig).length > 0) {
-    generationConfig.imageConfig = imageConfig
-  }
-
+function geminiImageOptionsFromSize(size: string | undefined) {
   return {
-    contents: [{
-      role: 'user',
-      parts,
-    }],
-    generationConfig,
+    aspectRatio: geminiAspectRatioFromSize(size),
+    imageSize: geminiImageSizeFromSize(size),
   }
+}
+
+function geminiImagePrompt(request: GeminiImageGatewayRequest) {
+  const options = geminiImageOptionsFromSize(request.size)
+  const instructions: string[] = []
+  if (options.aspectRatio) {
+    instructions.push(`aspect ratio ${options.aspectRatio}`)
+  }
+  if (options.imageSize) {
+    instructions.push(`${options.imageSize} resolution`)
+  }
+  if (instructions.length === 0) {
+    return request.prompt
+  }
+  return `${request.prompt}\n\nImage requirements: ${instructions.join(', ')}.`
+}
+
+async function buildGeminiChatCompletionsImageBody(request: GeminiImageGatewayRequest) {
+  const promptText = geminiImagePrompt(request)
+  const content: Array<Record<string, unknown>> = [{
+    type: 'text',
+    text: promptText,
+  }]
+  for (const image of request.referenceImages || []) {
+    const dataURL = await readFileAsDataURL(image)
+    if (dataURL) {
+      content.push({
+        type: 'image_url',
+        image_url: { url: dataURL },
+      })
+    }
+  }
+
+  const imageOptions = geminiImageOptionsFromSize(request.size)
+  const body: Record<string, unknown> = {
+    model: request.model.trim().replace(/^models\//, ''),
+    messages: [{
+      role: 'user',
+      content: content.length === 1 ? promptText : content,
+    }],
+    stream: false,
+  }
+  if (request.size && request.size !== 'auto') {
+    body.size = request.size
+  }
+  if (imageOptions.aspectRatio) {
+    body.aspect_ratio = imageOptions.aspectRatio
+  }
+  if (imageOptions.imageSize) {
+    body.image_size = imageOptions.imageSize
+  }
+  if (request.quality && request.quality !== 'auto') {
+    body.quality = request.quality
+  }
+  return body
 }
 
 async function readResponse(response: Response) {
@@ -399,8 +448,7 @@ export async function submitImageGatewayRequest(request: ImageGatewayRequest): P
 }
 
 export async function submitGeminiImageGatewayRequest(request: GeminiImageGatewayRequest): Promise<unknown> {
-  const model = request.model.trim().replace(/^models\//, '')
-  const url = gatewayUrl(request.baseUrl, `/v1beta/models/${encodeURIComponent(model)}:generateContent`)
+  const url = gatewayUrl(request.baseUrl, '/v1/chat/completions')
   const headers = new Headers({
     Authorization: `Bearer ${request.apiKey}`,
     Accept: 'application/json',
@@ -413,7 +461,7 @@ export async function submitGeminiImageGatewayRequest(request: GeminiImageGatewa
     const response = await fetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify(await buildGeminiImageBody({ ...request, count: 1 })),
+      body: JSON.stringify(await buildGeminiChatCompletionsImageBody({ ...request, count: 1 })),
       signal: request.signal,
     })
     const payload = normalizeGatewayPayload(await readResponse(response))

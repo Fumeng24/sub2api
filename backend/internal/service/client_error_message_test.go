@@ -56,6 +56,13 @@ func TestClientFacingErrorMessage_RedactsInternalDetails(t *testing.T) {
 			msg:     "Upstream response too large",
 			want:    clientFacingTemporaryUnavailableMessage,
 		},
+		{
+			name:    "cloudflare origin error page",
+			status:  http.StatusBadGateway,
+			errType: "upstream_error",
+			msg:     "The origin web server returned an invalid or incomplete response to Cloudflare. This typically indicates the origin is overloaded or misconfigured.",
+			want:    clientFacingTemporaryUnavailableMessage,
+		},
 	}
 
 	for _, tt := range tests {
@@ -65,7 +72,7 @@ func TestClientFacingErrorMessage_RedactsInternalDetails(t *testing.T) {
 				t.Fatalf("ClientFacingErrorMessage() = %q, want %q", got, tt.want)
 			}
 			lower := strings.ToLower(got)
-			for _, leaked := range []string{"account", "https://", "cf-ray", "request id", "candidate"} {
+			for _, leaked := range []string{"account", "https://", "cf-ray", "cloudflare", "request id", "candidate"} {
 				if strings.Contains(lower, leaked) {
 					t.Fatalf("sanitized message leaked %q: %q", leaked, got)
 				}
@@ -79,6 +86,16 @@ func TestClientFacingErrorMessage_PreservesActionableClientErrors(t *testing.T) 
 	got := ClientFacingErrorMessage(http.StatusBadRequest, "invalid_request_error", msg)
 	if got != msg {
 		t.Fatalf("ClientFacingErrorMessage() = %q, want %q", got, msg)
+	}
+}
+
+func TestClientFacingErrorMessage_RedactsCredentialLikeText(t *testing.T) {
+	msg := "upstream rejected request api_key=sk-testsecret123456789, Authorization: Bearer ya29.a0AfH6SMDUMMYTOKEN, Cookie: sessionid=secret-cookie"
+	got := ClientFacingErrorMessage(http.StatusBadGateway, "upstream_error", msg)
+	for _, leaked := range []string{"sk-testsecret", "ya29.a0AfH6", "secret-cookie"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("sanitized message leaked %q: %q", leaked, got)
+		}
 	}
 }
 

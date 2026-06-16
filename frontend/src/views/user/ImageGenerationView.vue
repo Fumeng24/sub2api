@@ -64,7 +64,7 @@
                 <label class="input-label">{{ t('imageGeneration.size') }}</label>
                 <div class="grid grid-cols-2 gap-2">
                   <button
-                    v-for="option in sizeOptions"
+                    v-for="option in visibleSizeOptions"
                     :key="option.value"
                     type="button"
                     :class="[
@@ -78,6 +78,9 @@
                     {{ option.label }}
                   </button>
                 </div>
+                <p v-if="sizeCapabilityHint" class="input-hint">
+                  {{ sizeCapabilityHint }}
+                </p>
               </div>
 
               <div class="grid grid-cols-2 gap-3">
@@ -390,7 +393,7 @@ let runCachePersistChain: Promise<void> = Promise.resolve()
 let referenceCachePersistVersion = 0
 let referenceCachePersistChain: Promise<void> = Promise.resolve()
 
-const sizeOptions = [
+const openAIImageSizeOptions = [
   { value: '1024x1024', label: '1:1 · 1K', tier: '1K' },
   { value: '1024x1536', label: '2:3 · 1K', tier: '1K' },
   { value: '1536x1024', label: '3:2 · 1K', tier: '1K' },
@@ -400,6 +403,26 @@ const sizeOptions = [
   { value: '1920x1088', label: '16:9 · 1K', tier: '1K' },
   { value: 'auto', label: 'Auto · 1K', tier: '1K' },
 ] as const
+
+const geminiImageSizeOptions = [
+  ...openAIImageSizeOptions,
+  { value: '2048x2048', label: '1:1 · 2K', tier: '2K' },
+  { value: '2048x3072', label: '2:3 · 2K', tier: '2K' },
+  { value: '3072x2048', label: '3:2 · 2K', tier: '2K' },
+  { value: '2048x2730', label: '3:4 · 2K', tier: '2K' },
+  { value: '2730x2048', label: '4:3 · 2K', tier: '2K' },
+  { value: '2176x3840', label: '9:16 · 2K', tier: '2K' },
+  { value: '3840x2176', label: '16:9 · 2K', tier: '2K' },
+  { value: '4096x4096', label: '1:1 · 4K', tier: '4K' },
+  { value: '4096x6144', label: '2:3 · 4K', tier: '4K' },
+  { value: '6144x4096', label: '3:2 · 4K', tier: '4K' },
+  { value: '4096x5460', label: '3:4 · 4K', tier: '4K' },
+  { value: '5460x4096', label: '4:3 · 4K', tier: '4K' },
+  { value: '4352x7680', label: '9:16 · 4K', tier: '4K' },
+  { value: '7680x4352', label: '16:9 · 4K', tier: '4K' },
+] as const
+
+type ImageSizeOption = (typeof geminiImageSizeOptions)[number]
 
 const qualityOptions = computed(() => [
   { value: 'auto', label: t('imageGeneration.qualityOptions.auto') },
@@ -422,6 +445,21 @@ const imageGroupOptions = computed(() => imageGroups.value.map((group) => ({
 
 const selectedGroup = computed(() => imageGroups.value.find((group) => group.id === selectedGroupId.value) || null)
 
+const visibleSizeOptions = computed<readonly ImageSizeOption[]>(() => (
+  selectedGroup.value?.platform === 'gemini'
+    ? geminiImageSizeOptions.filter((option) => supportsGeminiImageSizeTier(selectedImageModel.value, option.tier))
+    : openAIImageSizeOptions
+))
+
+const sizeCapabilityHint = computed(() => {
+  if (selectedGroup.value?.platform !== 'gemini') return ''
+  const tiers = new Set(visibleSizeOptions.value.map((option) => option.tier))
+  if (!tiers.has('2K') && !tiers.has('4K')) {
+    return t('imageGeneration.geminiFlashSizeHint')
+  }
+  return ''
+})
+
 const imageModelOptions = computed(() => {
   const group = selectedGroup.value
   if (!group) return []
@@ -443,7 +481,7 @@ const activeImageKeys = computed(() => apiKeys.value.filter((key) => key.status 
 
 const selectedGroupKey = computed(() => activeImageKeys.value.find((key) => key.group_id === selectedGroupId.value) || null)
 
-const selectedSize = computed(() => sizeOptions.find((option) => option.value === size.value) || sizeOptions[0])
+const selectedSize = computed(() => visibleSizeOptions.value.find((option) => option.value === size.value) || visibleSizeOptions.value[0])
 const userBalance = computed(() => Number(authStore.user?.balance || 0))
 const gatewayBaseUrl = computed(() => publicSettings.value?.api_base_url || window.location.origin)
 const cnyPerCredit = computed(() => {
@@ -564,6 +602,16 @@ function hasActiveKeyForGroup(keys: ApiKey[], groupId: number) {
   return keys.some((key) => key.status === 'active' && key.group_id === groupId)
 }
 
+function normalizeImageModelName(model: string) {
+  return model.trim().toLowerCase().replace(/^models\//, '')
+}
+
+function supportsGeminiImageSizeTier(model: string, tier: string) {
+  if (tier === '1K') return true
+  const normalized = normalizeImageModelName(model)
+  return normalized === 'gemini-3-pro-image' || normalized.startsWith('gemini-3-pro-image-')
+}
+
 function resolveImageBasePrice(group: Group, tier: string) {
   const value = tier === '2K'
     ? group.image_price_2k
@@ -640,6 +688,12 @@ function onSelectModel(value: string | number | boolean | null) {
 
 function syncSelectedModel() {
   selectedModelId.value = selectedImageModel.value
+}
+
+function syncSelectedSize() {
+  if (!visibleSizeOptions.value.some((option) => option.value === size.value)) {
+    size.value = visibleSizeOptions.value[0]?.value || '1024x1024'
+  }
 }
 
 function hasBrowserImageCache() {
@@ -1034,6 +1088,7 @@ async function loadInitialData() {
     apiKeys.value = keyPage.items || []
     selectedGroupId.value = resolvePreferredGroupId(targetGroups, apiKeys.value)
     syncSelectedModel()
+    syncSelectedSize()
     await ensureKeyForGroup(selectedGroup.value)
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, t('imageGeneration.loadKeysFailed')))
@@ -1329,6 +1384,7 @@ watch(selectedGroup, (group) => {
     return
   }
   syncSelectedModel()
+  syncSelectedSize()
   void ensureKeyForGroup(group)
 })
 

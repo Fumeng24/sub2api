@@ -1,29 +1,52 @@
 package service
 
+import "strings"
+
 // SensitiveCredentialKeys 列出 Account.Credentials JSON map 中绝不允许返回到前端的子键。
 // dto 层做响应脱敏、service 层做更新合并都引用此清单——新增凭证类型时务必同步。
 var SensitiveCredentialKeys = []string{
 	// OAuth
-	"access_token", "refresh_token", "id_token",
+	"access_token", "refresh_token", "id_token", "authorization",
 	// API Key 类
-	"api_key", "session_key", "cookie", "upstream_sub2api_password",
+	"api_key", "api-key", "apikey", "x-api-key",
+	"session_key", "session_token",
+	"cookie", "set-cookie", "upstream_sub2api_password",
+	"client_secret", "password", "passwd", "passphrase",
 	// 云服务凭据
 	"aws_secret_access_key", "aws_session_token",
 	"service_account_json", "service_account", "private_key",
+	// 常见 camelCase / 第三方导入别名
+	"accessToken", "refreshToken", "idToken",
+	"apiKey", "xApiKey", "sessionKey", "sessionToken",
+	"setCookie", "clientSecret",
+	"awsSecretAccessKey", "awsSessionToken",
+	"serviceAccountJson", "serviceAccount", "privateKey",
 }
 
 var sensitiveCredentialKeySet = func() map[string]struct{} {
 	m := make(map[string]struct{}, len(SensitiveCredentialKeys))
 	for _, k := range SensitiveCredentialKeys {
-		m[k] = struct{}{}
+		m[normalizeSensitiveCredentialKey(k)] = struct{}{}
 	}
 	return m
 }()
 
 // IsSensitiveCredentialKey 判断指定键是否为敏感凭证子键。
 func IsSensitiveCredentialKey(key string) bool {
-	_, ok := sensitiveCredentialKeySet[key]
+	_, ok := sensitiveCredentialKeySet[normalizeSensitiveCredentialKey(key)]
 	return ok
+}
+
+func normalizeSensitiveCredentialKey(key string) string {
+	key = strings.TrimSpace(strings.ToLower(key))
+	if key == "" {
+		return ""
+	}
+	key = strings.ReplaceAll(key, "_", "")
+	key = strings.ReplaceAll(key, "-", "")
+	key = strings.ReplaceAll(key, ".", "")
+	key = strings.ReplaceAll(key, " ", "")
+	return key
 }
 
 // MergePreservingSensitiveCreds 把 incoming 写入 existing 之上，但敏感子键采用"incoming 没提供就保留 existing"
@@ -35,16 +58,21 @@ func IsSensitiveCredentialKey(key string) bool {
 //   - 敏感键：incoming 显式提供则覆盖（用户主动旋转 token），否则保留 existing。
 func MergePreservingSensitiveCreds(existing, incoming map[string]any) map[string]any {
 	out := make(map[string]any, len(incoming)+len(SensitiveCredentialKeys))
+	incomingSensitiveKeys := make(map[string]struct{}, len(incoming))
 	for k, v := range incoming {
 		out[k] = v
+		if IsSensitiveCredentialKey(k) {
+			incomingSensitiveKeys[normalizeSensitiveCredentialKey(k)] = struct{}{}
+		}
 	}
-	for _, key := range SensitiveCredentialKeys {
-		if _, hasIncoming := incoming[key]; hasIncoming {
+	for key, existingVal := range existing {
+		if !IsSensitiveCredentialKey(key) {
 			continue
 		}
-		if existingVal, ok := existing[key]; ok {
-			out[key] = existingVal
+		if _, hasIncoming := incomingSensitiveKeys[normalizeSensitiveCredentialKey(key)]; hasIncoming {
+			continue
 		}
+		out[key] = existingVal
 	}
 	return out
 }

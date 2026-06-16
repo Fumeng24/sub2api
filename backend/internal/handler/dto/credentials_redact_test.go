@@ -16,9 +16,13 @@ func TestRedactCredentials_StripsSensitiveKeysAndReportsStatus(t *testing.T) {
 	in := map[string]any{
 		"refresh_token":             "rt-secret",
 		"access_token":              "at-secret",
+		"apiKey":                    "sk-camel-secret",
+		"Authorization":             "Bearer secret",
 		"api_key":                   "sk-secret",
 		"upstream_sub2api_password": "sub2api-secret",
+		"clientSecret":              "client-secret",
 		"aws_secret_access_key":     "aws-secret",
+		"privateKey":                "camel-key",
 		"service_account_json":      map[string]any{"private_key": "..."},
 		"private_key":               "raw-key",
 		// 非敏感
@@ -32,9 +36,13 @@ func TestRedactCredentials_StripsSensitiveKeysAndReportsStatus(t *testing.T) {
 
 	require.NotContains(t, out, "refresh_token")
 	require.NotContains(t, out, "access_token")
+	require.NotContains(t, out, "apiKey")
+	require.NotContains(t, out, "Authorization")
 	require.NotContains(t, out, "api_key")
 	require.NotContains(t, out, "upstream_sub2api_password")
+	require.NotContains(t, out, "clientSecret")
 	require.NotContains(t, out, "aws_secret_access_key")
+	require.NotContains(t, out, "privateKey")
 	require.NotContains(t, out, "service_account_json")
 	require.NotContains(t, out, "private_key")
 
@@ -45,9 +53,13 @@ func TestRedactCredentials_StripsSensitiveKeysAndReportsStatus(t *testing.T) {
 
 	require.True(t, status["has_refresh_token"])
 	require.True(t, status["has_access_token"])
+	require.True(t, status["has_apiKey"])
+	require.True(t, status["has_Authorization"])
 	require.True(t, status["has_api_key"])
 	require.True(t, status["has_upstream_sub2api_password"])
+	require.True(t, status["has_clientSecret"])
 	require.True(t, status["has_aws_secret_access_key"])
+	require.True(t, status["has_privateKey"])
 	require.True(t, status["has_service_account_json"])
 	require.True(t, status["has_private_key"])
 
@@ -97,4 +109,42 @@ func TestRedactCredentials_AllKnownSensitiveKeys(t *testing.T) {
 	for _, k := range keys {
 		require.True(t, status["has_"+k], "key %s 应在 status 中标记为已配置", k)
 	}
+}
+
+func TestRedactSensitiveMap_StripsNestedSensitiveKeys(t *testing.T) {
+	in := map[string]any{
+		"privacy_mode": "training_off",
+		"access_token": "at-secret",
+		"nested": map[string]any{
+			"apiKey":       "sk-secret",
+			"clientSecret": "client-secret",
+			"base_url":     "https://api.example.com",
+		},
+		"items": []any{
+			map[string]any{
+				"refreshToken": "rt-secret",
+				"safe":         "ok",
+			},
+		},
+	}
+
+	out := RedactSensitiveMap(in)
+
+	require.NotContains(t, out, "access_token")
+	require.Equal(t, "training_off", out["privacy_mode"])
+	require.Equal(t, "at-secret", in["access_token"], "原始 map 不应被修改")
+
+	nested, ok := out["nested"].(map[string]any)
+	require.True(t, ok)
+	require.NotContains(t, nested, "apiKey")
+	require.NotContains(t, nested, "clientSecret")
+	require.Equal(t, "https://api.example.com", nested["base_url"])
+
+	items, ok := out["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+	item, ok := items[0].(map[string]any)
+	require.True(t, ok)
+	require.NotContains(t, item, "refreshToken")
+	require.Equal(t, "ok", item["safe"])
 }

@@ -37,6 +37,9 @@ func (s *GeminiMessagesCompatService) ForwardAsChatCompletions(
 	if strings.TrimSpace(ccReq.Model) == "" {
 		return nil, s.writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", "model is required")
 	}
+	if account.Type == AccountTypeAPIKey && isImageGenerationModel(ccReq.Model) {
+		return s.forwardImageAsRawChatCompletions(ctx, c, account, body)
+	}
 
 	originalModel := ccReq.Model
 	clientStream := ccReq.Stream

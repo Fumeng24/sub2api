@@ -934,6 +934,7 @@ export default {
     selectModel: 'Select image model',
     noImageModel: 'This group does not have any image model configured.',
     size: 'Size',
+    geminiFlashSizeHint: 'The current Gemini Flash image upstream has been verified to return 1K only, so unavailable 2K/4K options are hidden.',
     quality: 'Quality',
     count: 'Count',
     promptPlaceholder: 'Enter the image you want to create, or paste/drop reference images',

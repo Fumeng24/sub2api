@@ -938,6 +938,7 @@ export default {
     selectModel: '选择生图模型',
     noImageModel: '这个分组没有配置可用的图片模型。',
     size: '尺寸',
+    geminiFlashSizeHint: '当前 Gemini Flash 生图上游实测仅返回 1K，已隐藏不可兑现的 2K/4K 选项。',
     quality: '质量',
     count: '数量',
     promptPlaceholder: '输入你想生成的画面，也可以粘贴或拖入参考图',

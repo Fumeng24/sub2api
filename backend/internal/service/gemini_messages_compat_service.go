@@ -23,6 +23,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 
@@ -1065,6 +1066,8 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 
 	var usage *ClaudeUsage
 	var firstTokenMs *int
+	imageCount := 0
+	requireImage := isImageGenerationModel(originalModel)
 	if req.Stream {
 		streamRes, err := s.handleStreamingResponse(c, resp, startTime, originalModel)
 		if err != nil {
@@ -1078,6 +1081,10 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 			if err != nil {
 				return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Failed to read upstream stream")
 			}
+			imageCount = countGeminiImagePartsFromMap(collected)
+			if requireImage && imageCount == 0 {
+				return nil, newGeminiEmptyImageFailoverError()
+			}
 			collectedBytes, _ := json.Marshal(collected)
 			claudeResp, usageObj2 := convertGeminiToClaudeMessage(collected, originalModel, collectedBytes)
 			c.JSON(http.StatusOK, claudeResp)
@@ -1086,20 +1093,18 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 				usage = usageObj
 			}
 		} else {
-			usage, err = s.handleNonStreamingResponse(c, resp, originalModel)
+			nonStreamRes, err := s.handleNonStreamingResponse(c, resp, originalModel, requireImage)
 			if err != nil {
 				return nil, err
 			}
+			usage = nonStreamRes.usage
+			imageCount = nonStreamRes.imageCount
 		}
 	}
 
 	// 图片生成计费
-	imageCount := 0
 	imageInputSize := s.extractImageInputSize(body)
 	imageSize := normalizeOpenAIImageSizeTier(imageInputSize)
-	if isImageGenerationModel(originalModel) {
-		imageCount = 1
-	}
 
 	return &ForwardResult{
 		RequestID:      requestID,
@@ -1597,6 +1602,8 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 
 	var usage *ClaudeUsage
 	var firstTokenMs *int
+	imageCount := 0
+	requireImage := isImageGenerationModel(originalModel)
 
 	if stream {
 		streamRes, err := s.handleNativeStreamingResponse(c, resp, startTime, isOAuth)
@@ -1605,21 +1612,27 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 		}
 		usage = streamRes.usage
 		firstTokenMs = streamRes.firstTokenMs
+		imageCount = streamRes.imageCount
 	} else {
 		if useUpstreamStream {
 			collected, usageObj, err := collectGeminiSSE(resp.Body, isOAuth)
 			if err != nil {
 				return nil, s.writeGoogleError(c, http.StatusBadGateway, "Failed to read upstream stream")
 			}
+			imageCount = countGeminiImagePartsFromMap(collected)
+			if requireImage && imageCount == 0 {
+				return nil, newGeminiEmptyImageFailoverError()
+			}
 			b, _ := json.Marshal(collected)
 			c.Data(http.StatusOK, "application/json", b)
 			usage = usageObj
 		} else {
-			usageResp, err := s.handleNativeNonStreamingResponse(c, resp, isOAuth)
+			usageResp, err := s.handleNativeNonStreamingResponse(c, resp, isOAuth, requireImage)
 			if err != nil {
 				return nil, err
 			}
-			usage = usageResp
+			usage = usageResp.usage
+			imageCount = usageResp.imageCount
 		}
 	}
 
@@ -1628,12 +1641,8 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	}
 
 	// 图片生成计费
-	imageCount := 0
 	imageInputSize := s.extractImageInputSize(body)
 	imageSize := normalizeOpenAIImageSizeTier(imageInputSize)
-	if isImageGenerationModel(originalModel) {
-		imageCount = 1
-	}
 
 	return &ForwardResult{
 		RequestID:      requestID,
@@ -1715,15 +1724,14 @@ func sleepGeminiBackoff(attempt int) {
 }
 
 var (
-	sensitiveQueryParamRegex = regexp.MustCompile(`(?i)([?&](?:key|client_secret|access_token|refresh_token)=)[^&"\s]+`)
-	retryInRegex             = regexp.MustCompile(`Please retry in ([0-9.]+)s`)
+	retryInRegex = regexp.MustCompile(`Please retry in ([0-9.]+)s`)
 )
 
 func sanitizeUpstreamErrorMessage(msg string) string {
 	if msg == "" {
 		return msg
 	}
-	return sensitiveQueryParamRegex.ReplaceAllString(msg, `$1***`)
+	return logredact.RedactText(msg)
 }
 
 func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, account *Account, upstreamStatus int, upstreamRequestID string, body []byte) error {
@@ -1967,7 +1975,12 @@ type geminiStreamResult struct {
 	firstTokenMs *int
 }
 
-func (s *GeminiMessagesCompatService) handleNonStreamingResponse(c *gin.Context, resp *http.Response, originalModel string) (*ClaudeUsage, error) {
+type geminiNonStreamingResult struct {
+	usage      *ClaudeUsage
+	imageCount int
+}
+
+func (s *GeminiMessagesCompatService) handleNonStreamingResponse(c *gin.Context, resp *http.Response, originalModel string, requireImage bool) (*geminiNonStreamingResult, error) {
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
 		return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Failed to read upstream response")
@@ -1983,10 +1996,15 @@ func (s *GeminiMessagesCompatService) handleNonStreamingResponse(c *gin.Context,
 		return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
 	}
 
+	imageCount := countGeminiImagePartsFromMap(geminiResp)
+	if requireImage && imageCount == 0 {
+		return nil, newGeminiEmptyImageFailoverError()
+	}
+
 	claudeResp, usage := convertGeminiToClaudeMessage(geminiResp, originalModel, unwrappedBody)
 	c.JSON(http.StatusOK, claudeResp)
 
-	return usage, nil
+	return &geminiNonStreamingResult{usage: usage, imageCount: imageCount}, nil
 }
 
 func (s *GeminiMessagesCompatService) handleStreamingResponse(c *gin.Context, resp *http.Response, startTime time.Time, originalModel string) (*geminiStreamResult, error) {
@@ -2504,6 +2522,12 @@ func mergeCollectedTextParts(response map[string]any, textParts []string) map[st
 type geminiNativeStreamResult struct {
 	usage        *ClaudeUsage
 	firstTokenMs *int
+	imageCount   int
+}
+
+type geminiNativeNonStreamingResult struct {
+	usage      *ClaudeUsage
+	imageCount int
 }
 
 func isGeminiInsufficientScope(headers http.Header, body []byte) bool {
@@ -2572,7 +2596,7 @@ type UpstreamHTTPResult struct {
 	Body       []byte
 }
 
-func (s *GeminiMessagesCompatService) handleNativeNonStreamingResponse(c *gin.Context, resp *http.Response, isOAuth bool) (*ClaudeUsage, error) {
+func (s *GeminiMessagesCompatService) handleNativeNonStreamingResponse(c *gin.Context, resp *http.Response, isOAuth bool, requireImage bool) (*geminiNativeNonStreamingResult, error) {
 	if s.cfg != nil && s.cfg.Gateway.GeminiDebugResponseHeaders {
 		logger.LegacyPrintf("service.gemini_messages_compat", "[GeminiAPI] ========== Response Headers ==========")
 		for key, values := range resp.Header {
@@ -2595,6 +2619,14 @@ func (s *GeminiMessagesCompatService) handleNativeNonStreamingResponse(c *gin.Co
 		}
 	}
 
+	imageCount := 0
+	if resp.StatusCode < http.StatusBadRequest {
+		imageCount = countGeminiImagePartsFromBytes(respBody)
+		if requireImage && imageCount == 0 {
+			return nil, newGeminiEmptyImageFailoverError()
+		}
+	}
+
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 
 	contentType := resp.Header.Get("Content-Type")
@@ -2606,10 +2638,11 @@ func (s *GeminiMessagesCompatService) handleNativeNonStreamingResponse(c *gin.Co
 	}
 	c.Data(resp.StatusCode, contentType, respBody)
 
+	usage := &ClaudeUsage{}
 	if u := extractGeminiUsage(respBody); u != nil {
-		return u, nil
+		usage = u
 	}
-	return &ClaudeUsage{}, nil
+	return &geminiNativeNonStreamingResult{usage: usage, imageCount: imageCount}, nil
 }
 
 func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Context, resp *http.Response, startTime time.Time, isOAuth bool) (*geminiNativeStreamResult, error) {
@@ -2646,6 +2679,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 	reader := bufio.NewReader(resp.Body)
 	usage := &ClaudeUsage{}
 	var firstTokenMs *int
+	imageCount := 0
 
 	for {
 		line, err := reader.ReadString('\n')
@@ -2675,6 +2709,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 					if u := extractGeminiUsage(rawBytes); u != nil {
 						usage = u
 					}
+					imageCount += countGeminiImagePartsFromBytes(rawBytes)
 
 					if firstTokenMs == nil {
 						ms := int(time.Since(startTime).Milliseconds())
@@ -2704,7 +2739,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 		}
 	}
 
-	return &geminiNativeStreamResult{usage: usage, firstTokenMs: firstTokenMs}, nil
+	return &geminiNativeStreamResult{usage: usage, firstTokenMs: firstTokenMs, imageCount: imageCount}, nil
 }
 
 // ForwardAIStudioGET forwards a GET request to AI Studio (generativelanguage.googleapis.com) for
@@ -3103,6 +3138,51 @@ func extractGeminiParts(geminiResp map[string]any) []map[string]any {
 		}
 	}
 	return nil
+}
+
+func countGeminiImagePartsFromBytes(body []byte) int {
+	if len(body) == 0 {
+		return 0
+	}
+	var geminiResp map[string]any
+	if err := json.Unmarshal(body, &geminiResp); err != nil {
+		return 0
+	}
+	return countGeminiImagePartsFromMap(geminiResp)
+}
+
+func countGeminiImagePartsFromMap(geminiResp map[string]any) int {
+	count := 0
+	for _, part := range extractGeminiParts(geminiResp) {
+		if isGeminiImagePart(part) {
+			count++
+		}
+	}
+	return count
+}
+
+func isGeminiImagePart(part map[string]any) bool {
+	inlineData, ok := part["inlineData"].(map[string]any)
+	if !ok {
+		inlineData, ok = part["inline_data"].(map[string]any)
+	}
+	if !ok {
+		return false
+	}
+	mimeType, _ := inlineData["mimeType"].(string)
+	if strings.TrimSpace(mimeType) == "" {
+		mimeType, _ = inlineData["mime_type"].(string)
+	}
+	data, _ := inlineData["data"].(string)
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(mimeType)), "image/") && strings.TrimSpace(data) != ""
+}
+
+func newGeminiEmptyImageFailoverError() *UpstreamFailoverError {
+	return &UpstreamFailoverError{
+		StatusCode:        http.StatusBadGateway,
+		ResponseBody:      []byte(`{"error":{"code":502,"message":"Upstream returned no image data","status":"BAD_GATEWAY"}}`),
+		SchedulerCategory: "transient",
+	}
 }
 
 func computeGeminiTextDelta(seen, incoming string) (delta, newSeen string) {

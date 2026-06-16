@@ -12,24 +12,56 @@ import (
 const maxRedactDepth = 32
 
 var defaultSensitiveKeys = map[string]struct{}{
-	"authorization_code": {},
-	"code":               {},
-	"code_verifier":      {},
-	"access_token":       {},
-	"refresh_token":      {},
-	"id_token":           {},
-	"client_secret":      {},
-	"password":           {},
+	"authorization_code":  {},
+	"authorization":       {},
+	"proxy-authorization": {},
+	"code":                {},
+	"code_verifier":       {},
+	"api_key":             {},
+	"api-key":             {},
+	"apikey":              {},
+	"x-api-key":           {},
+	"access_token":        {},
+	"accesstoken":         {},
+	"refresh_token":       {},
+	"refreshtoken":        {},
+	"id_token":            {},
+	"idtoken":             {},
+	"session_token":       {},
+	"sessiontoken":        {},
+	"client_secret":       {},
+	"clientsecret":        {},
+	"credential":          {},
+	"credentials":         {},
+	"cookie":              {},
+	"set-cookie":          {},
+	"password":            {},
 }
 
 var defaultSensitiveKeyList = []string{
 	"authorization_code",
+	"authorization",
+	"proxy-authorization",
 	"code",
 	"code_verifier",
+	"api_key",
+	"api-key",
+	"apikey",
+	"x-api-key",
 	"access_token",
+	"accesstoken",
 	"refresh_token",
+	"refreshtoken",
 	"id_token",
+	"idtoken",
+	"session_token",
+	"sessiontoken",
 	"client_secret",
+	"clientsecret",
+	"credential",
+	"credentials",
+	"cookie",
+	"set-cookie",
 	"password",
 }
 
@@ -37,11 +69,14 @@ type textRedactPatterns struct {
 	reJSONLike  *regexp.Regexp
 	reQueryLike *regexp.Regexp
 	rePlain     *regexp.Regexp
+	reHeader    *regexp.Regexp
 }
 
 var (
 	reGOCSPX = regexp.MustCompile(`GOCSPX-[0-9A-Za-z_-]{24,}`)
 	reAIza   = regexp.MustCompile(`AIza[0-9A-Za-z_-]{35}`)
+	reOpenAI = regexp.MustCompile(`\bsk-[A-Za-z0-9][A-Za-z0-9_-]{12,}`)
+	reBearer = regexp.MustCompile(`(?i)\b(Bearer)\s+[A-Za-z0-9._~+/\-=]{12,}`)
 
 	defaultTextRedactPatterns = compileTextRedactPatterns(nil)
 	extraTextPatternCache     sync.Map // map[string]*textRedactPatterns
@@ -99,9 +134,12 @@ func RedactText(input string, extraKeys ...string) string {
 	out := input
 	out = reGOCSPX.ReplaceAllString(out, "GOCSPX-***")
 	out = reAIza.ReplaceAllString(out, "AIza***")
+	out = reOpenAI.ReplaceAllString(out, "sk-***")
+	out = reBearer.ReplaceAllString(out, `$1 ***`)
 	out = patterns.reJSONLike.ReplaceAllString(out, `$1***$3`)
 	out = patterns.reQueryLike.ReplaceAllString(out, `$1=***`)
 	out = patterns.rePlain.ReplaceAllString(out, `$1$2***`)
+	out = patterns.reHeader.ReplaceAllString(out, `$1: ***`)
 	return out
 }
 
@@ -114,6 +152,8 @@ func compileTextRedactPatterns(extraKeys []string) *textRedactPatterns {
 		reQueryLike: regexp.MustCompile(`(?i)\b((?:` + keyAlt + `))=([^&\s]+)`),
 		// Plain: access_token: ... / access_token = ...
 		rePlain: regexp.MustCompile(`(?i)\b((?:` + keyAlt + `))\b(\s*[:=]\s*)([^,\s]+)`),
+		// Header-like values can contain spaces (e.g. "Authorization: Bearer ...").
+		reHeader: regexp.MustCompile(`(?i)\b(authorization|proxy-authorization|cookie|set-cookie|x-api-key)\s*:\s*[^,\r\n]+`),
 	}
 }
 

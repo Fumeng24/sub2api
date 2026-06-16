@@ -297,6 +297,73 @@ func TestGeminiForwardAsChatCompletions_AddsToolConfigForWebSearchAndFunctions(t
 	require.True(t, gjson.GetBytes(postedBody, `tools.#.functionDeclarations`).Exists(), string(postedBody))
 }
 
+func TestGeminiForwardAsChatCompletions_ImageAPIKeyUsesRawChatCompletions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"gemini-image-raw"}},
+			Body: io.NopCloser(strings.NewReader(`{
+				"id":"chatcmpl_img",
+				"object":"chat.completion",
+				"model":"gemini-3.1-flash-image",
+				"choices":[{
+					"index":0,
+					"message":{
+						"role":"assistant",
+						"content":"",
+						"images":[{"image_url":{"url":"data:image/jpeg;base64,aGVsbG8="}}]
+					},
+					"finish_reason":"stop"
+				}],
+				"usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}
+			}`)),
+		},
+	}
+	svc := &GeminiMessagesCompatService{httpUpstream: httpStub, cfg: &config.Config{}}
+	account := &Account{
+		ID:       38847,
+		Platform: PlatformGemini,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":  "gemini-key",
+			"base_url": "https://compat.example/image",
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	body := []byte(`{"model":"gemini-3.1-flash-image","messages":[{"role":"user","content":"draw a cat"}],"stream":false,"size":"4096x4096","image_size":"4K","aspect_ratio":"1:1","n":1}`)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+
+	result, err := svc.ForwardAsChatCompletions(context.Background(), c, account, body)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "gemini-3.1-flash-image", result.Model)
+	require.Equal(t, "gemini-3.1-flash-image", result.UpstreamModel)
+	require.Equal(t, 5, result.Usage.InputTokens)
+	require.Equal(t, 7, result.Usage.OutputTokens)
+	require.Equal(t, 1, result.ImageCount)
+	require.Equal(t, "4K", result.ImageSize)
+	require.Equal(t, "4K", result.ImageInputSize)
+	require.Contains(t, rec.Body.String(), `"images"`)
+	require.Contains(t, rec.Body.String(), `data:image/jpeg;base64,aGVsbG8=`)
+
+	require.NotNil(t, httpStub.lastReq)
+	require.Equal(t, "https://compat.example/image/v1/chat/completions", httpStub.lastReq.URL.String())
+	require.Equal(t, "Bearer gemini-key", httpStub.lastReq.Header.Get("Authorization"))
+	require.Empty(t, httpStub.lastReq.Header.Get("x-goog-api-key"))
+	postedBody, err := io.ReadAll(httpStub.lastReq.Body)
+	require.NoError(t, err)
+	require.Equal(t, "gemini-3.1-flash-image", gjson.GetBytes(postedBody, "model").String())
+	require.Equal(t, "4096x4096", gjson.GetBytes(postedBody, "size").String())
+	require.Equal(t, "4K", gjson.GetBytes(postedBody, "image_size").String())
+	require.Equal(t, "1:1", gjson.GetBytes(postedBody, "aspect_ratio").String())
+	require.False(t, gjson.GetBytes(postedBody, "n").Exists(), string(postedBody))
+}
+
 // TestConvertClaudeToolsToGeminiTools_CustomType 测试custom类型工具转换
 func TestConvertClaudeToolsToGeminiTools_CustomType(t *testing.T) {
 	tests := []struct {
@@ -491,10 +558,87 @@ func TestGeminiHandleNativeNonStreamingResponse_DebugDisabledDoesNotEmitHeaderLo
 		Body: io.NopCloser(strings.NewReader(`{"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":2}}`)),
 	}
 
-	usage, err := svc.handleNativeNonStreamingResponse(c, resp, false)
+	result, err := svc.handleNativeNonStreamingResponse(c, resp, false, false)
 	require.NoError(t, err)
-	require.NotNil(t, usage)
+	require.NotNil(t, result)
+	require.NotNil(t, result.usage)
 	require.False(t, logSink.ContainsMessage("[GeminiAPI]"), "debug 关闭时不应输出 Gemini 响应头日志")
+}
+
+func TestGeminiMessagesCompatServiceForwardNative_ImageModelEmptyPartsTriggersFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-3.1-flash-image:generateContent", nil)
+
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"candidates":[{"content":{"role":"model","parts":[]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":1473}}`)),
+		},
+	}
+	svc := &GeminiMessagesCompatService{httpUpstream: httpStub, cfg: &config.Config{}}
+	account := &Account{
+		ID:       38847,
+		Platform: PlatformGemini,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key": "test-key",
+		},
+	}
+	body := []byte(`{"contents":[{"role":"user","parts":[{"text":"draw a cat"}]}],"generationConfig":{"responseModalities":["TEXT","IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"2K"}}}`)
+
+	result, err := svc.ForwardNative(context.Background(), c, account, "gemini-3.1-flash-image", "generateContent", false, body)
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.True(t, errors.As(err, &failoverErr), "empty image response should trigger account failover: %v", err)
+	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.Equal(t, "transient", failoverErr.SchedulerCategory)
+	require.Equal(t, 0, w.Body.Len(), "empty image response must not be written as a successful response")
+}
+
+func TestGeminiMessagesCompatServiceForwardNative_ImageModelCountsInlineDataImages(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-3.1-flash-image:generateContent", nil)
+
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body: io.NopCloser(strings.NewReader(`{
+				"candidates":[{
+					"content":{
+						"role":"model",
+						"parts":[{"inlineData":{"mimeType":"image/png","data":"aGVsbG8="}}]
+					},
+					"finishReason":"STOP"
+				}],
+				"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":8}
+			}`)),
+		},
+	}
+	svc := &GeminiMessagesCompatService{httpUpstream: httpStub, cfg: &config.Config{}}
+	account := &Account{
+		ID:       38847,
+		Platform: PlatformGemini,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key": "test-key",
+		},
+	}
+	body := []byte(`{"contents":[{"role":"user","parts":[{"text":"draw a cat"}]}],"generationConfig":{"responseModalities":["TEXT","IMAGE"],"imageConfig":{"aspectRatio":"1:1","imageSize":"2K"}}}`)
+
+	result, err := svc.ForwardNative(context.Background(), c, account, "gemini-3.1-flash-image", "generateContent", false, body)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 1, result.ImageCount)
+	require.Equal(t, "2K", result.ImageSize)
+	require.Equal(t, "2K", result.ImageInputSize)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"inlineData"`)
 }
 
 func TestGeminiMessagesCompatServiceForward_PreservesRequestedModelAndMappedUpstreamModel(t *testing.T) {

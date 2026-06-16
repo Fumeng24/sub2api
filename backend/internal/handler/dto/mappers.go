@@ -222,7 +222,7 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		Type:                        a.Type,
 		Credentials:                 redactedCreds,
 		CredentialsStatus:           credsStatus,
-		Extra:                       a.Extra,
+		Extra:                       RedactSensitiveMap(a.Extra),
 		ProxyID:                     a.ProxyID,
 		ProxyFallbackOriginID:       a.ProxyFallbackOriginID,
 		ProxyFallbackOriginName:     a.ProxyFallbackOriginName,

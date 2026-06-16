@@ -53,6 +53,9 @@ func clientErrorMessageLeaksInternalState(message string) bool {
 		return true
 	}
 	if strings.Contains(lower, "cf-ray") ||
+		strings.Contains(lower, "cloudflare") ||
+		strings.Contains(lower, "origin web server") ||
+		strings.Contains(lower, "invalid or incomplete response") ||
 		strings.Contains(lower, "traceid") ||
 		strings.Contains(lower, "trace id") ||
 		strings.Contains(lower, "request id") ||
