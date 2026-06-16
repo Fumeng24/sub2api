@@ -123,6 +123,30 @@ func replaceOpenAIRequestModel(body []byte, model string) ([]byte, error) {
 	return updated, nil
 }
 
+type openAIModelBodyReplaceFunc func([]byte, string) []byte
+
+func openAIModelMappedBody(body []byte, mapped bool, mappedModel string, replace openAIModelBodyReplaceFunc) []byte {
+	if !mapped || replace == nil {
+		return body
+	}
+	return replace(body, mappedModel)
+}
+
+func newOpenAIModelMappedBodyCache(body []byte, replace openAIModelBodyReplaceFunc) func(bool, string) []byte {
+	replacedBodies := make(map[string][]byte)
+	return func(mapped bool, mappedModel string) []byte {
+		if !mapped {
+			return body
+		}
+		if cachedBody, ok := replacedBodies[mappedModel]; ok {
+			return cachedBody
+		}
+		replacedBody := openAIModelMappedBody(body, true, mappedModel, replace)
+		replacedBodies[mappedModel] = replacedBody
+		return replacedBody
+	}
+}
+
 func usageRecordContext(parent context.Context, base context.Context) context.Context {
 	if base == nil {
 		base = context.Background()
@@ -390,6 +414,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	failedAccountIDs := make(map[int64]struct{})
 	sameAccountRetryCount := make(map[int64]int)
 	var lastFailoverErr *service.UpstreamFailoverError
+	mappedBodyForResponses := newOpenAIModelMappedBodyCache(body, h.gatewayService.ReplaceModelInBody)
 
 	for {
 		// Select account supporting the requested model
@@ -465,10 +490,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		// 应用渠道模型映射到请求体。reqModel 可能在 compact fallback 后变化，
 		// 所以每次尝试都按当前模型重新解析映射。
 		attemptChannelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
-		forwardBody := body
-		if attemptChannelMapping.Mapped {
-			forwardBody = h.gatewayService.ReplaceModelInBody(body, attemptChannelMapping.MappedModel)
-		}
+		forwardBody := mappedBodyForResponses(attemptChannelMapping.Mapped, attemptChannelMapping.MappedModel)
 		writerSizeBeforeForward := c.Writer.Size()
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
@@ -514,6 +536,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 								zap.Int("upstream_status", failoverErr.StatusCode),
 							)
 							body = fallbackBody
+							mappedBodyForResponses = newOpenAIModelMappedBodyCache(body, h.gatewayService.ReplaceModelInBody)
 							reqModel = openAICompactFallbackModel
 							setOpsRequestContext(c, reqModel, reqStream, body)
 							failedAccountIDs = make(map[int64]struct{})
@@ -808,6 +831,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 	// 解析渠道级模型映射
 	channelMappingMsg, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
+	mappedBodyForMessages := newOpenAIModelMappedBodyCache(body, h.gatewayService.ReplaceModelInBody)
 
 	// 绑定错误透传服务，允许 service 层在非 failover 错误场景复用规则。
 	if h.errorPassthroughService != nil {
@@ -908,10 +932,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 		defaultMappedModel := strings.TrimSpace(effectiveMappedModel)
 		// 应用渠道模型映射到请求体
-		forwardBody := body
-		if channelMappingMsg.Mapped {
-			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMappingMsg.MappedModel)
-		}
+		forwardBody := mappedBodyForMessages(channelMappingMsg.Mapped, channelMappingMsg.MappedModel)
 		writerSizeBeforeForward := c.Writer.Size()
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
@@ -1152,45 +1173,11 @@ func (h *OpenAIGatewayHandler) acquireResponsesUserSlot(
 	reqLog *zap.Logger,
 ) (func(), bool) {
 	ctx := c.Request.Context()
-	userReleaseFunc, userAcquired, err := h.concurrencyHelper.TryAcquireUserSlot(ctx, userID, userConcurrency)
+	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, userID, userConcurrency, reqStream, streamStarted)
 	if err != nil {
 		reqLog.Warn("openai.user_slot_acquire_failed", zap.Error(err))
 		h.handleConcurrencyError(c, err, "user", *streamStarted)
 		return nil, false
-	}
-	if userAcquired {
-		return wrapReleaseOnDone(ctx, userReleaseFunc), true
-	}
-
-	maxWait := service.CalculateMaxWait(userConcurrency)
-	canWait, waitErr := h.concurrencyHelper.IncrementWaitCount(ctx, userID, maxWait)
-	if waitErr != nil {
-		reqLog.Warn("openai.user_wait_counter_increment_failed", zap.Error(waitErr))
-		// 按现有降级语义：等待计数异常时放行后续抢槽流程
-	} else if !canWait {
-		reqLog.Info("openai.user_wait_queue_full", zap.Int("max_wait", maxWait))
-		h.errorResponse(c, http.StatusTooManyRequests, "rate_limit_error", "Too many pending requests, please retry later")
-		return nil, false
-	}
-
-	waitCounted := waitErr == nil && canWait
-	defer func() {
-		if waitCounted {
-			h.concurrencyHelper.DecrementWaitCount(ctx, userID)
-		}
-	}()
-
-	userReleaseFunc, err = h.concurrencyHelper.AcquireUserSlotWithWait(c, userID, userConcurrency, reqStream, streamStarted)
-	if err != nil {
-		reqLog.Warn("openai.user_slot_acquire_failed_after_wait", zap.Error(err))
-		h.handleConcurrencyError(c, err, "user", *streamStarted)
-		return nil, false
-	}
-
-	// 槽位获取成功后，立刻退出等待计数。
-	if waitCounted {
-		h.concurrencyHelper.DecrementWaitCount(ctx, userID)
-		waitCounted = false
 	}
 	return wrapReleaseOnDone(ctx, userReleaseFunc), true
 }
@@ -2008,11 +1995,9 @@ func (h *OpenAIGatewayHandler) ensureForwardErrorResponse(c *gin.Context, stream
 	if c == nil || c.Writer == nil {
 		return false
 	}
-	// 旧实现在 Writer.Written 时直接 return false，导致 ping 已 flush 之后的
-	// 上游错误（http2 timeout、连接中断等）完全无法把错误传给客户端——
-	// HTTP 200 已锁死，TCP 直接 EOF，Codex CLI 报 "stream closed before response.completed"。
-	// 这里改成：Writer 已写过时强制走 streamStarted 分支，让
-	// handleStreamingAwareError 通过 SSE 发协议合规的 response.failed。
+	if service.IsResponseCommitted(c) {
+		return false
+	}
 	if c.Writer.Written() {
 		streamStarted = true
 	}

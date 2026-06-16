@@ -2780,13 +2780,12 @@ func (s *OpenAIGatewayService) readUpstreamErrorBody(resp *http.Response) []byte
 	return body
 }
 
-func (s *OpenAIGatewayService) handleFailoverSideEffects(ctx context.Context, resp *http.Response, account *Account, requestedModel ...string) {
-	body := s.readUpstreamErrorBody(resp)
+func (s *OpenAIGatewayService) handleFailoverSideEffects(ctx context.Context, resp *http.Response, account *Account, responseBody []byte, requestedModel ...string) {
 	if len(requestedModel) > 0 {
-		s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, requestedModel[0])
+		s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, responseBody, requestedModel[0])
 		return
 	}
-	s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
+	s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, responseBody)
 }
 
 // Forward forwards request to OpenAI API
@@ -3455,7 +3454,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 					Detail:             upstreamDetail,
 				})
 
-				s.handleFailoverSideEffects(ctx, resp, account, upstreamModel)
+				s.handleFailoverSideEffects(ctx, resp, account, respBody, upstreamModel)
 				return nil, &UpstreamFailoverError{
 					StatusCode:             resp.StatusCode,
 					ResponseBody:           respBody,
@@ -4005,6 +4004,7 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 	account *Account,
 	requestBody []byte,
 ) error {
+	MarkResponseCommitted(c)
 	body := s.readUpstreamErrorBody(resp)
 
 	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(body))
@@ -5065,6 +5065,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		"upstream_error",
 		"Upstream request failed",
 	); matched {
+		MarkResponseCommitted(c)
 		writeClientOpenAIError(c, status, errType, errMsg)
 		if upstreamMsg == "" {
 			upstreamMsg = errMsg
@@ -5092,6 +5093,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			if msg := openAIContextWindowClientMessageForModel(reqModel, body); msg != "" {
 				statusCode, errType, errMsg = http.StatusBadRequest, "invalid_request_error", msg
 			}
+			MarkResponseCommitted(c)
 			writeClientOpenAIError(c, statusCode, errType, errMsg)
 			return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
 		}
@@ -5126,6 +5128,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	if msg := openAIContextWindowClientMessageForModel(reqModel, body); msg != "" {
 		statusCode, errType, errMsg = http.StatusBadRequest, "invalid_request_error", msg
 	}
+	MarkResponseCommitted(c)
 	writeClientOpenAIError(c, statusCode, errType, errMsg)
 
 	return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
@@ -5278,6 +5281,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		c, account.Platform, resp.StatusCode, body,
 		http.StatusBadGateway, "api_error", "Upstream request failed",
 	); matched {
+		MarkResponseCommitted(c)
 		writeError(c, status, errType, errMsg)
 		if upstreamMsg == "" {
 			upstreamMsg = errMsg
@@ -5302,6 +5306,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		})
 		if !shouldFailover {
 			statusCode, errType, errMsg := openAIErrorResponseForClass(resp.StatusCode, upstreamClass, upstreamMsg, true)
+			MarkResponseCommitted(c)
 			writeError(c, statusCode, errType, errMsg)
 			return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
 		}
@@ -5339,6 +5344,7 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 	}
 
 	statusCode, errType, errMsg := openAIErrorResponseForClass(resp.StatusCode, upstreamClass, upstreamMsg, true)
+	MarkResponseCommitted(c)
 	writeError(c, statusCode, errType, errMsg)
 	return nil, newUpstreamTerminalError(statusCode, upstreamMsg)
 }

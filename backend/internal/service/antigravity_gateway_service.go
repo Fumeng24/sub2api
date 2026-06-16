@@ -2448,6 +2448,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		})
 		logger.LegacyPrintf("service.antigravity_gateway", "[antigravity-Forward] upstream error status=%d body=%s", resp.StatusCode, truncateForLog(unwrappedForOps, 500))
 		unwrappedForOps = ClientFacingErrorBody(resp.StatusCode, "upstream_error", unwrappedForOps)
+		MarkResponseCommitted(c)
 		c.Data(resp.StatusCode, contentType, unwrappedForOps)
 		return nil, fmt.Errorf("antigravity upstream error: %d", resp.StatusCode)
 	}
@@ -3646,6 +3647,7 @@ func mergeTextPartsToResponse(response map[string]any, textParts []string) map[s
 
 func (s *AntigravityGatewayService) writeClaudeError(c *gin.Context, status int, errType, message string) error {
 	message = ClientFacingErrorMessage(status, errType, message)
+	MarkResponseCommitted(c)
 	c.JSON(status, gin.H{
 		"type":  "error",
 		"error": gin.H{"type": errType, "message": message},
@@ -3659,6 +3661,7 @@ func (s *AntigravityGatewayService) WriteMappedClaudeError(c *gin.Context, accou
 }
 
 func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, account *Account, upstreamStatus int, upstreamRequestID string, body []byte) error {
+	MarkResponseCommitted(c)
 	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(body))
 	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
 	logBody, maxBytes := s.getLogConfig()
@@ -3731,6 +3734,7 @@ func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, accou
 
 func (s *AntigravityGatewayService) writeGoogleError(c *gin.Context, status int, message string) error {
 	message = ClientFacingErrorMessage(status, "", message)
+	MarkResponseCommitted(c)
 	statusStr := "UNKNOWN"
 	switch status {
 	case 400:

@@ -4,6 +4,7 @@ package routes
 import (
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,6 +15,7 @@ func RegisterAdminRoutes(
 	h *handler.Handlers,
 	adminAuth middleware.AdminAuthMiddleware,
 	adminOrSupportAuth middleware.AdminOrSupportAuthMiddleware,
+	settingService *service.SettingService,
 ) {
 	supportAdmin := v1.Group("/admin")
 	supportAdmin.Use(gin.HandlerFunc(adminOrSupportAuth))
@@ -23,7 +25,11 @@ func RegisterAdminRoutes(
 
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
+	admin.Use(middleware.AdminComplianceGuard(settingService))
 	{
+		// 部署与运营合规确认
+		registerAdminComplianceRoutes(admin, h)
+
 		// 仪表盘
 		registerDashboardRoutes(admin, h)
 
@@ -122,6 +128,14 @@ func registerTicketRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		tickets.POST("/:id/escalate", h.Admin.Ticket.Escalate)
 		tickets.POST("/:id/balance-adjust", h.Admin.Ticket.AdjustBalance)
 		tickets.POST("/:id/messages", h.Admin.Ticket.AddMessage)
+	}
+}
+
+func registerAdminComplianceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	compliance := admin.Group("/compliance")
+	{
+		compliance.GET("", h.Admin.Compliance.GetStatus)
+		compliance.POST("/accept", h.Admin.Compliance.Accept)
 	}
 }
 
