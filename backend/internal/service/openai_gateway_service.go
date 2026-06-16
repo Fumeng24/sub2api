@@ -221,6 +221,7 @@ func (s *OpenAICodexUsageSnapshot) Normalize() *NormalizedCodexLimits {
 // OpenAIUsage represents OpenAI API response usage
 type OpenAIUsage struct {
 	InputTokens              int `json:"input_tokens"`
+	ImageInputTokens         int `json:"image_input_tokens,omitempty"`
 	OutputTokens             int `json:"output_tokens"`
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
 	CacheReadInputTokens     int `json:"cache_read_input_tokens,omitempty"`
@@ -2845,6 +2846,8 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	if passthroughEnabled {
 		// 透传分支只需要轻量提取字段，避免热路径全量 Unmarshal。
 		reasoningEffort := extractOpenAIReasoningEffortFromBody(body, reqModel)
+		// 国产模型默认 effort 补充：也要用 mappedModel 判定是否是 passback-required 上游。
+		reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, account.GetMappedModel(reqModel))
 		return s.forwardOpenAIPassthrough(ctx, c, account, originalBody, reqModel, reasoningEffort, reqStream, startTime)
 	}
 
@@ -3467,6 +3470,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		defer func() { _ = resp.Body.Close() }()
 
 		reasoningEffort := extractOpenAIReasoningEffortFromBody(body, originalModel)
+		// 国产模型默认 effort 补充：此处 reqModel 已被 mapping 重写为 billingModel（见
+		// line 2510-2515 的 GetMappedModel + reqModel 赋值），可直接作为 mappedModel。
+		reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, reqModel)
 		serviceTier := extractOpenAIServiceTierFromBody(body)
 		// 上游接受后只保留计费需要的标量，避免响应处理期间继续保活完整 input/tools map。
 		reqBody = nil
@@ -4007,6 +4013,19 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 	MarkResponseCommitted(c)
 	body := s.readUpstreamErrorBody(resp)
 
+	// cyber_policy：透传账号本就把原始 body 回给客户端（下方 c.Data），此处仅打标记，
+	// 供 handler 事后写风控/邮件。cyber 是上游网络安全策略拦截，不冷却账号，
+	// 故下方跳过 handleOpenAIAccountUpstreamError（避免自定义 temp-unschedulable 规则误冷却）。
+	cyberHit, cyberCode, cyberMsg := detectOpenAICyberPolicy(body)
+	if cyberHit {
+		MarkOpsCyberPolicy(c, CyberPolicyMark{
+			Code:           cyberCode,
+			Message:        cyberMsg,
+			Body:           truncateString(string(body), 4096),
+			UpstreamStatus: resp.StatusCode,
+		})
+	}
+
 	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(body))
 	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
 	upstreamDetail := ""
@@ -4023,48 +4042,50 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 		return s.newOpenAICompactContextWindowFailoverError(c, account, resp, body, true, upstreamMsg, upstreamDetail)
 	}
 	// 透传模式保留原始上游错误响应，但运行态账号状态仍需更新，
-	// 避免粘性路由继续复用刚被限流的账号。
-	reqModel, _, _ := extractOpenAIRequestMetaFromBody(requestBody)
-	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
-	if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, upstreamMsg, body) {
-		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-			Platform:             account.Platform,
-			AccountID:            account.ID,
-			AccountName:          account.Name,
-			UpstreamStatusCode:   resp.StatusCode,
-			UpstreamRequestID:    resp.Header.Get("x-request-id"),
-			Passthrough:          true,
-			Kind:                 "failover",
-			Message:              upstreamMsg,
-			Detail:               upstreamDetail,
-			UpstreamResponseBody: upstreamDetail,
-		})
-		return &UpstreamFailoverError{
-			StatusCode:        resp.StatusCode,
-			ResponseBody:      body,
-			ResponseHeaders:   resp.Header.Clone(),
-			SchedulerCategory: s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
+	// 避免粘性路由继续复用刚被限流的账号。cyber 例外：不冷却账号。
+	if !cyberHit {
+		reqModel, _, _ := extractOpenAIRequestMetaFromBody(requestBody)
+		upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
+		if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, upstreamMsg, body) {
+			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+				Platform:             account.Platform,
+				AccountID:            account.ID,
+				AccountName:          account.Name,
+				UpstreamStatusCode:   resp.StatusCode,
+				UpstreamRequestID:    resp.Header.Get("x-request-id"),
+				Passthrough:          true,
+				Kind:                 "failover",
+				Message:              upstreamMsg,
+				Detail:               upstreamDetail,
+				UpstreamResponseBody: upstreamDetail,
+			})
+			return &UpstreamFailoverError{
+				StatusCode:        resp.StatusCode,
+				ResponseBody:      body,
+				ResponseHeaders:   resp.Header.Clone(),
+				SchedulerCategory: s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
+			}
 		}
-	}
-	shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
-	if openAIUpstreamErrorClassImmediateFailover(upstreamClass) || shouldDisable && openAIUpstreamErrorClassShouldFailover(upstreamClass) {
-		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-			Platform:             account.Platform,
-			AccountID:            account.ID,
-			AccountName:          account.Name,
-			UpstreamStatusCode:   resp.StatusCode,
-			UpstreamRequestID:    resp.Header.Get("x-request-id"),
-			Passthrough:          true,
-			Kind:                 "failover",
-			Message:              upstreamMsg,
-			Detail:               upstreamDetail,
-			UpstreamResponseBody: upstreamDetail,
-		})
-		return &UpstreamFailoverError{
-			StatusCode:        resp.StatusCode,
-			ResponseBody:      body,
-			ResponseHeaders:   resp.Header.Clone(),
-			SchedulerCategory: s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
+		shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, reqModel)
+		if openAIUpstreamErrorClassImmediateFailover(upstreamClass) || shouldDisable && openAIUpstreamErrorClassShouldFailover(upstreamClass) {
+			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+				Platform:             account.Platform,
+				AccountID:            account.ID,
+				AccountName:          account.Name,
+				UpstreamStatusCode:   resp.StatusCode,
+				UpstreamRequestID:    resp.Header.Get("x-request-id"),
+				Passthrough:          true,
+				Kind:                 "failover",
+				Message:              upstreamMsg,
+				Detail:               upstreamDetail,
+				UpstreamResponseBody: upstreamDetail,
+			})
+			return &UpstreamFailoverError{
+				StatusCode:        resp.StatusCode,
+				ResponseBody:      body,
+				ResponseHeaders:   resp.Header.Clone(),
+				SchedulerCategory: s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
+			}
 		}
 	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -4496,6 +4517,21 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			if eventType == "response.failed" {
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
 				failedPayload = append(failedPayload[:0], dataBytes...)
+				// response.failed 自带上游已消耗的 usage；必须先解析再打 cyber 标记，
+				// 否则错误路径计费会按 0 token 记录。
+				s.parseSSEUsageBytes(dataBytes, usage)
+				cyberPolicyHit := false
+				if hit, code, msg := detectOpenAICyberPolicy(dataBytes); hit {
+					cyberPolicyHit = true
+					MarkOpsCyberPolicy(c, CyberPolicyMark{
+						Code:           code,
+						Message:        msg,
+						Body:           truncateString(string(dataBytes), 4096),
+						UpstreamStatus: http.StatusOK,
+						UpstreamInTok:  usage.InputTokens,
+						UpstreamOutTok: usage.OutputTokens,
+					})
+				}
 				if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, failedMessage, dataBytes) && !openAIStreamClientOutputStarted(c, clientOutputStarted) {
 					return resultWithUsage(),
 						s.newOpenAIStreamFailoverError(c, account, true, upstreamRequestID, dataBytes, failedMessage)
@@ -4506,7 +4542,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 						s.newOpenAIStreamFailoverError(c, account, true, upstreamRequestID, dataBytes, failedMessage)
 				}
 				failedEventShouldFailover = failedEventShouldFailover || shouldFailoverFailedEvent
-				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && shouldFailoverFailedEvent {
+				if !cyberPolicyHit && !openAIStreamClientOutputStarted(c, clientOutputStarted) && shouldFailoverFailedEvent {
 					return resultWithUsage(),
 						s.newOpenAIStreamFailoverError(c, account, true, upstreamRequestID, dataBytes, failedMessage)
 				}
@@ -4982,6 +5018,29 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 ) (*OpenAIForwardResult, error) {
 	body := s.readUpstreamErrorBody(resp)
 
+	// cyber_policy 硬阻断：透传上游原始错误体给客户端（不重包成通用 502），不冷却账号。
+	// 当前请求恒透传（需求1）；标记供 handler 事后写风控/邮件。400 cyber 不可 failover
+	// （shouldFailoverUpstreamError(400)=false），故走到此处即可安全早返回。
+	if hit, code, cyberMsg := detectOpenAICyberPolicy(body); hit {
+		MarkOpsCyberPolicy(c, CyberPolicyMark{
+			Code:           code,
+			Message:        cyberMsg,
+			Body:           truncateString(string(body), 4096),
+			UpstreamStatus: resp.StatusCode,
+		})
+		setOpsUpstreamError(c, resp.StatusCode, cyberMsg, truncateString(string(body), 2048))
+		writeOpenAIPassthroughResponseHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
+		contentType := resp.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = "application/json"
+		}
+		c.Data(resp.StatusCode, contentType, body)
+		if cyberMsg == "" {
+			return nil, fmt.Errorf("openai cyber_policy: %d", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("openai cyber_policy: %s", cyberMsg)
+	}
+
 	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(body))
 	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
 	upstreamDetail := ""
@@ -5230,6 +5289,29 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 	requestedModel ...string,
 ) (*OpenAIForwardResult, error) {
 	body := s.readUpstreamErrorBody(resp)
+
+	// cyber_policy：兼容路径（Chat Completions / Anthropic）以各自格式回写错误，
+	// 不原样透传 responses 格式的 cyber body（否则对下游格式不合法）。cyber 是上游网络
+	// 安全策略拦截，不冷却账号，故标记后直接以兼容格式回写错误并返回，跳过下方
+	// handleOpenAIAccountUpstreamError（避免自定义 temp-unschedulable 规则误冷却）。
+	if hit, code, cyberMsg := detectOpenAICyberPolicy(body); hit {
+		MarkOpsCyberPolicy(c, CyberPolicyMark{
+			Code:           code,
+			Message:        cyberMsg,
+			Body:           truncateString(string(body), 4096),
+			UpstreamStatus: resp.StatusCode,
+		})
+		setOpsUpstreamError(c, resp.StatusCode, cyberMsg, truncateString(string(body), 2048))
+		clientMsg := cyberMsg
+		if clientMsg == "" {
+			clientMsg = "Request blocked by upstream cyber-security policy"
+		}
+		writeError(c, resp.StatusCode, "invalid_request_error", clientMsg)
+		if cyberMsg == "" {
+			return nil, fmt.Errorf("openai cyber_policy: %d", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("openai cyber_policy: %s", cyberMsg)
+	}
 
 	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(body))
 	if upstreamMsg == "" {
@@ -5582,6 +5664,21 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 			if eventType == "response.failed" {
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
 				failedPayload = append(failedPayload[:0], dataBytes...)
+				// response.failed 自带上游已消耗的 usage；必须先解析再打 cyber 标记，
+				// 否则错误路径计费会按 0 token 记录。
+				s.parseSSEUsageBytes(dataBytes, usage)
+				cyberPolicyHit := false
+				if hit, code, msg := detectOpenAICyberPolicy(dataBytes); hit {
+					cyberPolicyHit = true
+					MarkOpsCyberPolicy(c, CyberPolicyMark{
+						Code:           code,
+						Message:        msg,
+						Body:           truncateString(string(dataBytes), 4096),
+						UpstreamStatus: http.StatusOK,
+						UpstreamInTok:  usage.InputTokens,
+						UpstreamOutTok: usage.OutputTokens,
+					})
+				}
 				if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, failedMessage, dataBytes) && !openAIStreamClientOutputStarted(c, clientOutputStarted) {
 					sawFailedEvent = true
 					streamFailoverErr = s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, dataBytes, failedMessage)
@@ -5594,7 +5691,7 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 					return
 				}
 				failedEventShouldFailover = failedEventShouldFailover || shouldFailoverFailedEvent
-				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && shouldFailoverFailedEvent {
+				if !cyberPolicyHit && !openAIStreamClientOutputStarted(c, clientOutputStarted) && shouldFailoverFailedEvent {
 					sawFailedEvent = true
 					streamFailoverErr = s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, dataBytes, failedMessage)
 					return
@@ -7042,7 +7139,70 @@ type OpenAIRecordUsageInput struct {
 	IPAddress          string // 请求的客户端 IP 地址
 	RequestPayloadHash string
 	APIKeyService      APIKeyQuotaUpdater
+	// CyberBlocked 为 true 时把该用量行标记为 cyber（request_type=cyber），计费逻辑不变。
+	CyberBlocked bool
 	ChannelUsageFields
+}
+
+// CyberPolicyUsageInput 是 cyber 拒绝、未走正常 RecordUsage 的请求记录用量的入参。
+// 用量按上游真实 token 计费，与 WS cyber 及正常请求口径一致（InputTokens/OutputTokens
+// 取自上游 response.failed 报告的 usage，即 mark.UpstreamInTok/OutTok）。
+type CyberPolicyUsageInput struct {
+	APIKey       *APIKey
+	Account      *Account
+	Subscription *UserSubscription
+	RequestID    string
+	Model        string
+	Stream       bool
+	InputTokens  int
+	OutputTokens int
+	// 渠道归因与请求级 meta，使 cyber 计费行与正常 RecordUsage 行口径一致
+	// （否则 cyber 行 channel_id 等为空，渠道维度统计会遗漏 cyber 命中）。
+	InboundEndpoint    string
+	UpstreamEndpoint   string
+	UserAgent          string
+	IPAddress          string
+	RequestPayloadHash string
+	APIKeyService      APIKeyQuotaUpdater
+	ChannelUsageFields
+}
+
+// RecordCyberPolicyUsageLog 为被上游 cyber_policy 拒绝、未走正常 RecordUsage 的请求
+// （HTTP forward 返回错误路径）记录用量并按上游真实 token 计费，使其与 WS cyber 路径、
+// 与正常请求的计费口径统一（不再是 tokens=0 免费行）。token 取自上游 response.failed
+// 报告的 usage（非流式直接拒通常为 0，cost 随之为 0）。复用 RecordUsage 完成成本计算、
+// 扣费与用量行写入（request_type=cyber 由 CyberBlocked 置位）。仅 forward 返回错误的
+// 路径由 handler 调用，避免与成功路径的正常 RecordUsage 重复。
+func (s *OpenAIGatewayService) RecordCyberPolicyUsageLog(ctx context.Context, in CyberPolicyUsageInput) {
+	if s == nil || in.APIKey == nil || in.APIKey.User == nil || in.Account == nil || strings.TrimSpace(in.Model) == "" {
+		return
+	}
+	result := &OpenAIForwardResult{
+		RequestID: in.RequestID,
+		Model:     in.Model,
+		Stream:    in.Stream,
+		Usage: OpenAIUsage{
+			InputTokens:  in.InputTokens,
+			OutputTokens: in.OutputTokens,
+		},
+	}
+	if err := s.RecordUsage(ctx, &OpenAIRecordUsageInput{
+		Result:             result,
+		APIKey:             in.APIKey,
+		User:               in.APIKey.User,
+		Account:            in.Account,
+		Subscription:       in.Subscription,
+		InboundEndpoint:    in.InboundEndpoint,
+		UpstreamEndpoint:   in.UpstreamEndpoint,
+		UserAgent:          in.UserAgent,
+		IPAddress:          in.IPAddress,
+		RequestPayloadHash: in.RequestPayloadHash,
+		APIKeyService:      in.APIKeyService,
+		ChannelUsageFields: in.ChannelUsageFields,
+		CyberBlocked:       true,
+	}); err != nil {
+		logger.LegacyPrintf("service.openai_gateway", "cyber usage record failed: request_id=%s err=%v", in.RequestID, err)
+	}
 }
 
 // RecordUsage records usage and deducts balance
@@ -7075,6 +7235,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	// Calculate cost
 	tokens := UsageTokens{
 		InputTokens:         actualInputTokens,
+		ImageInputTokens:    result.Usage.ImageInputTokens,
 		OutputTokens:        result.Usage.OutputTokens,
 		CacheCreationTokens: result.Usage.CacheCreationInputTokens,
 		CacheReadTokens:     result.Usage.CacheReadInputTokens,
@@ -7197,6 +7358,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	usageLog.AccountRateMultiplier = &accountRateMultiplier
 	usageLog.BillingType = billingType
 	usageLog.Stream = result.Stream
+	if input.CyberBlocked {
+		usageLog.RequestType = RequestTypeCyberBlocked
+	}
 	usageLog.OpenAIWSMode = result.OpenAIWSMode
 	usageLog.DurationMs = &durationMs
 	usageLog.FirstTokenMs = result.FirstTokenMs
@@ -8493,7 +8657,7 @@ func normalizeOpenAIReasoningEffort(raw string) string {
 		return ""
 	case "low", "medium", "high":
 		return value
-	case "xhigh", "extrahigh":
+	case "xhigh", "extrahigh", "max":
 		return "xhigh"
 	default:
 		// Only store known effort levels for now to keep UI consistent.

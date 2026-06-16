@@ -46,6 +46,7 @@ func (r *channelMonitorRepository) Create(ctx context.Context, m *service.Channe
 		SetSortOrder(m.SortOrder).
 		SetEnabled(m.Enabled).
 		SetIntervalSeconds(m.IntervalSeconds).
+		SetJitterSeconds(m.JitterSeconds).
 		SetCreatedBy(m.CreatedBy).
 		SetExtraHeaders(emptyHeadersIfNilRepo(m.ExtraHeaders)).
 		SetBodyOverrideMode(defaultBodyModeRepo(m.BodyOverrideMode))
@@ -93,6 +94,7 @@ func (r *channelMonitorRepository) Update(ctx context.Context, m *service.Channe
 		SetSortOrder(m.SortOrder).
 		SetEnabled(m.Enabled).
 		SetIntervalSeconds(m.IntervalSeconds).
+		SetJitterSeconds(m.JitterSeconds).
 		SetExtraHeaders(emptyHeadersIfNilRepo(m.ExtraHeaders)).
 		SetBodyOverrideMode(defaultBodyModeRepo(m.BodyOverrideMode))
 	if m.APIKeyID != nil {
@@ -797,6 +799,7 @@ func entToServiceMonitor(row *dbent.ChannelMonitor) *service.ChannelMonitor {
 		SortOrder:        row.SortOrder,
 		Enabled:          row.Enabled,
 		IntervalSeconds:  row.IntervalSeconds,
+		JitterSeconds:    row.JitterSeconds,
 		LastCheckedAt:    row.LastCheckedAt,
 		CreatedBy:        row.CreatedBy,
 		CreatedAt:        row.CreatedAt,

@@ -48,6 +48,7 @@ type channelMonitorCreateRequest struct {
 	SortOrder        int               `json:"sort_order" binding:"omitempty,min=0,max=100000"`
 	Enabled          *bool             `json:"enabled"`
 	IntervalSeconds  int               `json:"interval_seconds" binding:"required,min=15,max=3600"`
+	JitterSeconds    int               `json:"jitter_seconds" binding:"omitempty,min=0,max=3585"`
 	TemplateID       *int64            `json:"template_id"`
 	ExtraHeaders     map[string]string `json:"extra_headers"`
 	BodyOverrideMode string            `json:"body_override_mode" binding:"omitempty,oneof=off merge replace"`
@@ -68,6 +69,7 @@ type channelMonitorUpdateRequest struct {
 	SortOrder        *int               `json:"sort_order" binding:"omitempty,min=0,max=100000"`
 	Enabled          *bool              `json:"enabled"`
 	IntervalSeconds  *int               `json:"interval_seconds" binding:"omitempty,min=15,max=3600"`
+	JitterSeconds    *int               `json:"jitter_seconds" binding:"omitempty,min=0,max=3585"`
 	TemplateID       *int64             `json:"template_id"`
 	ClearTemplate    bool               `json:"clear_template"` // true 时把 template_id 置空，忽略 TemplateID
 	ExtraHeaders     *map[string]string `json:"extra_headers"`
@@ -97,6 +99,7 @@ type channelMonitorResponse struct {
 	SortOrder           int                                  `json:"sort_order"`
 	Enabled             bool                                 `json:"enabled"`
 	IntervalSeconds     int                                  `json:"interval_seconds"`
+	JitterSeconds       int                                  `json:"jitter_seconds"`
 	LastCheckedAt       *string                              `json:"last_checked_at"`
 	CreatedBy           int64                                `json:"created_by"`
 	CreatedAt           string                               `json:"created_at"`
@@ -166,6 +169,7 @@ func channelMonitorToResponse(m *service.ChannelMonitor) *channelMonitorResponse
 		SortOrder:           m.SortOrder,
 		Enabled:             m.Enabled,
 		IntervalSeconds:     m.IntervalSeconds,
+		JitterSeconds:       m.JitterSeconds,
 		CreatedBy:           m.CreatedBy,
 		CreatedAt:           m.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:           m.UpdatedAt.UTC().Format(time.RFC3339),
@@ -333,6 +337,7 @@ func (h *ChannelMonitorHandler) Create(c *gin.Context) {
 		SortOrder:        req.SortOrder,
 		Enabled:          enabled,
 		IntervalSeconds:  req.IntervalSeconds,
+		JitterSeconds:    req.JitterSeconds,
 		CreatedBy:        subject.UserID,
 		TemplateID:       req.TemplateID,
 		ExtraHeaders:     req.ExtraHeaders,
@@ -372,6 +377,7 @@ func (h *ChannelMonitorHandler) Update(c *gin.Context) {
 		SortOrder:        req.SortOrder,
 		Enabled:          req.Enabled,
 		IntervalSeconds:  req.IntervalSeconds,
+		JitterSeconds:    req.JitterSeconds,
 		TemplateID:       req.TemplateID,
 		ClearTemplate:    req.ClearTemplate,
 		ExtraHeaders:     req.ExtraHeaders,

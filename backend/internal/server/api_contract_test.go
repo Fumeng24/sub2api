@@ -998,6 +998,8 @@ func TestAPIContracts(t *testing.T) {
 						}
 					},
 					"risk_control_enabled": false,
+					"cyber_session_block_enabled": false,
+					"cyber_session_block_ttl_seconds": 3600,
 					"affiliate_enabled": false,
 					"wechat_connect_enabled": false,
 					"wechat_connect_app_id": "",
@@ -1340,6 +1342,8 @@ func TestAPIContracts(t *testing.T) {
 						}
 					},
 					"risk_control_enabled": false,
+					"cyber_session_block_enabled": false,
+					"cyber_session_block_ttl_seconds": 3600,
 					"affiliate_enabled": false,
 					"wechat_connect_enabled": true,
 					"wechat_connect_app_id": "wx-open-config",
