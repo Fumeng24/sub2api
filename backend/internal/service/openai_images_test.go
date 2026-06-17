@@ -899,26 +899,30 @@ func TestOpenAIGatewayServiceForwardImages_OAuthStreamServerErrorAfterFlushDoesN
 	require.Equal(t, account.ID, events[0].AccountID)
 }
 
-func TestOpenAIImagesSSEClientErrorsAreNotRetryable(t *testing.T) {
+func TestOpenAIImagesSSEClientErrorsRetryability(t *testing.T) {
 	tests := []struct {
 		name       string
 		payload    string
 		wantStatus int
+		wantRetry  bool
 	}{
 		{
 			name:       "invalid request",
 			payload:    `{"type":"error","error":{"type":"invalid_request_error","code":"invalid_value","message":"bad size"}}`,
 			wantStatus: http.StatusBadRequest,
+			wantRetry:  false,
 		},
 		{
 			name:       "content policy",
 			payload:    `{"type":"error","error":{"type":"image_generation_user_error","code":"content_policy_violation","message":"blocked"}}`,
 			wantStatus: http.StatusBadRequest,
+			wantRetry:  false,
 		},
 		{
-			name:       "rate limit remains distinct from server error",
+			name:       "rate limit retries on another account",
 			payload:    `{"type":"error","error":{"type":"rate_limit_exceeded","code":"rate_limit_exceeded","message":"try again"}}`,
 			wantStatus: http.StatusTooManyRequests,
+			wantRetry:  true,
 		},
 	}
 
@@ -927,7 +931,7 @@ func TestOpenAIImagesSSEClientErrorsAreNotRetryable(t *testing.T) {
 			upstreamErr := openAIImagesUpstreamErrorFromSSEPayload([]byte(tt.payload))
 			require.NotNil(t, upstreamErr)
 			require.Equal(t, tt.wantStatus, upstreamErr.StatusCode)
-			require.False(t, IsOpenAIImagesRetryableUpstreamError(upstreamErr))
+			require.Equal(t, tt.wantRetry, IsOpenAIImagesRetryableUpstreamError(upstreamErr))
 		})
 	}
 }
