@@ -46,6 +46,10 @@ func (r openAIImagesFailoverAccountRepo) ListSchedulableUngroupedByPlatform(_ co
 	return r.accountsForPlatform(platform), nil
 }
 
+func (r openAIImagesFailoverAccountRepo) ListByPlatform(_ context.Context, platform string) ([]service.Account, error) {
+	return r.accountsForPlatform(platform), nil
+}
+
 func (r openAIImagesFailoverAccountRepo) accountsForPlatform(platform string) []service.Account {
 	out := make([]service.Account, 0, len(r.accounts))
 	for _, account := range r.accounts {

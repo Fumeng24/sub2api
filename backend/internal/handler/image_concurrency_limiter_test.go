@@ -143,7 +143,7 @@ func TestOpenAIGatewayHandlerAcquireImageGenerationSlot_Returns429WhenFull(t *te
 
 func TestOpenAIGatewayHandlerResponses_ImageIntentRejectedByImageConcurrency(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	body := `{"model":"gpt-5.4","input":"draw","tools":[{"type":"image_generation"}]}`
+	body := `{"model":"gpt-5.4","input":"draw","tools":[{"type":"image_generation","size":"1024x1024"}]}`
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
