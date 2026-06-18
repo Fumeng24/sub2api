@@ -403,9 +403,9 @@ gateway:
   # Auto inject anthropic-beta header for API-key accounts when needed (default: off)
   # 需要时自动为 API-key 账户注入 anthropic-beta 头（默认：关闭）
   inject_beta_for_apikey: false
-  # Allow failover on selected 400 errors (default: off)
-  # 允许在特定 400 错误时进行故障转移（默认：关闭）
-  failover_on_400: false
+  # Allow failover on selected upstream compatibility 400 errors (default: on)
+  # 允许在特定上游兼容层 400 错误时进行故障转移（默认：开启）
+  failover_on_400: true
   # Scheduling configuration
   # 调度配置
   scheduling:

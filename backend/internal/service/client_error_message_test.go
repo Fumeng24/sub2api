@@ -89,6 +89,14 @@ func TestClientFacingErrorMessage_PreservesActionableClientErrors(t *testing.T) 
 	}
 }
 
+func TestClientFacingErrorMessage_PreservesClaudeCodeVersionUpdate(t *testing.T) {
+	msg := "Your Claude Code version (2.1.31) is below the minimum required version (2.1.85). Please update: npm update -g @anthropic-ai/claude-code"
+	got := ClientFacingErrorMessage(http.StatusBadRequest, "invalid_request_error", msg)
+	if got != msg {
+		t.Fatalf("ClientFacingErrorMessage() = %q, want %q", got, msg)
+	}
+}
+
 func TestClientFacingErrorMessage_RedactsCredentialLikeText(t *testing.T) {
 	msg := "upstream rejected request api_key=sk-testsecret123456789, Authorization: Bearer ya29.a0AfH6SMDUMMYTOKEN, Cookie: sessionid=secret-cookie"
 	got := ClientFacingErrorMessage(http.StatusBadGateway, "upstream_error", msg)

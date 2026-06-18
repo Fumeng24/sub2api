@@ -12,6 +12,7 @@ export interface ModelsListState {
   enabled: boolean
   savedModels: string[]
   items: ModelsListItem[]
+  candidatesLoaded: boolean
 }
 
 export const createModelsListState = (
@@ -20,6 +21,7 @@ export const createModelsListState = (
   enabled: config?.enabled ?? false,
   savedModels: normalizeModels(config?.models ?? []),
   items: [],
+  candidatesLoaded: false,
 })
 
 export const hydrateModelsListState = (
@@ -36,17 +38,19 @@ export const setModelsListCandidates = (
   candidates: string[],
 ) => {
   const normalizedCandidates = normalizeModels(candidates)
+  state.candidatesLoaded = true
   const currentSelected = new Set(
     state.items.filter(item => item.selected).map(item => item.id),
   )
   const currentKnown = new Set(state.items.map(item => item.id))
   const savedSelected = new Set(state.savedModels)
   const hasExistingItems = state.items.length > 0
+  const allowed = new Set(normalizedCandidates)
   const selectionOrder = normalizeModels([
     ...state.items.map(item => item.id),
     ...state.savedModels,
     ...normalizedCandidates,
-  ])
+  ]).filter(id => allowed.has(id))
 
   state.items = selectionOrder.map(id => {
     const selected = hasExistingItems
@@ -103,6 +107,8 @@ export const buildModelsListConfig = (state: ModelsListState): ModelsListConfig 
   enabled: state.enabled,
   models: state.items.length > 0
     ? state.items.filter(item => item.selected).map(item => item.id)
+    : state.candidatesLoaded
+      ? []
     : [...state.savedModels],
 })
 

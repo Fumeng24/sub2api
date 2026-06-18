@@ -394,6 +394,7 @@ export default {
     apiKeys: 'API Keys',
     imageGeneration: 'AI Images',
     usage: 'Usage',
+    cardCodePurchase: 'Buy Card Code',
     redeem: 'Redeem',
     affiliate: 'Affiliate Rebates',
     affiliateManagement: 'Affiliate Rebates',
@@ -431,7 +432,7 @@ export default {
     channelManagement: 'Channels',
     channelPricing: 'Channel Pricing',
     channelMonitor: 'Channel Monitor',
-    channelStatus: 'Channel Status',
+    channelStatus: 'Service Status',
     riskControl: 'Risk Control',
   },
 
@@ -788,6 +789,14 @@ export default {
     selectGroup: 'Select a group',
     statusLabel: 'Status',
     selectStatus: 'Select status',
+    serviceStatusTip: {
+      title: 'Can’t connect or seeing errors? Check service status first',
+      description: 'If requests fail, time out, or a model is temporarily unavailable, check the current group status first. When a group is unstable, switch to a more stable group in time.',
+      action: 'View Service Status',
+    },
+    createServiceStatusHint:
+      'Before creating a key, confirm the selected group is healthy. If you later cannot connect or see errors, check service status first and switch to a more stable group when needed.',
+    viewServiceStatus: 'View service status',
     saving: 'Saving...',
     noKeysYet: 'No API keys yet',
     createFirstKey: 'Create your first API key to get started with the API.',
@@ -1202,8 +1211,11 @@ export default {
     visible: 'Visibility',
     groupsTitle: 'Accessible Groups',
     modelsTitle: 'Supported Models',
+    platformSectionTitle: 'Available groups on this platform',
+    groupModelsTitle: 'Models in this group',
     exclusive: 'Exclusive',
     public: 'Public',
+    subscription: 'Subscription',
     exclusiveTooltip: 'Exclusive groups granted to you by an admin',
     publicTooltip: 'Groups open to all users',
     stats: {
@@ -2498,7 +2510,7 @@ export default {
       },
       modelsList: {
         title: 'Custom /v1/models Model List',
-        hint: 'Only changes the /v1/models response. Whitelist model calls and account routing are unchanged.',
+        hint: 'Candidates come from models supported by accounts bound to this group. User /v1/models and Available Channels only show selected models here.',
         loading: 'Loading model list...',
         empty: 'No displayable models'
       },

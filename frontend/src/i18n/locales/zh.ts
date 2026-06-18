@@ -394,6 +394,7 @@ export default {
     apiKeys: 'API 密钥',
     imageGeneration: 'AI 生图',
     usage: '使用记录',
+    cardCodePurchase: '卡密购买',
     redeem: '兑换',
     affiliate: '邀请返利',
     affiliateManagement: '邀请返利',
@@ -431,7 +432,7 @@ export default {
     channelManagement: '渠道管理',
     channelPricing: '渠道定价',
     channelMonitor: '渠道监控',
-    channelStatus: '渠道状态',
+    channelStatus: '服务状态',
     riskControl: '风控中心',
   },
 
@@ -787,6 +788,14 @@ export default {
     selectGroup: '选择分组',
     statusLabel: '状态',
     selectStatus: '选择状态',
+    serviceStatusTip: {
+      title: '连接不上或调用报错？先看服务状态',
+      description: '如果请求失败、连接超时或模型暂时不可用，先确认当前分组状态；若处于波动中，建议及时切换到更稳定的分组。',
+      action: '查看服务状态'
+    },
+    createServiceStatusHint:
+      '创建密钥时建议先确认所选分组是否正常；后续如果连接不上或有报错，也可以先查看服务状态，再切换到更稳定的分组。',
+    viewServiceStatus: '查看服务状态',
     saving: '保存中...',
     noKeysYet: '暂无 API 密钥',
     createFirstKey: '创建您的第一个 API 密钥以开始使用 API。',
@@ -1206,8 +1215,11 @@ export default {
     visible: '可见状态',
     groupsTitle: '可访问分组',
     modelsTitle: '支持模型',
+    platformSectionTitle: '平台下的可用分组',
+    groupModelsTitle: '本分组支持模型',
     exclusive: '专属',
     public: '公开',
+    subscription: '订阅',
     exclusiveTooltip: '管理员授权给你的专属分组',
     publicTooltip: '对所有用户公开的分组',
     stats: {
@@ -2581,7 +2593,7 @@ export default {
       },
       modelsList: {
         title: '自定义 /v1/models 模型列表',
-        hint: '仅影响 /v1/models 展示结果，不影响白名单模型调用和账号调度。',
+        hint: '候选来自当前分组已绑定账号支持的模型；用户侧 /v1/models 和可用渠道页只展示这里勾选的模型。',
         loading: '正在加载模型列表...',
         empty: '暂无可展示模型'
       },

@@ -80,6 +80,7 @@ import userChannelsAPI, { type UserAvailableChannel } from '@/api/channels'
 import userGroupsAPI from '@/api/groups'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import type { UserAvailableGroup } from '@/api/channels'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -107,7 +108,9 @@ const filteredChannels = computed(() => {
         (p) =>
           p.platform.toLowerCase().includes(q) ||
           p.groups.some((g) => g.name.toLowerCase().includes(q)) ||
-          p.supported_models.some((m) => m.name.toLowerCase().includes(q)),
+          p.groups.some((g) =>
+            groupModels(g).some((m) => m.name.toLowerCase().includes(q)),
+          ),
       )
       if (matchingSections.length === 0) return null
       return { ...ch, platforms: matchingSections }
@@ -123,7 +126,7 @@ const summary = computed(() => {
     0,
   )
   const modelCount = list.reduce(
-    (sum, channel) => sum + channel.platforms.reduce((n, section) => n + section.supported_models.length, 0),
+    (sum, channel) => sum + channelModelCount(channel),
     0,
   )
   return {
@@ -140,6 +143,22 @@ const summaryItems = computed(() => [
   { label: t('availableChannels.stats.groups'), value: summary.value.groups },
   { label: t('availableChannels.stats.models'), value: summary.value.models },
 ])
+
+function groupModels(group: UserAvailableGroup) {
+  return group.supported_models || []
+}
+
+function channelModelCount(channel: UserAvailableChannel): number {
+  const names = new Set<string>()
+  for (const section of channel.platforms) {
+    for (const group of section.groups) {
+      for (const model of groupModels(group)) {
+        names.add(`${model.platform || section.platform}:${model.name.toLowerCase()}`)
+      }
+    }
+  }
+  return names.size
+}
 
 async function loadChannels() {
   loading.value = true

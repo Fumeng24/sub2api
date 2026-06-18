@@ -26,6 +26,8 @@ export interface UserAvailableGroup {
   group_rate_discount_timezone?: string | null
   /** true = 专属分组（小范围授权）；false = 公开分组。 */
   is_exclusive: boolean
+  /** 当前分组实际对用户展示的模型列表，与该分组 /v1/models 清单保持一致。 */
+  supported_models?: UserSupportedModel[]
 }
 
 export interface UserPricingInterval {
@@ -57,7 +59,7 @@ export interface UserSupportedModel {
 }
 
 /**
- * 渠道下单个平台的子视图：用户可访问的分组 + 该平台支持的模型。
+ * 渠道下单个平台的子视图：用户可访问的分组 + 分组可见模型并集。
  * 后端把一个渠道按平台聚合成 sections，前端可以把渠道名作为 row-group
  * 一次渲染，后面按 sections 顺序用 rowspan 铺开。
  */

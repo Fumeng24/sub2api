@@ -5773,50 +5773,8 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 	}
 	if resp.StatusCode >= 400 {
-		// 可选：对部分 400 触发 failover（默认关闭以保持语义）
-		if resp.StatusCode == 400 && s.cfg != nil && s.cfg.Gateway.FailoverOn400 {
-			respBody, readErr := s.readUpstreamErrorBody(resp)
-			if readErr != nil {
-				// ReadAll failed, fall back to normal error handling without consuming the stream
-				return s.handleErrorResponse(ctx, resp, c, account, reqModel)
-			}
-			_ = resp.Body.Close()
-			resp.Body = io.NopCloser(bytes.NewReader(respBody))
-
-			if s.shouldFailoverOn400(respBody) {
-				upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
-				upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
-				upstreamDetail := ""
-				if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-					maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
-					if maxBytes <= 0 {
-						maxBytes = 2048
-					}
-					upstreamDetail = truncateString(string(respBody), maxBytes)
-				}
-				appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-					Platform:           account.Platform,
-					AccountID:          account.ID,
-					AccountName:        account.Name,
-					UpstreamStatusCode: resp.StatusCode,
-					UpstreamRequestID:  resp.Header.Get("x-request-id"),
-					Kind:               "failover_on_400",
-					Message:            upstreamMsg,
-					Detail:             upstreamDetail,
-				})
-
-				if s.cfg.Gateway.LogUpstreamErrorBody {
-					logger.LegacyPrintf("service.gateway",
-						"Account %d: 400 error, attempting failover: %s",
-						account.ID,
-						truncateForLog(respBody, s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes),
-					)
-				} else {
-					logger.LegacyPrintf("service.gateway", "Account %d: 400 error, attempting failover", account.ID)
-				}
-				s.handleFailoverSideEffects(ctx, resp, account, reqModel)
-				return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode, ResponseBody: respBody}
-			}
+		if failoverErr, ok := s.handleOptional400Failover(ctx, resp, c, account, reqModel, false); ok {
+			return nil, failoverErr
 		}
 		return s.handleErrorResponse(ctx, resp, c, account, reqModel)
 	}
@@ -6127,6 +6085,9 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 	}
 
 	if resp.StatusCode >= 400 {
+		if failoverErr, ok := s.handleOptional400Failover(ctx, resp, c, account, input.RequestModel, true); ok {
+			return nil, failoverErr
+		}
 		return s.handleErrorResponse(ctx, resp, c, account, input.RequestModel)
 	}
 
@@ -7968,6 +7929,11 @@ func (s *GatewayService) shouldFailoverOn400(respBody []byte) bool {
 		return false
 	}
 
+	if strings.Contains(msg, "bad response status code 400") ||
+		strings.Contains(msg, "bad_response_status_code") {
+		return true
+	}
+
 	// 缺少/错误的 beta header：换账号/链路可能成功（尤其是混合调度时）。
 	// 更精确匹配 beta 相关的兼容性问题，避免误触发切换。
 	if strings.Contains(msg, "anthropic-beta") ||
@@ -8289,11 +8255,71 @@ func (s *GatewayService) handleRetryExhaustedSideEffects(ctx context.Context, re
 
 func (s *GatewayService) handleFailoverSideEffects(ctx context.Context, resp *http.Response, account *Account, requestedModel ...string) {
 	body, _ := s.readUpstreamErrorBody(resp)
+	if s.rateLimitService == nil {
+		return
+	}
 	if len(requestedModel) > 0 {
 		s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body, requestedModel[0])
 		return
 	}
 	s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
+}
+
+func (s *GatewayService) handleOptional400Failover(
+	ctx context.Context,
+	resp *http.Response,
+	c *gin.Context,
+	account *Account,
+	requestedModel string,
+	passthrough bool,
+) (*UpstreamFailoverError, bool) {
+	if resp == nil || resp.StatusCode != http.StatusBadRequest || s == nil || s.cfg == nil || !s.cfg.Gateway.FailoverOn400 {
+		return nil, false
+	}
+	respBody, readErr := s.readUpstreamErrorBody(resp)
+	if readErr != nil {
+		return nil, false
+	}
+	_ = resp.Body.Close()
+	resp.Body = io.NopCloser(bytes.NewReader(respBody))
+
+	if !s.shouldFailoverOn400(respBody) {
+		return nil, false
+	}
+
+	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
+	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+	upstreamDetail := ""
+	if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
+		maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
+		if maxBytes <= 0 {
+			maxBytes = 2048
+		}
+		upstreamDetail = truncateString(string(respBody), maxBytes)
+	}
+	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		Platform:           account.Platform,
+		AccountID:          account.ID,
+		AccountName:        account.Name,
+		UpstreamStatusCode: resp.StatusCode,
+		UpstreamRequestID:  resp.Header.Get("x-request-id"),
+		Passthrough:        passthrough,
+		Kind:               "failover_on_400",
+		Message:            upstreamMsg,
+		Detail:             upstreamDetail,
+	})
+
+	if s.cfg.Gateway.LogUpstreamErrorBody {
+		logger.LegacyPrintf("service.gateway",
+			"Account %d: 400 error, attempting failover: %s",
+			account.ID,
+			truncateForLog(respBody, s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes),
+		)
+	} else {
+		logger.LegacyPrintf("service.gateway", "Account %d: 400 error, attempting failover", account.ID)
+	}
+	s.handleFailoverSideEffects(ctx, resp, account, requestedModel)
+	return &UpstreamFailoverError{StatusCode: resp.StatusCode, ResponseBody: respBody}, true
 }
 
 // handleRetryExhaustedError 处理重试耗尽后的错误

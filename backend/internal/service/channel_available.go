@@ -18,6 +18,7 @@ type AvailableGroupRef struct {
 	Platform         string
 	SubscriptionType string
 	RateMultiplier   float64
+	ModelsListConfig GroupModelsListConfig
 	IsExclusive      bool
 }
 
@@ -64,6 +65,7 @@ func (s *ChannelService) ListAvailable(ctx context.Context) ([]AvailableChannel,
 			Platform:         g.Platform,
 			SubscriptionType: g.SubscriptionType,
 			RateMultiplier:   g.RateMultiplier,
+			ModelsListConfig: g.ModelsListConfig,
 			IsExclusive:      g.IsExclusive,
 		}
 	}

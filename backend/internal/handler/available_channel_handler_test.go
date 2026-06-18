@@ -34,7 +34,7 @@ func TestFilterUserVisibleGroups_IntersectionOnly(t *testing.T) {
 		{ID: 2, Name: "g2", Platform: "anthropic"},
 		{ID: 3, Name: "g3", Platform: "openai"},
 	}
-	allowed := map[int64]struct{}{1: {}, 3: {}}
+	allowed := map[int64]service.GroupModelsListConfig{1: {}, 3: {}}
 
 	visible := filterUserVisibleGroups(groups, allowed, nil)
 	require.Len(t, visible, 2)
@@ -47,7 +47,7 @@ func TestFilterUserVisibleGroups_EmbedsActiveDiscount(t *testing.T) {
 		{ID: 1, Name: "g1", Platform: "anthropic", RateMultiplier: 2},
 		{ID: 2, Name: "g2", Platform: "openai", RateMultiplier: 3},
 	}
-	allowed := map[int64]struct{}{1: {}, 2: {}}
+	allowed := map[int64]service.GroupModelsListConfig{1: {}, 2: {}}
 	discount := &service.ActiveGroupRateDiscount{
 		Name:               "Promo",
 		DiscountMultiplier: 0.5,
@@ -73,6 +73,30 @@ func TestFilterUserVisibleGroups_EmbedsActiveDiscount(t *testing.T) {
 	require.Equal(t, "09:00", *visible[1].GroupRateDiscountDailyStartTime)
 	require.Equal(t, "18:00", *visible[1].GroupRateDiscountDailyEndTime)
 	require.Equal(t, "Asia/Shanghai", *visible[1].GroupRateDiscountTimezone)
+}
+
+func TestFilterUserVisibleGroups_UsesAllowedGroupModelsConfig(t *testing.T) {
+	// 用户可见分组来自 APIKeyService，那里可能已经按权限/账号可用性过滤过模型。
+	// available-channels 必须使用这份过滤后的配置，而不是 ChannelService.ListAvailable
+	// 里活跃分组的原始配置。
+	groups := []service.AvailableGroupRef{
+		{
+			ID:       1,
+			Name:     "image",
+			Platform: "openai",
+			ModelsListConfig: service.GroupModelsListConfig{
+				Enabled: true,
+				Models:  []string{"too-wide-model"},
+			},
+		},
+	}
+	allowed := map[int64]service.GroupModelsListConfig{
+		1: {Enabled: true, Models: []string{"filtered-model"}},
+	}
+
+	visible := filterUserVisibleGroups(groups, allowed, nil)
+	require.Len(t, visible, 1)
+	require.Equal(t, []string{"filtered-model"}, visible[0].modelsListConfig.Models)
 }
 
 func TestToUserSupportedModels_FiltersByAllowedPlatforms(t *testing.T) {
@@ -140,7 +164,7 @@ func TestUserAvailableChannel_FieldWhitelist(t *testing.T) {
 	require.NoError(t, err)
 	var groupDecoded map[string]any
 	require.NoError(t, json.Unmarshal(rawGroup, &groupDecoded))
-	for _, key := range []string{"id", "name", "platform", "subscription_type", "rate_multiplier", "is_exclusive"} {
+	for _, key := range []string{"id", "name", "platform", "subscription_type", "rate_multiplier", "is_exclusive", "supported_models"} {
 		_, exists := groupDecoded[key]
 		require.Truef(t, exists, "group DTO must expose %q", key)
 	}
@@ -166,7 +190,7 @@ func TestUserAvailableChannel_FieldWhitelist(t *testing.T) {
 
 func TestBuildPlatformSections_GroupsByPlatform(t *testing.T) {
 	// 一个渠道横跨 anthropic / openai / 空平台：应该生成 2 个 section，
-	// 按 platform 字母序排序，各自 groups 和 supported_models 只含同平台条目。
+	// 按 platform 字母序排序；未配置 /v1/models 清单的分组不展示模型。
 	ch := service.AvailableChannel{
 		Name: "ch",
 		SupportedModels: []service.SupportedModel{
@@ -185,6 +209,108 @@ func TestBuildPlatformSections_GroupsByPlatform(t *testing.T) {
 	require.Equal(t, "openai", sections[1].Platform)
 	require.Len(t, sections[0].Groups, 1)
 	require.Equal(t, int64(2), sections[0].Groups[0].ID)
-	require.Len(t, sections[0].SupportedModels, 1)
-	require.Equal(t, "claude-sonnet-4-6", sections[0].SupportedModels[0].Name)
+	require.Empty(t, sections[0].SupportedModels)
+}
+
+func TestBuildPlatformSections_GroupSupportedModelsUseCustomList(t *testing.T) {
+	// 同一个渠道、同一个平台下两个分组模型清单不同：用户侧必须按分组展示，
+	// 不能把平台聚合模型无脑塞给每个分组。
+	ch := service.AvailableChannel{
+		Name: "ch",
+		SupportedModels: []service.SupportedModel{
+			{
+				Name:     "claude-sonnet-4-6",
+				Platform: "anthropic",
+				Pricing:  &service.ChannelModelPricing{BillingMode: service.BillingModeToken},
+			},
+			{
+				Name:     "claude-opus-4-6",
+				Platform: "anthropic",
+				Pricing:  &service.ChannelModelPricing{BillingMode: service.BillingModeToken},
+			},
+			{Name: "gpt-5.4", Platform: "openai"},
+		},
+	}
+	visible := []userAvailableGroup{
+		{
+			ID:       1,
+			Name:     "Claude Pro",
+			Platform: "anthropic",
+			modelsListConfig: service.GroupModelsListConfig{
+				Enabled: true,
+				Models:  []string{"claude-sonnet-4-6", "claude-opus-4-6"},
+			},
+		},
+		{
+			ID:       2,
+			Name:     "Claude Lite",
+			Platform: "anthropic",
+			modelsListConfig: service.GroupModelsListConfig{
+				Enabled: true,
+				Models:  []string{"claude-haiku-4-5"},
+			},
+		},
+	}
+
+	sections := buildPlatformSections(ch, visible)
+	require.Len(t, sections, 1)
+	require.Equal(t, []string{"claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5"}, sectionModelNames(sections[0]))
+	require.Len(t, sections[0].Groups, 2)
+	require.Equal(t, []string{"claude-sonnet-4-6", "claude-opus-4-6"}, groupModelNames(sections[0].Groups[0]))
+	require.Equal(t, []string{"claude-haiku-4-5"}, groupModelNames(sections[0].Groups[1]))
+	require.NotNil(t, sections[0].Groups[0].SupportedModels[0].Pricing)
+	require.Nil(t, sections[0].Groups[1].SupportedModels[0].Pricing)
+}
+
+func TestBuildPlatformSections_GroupWithoutCustomListShowsNoModels(t *testing.T) {
+	ch := service.AvailableChannel{
+		Name: "ch",
+		SupportedModels: []service.SupportedModel{
+			{Name: "gpt-5.4", Platform: "openai"},
+			{Name: "claude-sonnet-4-6", Platform: "anthropic"},
+		},
+	}
+	visible := []userAvailableGroup{{ID: 1, Name: "OpenAI", Platform: "openai"}}
+
+	sections := buildPlatformSections(ch, visible)
+	require.Len(t, sections, 1)
+	require.Empty(t, groupModelNames(sections[0].Groups[0]))
+}
+
+func TestBuildPlatformSections_EnabledEmptyCustomListDoesNotFallback(t *testing.T) {
+	ch := service.AvailableChannel{
+		Name: "ch",
+		SupportedModels: []service.SupportedModel{
+			{Name: "gpt-5.4", Platform: "openai"},
+		},
+	}
+	visible := []userAvailableGroup{{
+		ID:       1,
+		Name:     "OpenAI",
+		Platform: "openai",
+		modelsListConfig: service.GroupModelsListConfig{
+			Enabled: true,
+			Models:  nil,
+		},
+	}}
+
+	sections := buildPlatformSections(ch, visible)
+	require.Len(t, sections, 1)
+	require.Empty(t, sections[0].Groups[0].SupportedModels)
+}
+
+func groupModelNames(group userAvailableGroup) []string {
+	names := make([]string, 0, len(group.SupportedModels))
+	for _, model := range group.SupportedModels {
+		names = append(names, model.Name)
+	}
+	return names
+}
+
+func sectionModelNames(section userChannelPlatformSection) []string {
+	names := make([]string, 0, len(section.SupportedModels))
+	for _, model := range section.SupportedModels {
+		names = append(names, model.Name)
+	}
+	return names
 }

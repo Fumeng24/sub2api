@@ -771,7 +771,7 @@ type GatewayConfig struct {
 	// API-key 账号在客户端未提供 anthropic-beta 时，是否按需自动补齐（默认关闭以保持兼容）
 	InjectBetaForAPIKey bool `mapstructure:"inject_beta_for_apikey"`
 
-	// 是否允许对部分 400 错误触发 failover（默认关闭以避免改变语义）
+	// 是否允许对部分 400 错误触发 failover（仅识别已知上游兼容层错误，普通参数错误不切换）
 	FailoverOn400 bool `mapstructure:"failover_on_400"`
 
 	// 账户切换最大次数（遇到上游错误时切换到其他账户的次数上限）
@@ -1843,7 +1843,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.log_upstream_error_body", true)
 	viper.SetDefault("gateway.log_upstream_error_body_max_bytes", 2048)
 	viper.SetDefault("gateway.inject_beta_for_apikey", false)
-	viper.SetDefault("gateway.failover_on_400", false)
+	viper.SetDefault("gateway.failover_on_400", true)
 	viper.SetDefault("gateway.max_account_switches", 10)
 	viper.SetDefault("gateway.max_account_switches_gemini", 3)
 	viper.SetDefault("gateway.force_codex_cli", false)

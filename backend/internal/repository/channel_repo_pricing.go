@@ -145,13 +145,15 @@ func (r *channelRepository) batchLoadIntervals(ctx context.Context, pricingIDs [
 	intervalMap := make(map[int64][]service.PricingInterval, len(pricingIDs))
 	for rows.Next() {
 		var iv service.PricingInterval
+		var tierLabel sql.NullString
 		if err := rows.Scan(
-			&iv.ID, &iv.PricingID, &iv.MinTokens, &iv.MaxTokens, &iv.TierLabel,
+			&iv.ID, &iv.PricingID, &iv.MinTokens, &iv.MaxTokens, &tierLabel,
 			&iv.InputPrice, &iv.OutputPrice, &iv.CacheWritePrice, &iv.CacheReadPrice,
 			&iv.PerRequestPrice, &iv.SortOrder, &iv.CreatedAt, &iv.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan interval: %w", err)
 		}
+		iv.TierLabel = tierLabel.String
 		intervalMap[iv.PricingID] = append(intervalMap[iv.PricingID], iv)
 	}
 	if err := rows.Err(); err != nil {

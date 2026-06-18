@@ -27,6 +27,8 @@ func ClientFacingErrorMessage(statusCode int, errType, message string) string {
 func clientErrorSpecificReplacement(message string) (string, bool) {
 	lower := strings.ToLower(strings.TrimSpace(message))
 	switch {
+	case strings.Contains(lower, "claude code version") && strings.Contains(lower, "please update"):
+		return message, true
 	case strings.Contains(lower, "image generation concurrency limit exceeded"):
 		return "Image generation concurrency limit exceeded, please retry later", true
 	case strings.Contains(lower, "upstream stream disconnected"):

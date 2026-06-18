@@ -3,6 +3,28 @@
     <TablePageLayout>
       <template #filters>
         <div class="flex flex-col gap-3">
+          <div class="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/85 p-4 shadow-sm dark:border-sky-500/25 dark:bg-sky-950/30 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start gap-3">
+              <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-white shadow-sm shadow-sky-500/25">
+                <Icon name="chart" size="md" />
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-sky-950 dark:text-sky-100">{{ t('keys.serviceStatusTip.title') }}</p>
+                <p class="mt-1 text-sm leading-6 text-sky-800 dark:text-sky-200">
+                  {{ t('keys.serviceStatusTip.description') }}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-sky-600/20 transition-colors hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-400"
+              @click="router.push('/monitor')"
+            >
+              {{ t('keys.serviceStatusTip.action') }}
+              <Icon name="arrowRight" size="sm" />
+            </button>
+          </div>
+
           <div class="flex flex-wrap items-center gap-3">
             <SearchInput
               v-model="filterSearch"
@@ -487,6 +509,21 @@
               />
             </template>
           </Select>
+          <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-100">
+            <div class="flex items-start gap-2">
+              <Icon name="chart" size="sm" class="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300" />
+              <p>
+                {{ t('keys.createServiceStatusHint') }}
+                <button
+                  type="button"
+                  class="font-semibold text-amber-950 underline decoration-amber-500/50 underline-offset-4 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200"
+                  @click="router.push('/monitor')"
+                >
+                  {{ t('keys.viewServiceStatus') }}
+                </button>
+              </p>
+            </div>
+          </div>
         </div>
 
         <!-- Custom Key Section (only for create) -->

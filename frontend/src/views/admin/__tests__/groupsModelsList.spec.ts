@@ -24,7 +24,7 @@ describe("groupsModelsList", () => {
     ]);
   });
 
-  it("keeps saved selections and marks new candidates as unselected when editing", () => {
+  it("keeps saved selections that are still backed by account candidates", () => {
     const state = createModelsListState({
       enabled: true,
       models: ["gpt-5.5", "gpt-5.4"],
@@ -38,6 +38,39 @@ describe("groupsModelsList", () => {
       { id: "gpt-5.4", selected: true },
       { id: "legacy-gpt", selected: false },
     ]);
+  });
+
+  it("drops saved models that are no longer supported by group accounts", () => {
+    const state = createModelsListState({
+      enabled: true,
+      models: ["gpt-5.5", "stale-pro-model"],
+    });
+
+    setModelsListCandidates(state, ["gpt-5.5", "gpt-5.4"]);
+
+    expect(state.items).toEqual([
+      { id: "gpt-5.5", selected: true },
+      { id: "gpt-5.4", selected: false },
+    ]);
+    expect(buildModelsListConfig(state)).toEqual({
+      enabled: true,
+      models: ["gpt-5.5"],
+    });
+  });
+
+  it("clears saved models after an empty account candidate list has loaded", () => {
+    const state = createModelsListState({
+      enabled: true,
+      models: ["stale-pro-model"],
+    });
+
+    setModelsListCandidates(state, []);
+
+    expect(state.items).toEqual([]);
+    expect(buildModelsListConfig(state)).toEqual({
+      enabled: true,
+      models: [],
+    });
   });
 
   it("preserves explicitly unselected saved candidates when candidates refresh", () => {

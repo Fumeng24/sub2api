@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -797,23 +798,138 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 	availableGroups := make([]Group, 0)
 	for _, group := range allGroups {
 		if s.canUserBindGroupInternal(user, &group, subscribedGroupIDs) {
-			availableGroups = append(availableGroups, s.filterAvailableImageGroupModels(ctx, group))
+			availableGroups = append(availableGroups, s.resolveAvailableGroupModels(ctx, group))
 		}
 	}
 
 	return availableGroups, nil
 }
 
-func (s *APIKeyService) filterAvailableImageGroupModels(ctx context.Context, group Group) Group {
-	if s.accountRepo == nil || !isUserVisibleImageGenerationGroup(&group) || len(group.ModelsListConfig.Models) == 0 {
+func (s *APIKeyService) resolveAvailableGroupModels(ctx context.Context, group Group) Group {
+	if s.accountRepo == nil || strings.TrimSpace(group.Platform) == "" {
 		return group
 	}
 	accounts, err := s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, group.ID, group.Platform)
 	if err != nil {
 		return group
 	}
-	group.ModelsListConfig.Models = filterImageModelsSupportedByAccounts(group.ModelsListConfig.Models, group.Platform, accounts)
+	group.ModelsListConfig = resolveAvailableGroupModelsListConfig(group, accounts)
 	return group
+}
+
+func resolveAvailableGroupModelsListConfig(
+	group Group,
+	accounts []Account,
+) GroupModelsListConfig {
+	config := group.ModelsListConfig
+	platform := group.Platform
+	config = normalizeGroupModelsListConfig(config)
+	if len(accounts) == 0 {
+		return GroupModelsListConfig{Enabled: true}
+	}
+
+	if config.Enabled {
+		if isUserVisibleImageGenerationGroup(&group) {
+			return GroupModelsListConfig{
+				Enabled: true,
+				Models:  filterImageModelsSupportedByAccounts(config.Models, platform, accounts),
+			}
+		}
+		return GroupModelsListConfig{
+			Enabled: true,
+			Models:  filterModelsSupportedByAccounts(config.Models, platform, accounts),
+		}
+	}
+
+	models, enumerable := modelsFromGroupAccounts(platform, accounts)
+	if !enumerable {
+		return config
+	}
+	if isUserVisibleImageGenerationGroup(&group) {
+		models = filterImageModelNames(models)
+	}
+	return GroupModelsListConfig{Enabled: true, Models: models}
+}
+
+func modelsFromGroupAccounts(platform string, accounts []Account) ([]string, bool) {
+	normalizedPlatform := strings.ToLower(strings.TrimSpace(platform))
+	seen := make(map[string]struct{})
+	models := make([]string, 0)
+	considered := 0
+
+	for i := range accounts {
+		account := &accounts[i]
+		if normalizedPlatform != "" && strings.ToLower(strings.TrimSpace(account.Platform)) != normalizedPlatform {
+			continue
+		}
+		considered++
+		mapping := account.GetModelMapping()
+		if len(mapping) == 0 {
+			// Empty mapping means the account accepts arbitrary model names.
+			// There is no finite account-derived list to expose.
+			return nil, false
+		}
+		for model := range mapping {
+			model = strings.TrimSpace(model)
+			if model == "" {
+				continue
+			}
+			if strings.HasSuffix(model, "*") {
+				// Wildcards are capabilities, not user-facing concrete model names.
+				return nil, false
+			}
+			key := strings.ToLower(model)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			models = append(models, model)
+		}
+	}
+
+	if considered == 0 {
+		return nil, true
+	}
+	sort.Strings(models)
+	return models, true
+}
+
+func filterModelsSupportedByAccounts(models []string, platform string, accounts []Account) []string {
+	if len(models) == 0 || len(accounts) == 0 {
+		return nil
+	}
+
+	filtered := make([]string, 0, len(models))
+	seen := make(map[string]struct{}, len(models))
+	for _, model := range models {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		key := strings.ToLower(model)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		if modelSupportedByAnyAccount(model, platform, accounts) {
+			seen[key] = struct{}{}
+			filtered = append(filtered, model)
+		}
+	}
+	return filtered
+}
+
+func modelSupportedByAnyAccount(model, platform string, accounts []Account) bool {
+	normalizedPlatform := strings.ToLower(strings.TrimSpace(platform))
+	for i := range accounts {
+		account := &accounts[i]
+		if normalizedPlatform != "" && strings.ToLower(strings.TrimSpace(account.Platform)) != normalizedPlatform {
+			continue
+		}
+		if account.IsModelSupported(model) {
+			return true
+		}
+	}
+	return false
 }
 
 func isUserVisibleImageGenerationGroup(group *Group) bool {
@@ -832,7 +948,6 @@ func filterImageModelsSupportedByAccounts(models []string, platform string, acco
 		return nil
 	}
 
-	normalizedPlatform := strings.ToLower(strings.TrimSpace(platform))
 	filtered := make([]string, 0, len(models))
 	seen := make(map[string]struct{}, len(models))
 	for _, model := range models {
@@ -843,7 +958,7 @@ func filterImageModelsSupportedByAccounts(models []string, platform string, acco
 		if _, ok := seen[model]; ok {
 			continue
 		}
-		if imageModelSupportedByAnyAccount(model, normalizedPlatform, accounts) {
+		if modelSupportedByAnyAccount(model, platform, accounts) {
 			seen[model] = struct{}{}
 			filtered = append(filtered, model)
 		}
@@ -851,23 +966,25 @@ func filterImageModelsSupportedByAccounts(models []string, platform string, acco
 	return filtered
 }
 
-func imageModelSupportedByAnyAccount(model, platform string, accounts []Account) bool {
-	for i := range accounts {
-		account := &accounts[i]
-		if strings.ToLower(strings.TrimSpace(account.Platform)) != platform {
-			continue
-		}
-		if account.IsModelSupported(model) {
-			return true
-		}
-	}
-	return false
-}
-
 func isUserVisibleImageModelName(model string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(model))
 	normalized = strings.TrimPrefix(normalized, "models/")
 	return strings.Contains(normalized, "image")
+}
+
+func filterImageModelNames(models []string) []string {
+	if len(models) == 0 {
+		return nil
+	}
+	filtered := make([]string, 0, len(models))
+	for _, model := range models {
+		model = strings.TrimSpace(model)
+		if model == "" || !isUserVisibleImageModelName(model) {
+			continue
+		}
+		filtered = append(filtered, model)
+	}
+	return filtered
 }
 
 // canUserBindGroupInternal 内部方法，检查用户是否可以绑定分组（使用预加载的订阅数据）

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -54,22 +55,24 @@ func (h *AvailableChannelHandler) featureEnabled(c *gin.Context) bool {
 // 订阅视觉加深），并用 RateMultiplier 作为默认倍率；用户专属倍率前端走
 // /groups/rates，和 API 密钥页面保持一致。
 type userAvailableGroup struct {
-	ID                              int64    `json:"id"`
-	Name                            string   `json:"name"`
-	Platform                        string   `json:"platform"`
-	SubscriptionType                string   `json:"subscription_type"`
-	RateMultiplier                  float64  `json:"rate_multiplier"`
-	GroupRateDiscountMultiplier     *float64 `json:"group_rate_discount_multiplier,omitempty"`
-	DiscountedRateMultiplier        *float64 `json:"discounted_rate_multiplier,omitempty"`
-	GroupRateDiscountName           *string  `json:"group_rate_discount_name,omitempty"`
-	GroupRateDiscountScheduleMode   *string  `json:"group_rate_discount_schedule_mode,omitempty"`
-	GroupRateDiscountStartAt        *string  `json:"group_rate_discount_start_at,omitempty"`
-	GroupRateDiscountEndAt          *string  `json:"group_rate_discount_end_at,omitempty"`
-	GroupRateDiscountWeekdays       []int    `json:"group_rate_discount_weekdays,omitempty"`
-	GroupRateDiscountDailyStartTime *string  `json:"group_rate_discount_daily_start_time,omitempty"`
-	GroupRateDiscountDailyEndTime   *string  `json:"group_rate_discount_daily_end_time,omitempty"`
-	GroupRateDiscountTimezone       *string  `json:"group_rate_discount_timezone,omitempty"`
-	IsExclusive                     bool     `json:"is_exclusive"`
+	ID                              int64                `json:"id"`
+	Name                            string               `json:"name"`
+	Platform                        string               `json:"platform"`
+	SubscriptionType                string               `json:"subscription_type"`
+	RateMultiplier                  float64              `json:"rate_multiplier"`
+	GroupRateDiscountMultiplier     *float64             `json:"group_rate_discount_multiplier,omitempty"`
+	DiscountedRateMultiplier        *float64             `json:"discounted_rate_multiplier,omitempty"`
+	GroupRateDiscountName           *string              `json:"group_rate_discount_name,omitempty"`
+	GroupRateDiscountScheduleMode   *string              `json:"group_rate_discount_schedule_mode,omitempty"`
+	GroupRateDiscountStartAt        *string              `json:"group_rate_discount_start_at,omitempty"`
+	GroupRateDiscountEndAt          *string              `json:"group_rate_discount_end_at,omitempty"`
+	GroupRateDiscountWeekdays       []int                `json:"group_rate_discount_weekdays,omitempty"`
+	GroupRateDiscountDailyStartTime *string              `json:"group_rate_discount_daily_start_time,omitempty"`
+	GroupRateDiscountDailyEndTime   *string              `json:"group_rate_discount_daily_end_time,omitempty"`
+	GroupRateDiscountTimezone       *string              `json:"group_rate_discount_timezone,omitempty"`
+	IsExclusive                     bool                 `json:"is_exclusive"`
+	SupportedModels                 []userSupportedModel `json:"supported_models"`
+	modelsListConfig                service.GroupModelsListConfig
 }
 
 // userSupportedModelPricing 用户可见的定价字段白名单。
@@ -143,9 +146,9 @@ func (h *AvailableChannelHandler) List(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	allowedGroupIDs := make(map[int64]struct{}, len(userGroups))
+	allowedGroupModels := make(map[int64]service.GroupModelsListConfig, len(userGroups))
 	for i := range userGroups {
-		allowedGroupIDs[userGroups[i].ID] = struct{}{}
+		allowedGroupModels[userGroups[i].ID] = userGroups[i].ModelsListConfig
 	}
 
 	channels, err := h.channelService.ListAvailable(c.Request.Context())
@@ -163,7 +166,7 @@ func (h *AvailableChannelHandler) List(c *gin.Context) {
 		if h.settingService != nil {
 			discount = h.settingService.ActiveGroupRateDiscount(c.Request.Context(), time.Now())
 		}
-		visibleGroups := filterUserVisibleGroups(ch.Groups, allowedGroupIDs, discount)
+		visibleGroups := filterUserVisibleGroups(ch.Groups, allowedGroupModels, discount)
 		if len(visibleGroups) == 0 {
 			continue
 		}
@@ -207,25 +210,96 @@ func buildPlatformSections(
 
 	sections := make([]userChannelPlatformSection, 0, len(platforms))
 	for _, platform := range platforms {
-		platformSet := map[string]struct{}{platform: {}}
+		groups := groupsByPlatform[platform]
+		for i := range groups {
+			groups[i].SupportedModels = supportedModelsForGroup(ch.SupportedModels, groups[i])
+		}
 		sections = append(sections, userChannelPlatformSection{
 			Platform:        platform,
-			Groups:          groupsByPlatform[platform],
-			SupportedModels: toUserSupportedModels(ch.SupportedModels, platformSet),
+			Groups:          groups,
+			SupportedModels: supportedModelsForGroups(groups),
 		})
 	}
 	return sections
 }
 
+func supportedModelsForGroup(
+	channelModels []service.SupportedModel,
+	group userAvailableGroup,
+) []userSupportedModel {
+	cfg := group.modelsListConfig
+	if !cfg.Enabled {
+		return nil
+	}
+	if len(cfg.Models) == 0 {
+		return nil
+	}
+
+	pricingByName := make(map[string]service.SupportedModel, len(channelModels))
+	for i := range channelModels {
+		m := channelModels[i]
+		if m.Platform != group.Platform {
+			continue
+		}
+		pricingByName[strings.ToLower(m.Name)] = m
+	}
+
+	out := make([]userSupportedModel, 0, len(cfg.Models))
+	seen := make(map[string]struct{}, len(cfg.Models))
+	for _, name := range cfg.Models {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+
+		if priced, ok := pricingByName[key]; ok {
+			out = append(out, userSupportedModel{
+				Name:     priced.Name,
+				Platform: priced.Platform,
+				Pricing:  toUserPricing(priced.Pricing),
+			})
+			continue
+		}
+		out = append(out, userSupportedModel{
+			Name:     name,
+			Platform: group.Platform,
+			Pricing:  nil,
+		})
+	}
+	return out
+}
+
+func supportedModelsForGroups(groups []userAvailableGroup) []userSupportedModel {
+	seen := make(map[string]struct{})
+	out := make([]userSupportedModel, 0)
+	for _, group := range groups {
+		for _, model := range group.SupportedModels {
+			key := strings.ToLower(model.Platform + ":" + model.Name)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, model)
+		}
+	}
+	return out
+}
+
 // filterUserVisibleGroups 仅保留用户可访问的分组。
 func filterUserVisibleGroups(
 	groups []service.AvailableGroupRef,
-	allowed map[int64]struct{},
+	allowedGroupModels map[int64]service.GroupModelsListConfig,
 	discount *service.ActiveGroupRateDiscount,
 ) []userAvailableGroup {
 	visible := make([]userAvailableGroup, 0, len(groups))
 	for _, g := range groups {
-		if _, ok := allowed[g.ID]; !ok {
+		modelsListConfig, ok := allowedGroupModels[g.ID]
+		if !ok {
 			continue
 		}
 		group := userAvailableGroup{
@@ -235,6 +309,7 @@ func filterUserVisibleGroups(
 			SubscriptionType: g.SubscriptionType,
 			RateMultiplier:   g.RateMultiplier,
 			IsExclusive:      g.IsExclusive,
+			modelsListConfig: modelsListConfig,
 		}
 		if discount != nil && discount.AppliesToGroup(g.ID) {
 			multiplier := discount.DiscountMultiplier
