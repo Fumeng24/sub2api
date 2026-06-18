@@ -1681,7 +1681,7 @@ func isOpenAIStableLowTTFTGroup(group *Group) bool {
 	if group == nil || !strings.EqualFold(strings.TrimSpace(group.Platform), PlatformOpenAI) {
 		return false
 	}
-	return strings.Contains(group.Name, "稳定")
+	return group.OpenAIStableLowTTFT
 }
 
 func buildOpenAIStableLowTTFTSelectionOrder(pool []openAIAccountCandidateScore, seq uint64) []openAIAccountCandidateScore {

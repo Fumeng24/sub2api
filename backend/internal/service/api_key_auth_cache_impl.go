@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 12 // v12: reload force_openai_priority and exclusive group authorization fields
+const apiKeyAuthSnapshotVersion = 13 // v13: reload openai_stable_low_ttft group scheduling flag
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -276,6 +276,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			MessagesDispatchModelConfig:     apiKey.Group.MessagesDispatchModelConfig,
 			ModelsListConfig:                apiKey.Group.ModelsListConfig,
 			ForceOpenAIPriority:             apiKey.Group.ForceOpenAIPriority,
+			OpenAIStableLowTTFT:             apiKey.Group.OpenAIStableLowTTFT,
 			RPMLimit:                        apiKey.Group.RPMLimit,
 		}
 	}
@@ -350,6 +351,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			MessagesDispatchModelConfig:     snapshot.Group.MessagesDispatchModelConfig,
 			ModelsListConfig:                snapshot.Group.ModelsListConfig,
 			ForceOpenAIPriority:             snapshot.Group.ForceOpenAIPriority,
+			OpenAIStableLowTTFT:             snapshot.Group.OpenAIStableLowTTFT,
 			RPMLimit:                        snapshot.Group.RPMLimit,
 		}
 	}

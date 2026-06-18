@@ -28,10 +28,24 @@ func TestIsImageGenerationIntent(t *testing.T) {
 			want:     true,
 		},
 		{
-			name:     "image tool",
+			name:     "implicit image tool is text",
 			endpoint: "/v1/responses",
 			model:    "gpt-5.4",
 			body:     []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"}]}`),
+			want:     false,
+		},
+		{
+			name:     "image tool with model",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.4",
+			body:     []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation","model":"gpt-image-2"}]}`),
+			want:     true,
+		},
+		{
+			name:     "image tool with size",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.4",
+			body:     []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation","size":"1024x1024"}]}`),
 			want:     true,
 		},
 		{

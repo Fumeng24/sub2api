@@ -361,6 +361,7 @@ func TestAPIContracts(t *testing.T) {
 						"claude_code_only": false,
 						"allow_messages_dispatch": false,
 						"force_openai_priority": false,
+						"openai_stable_low_ttft": false,
 						"models_list_config": {
 							"enabled": false
 						},

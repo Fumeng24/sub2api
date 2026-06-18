@@ -191,6 +191,7 @@ func groupFromServiceBase(g *service.Group) Group {
 		FallbackGroupIDOnInvalidRequest: g.FallbackGroupIDOnInvalidRequest,
 		AllowMessagesDispatch:           g.AllowMessagesDispatch,
 		ForceOpenAIPriority:             g.ForceOpenAIPriority,
+		OpenAIStableLowTTFT:             g.OpenAIStableLowTTFT,
 		ModelsListConfig:                g.ModelsListConfig,
 		RequireOAuthOnly:                g.RequireOAuthOnly,
 		RequirePrivacySet:               g.RequirePrivacySet,

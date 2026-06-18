@@ -1141,6 +1141,39 @@
 	            </button>
 	          </div>
 
+          <div class="mt-4 flex items-center justify-between">
+            <div>
+              <label class="text-sm text-gray-600 dark:text-gray-400">
+                低首字稳定调度
+              </label>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                定期探测账号首字，优先选择首字更低的可用账号；适合稳定分组。
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="
+                createForm.openai_stable_low_ttft =
+                  !createForm.openai_stable_low_ttft
+              "
+              class="relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+              :class="
+                createForm.openai_stable_low_ttft
+                  ? 'bg-primary-500'
+                  : 'bg-gray-300 dark:bg-dark-600'
+              "
+            >
+              <span
+                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                :class="
+                  createForm.openai_stable_low_ttft
+                    ? 'translate-x-6'
+                    : 'translate-x-1'
+                "
+              />
+            </button>
+          </div>
+
 	          <div v-if="createForm.allow_messages_dispatch" class="mt-3">
             <div
               class="relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-600 dark:bg-dark-800"
@@ -2598,6 +2631,39 @@
 	            </button>
 	          </div>
 
+          <div class="mt-4 flex items-center justify-between">
+            <div>
+              <label class="text-sm text-gray-600 dark:text-gray-400">
+                低首字稳定调度
+              </label>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                定期探测账号首字，优先选择首字更低的可用账号；适合稳定分组。
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="
+                editForm.openai_stable_low_ttft =
+                  !editForm.openai_stable_low_ttft
+              "
+              class="relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+              :class="
+                editForm.openai_stable_low_ttft
+                  ? 'bg-primary-500'
+                  : 'bg-gray-300 dark:bg-dark-600'
+              "
+            >
+              <span
+                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                :class="
+                  editForm.openai_stable_low_ttft
+                    ? 'translate-x-6'
+                    : 'translate-x-1'
+                "
+              />
+            </button>
+          </div>
+
 	          <div v-if="editForm.allow_messages_dispatch" class="mt-3">
             <div
               class="relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-600 dark:bg-dark-800"
@@ -3363,7 +3429,7 @@
                               schedulingUpstreamStatus(entry)?.status === 'ok' ? 'bg-cyan-500' : 'bg-amber-500',
                             ]"
                           />
-                          上游倍率 {{ formatSchedulingRate(schedulingUpstreamStatus(entry)?.upstream_group_effective_rate_multiplier) }}
+                          {{ schedulingUpstreamBadgeLabel(entry) }}
                         </span>
                         <span
                           class="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-gray-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300"
@@ -3818,6 +3884,7 @@ const createForm = reactive({
 	  // OpenAI Messages 调度配置（仅 openai 平台使用）
 	  allow_messages_dispatch: false,
 	  force_openai_priority: false,
+  openai_stable_low_ttft: false,
 	  opus_mapped_model: createMessagesDispatchDefaults.opus_mapped_model,
   sonnet_mapped_model: createMessagesDispatchDefaults.sonnet_mapped_model,
   haiku_mapped_model: createMessagesDispatchDefaults.haiku_mapped_model,
@@ -4150,6 +4217,7 @@ const editForm = reactive({
 	  // OpenAI Messages 调度配置（仅 openai 平台使用）
 	  allow_messages_dispatch: false,
 	  force_openai_priority: false,
+  openai_stable_low_ttft: false,
 	  default_mapped_model: '',
   opus_mapped_model: editMessagesDispatchDefaults.opus_mapped_model,
   sonnet_mapped_model: editMessagesDispatchDefaults.sonnet_mapped_model,
@@ -4527,6 +4595,18 @@ const schedulingAccountTypeLabel = (entry: AccountSchedulingEntry) => {
 const schedulingUpstreamStatus = (entry: AccountSchedulingEntry) =>
   accountSchedulingUpstreamStatusMap.value.get(entry.account_id);
 
+const schedulingUpstreamBadgeLabel = (entry: AccountSchedulingEntry): string => {
+  const status = schedulingUpstreamStatus(entry);
+  if (!status) return "";
+  if (status.status === "ok") {
+    return `上游倍率 ${formatSchedulingRate(status.upstream_group_effective_rate_multiplier)}`;
+  }
+  if (status.status === "cloudflare_blocked") {
+    return "Cloudflare 拦截";
+  }
+  return "上游信息异常";
+};
+
 const formatSchedulingRate = (value: number | null | undefined): string => {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
   return `${value.toFixed(3).replace(/\.?0+$/, "")}x`;
@@ -4547,6 +4627,7 @@ const schedulingUpstreamTitle = (entry: AccountSchedulingEntry): string => {
   const lines = [
     `上游: ${status.base_url}`,
     `状态: ${status.status}`,
+    status.proxy_used ? "已使用账号代理" : "未使用账号代理",
   ];
   if (status.upstream_key_name) {
     lines.push(`Key: ${status.upstream_key_name}`);
@@ -4739,6 +4820,7 @@ const closeCreateModal = () => {
   createForm.fallback_group_id_on_invalid_request = null;
 	  resetMessagesDispatchFormState(createForm);
 	  createForm.force_openai_priority = false;
+  createForm.openai_stable_low_ttft = false;
 	  createForm.require_oauth_only = false;
   createForm.require_privacy_set = false;
   createForm.supported_model_scopes = ["claude", "gemini_text", "gemini_image"];
@@ -4872,6 +4954,7 @@ const handleEdit = async (group: AdminGroup) => {
 	    group.allow_messages_dispatch ||
 	    messagesDispatchFormState.allow_messages_dispatch;
 	  editForm.force_openai_priority = group.force_openai_priority ?? false;
+  editForm.openai_stable_low_ttft = group.openai_stable_low_ttft ?? false;
 	  editForm.opus_mapped_model = messagesDispatchFormState.opus_mapped_model;
   editForm.sonnet_mapped_model = messagesDispatchFormState.sonnet_mapped_model;
   editForm.haiku_mapped_model = messagesDispatchFormState.haiku_mapped_model;
@@ -5056,6 +5139,7 @@ watch(
 	    if (newVal !== "openai") {
 	      resetMessagesDispatchFormState(createForm);
 	      createForm.force_openai_priority = false;
+      createForm.openai_stable_low_ttft = false;
 	    }
     if (!["openai", "antigravity", "anthropic", "gemini"].includes(newVal)) {
       createForm.require_oauth_only = false;
@@ -5075,6 +5159,7 @@ watch(
 	    if (newVal !== "openai") {
 	      resetMessagesDispatchFormState(editForm);
 	      editForm.force_openai_priority = false;
+      editForm.openai_stable_low_ttft = false;
 	    }
     if (!["openai", "antigravity", "anthropic", "gemini"].includes(newVal)) {
       editForm.require_oauth_only = false;
@@ -5096,6 +5181,7 @@ watch(
 	    if (newVal !== 'openai') {
 	      editForm.allow_messages_dispatch = false
 	      editForm.force_openai_priority = false
+      editForm.openai_stable_low_ttft = false
 	      editForm.default_mapped_model = ''
 	    }
   }

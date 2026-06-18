@@ -2661,6 +2661,20 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				normalized = rebuilt
 			}
 		}
+		if !imageGenerationAllowed && openAIRequestBodyHasImageGenerationTool(normalized) && !openAIRequestBodyHasExplicitImageGenerationTool(normalized) {
+			payloadMap := make(map[string]any)
+			if err := json.Unmarshal(normalized, &payloadMap); err != nil {
+				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", err)
+			}
+			if removeOpenAIImplicitImageGenerationTools(payloadMap) {
+				rebuilt, marshalErr := json.Marshal(payloadMap)
+				if marshalErr != nil {
+					return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", marshalErr)
+				}
+				normalized = rebuilt
+				logOpenAIWSModeInfo("ingress_ws_implicit_image_tool_removed account_id=%d", account.ID)
+			}
+		}
 		mappedModel := account.GetMappedModel(originalModel)
 		upstreamModel := mappedModel
 		if mappedModel == originalModel {

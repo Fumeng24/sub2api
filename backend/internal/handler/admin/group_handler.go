@@ -122,6 +122,7 @@ type CreateGroupRequest struct {
 	MessagesDispatchModelConfig service.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
 	ModelsListConfig            service.GroupModelsListConfig             `json:"models_list_config"`
 	ForceOpenAIPriority         bool                                      `json:"force_openai_priority"`
+	OpenAIStableLowTTFT         bool                                      `json:"openai_stable_low_ttft"`
 	// 分组 RPM 上限（0 = 不限制）
 	RPMLimit int `json:"rpm_limit"`
 	// 从指定分组复制账号（创建后自动绑定）
@@ -164,6 +165,7 @@ type UpdateGroupRequest struct {
 	MessagesDispatchModelConfig *service.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
 	ModelsListConfig            *service.GroupModelsListConfig             `json:"models_list_config"`
 	ForceOpenAIPriority         *bool                                      `json:"force_openai_priority"`
+	OpenAIStableLowTTFT         *bool                                      `json:"openai_stable_low_ttft"`
 	// 分组 RPM 上限（0 = 不限制）；nil 表示未提供不改动
 	RPMLimit *int `json:"rpm_limit"`
 	// 从指定分组复制账号（同步操作：先清空当前分组的账号绑定，再绑定源分组的账号）
@@ -409,6 +411,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		MessagesDispatchModelConfig:     req.MessagesDispatchModelConfig,
 		ModelsListConfig:                req.ModelsListConfig,
 		ForceOpenAIPriority:             req.ForceOpenAIPriority,
+		OpenAIStableLowTTFT:             req.OpenAIStableLowTTFT,
 		RPMLimit:                        req.RPMLimit,
 		CopyAccountsFromGroupIDs:        req.CopyAccountsFromGroupIDs,
 	})
@@ -466,6 +469,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		MessagesDispatchModelConfig:     req.MessagesDispatchModelConfig,
 		ModelsListConfig:                req.ModelsListConfig,
 		ForceOpenAIPriority:             req.ForceOpenAIPriority,
+		OpenAIStableLowTTFT:             req.OpenAIStableLowTTFT,
 		RPMLimit:                        req.RPMLimit,
 		CopyAccountsFromGroupIDs:        req.CopyAccountsFromGroupIDs,
 	})

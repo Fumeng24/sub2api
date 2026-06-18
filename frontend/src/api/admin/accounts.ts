@@ -28,6 +28,7 @@ export interface UpstreamSub2APIAccountStatus {
   local_platform: string
   base_url: string
   upstream_kind?: 'sub2api' | 'newapi' | 'auto' | string
+  proxy_used?: boolean
   status: string
   message?: string
   fetched_at: string

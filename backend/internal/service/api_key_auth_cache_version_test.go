@@ -12,6 +12,7 @@ func TestAPIKeyService_RejectsLegacyAuthSnapshots(t *testing.T) {
 	}{
 		{name: "v10_without_models_list_config", version: 10},
 		{name: "v11_without_force_openai_priority", version: 11},
+		{name: "v12_without_openai_stable_low_ttft", version: 12},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			apiKey, ok, err := svc.applyAuthCacheEntry("k-legacy", &APIKeyAuthCacheEntry{

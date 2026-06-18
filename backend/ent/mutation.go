@@ -15569,6 +15569,7 @@ type GroupMutation struct {
 	messages_dispatch_model_config          *domain.OpenAIMessagesDispatchModelConfig
 	models_list_config                      *domain.GroupModelsListConfig
 	force_openai_priority                   *bool
+	openai_stable_low_ttft                  *bool
 	rpm_limit                               *int
 	addrpm_limit                            *int
 	clearedFields                           map[string]struct{}
@@ -17359,6 +17360,42 @@ func (m *GroupMutation) ResetForceOpenaiPriority() {
 	m.force_openai_priority = nil
 }
 
+// SetOpenaiStableLowTtft sets the "openai_stable_low_ttft" field.
+func (m *GroupMutation) SetOpenaiStableLowTtft(b bool) {
+	m.openai_stable_low_ttft = &b
+}
+
+// OpenaiStableLowTtft returns the value of the "openai_stable_low_ttft" field in the mutation.
+func (m *GroupMutation) OpenaiStableLowTtft() (r bool, exists bool) {
+	v := m.openai_stable_low_ttft
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOpenaiStableLowTtft returns the old "openai_stable_low_ttft" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldOpenaiStableLowTtft(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOpenaiStableLowTtft is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOpenaiStableLowTtft requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOpenaiStableLowTtft: %w", err)
+	}
+	return oldValue.OpenaiStableLowTtft, nil
+}
+
+// ResetOpenaiStableLowTtft resets all changes to the "openai_stable_low_ttft" field.
+func (m *GroupMutation) ResetOpenaiStableLowTtft() {
+	m.openai_stable_low_ttft = nil
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (m *GroupMutation) SetRpmLimit(i int) {
 	m.rpm_limit = &i
@@ -17773,7 +17810,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 36)
+	fields := make([]string, 0, 37)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -17879,6 +17916,9 @@ func (m *GroupMutation) Fields() []string {
 	if m.force_openai_priority != nil {
 		fields = append(fields, group.FieldForceOpenaiPriority)
 	}
+	if m.openai_stable_low_ttft != nil {
+		fields = append(fields, group.FieldOpenaiStableLowTtft)
+	}
 	if m.rpm_limit != nil {
 		fields = append(fields, group.FieldRpmLimit)
 	}
@@ -17960,6 +18000,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.ModelsListConfig()
 	case group.FieldForceOpenaiPriority:
 		return m.ForceOpenaiPriority()
+	case group.FieldOpenaiStableLowTtft:
+		return m.OpenaiStableLowTtft()
 	case group.FieldRpmLimit:
 		return m.RpmLimit()
 	}
@@ -18041,6 +18083,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldModelsListConfig(ctx)
 	case group.FieldForceOpenaiPriority:
 		return m.OldForceOpenaiPriority(ctx)
+	case group.FieldOpenaiStableLowTtft:
+		return m.OldOpenaiStableLowTtft(ctx)
 	case group.FieldRpmLimit:
 		return m.OldRpmLimit(ctx)
 	}
@@ -18296,6 +18340,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetForceOpenaiPriority(v)
+		return nil
+	case group.FieldOpenaiStableLowTtft:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOpenaiStableLowTtft(v)
 		return nil
 	case group.FieldRpmLimit:
 		v, ok := value.(int)
@@ -18685,6 +18736,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldForceOpenaiPriority:
 		m.ResetForceOpenaiPriority()
+		return nil
+	case group.FieldOpenaiStableLowTtft:
+		m.ResetOpenaiStableLowTtft()
 		return nil
 	case group.FieldRpmLimit:
 		m.ResetRpmLimit()

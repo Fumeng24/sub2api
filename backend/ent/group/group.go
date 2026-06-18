@@ -86,6 +86,8 @@ const (
 	FieldModelsListConfig = "models_list_config"
 	// FieldForceOpenaiPriority holds the string denoting the force_openai_priority field in the database.
 	FieldForceOpenaiPriority = "force_openai_priority"
+	// FieldOpenaiStableLowTtft holds the string denoting the openai_stable_low_ttft field in the database.
+	FieldOpenaiStableLowTtft = "openai_stable_low_ttft"
 	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
 	FieldRpmLimit = "rpm_limit"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
@@ -198,6 +200,7 @@ var Columns = []string{
 	FieldMessagesDispatchModelConfig,
 	FieldModelsListConfig,
 	FieldForceOpenaiPriority,
+	FieldOpenaiStableLowTtft,
 	FieldRpmLimit,
 }
 
@@ -286,6 +289,8 @@ var (
 	DefaultModelsListConfig domain.GroupModelsListConfig
 	// DefaultForceOpenaiPriority holds the default value on creation for the "force_openai_priority" field.
 	DefaultForceOpenaiPriority bool
+	// DefaultOpenaiStableLowTtft holds the default value on creation for the "openai_stable_low_ttft" field.
+	DefaultOpenaiStableLowTtft bool
 	// DefaultRpmLimit holds the default value on creation for the "rpm_limit" field.
 	DefaultRpmLimit int
 )
@@ -451,6 +456,11 @@ func ByDefaultMappedModel(opts ...sql.OrderTermOption) OrderOption {
 // ByForceOpenaiPriority orders the results by the force_openai_priority field.
 func ByForceOpenaiPriority(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldForceOpenaiPriority, opts...).ToFunc()
+}
+
+// ByOpenaiStableLowTtft orders the results by the openai_stable_low_ttft field.
+func ByOpenaiStableLowTtft(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOpenaiStableLowTtft, opts...).ToFunc()
 }
 
 // ByRpmLimit orders the results by the rpm_limit field.

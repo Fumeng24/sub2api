@@ -16,8 +16,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/httputil"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,6 +34,10 @@ const (
 )
 
 var errUpstreamSub2APITwoFactor = errors.New("upstream panel account requires two-factor authentication")
+var errUpstreamSub2APICloudflareBlocked = errors.New("upstream panel blocked by Cloudflare")
+
+type upstreamSub2APIHTTPClientContextKey struct{}
+type upstreamSub2APIProxyURLContextKey struct{}
 
 type upstreamSub2APIStatusClient struct {
 	httpClient *http.Client
@@ -40,6 +46,12 @@ type upstreamSub2APIStatusClient struct {
 	statusCache  map[string]upstreamSub2APIStatusCacheEntry
 	tokenCache   map[string]upstreamSub2APITokenCacheEntry
 	sessionCache map[string]upstreamNewAPISessionCacheEntry
+}
+
+type upstreamSub2APICloudflareBlockedError struct {
+	statusCode int
+	rayID      string
+	proxyUsed  bool
 }
 
 type upstreamSub2APIStatusCacheEntry struct {
@@ -64,6 +76,7 @@ type UpstreamSub2APIAccountStatus struct {
 	LocalPlatform string    `json:"local_platform"`
 	BaseURL       string    `json:"base_url"`
 	UpstreamKind  string    `json:"upstream_kind,omitempty"`
+	ProxyUsed     bool      `json:"proxy_used"`
 	Status        string    `json:"status"`
 	Message       string    `json:"message,omitempty"`
 	FetchedAt     time.Time `json:"fetched_at"`
@@ -171,6 +184,21 @@ func newUpstreamSub2APIStatusClient() *upstreamSub2APIStatusClient {
 		tokenCache:   make(map[string]upstreamSub2APITokenCacheEntry),
 		sessionCache: make(map[string]upstreamNewAPISessionCacheEntry),
 	}
+}
+
+func (e *upstreamSub2APICloudflareBlockedError) Error() string {
+	message := "上游面板被 Cloudflare 拦截，请给该账号配置可用代理，或联系上游将本机出口 IP 加入白名单"
+	if e != nil && e.proxyUsed {
+		message = "上游面板通过账号代理访问时仍被 Cloudflare 拦截，请更换可用代理，或联系上游将代理出口 IP 加入白名单"
+	}
+	if e != nil && strings.TrimSpace(e.rayID) != "" {
+		message += " (cf-ray: " + strings.TrimSpace(e.rayID) + ")"
+	}
+	return message
+}
+
+func (e *upstreamSub2APICloudflareBlockedError) Is(target error) bool {
+	return target == errUpstreamSub2APICloudflareBlocked
 }
 
 // GetUpstreamSub2APIStatus returns upstream panel metadata for the requested accounts.
@@ -297,14 +325,22 @@ func (p *upstreamSub2APIStatusClient) ProbeAccount(ctx context.Context, account 
 		return status
 	}
 
-	cacheKey := upstreamSub2APIStatusCacheKey(account.ID, root, apiKey, email, password, panelType)
+	probeCtx, proxyURL, err := p.contextForAccount(ctx, account)
+	if err != nil {
+		status.Status = "request_failed"
+		status.Message = "account proxy is invalid: " + err.Error()
+		return status
+	}
+	status.ProxyUsed = proxyURL != ""
+
+	cacheKey := upstreamSub2APIStatusCacheKey(account.ID, root, apiKey, email, password, panelType, proxyURL)
 	if !force {
 		if cached, ok := p.getCachedStatus(cacheKey, now); ok {
 			return cached
 		}
 	}
 
-	probed := p.probeAccountFresh(ctx, status, root, apiKey, email, password, panelType)
+	probed := p.probeAccountFresh(probeCtx, status, root, apiKey, email, password, panelType)
 	p.setCachedStatus(cacheKey, probed, now.Add(upstreamSub2APIStatusTTL))
 	return probed
 }
@@ -478,6 +514,9 @@ func upstreamSub2APILoginStatus(err error) string {
 	if errors.Is(err, errUpstreamSub2APITwoFactor) {
 		return "two_factor_required"
 	}
+	if errors.Is(err, errUpstreamSub2APICloudflareBlocked) {
+		return "cloudflare_blocked"
+	}
 	return "request_failed"
 }
 
@@ -616,7 +655,7 @@ func (p *upstreamSub2APIStatusClient) getAuthenticatedJSONWithStatus(ctx context
 	}
 	status, err := p.doJSON(ctx, http.MethodGet, joinUpstreamSub2APIURL(root, path), token, nil, out)
 	if status == http.StatusUnauthorized {
-		p.invalidateToken(root, email, password)
+		p.invalidateToken(ctx, root, email, password)
 		token, err = p.login(ctx, root, email, password, true)
 		if err != nil {
 			return status, err
@@ -633,7 +672,7 @@ func (p *upstreamSub2APIStatusClient) getNewAPIAuthenticatedJSON(ctx context.Con
 	}
 	status, _, err := p.doNewAPIJSON(ctx, http.MethodGet, joinUpstreamSub2APIURL(root, path), session, "", nil, out)
 	if status == http.StatusUnauthorized {
-		p.invalidateNewAPISession(root, username, password)
+		p.invalidateNewAPISession(ctx, root, username, password)
 		session, err = p.loginNewAPI(ctx, root, username, password, true)
 		if err != nil {
 			return err
@@ -644,7 +683,7 @@ func (p *upstreamSub2APIStatusClient) getNewAPIAuthenticatedJSON(ctx context.Con
 }
 
 func (p *upstreamSub2APIStatusClient) login(ctx context.Context, root, email, password string, force bool) (string, error) {
-	cacheKey := upstreamSub2APITokenCacheKey(root, email, password)
+	cacheKey := upstreamSub2APITokenCacheKey(upstreamSub2APIProxyURLFromContext(ctx), root, email, password)
 	now := time.Now().UTC()
 	if !force {
 		p.mu.Lock()
@@ -687,7 +726,7 @@ func (p *upstreamSub2APIStatusClient) login(ctx context.Context, root, email, pa
 }
 
 func (p *upstreamSub2APIStatusClient) loginNewAPI(ctx context.Context, root, username, password string, force bool) (*upstreamNewAPISessionCacheEntry, error) {
-	cacheKey := upstreamNewAPISessionCacheKey(root, username, password)
+	cacheKey := upstreamNewAPISessionCacheKey(upstreamSub2APIProxyURLFromContext(ctx), root, username, password)
 	now := time.Now().UTC()
 	if !force {
 		p.mu.Lock()
@@ -744,6 +783,7 @@ func (p *upstreamSub2APIStatusClient) doJSON(ctx context.Context, method, target
 	if err != nil {
 		return 0, err
 	}
+	setUpstreamPanelRequestHeaders(req)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -751,7 +791,7 @@ func (p *upstreamSub2APIStatusClient) doJSON(ctx context.Context, method, target
 		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(bearerToken))
 	}
 
-	resp, err := p.httpClient.Do(req)
+	resp, err := p.httpClientForContext(ctx).Do(req)
 	if err != nil {
 		return 0, err
 	}
@@ -762,6 +802,9 @@ func (p *upstreamSub2APIStatusClient) doJSON(ctx context.Context, method, target
 		return resp.StatusCode, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if httputil.IsCloudflareChallengeResponse(resp.StatusCode, resp.Header, data) {
+			return resp.StatusCode, newUpstreamSub2APICloudflareBlockedError(resp.StatusCode, resp.Header, data, upstreamSub2APIProxyURLFromContext(ctx))
+		}
 		return resp.StatusCode, fmt.Errorf("upstream returned HTTP %d: %s", resp.StatusCode, truncateUpstreamSub2APIError(data))
 	}
 	if out == nil {
@@ -793,6 +836,7 @@ func (p *upstreamSub2APIStatusClient) doNewAPIJSON(ctx context.Context, method, 
 	if err != nil {
 		return 0, nil, err
 	}
+	setUpstreamPanelRequestHeaders(req)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -810,7 +854,7 @@ func (p *upstreamSub2APIStatusClient) doNewAPIJSON(ctx context.Context, method, 
 		}
 	}
 
-	resp, err := p.httpClient.Do(req)
+	resp, err := p.httpClientForContext(ctx).Do(req)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -821,6 +865,9 @@ func (p *upstreamSub2APIStatusClient) doNewAPIJSON(ctx context.Context, method, 
 		return resp.StatusCode, resp.Cookies(), err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if httputil.IsCloudflareChallengeResponse(resp.StatusCode, resp.Header, data) {
+			return resp.StatusCode, resp.Cookies(), newUpstreamSub2APICloudflareBlockedError(resp.StatusCode, resp.Header, data, upstreamSub2APIProxyURLFromContext(ctx))
+		}
 		return resp.StatusCode, resp.Cookies(), fmt.Errorf("upstream returned HTTP %d: %s", resp.StatusCode, truncateUpstreamSub2APIError(data))
 	}
 	if out == nil {
@@ -837,6 +884,72 @@ func (p *upstreamSub2APIStatusClient) doNewAPIJSON(ctx context.Context, method, 
 		return resp.StatusCode, resp.Cookies(), err
 	}
 	return resp.StatusCode, resp.Cookies(), nil
+}
+
+func (p *upstreamSub2APIStatusClient) contextForAccount(ctx context.Context, account *service.Account) (context.Context, string, error) {
+	proxyURL := upstreamSub2APIAccountProxyURL(account)
+	if proxyURL == "" {
+		return ctx, "", nil
+	}
+
+	client, err := httpclient.GetClient(httpclient.Options{
+		ProxyURL: proxyURL,
+		Timeout:  8 * time.Second,
+	})
+	if err != nil {
+		return ctx, "", err
+	}
+
+	proxyCtx := context.WithValue(ctx, upstreamSub2APIHTTPClientContextKey{}, client)
+	proxyCtx = context.WithValue(proxyCtx, upstreamSub2APIProxyURLContextKey{}, proxyURL)
+	return proxyCtx, proxyURL, nil
+}
+
+func upstreamSub2APIAccountProxyURL(account *service.Account) string {
+	if account == nil || account.ProxyID == nil || account.Proxy == nil {
+		return ""
+	}
+	return strings.TrimSpace(account.Proxy.URL())
+}
+
+func (p *upstreamSub2APIStatusClient) httpClientForContext(ctx context.Context) *http.Client {
+	if ctx != nil {
+		if client, ok := ctx.Value(upstreamSub2APIHTTPClientContextKey{}).(*http.Client); ok && client != nil {
+			return client
+		}
+	}
+	return p.httpClient
+}
+
+func upstreamSub2APIProxyURLFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	proxyURL, _ := ctx.Value(upstreamSub2APIProxyURLContextKey{}).(string)
+	return strings.TrimSpace(proxyURL)
+}
+
+func newUpstreamSub2APICloudflareBlockedError(statusCode int, headers http.Header, body []byte, proxyURL string) error {
+	return &upstreamSub2APICloudflareBlockedError{
+		statusCode: statusCode,
+		rayID:      httputil.ExtractCloudflareRayID(headers, body),
+		proxyUsed:  strings.TrimSpace(proxyURL) != "",
+	}
+}
+
+func setUpstreamPanelRequestHeaders(req *http.Request) {
+	if req == nil {
+		return
+	}
+	if strings.TrimSpace(req.Header.Get("Accept")) == "" {
+		req.Header.Set("Accept", "application/json, text/plain, */*")
+	}
+	if strings.TrimSpace(req.Header.Get("Accept-Language")) == "" {
+		req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+	}
+	if strings.TrimSpace(req.Header.Get("User-Agent")) == "" {
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36")
+	}
 }
 
 func unwrapUpstreamSub2APIEnvelope(data []byte) ([]byte, error) {
@@ -984,15 +1097,15 @@ func (p *upstreamSub2APIStatusClient) setCachedStatus(key string, status Upstrea
 	p.mu.Unlock()
 }
 
-func (p *upstreamSub2APIStatusClient) invalidateToken(root, email, password string) {
+func (p *upstreamSub2APIStatusClient) invalidateToken(ctx context.Context, root, email, password string) {
 	p.mu.Lock()
-	delete(p.tokenCache, upstreamSub2APITokenCacheKey(root, email, password))
+	delete(p.tokenCache, upstreamSub2APITokenCacheKey(upstreamSub2APIProxyURLFromContext(ctx), root, email, password))
 	p.mu.Unlock()
 }
 
-func (p *upstreamSub2APIStatusClient) invalidateNewAPISession(root, username, password string) {
+func (p *upstreamSub2APIStatusClient) invalidateNewAPISession(ctx context.Context, root, username, password string) {
 	p.mu.Lock()
-	delete(p.sessionCache, upstreamNewAPISessionCacheKey(root, username, password))
+	delete(p.sessionCache, upstreamNewAPISessionCacheKey(upstreamSub2APIProxyURLFromContext(ctx), root, username, password))
 	p.mu.Unlock()
 }
 
@@ -1039,16 +1152,33 @@ func joinUpstreamSub2APIURL(root, path string) string {
 	return strings.TrimRight(root, "/") + path
 }
 
-func upstreamSub2APIStatusCacheKey(accountID int64, root, apiKey, email, password, panelType string) string {
-	return fmt.Sprintf("%d|%s|%s|%s|%s|%s", accountID, root, normalizeUpstreamPanelType(panelType), shortUpstreamSub2APIFingerprint(apiKey), strings.ToLower(email), shortUpstreamSub2APIFingerprint(password))
+func upstreamSub2APIStatusCacheKey(accountID int64, root, apiKey, email, password, panelType, proxyURL string) string {
+	return fmt.Sprintf(
+		"%d|%s|%s|%s|%s|%s|%s",
+		accountID,
+		root,
+		normalizeUpstreamPanelType(panelType),
+		shortUpstreamSub2APIFingerprint(apiKey),
+		strings.ToLower(strings.TrimSpace(email)),
+		shortUpstreamSub2APIFingerprint(password),
+		upstreamSub2APIProxyCacheKey(proxyURL),
+	)
 }
 
-func upstreamSub2APITokenCacheKey(root, email, password string) string {
-	return fmt.Sprintf("%s|%s|%s", root, strings.ToLower(email), shortUpstreamSub2APIFingerprint(password))
+func upstreamSub2APITokenCacheKey(proxyURL, root, email, password string) string {
+	return fmt.Sprintf("%s|%s|%s|%s", upstreamSub2APIProxyCacheKey(proxyURL), root, strings.ToLower(strings.TrimSpace(email)), shortUpstreamSub2APIFingerprint(password))
 }
 
-func upstreamNewAPISessionCacheKey(root, username, password string) string {
-	return fmt.Sprintf("%s|%s|%s", root, strings.ToLower(strings.TrimSpace(username)), shortUpstreamSub2APIFingerprint(password))
+func upstreamNewAPISessionCacheKey(proxyURL, root, username, password string) string {
+	return fmt.Sprintf("%s|%s|%s|%s", upstreamSub2APIProxyCacheKey(proxyURL), root, strings.ToLower(strings.TrimSpace(username)), shortUpstreamSub2APIFingerprint(password))
+}
+
+func upstreamSub2APIProxyCacheKey(proxyURL string) string {
+	proxyURL = strings.TrimSpace(proxyURL)
+	if proxyURL == "" {
+		return "direct"
+	}
+	return "proxy:" + shortUpstreamSub2APIFingerprint(proxyURL)
 }
 
 func normalizeUpstreamPanelType(raw string) string {

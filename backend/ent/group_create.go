@@ -495,6 +495,20 @@ func (_c *GroupCreate) SetNillableForceOpenaiPriority(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetOpenaiStableLowTtft sets the "openai_stable_low_ttft" field.
+func (_c *GroupCreate) SetOpenaiStableLowTtft(v bool) *GroupCreate {
+	_c.mutation.SetOpenaiStableLowTtft(v)
+	return _c
+}
+
+// SetNillableOpenaiStableLowTtft sets the "openai_stable_low_ttft" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableOpenaiStableLowTtft(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetOpenaiStableLowTtft(*v)
+	}
+	return _c
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (_c *GroupCreate) SetRpmLimit(v int) *GroupCreate {
 	_c.mutation.SetRpmLimit(v)
@@ -734,6 +748,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultForceOpenaiPriority
 		_c.mutation.SetForceOpenaiPriority(v)
 	}
+	if _, ok := _c.mutation.OpenaiStableLowTtft(); !ok {
+		v := group.DefaultOpenaiStableLowTtft
+		_c.mutation.SetOpenaiStableLowTtft(v)
+	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		v := group.DefaultRpmLimit
 		_c.mutation.SetRpmLimit(v)
@@ -839,6 +857,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.ForceOpenaiPriority(); !ok {
 		return &ValidationError{Name: "force_openai_priority", err: errors.New(`ent: missing required field "Group.force_openai_priority"`)}
+	}
+	if _, ok := _c.mutation.OpenaiStableLowTtft(); !ok {
+		return &ValidationError{Name: "openai_stable_low_ttft", err: errors.New(`ent: missing required field "Group.openai_stable_low_ttft"`)}
 	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		return &ValidationError{Name: "rpm_limit", err: errors.New(`ent: missing required field "Group.rpm_limit"`)}
@@ -1009,6 +1030,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ForceOpenaiPriority(); ok {
 		_spec.SetField(group.FieldForceOpenaiPriority, field.TypeBool, value)
 		_node.ForceOpenaiPriority = value
+	}
+	if value, ok := _c.mutation.OpenaiStableLowTtft(); ok {
+		_spec.SetField(group.FieldOpenaiStableLowTtft, field.TypeBool, value)
+		_node.OpenaiStableLowTtft = value
 	}
 	if value, ok := _c.mutation.RpmLimit(); ok {
 		_spec.SetField(group.FieldRpmLimit, field.TypeInt, value)
@@ -1716,6 +1741,18 @@ func (u *GroupUpsert) UpdateForceOpenaiPriority() *GroupUpsert {
 	return u
 }
 
+// SetOpenaiStableLowTtft sets the "openai_stable_low_ttft" field.
+func (u *GroupUpsert) SetOpenaiStableLowTtft(v bool) *GroupUpsert {
+	u.Set(group.FieldOpenaiStableLowTtft, v)
+	return u
+}
+
+// UpdateOpenaiStableLowTtft sets the "openai_stable_low_ttft" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateOpenaiStableLowTtft() *GroupUpsert {
+	u.SetExcluded(group.FieldOpenaiStableLowTtft)
+	return u
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (u *GroupUpsert) SetRpmLimit(v int) *GroupUpsert {
 	u.Set(group.FieldRpmLimit, v)
@@ -2413,6 +2450,20 @@ func (u *GroupUpsertOne) SetForceOpenaiPriority(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateForceOpenaiPriority() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateForceOpenaiPriority()
+	})
+}
+
+// SetOpenaiStableLowTtft sets the "openai_stable_low_ttft" field.
+func (u *GroupUpsertOne) SetOpenaiStableLowTtft(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetOpenaiStableLowTtft(v)
+	})
+}
+
+// UpdateOpenaiStableLowTtft sets the "openai_stable_low_ttft" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateOpenaiStableLowTtft() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateOpenaiStableLowTtft()
 	})
 }
 
@@ -3282,6 +3333,20 @@ func (u *GroupUpsertBulk) SetForceOpenaiPriority(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateForceOpenaiPriority() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateForceOpenaiPriority()
+	})
+}
+
+// SetOpenaiStableLowTtft sets the "openai_stable_low_ttft" field.
+func (u *GroupUpsertBulk) SetOpenaiStableLowTtft(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetOpenaiStableLowTtft(v)
+	})
+}
+
+// UpdateOpenaiStableLowTtft sets the "openai_stable_low_ttft" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateOpenaiStableLowTtft() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateOpenaiStableLowTtft()
 	})
 }
 

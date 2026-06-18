@@ -2914,6 +2914,16 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		writeClientOpenAIError(c, http.StatusForbidden, "permission_error", ImageGenerationPermissionMessage())
 		return nil, errors.New("image generation disabled for group")
 	}
+	if !imageGenerationAllowed && openAIRequestBodyHasImageGenerationTool(body) && !openAIRequestBodyHasExplicitImageGenerationTool(body) {
+		decoded, decodeErr := ensureReqBody()
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		if removeOpenAIImplicitImageGenerationTools(decoded) {
+			markDecodedModified()
+			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Removed implicit /responses image_generation tool for disabled group")
+		}
+	}
 
 	instructions := gjson.GetBytes(body, "instructions")
 	instructionsEmpty := !instructions.Exists() || instructions.Type != gjson.String || strings.TrimSpace(instructions.String()) == ""
@@ -2994,7 +3004,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": ClientFacingErrorMessage(http.StatusBadRequest, "invalid_request_error", err.Error()), "param": "model"}})
 			return nil, err
 		}
-		if hasOpenAIImageGenerationTool(decoded) {
+		if hasOpenAIExplicitImageGenerationTool(decoded) {
 			imageIntent = true
 			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] /responses image_generation request inbound_model=%s mapped_model=%s account_type=%s", requestView.Model, upstreamModel, account.Type)
 		}
@@ -3002,7 +3012,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			markDecodedModified()
 			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Added Codex image_generation bridge instructions")
 		}
-	} else if imageGenerationAllowed && imageIntent && openAIRequestBodyHasImageGenerationTool(body) {
+	} else if imageGenerationAllowed && imageIntent && openAIRequestBodyHasExplicitImageGenerationTool(body) {
 		// 完整 image_generation tool 只做 raw 计费读取，校验/桥接/旧字段迁移命中时才展开大 input map。
 		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] /responses image_generation request inbound_model=%s mapped_model=%s account_type=%s", requestView.Model, upstreamModel, account.Type)
 	}
@@ -3627,7 +3637,22 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	body = updatedBody
 
 	apiKey := getAPIKeyFromContext(c)
-	if IsImageGenerationIntent(openAIResponsesEndpoint, reqModel, body) && !GroupAllowsImageGeneration(apiKeyGroup(apiKey)) {
+	imageGenerationAllowed := GroupAllowsImageGeneration(apiKeyGroup(apiKey))
+	if !imageGenerationAllowed && openAIRequestBodyHasImageGenerationTool(body) && !openAIRequestBodyHasExplicitImageGenerationTool(body) {
+		reqBody := map[string]any{}
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			return nil, fmt.Errorf("parse request body: %w", err)
+		}
+		if removeOpenAIImplicitImageGenerationTools(reqBody) {
+			var marshalErr error
+			body, marshalErr = marshalOpenAIUpstreamJSON(reqBody)
+			if marshalErr != nil {
+				return nil, fmt.Errorf("serialize request body: %w", marshalErr)
+			}
+			logger.LegacyPrintf("service.openai_gateway", "[OpenAI 自动透传] Removed implicit /responses image_generation tool for disabled group")
+		}
+	}
+	if IsImageGenerationIntent(openAIResponsesEndpoint, reqModel, body) && !imageGenerationAllowed {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
 		writeClientOpenAIError(c, http.StatusForbidden, "permission_error", ImageGenerationPermissionMessage())
 		return nil, errors.New("image generation disabled for group")

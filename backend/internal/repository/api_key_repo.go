@@ -197,6 +197,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldMessagesDispatchModelConfig,
 				group.FieldModelsListConfig,
 				group.FieldForceOpenaiPriority,
+				group.FieldOpenaiStableLowTtft,
 				group.FieldRpmLimit,
 			)
 		}).
@@ -834,6 +835,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		MessagesDispatchModelConfig:     g.MessagesDispatchModelConfig,
 		ModelsListConfig:                g.ModelsListConfig,
 		ForceOpenAIPriority:             g.ForceOpenaiPriority,
+		OpenAIStableLowTTFT:             g.OpenaiStableLowTtft,
 		RPMLimit:                        g.RpmLimit,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,

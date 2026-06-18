@@ -644,6 +644,20 @@ func (_u *GroupUpdate) SetNillableForceOpenaiPriority(v *bool) *GroupUpdate {
 	return _u
 }
 
+// SetOpenaiStableLowTtft sets the "openai_stable_low_ttft" field.
+func (_u *GroupUpdate) SetOpenaiStableLowTtft(v bool) *GroupUpdate {
+	_u.mutation.SetOpenaiStableLowTtft(v)
+	return _u
+}
+
+// SetNillableOpenaiStableLowTtft sets the "openai_stable_low_ttft" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableOpenaiStableLowTtft(v *bool) *GroupUpdate {
+	if v != nil {
+		_u.SetOpenaiStableLowTtft(*v)
+	}
+	return _u
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (_u *GroupUpdate) SetRpmLimit(v int) *GroupUpdate {
 	_u.mutation.ResetRpmLimit()
@@ -1145,6 +1159,9 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.ForceOpenaiPriority(); ok {
 		_spec.SetField(group.FieldForceOpenaiPriority, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.OpenaiStableLowTtft(); ok {
+		_spec.SetField(group.FieldOpenaiStableLowTtft, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RpmLimit(); ok {
 		_spec.SetField(group.FieldRpmLimit, field.TypeInt, value)
@@ -2074,6 +2091,20 @@ func (_u *GroupUpdateOne) SetNillableForceOpenaiPriority(v *bool) *GroupUpdateOn
 	return _u
 }
 
+// SetOpenaiStableLowTtft sets the "openai_stable_low_ttft" field.
+func (_u *GroupUpdateOne) SetOpenaiStableLowTtft(v bool) *GroupUpdateOne {
+	_u.mutation.SetOpenaiStableLowTtft(v)
+	return _u
+}
+
+// SetNillableOpenaiStableLowTtft sets the "openai_stable_low_ttft" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableOpenaiStableLowTtft(v *bool) *GroupUpdateOne {
+	if v != nil {
+		_u.SetOpenaiStableLowTtft(*v)
+	}
+	return _u
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (_u *GroupUpdateOne) SetRpmLimit(v int) *GroupUpdateOne {
 	_u.mutation.ResetRpmLimit()
@@ -2605,6 +2636,9 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.ForceOpenaiPriority(); ok {
 		_spec.SetField(group.FieldForceOpenaiPriority, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.OpenaiStableLowTtft(); ok {
+		_spec.SetField(group.FieldOpenaiStableLowTtft, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RpmLimit(); ok {
 		_spec.SetField(group.FieldRpmLimit, field.TypeInt, value)

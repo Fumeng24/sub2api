@@ -89,6 +89,8 @@ type Group struct {
 	ModelsListConfig domain.GroupModelsListConfig `json:"models_list_config,omitempty"`
 	// OpenAI 分组是否强制为 /v1/responses 请求启用 service_tier=priority；计费仍按普通倍率
 	ForceOpenaiPriority bool `json:"force_openai_priority,omitempty"`
+	// OpenAI 分组是否启用低首字稳定调度；启用后定期探测账号首字并优先选择首字低的账号
+	OpenaiStableLowTtft bool `json:"openai_stable_low_ttft,omitempty"`
 	// 分组 RPM 上限，0 表示不限制；设置后接管该分组用户的限流
 	RpmLimit int `json:"rpm_limit,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -199,7 +201,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case group.FieldModelRouting, group.FieldSupportedModelScopes, group.FieldMessagesDispatchModelConfig, group.FieldModelsListConfig:
 			values[i] = new([]byte)
-		case group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldImageRateIndependent, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet, group.FieldForceOpenaiPriority:
+		case group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldImageRateIndependent, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet, group.FieldForceOpenaiPriority, group.FieldOpenaiStableLowTtft:
 			values[i] = new(sql.NullBool)
 		case group.FieldRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImageRateMultiplier, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k:
 			values[i] = new(sql.NullFloat64)
@@ -458,6 +460,12 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ForceOpenaiPriority = value.Bool
 			}
+		case group.FieldOpenaiStableLowTtft:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field openai_stable_low_ttft", values[i])
+			} else if value.Valid {
+				_m.OpenaiStableLowTtft = value.Bool
+			}
 		case group.FieldRpmLimit:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field rpm_limit", values[i])
@@ -664,6 +672,9 @@ func (_m *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("force_openai_priority=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ForceOpenaiPriority))
+	builder.WriteString(", ")
+	builder.WriteString("openai_stable_low_ttft=")
+	builder.WriteString(fmt.Sprintf("%v", _m.OpenaiStableLowTtft))
 	builder.WriteString(", ")
 	builder.WriteString("rpm_limit=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RpmLimit))

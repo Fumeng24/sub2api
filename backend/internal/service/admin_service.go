@@ -237,6 +237,7 @@ type CreateGroupInput struct {
 	MessagesDispatchModelConfig OpenAIMessagesDispatchModelConfig
 	ModelsListConfig            GroupModelsListConfig
 	ForceOpenAIPriority         bool
+	OpenAIStableLowTTFT         bool
 	// RPMLimit 分组 RPM 上限（0 = 不限制）
 	RPMLimit int
 	// 从指定分组复制账号（创建分组后在同一事务内绑定）
@@ -279,6 +280,7 @@ type UpdateGroupInput struct {
 	MessagesDispatchModelConfig *OpenAIMessagesDispatchModelConfig
 	ModelsListConfig            *GroupModelsListConfig
 	ForceOpenAIPriority         *bool
+	OpenAIStableLowTTFT         *bool
 	// RPMLimit 分组 RPM 上限（0 = 不限制），nil 表示未提供不改动。
 	RPMLimit *int
 	// 从指定分组复制账号（同步操作：先清空当前分组的账号绑定，再绑定源分组的账号）
@@ -2087,6 +2089,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		MessagesDispatchModelConfig:     normalizeOpenAIMessagesDispatchModelConfig(input.MessagesDispatchModelConfig),
 		ModelsListConfig:                normalizeGroupModelsListConfig(input.ModelsListConfig),
 		ForceOpenAIPriority:             input.ForceOpenAIPriority,
+		OpenAIStableLowTTFT:             input.OpenAIStableLowTTFT,
 		RPMLimit:                        input.RPMLimit,
 	}
 	sanitizeGroupMessagesDispatchFields(group)
@@ -2339,6 +2342,9 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.ForceOpenAIPriority != nil {
 		group.ForceOpenAIPriority = *input.ForceOpenAIPriority
+	}
+	if input.OpenAIStableLowTTFT != nil {
+		group.OpenAIStableLowTTFT = *input.OpenAIStableLowTTFT
 	}
 	if input.RPMLimit != nil {
 		group.RPMLimit = *input.RPMLimit

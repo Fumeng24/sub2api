@@ -64,6 +64,7 @@ type Group struct {
 	MessagesDispatchModelConfig OpenAIMessagesDispatchModelConfig
 	ModelsListConfig            GroupModelsListConfig
 	ForceOpenAIPriority         bool // OpenAI /v1/responses 强制启用 service_tier=priority，计费按普通 tier
+	OpenAIStableLowTTFT         bool // OpenAI 分组低首字稳定调度
 
 	// RPMLimit 分组级每分钟请求数上限（0 = 不限制）。
 	// 一旦设置即接管该分组用户的限流（覆盖用户级 rpm_limit），可被 user-group rpm_override 进一步覆盖。

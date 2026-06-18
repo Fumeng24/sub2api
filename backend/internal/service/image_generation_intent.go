@@ -36,7 +36,7 @@ func IsImageGenerationIntent(endpoint string, requestedModel string, body []byte
 	if model := strings.TrimSpace(gjson.GetBytes(body, "model").String()); isOpenAIImageGenerationModel(model) {
 		return true
 	}
-	if openAIJSONToolsContainImageGeneration(gjson.GetBytes(body, "tools")) {
+	if openAIJSONToolsContainExplicitImageGeneration(gjson.GetBytes(body, "tools")) {
 		return true
 	}
 	return openAIJSONToolChoiceSelectsImageGeneration(gjson.GetBytes(body, "tool_choice"))
@@ -56,7 +56,7 @@ func IsImageGenerationIntentMap(endpoint string, requestedModel string, reqBody 
 	if isOpenAIImageGenerationModel(firstNonEmptyString(reqBody["model"])) {
 		return true
 	}
-	if hasOpenAIImageGenerationTool(reqBody) {
+	if hasOpenAIExplicitImageGenerationTool(reqBody) {
 		return true
 	}
 	return openAIAnyToolChoiceSelectsImageGeneration(reqBody["tool_choice"])
@@ -99,11 +99,60 @@ func openAIJSONToolsContainImageGeneration(tools gjson.Result) bool {
 	return found
 }
 
+func openAIJSONToolsContainExplicitImageGeneration(tools gjson.Result) bool {
+	if !tools.IsArray() {
+		return false
+	}
+	found := false
+	tools.ForEach(func(_, item gjson.Result) bool {
+		if openAIJSONString(item.Get("type")) == "image_generation" && openAIJSONImageGenerationToolIsExplicit(item) {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+func openAIJSONImageGenerationToolIsExplicit(tool gjson.Result) bool {
+	if !tool.IsObject() {
+		return false
+	}
+	for _, key := range openAIExplicitImageGenerationToolKeys() {
+		if tool.Get(key).Exists() {
+			return true
+		}
+	}
+	return false
+}
+
+func openAIExplicitImageGenerationToolKeys() []string {
+	return []string{
+		"model",
+		"size",
+		"quality",
+		"background",
+		"action",
+		"output_format",
+		"format",
+		"output_compression",
+		"compression",
+		"partial_images",
+	}
+}
+
 func openAIRequestBodyHasImageGenerationTool(body []byte) bool {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return false
 	}
 	return openAIJSONToolsContainImageGeneration(gjson.GetBytes(body, "tools"))
+}
+
+func openAIRequestBodyHasExplicitImageGenerationTool(body []byte) bool {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return false
+	}
+	return openAIJSONToolsContainExplicitImageGeneration(gjson.GetBytes(body, "tools"))
 }
 
 func openAIRequestBodyImageGenerationToolNeedsNormalization(body []byte) bool {

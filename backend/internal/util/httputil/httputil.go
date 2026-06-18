@@ -17,6 +17,12 @@ var (
 		"enable javascript and cookies to continue",
 		"__cf_chl_",
 		"challenge-platform",
+		"error code: 1010",
+		"error code 1010",
+		"error code: 1020",
+		"error code 1020",
+		"browser's signature",
+		"access denied",
 	}
 )
 
@@ -28,6 +34,14 @@ func IsCloudflareChallengeResponse(statusCode int, headers http.Header, body []b
 
 	if headers != nil && strings.EqualFold(strings.TrimSpace(headers.Get("cf-mitigated")), "challenge") {
 		return true
+	}
+	if headers != nil && strings.TrimSpace(headers.Get("cf-ray")) != "" {
+		contentType := strings.ToLower(strings.TrimSpace(headers.Get("content-type")))
+		preview := strings.ToLower(TruncateBody(body, 4096))
+		if strings.Contains(contentType, "text/html") &&
+			(strings.Contains(preview, "cloudflare") || strings.Contains(preview, "error code")) {
+			return true
+		}
 	}
 
 	preview := strings.ToLower(TruncateBody(body, 4096))

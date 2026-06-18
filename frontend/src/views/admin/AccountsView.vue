@@ -1237,6 +1237,9 @@ function getUpstreamSub2APILabel(row: Account): string {
   const status = upstreamSub2APIStatusMap.value.get(row.id)
   if (!status) return ''
   if (status.status !== 'ok') {
+    if (status.status === 'cloudflare_blocked') {
+      return t('admin.accounts.upstreamSub2API.statusCloudflareBlocked')
+    }
     return t('admin.accounts.upstreamSub2API.statusError')
   }
   const rate = formatUpstreamSub2APIRate(status.upstream_group_effective_rate_multiplier)
@@ -1251,6 +1254,9 @@ function getUpstreamSub2APITitle(row: Account): string {
     `${t('admin.accounts.upstreamSub2API.title')}: ${status.base_url}`,
     `${t('admin.accounts.upstreamSub2API.panelType')}: ${upstreamPanelKindLabel(status.upstream_kind)}`,
     `${t('admin.accounts.upstreamSub2API.status')}: ${status.status}`,
+    status.proxy_used
+      ? t('admin.accounts.upstreamSub2API.proxyUsed')
+      : t('admin.accounts.upstreamSub2API.proxyNotUsed'),
   ]
   if (status.upstream_key_name) {
     lines.push(`${t('admin.accounts.upstreamSub2API.key')}: ${status.upstream_key_name}`)

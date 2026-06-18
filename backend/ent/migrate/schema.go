@@ -706,6 +706,7 @@ var (
 		{Name: "messages_dispatch_model_config", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "models_list_config", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "force_openai_priority", Type: field.TypeBool, Default: false},
+		{Name: "openai_stable_low_ttft", Type: field.TypeBool, Default: false},
 		{Name: "rpm_limit", Type: field.TypeInt, Default: 0},
 	}
 	// GroupsTable holds the schema information for the "groups" table.

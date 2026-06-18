@@ -162,6 +162,9 @@ func (Group) Fields() []ent.Field {
 		field.Bool("force_openai_priority").
 			Default(false).
 			Comment("OpenAI 分组是否强制为 /v1/responses 请求启用 service_tier=priority；计费仍按普通倍率"),
+		field.Bool("openai_stable_low_ttft").
+			Default(false).
+			Comment("OpenAI 分组是否启用低首字稳定调度；启用后定期探测账号首字并优先选择首字低的账号"),
 
 		// 分组级每分钟请求数上限（0 = 不限制）。设置后优先于用户级兜底生效。
 		field.Int("rpm_limit").

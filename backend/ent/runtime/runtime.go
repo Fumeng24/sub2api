@@ -917,8 +917,12 @@ func init() {
 	groupDescForceOpenaiPriority := groupFields[31].Descriptor()
 	// group.DefaultForceOpenaiPriority holds the default value on creation for the force_openai_priority field.
 	group.DefaultForceOpenaiPriority = groupDescForceOpenaiPriority.Default.(bool)
+	// groupDescOpenaiStableLowTtft is the schema descriptor for openai_stable_low_ttft field.
+	groupDescOpenaiStableLowTtft := groupFields[32].Descriptor()
+	// group.DefaultOpenaiStableLowTtft holds the default value on creation for the openai_stable_low_ttft field.
+	group.DefaultOpenaiStableLowTtft = groupDescOpenaiStableLowTtft.Default.(bool)
 	// groupDescRpmLimit is the schema descriptor for rpm_limit field.
-	groupDescRpmLimit := groupFields[32].Descriptor()
+	groupDescRpmLimit := groupFields[33].Descriptor()
 	// group.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	group.DefaultRpmLimit = groupDescRpmLimit.Default.(int)
 	idempotencyrecordMixin := schema.IdempotencyRecord{}.Mixin()

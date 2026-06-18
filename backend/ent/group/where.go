@@ -210,6 +210,11 @@ func ForceOpenaiPriority(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldForceOpenaiPriority, v))
 }
 
+// OpenaiStableLowTtft applies equality check predicate on the "openai_stable_low_ttft" field. It's identical to OpenaiStableLowTtftEQ.
+func OpenaiStableLowTtft(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldOpenaiStableLowTtft, v))
+}
+
 // RpmLimit applies equality check predicate on the "rpm_limit" field. It's identical to RpmLimitEQ.
 func RpmLimit(v int) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldRpmLimit, v))
@@ -1413,6 +1418,16 @@ func ForceOpenaiPriorityEQ(v bool) predicate.Group {
 // ForceOpenaiPriorityNEQ applies the NEQ predicate on the "force_openai_priority" field.
 func ForceOpenaiPriorityNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldForceOpenaiPriority, v))
+}
+
+// OpenaiStableLowTtftEQ applies the EQ predicate on the "openai_stable_low_ttft" field.
+func OpenaiStableLowTtftEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldOpenaiStableLowTtft, v))
+}
+
+// OpenaiStableLowTtftNEQ applies the NEQ predicate on the "openai_stable_low_ttft" field.
+func OpenaiStableLowTtftNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldOpenaiStableLowTtft, v))
 }
 
 // RpmLimitEQ applies the EQ predicate on the "rpm_limit" field.

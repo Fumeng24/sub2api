@@ -3162,9 +3162,9 @@ func TestDefaultOpenAIAccountScheduler_IsAccountTransportCompatible_Branches(t *
 }
 
 func TestOpenAIStableLowTTFTGroupDetection(t *testing.T) {
-	require.True(t, isOpenAIStableLowTTFTGroup(&Group{Name: "Codex(稳定)", Platform: PlatformOpenAI}))
-	require.False(t, isOpenAIStableLowTTFTGroup(&Group{Name: "Codex(特价)", Platform: PlatformOpenAI}))
-	require.False(t, isOpenAIStableLowTTFTGroup(&Group{Name: "Claude(稳定)", Platform: PlatformAnthropic}))
+	require.True(t, isOpenAIStableLowTTFTGroup(&Group{Name: "Codex(特价)", Platform: PlatformOpenAI, OpenAIStableLowTTFT: true}))
+	require.False(t, isOpenAIStableLowTTFTGroup(&Group{Name: "Codex(稳定)", Platform: PlatformOpenAI}))
+	require.False(t, isOpenAIStableLowTTFTGroup(&Group{Name: "Claude(稳定)", Platform: PlatformAnthropic, OpenAIStableLowTTFT: true}))
 	require.False(t, isOpenAIStableLowTTFTGroup(nil))
 }
 

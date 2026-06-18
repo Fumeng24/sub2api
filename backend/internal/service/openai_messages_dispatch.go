@@ -96,6 +96,7 @@ func sanitizeGroupMessagesDispatchFields(g *Group) {
 	}
 	g.AllowMessagesDispatch = false
 	g.ForceOpenAIPriority = false
+	g.OpenAIStableLowTTFT = false
 	g.DefaultMappedModel = ""
 	g.MessagesDispatchModelConfig = OpenAIMessagesDispatchModelConfig{}
 }

@@ -602,6 +602,67 @@ func hasOpenAIImageGenerationTool(reqBody map[string]any) bool {
 	return false
 }
 
+func hasOpenAIExplicitImageGenerationTool(reqBody map[string]any) bool {
+	rawTools, ok := reqBody["tools"]
+	if !ok || rawTools == nil {
+		return false
+	}
+	tools, ok := rawTools.([]any)
+	if !ok {
+		return false
+	}
+	for _, rawTool := range tools {
+		toolMap, ok := rawTool.(map[string]any)
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(firstNonEmptyString(toolMap["type"])) == "image_generation" && openAIMapImageGenerationToolIsExplicit(toolMap) {
+			return true
+		}
+	}
+	return false
+}
+
+func openAIMapImageGenerationToolIsExplicit(toolMap map[string]any) bool {
+	for _, key := range openAIExplicitImageGenerationToolKeys() {
+		if _, ok := toolMap[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func removeOpenAIImplicitImageGenerationTools(reqBody map[string]any) bool {
+	rawTools, ok := reqBody["tools"]
+	if !ok || rawTools == nil {
+		return false
+	}
+	tools, ok := rawTools.([]any)
+	if !ok {
+		return false
+	}
+
+	filtered := make([]any, 0, len(tools))
+	modified := false
+	for _, rawTool := range tools {
+		toolMap, ok := rawTool.(map[string]any)
+		if ok && strings.TrimSpace(firstNonEmptyString(toolMap["type"])) == "image_generation" && !openAIMapImageGenerationToolIsExplicit(toolMap) {
+			modified = true
+			continue
+		}
+		filtered = append(filtered, rawTool)
+	}
+	if !modified {
+		return false
+	}
+	if len(filtered) == 0 {
+		delete(reqBody, "tools")
+		return true
+	}
+	reqBody["tools"] = filtered
+	return true
+}
+
 func hasOpenAIInputImage(reqBody map[string]any) bool {
 	if reqBody == nil {
 		return false

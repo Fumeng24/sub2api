@@ -3,8 +3,11 @@ package admin
 import (
 	"bytes"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -112,6 +115,133 @@ func TestProbeSub2APIAccountUsesKeysEndpoint(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&loginCount); got != 1 {
 		t.Fatalf("expected one sub2api login, got %d", got)
+	}
+}
+
+func TestProbeSub2APIAccountUsesAccountProxy(t *testing.T) {
+	var proxyHits int32
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&proxyHits, 1)
+		if got := r.URL.Host; got != "upstream.example.test" {
+			t.Fatalf("expected absolute proxy request for upstream.example.test, got host %q url=%s", got, r.URL.String())
+		}
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/auth/login":
+			writeJSON(t, w, `{"code":0,"message":"success","data":{"access_token":"proxied-token","expires_in":3600,"token_type":"Bearer"}}`)
+
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/auth/me":
+			requireBearer(t, r, "proxied-token")
+			writeJSON(t, w, `{"code":0,"message":"success","data":{"id":7,"email":"upstream@example.com","balance":9.5}}`)
+
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/groups/available":
+			requireBearer(t, r, "proxied-token")
+			writeJSON(t, w, `{"code":0,"message":"success","data":[{"id":5,"name":"proxy-group","platform":"openai","rate_multiplier":0.5}]}`)
+
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/groups/rates":
+			requireBearer(t, r, "proxied-token")
+			writeJSON(t, w, `{"code":0,"message":"success","data":{"5":0.6}}`)
+
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/keys":
+			requireBearer(t, r, "proxied-token")
+			writeJSON(t, w, `{"code":0,"message":"success","data":{"items":[{"id":9,"key":"sk-proxied","name":"proxied-key","group_id":5}],"total":1,"page":1,"page_size":100,"pages":1}}`)
+
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/usage":
+			requireBearer(t, r, "sk-proxied")
+			writeJSON(t, w, `{"mode":"unrestricted","planName":"wallet","remaining":4.2,"balance":8.8,"unit":"USD"}`)
+
+		default:
+			t.Fatalf("unexpected proxied request: %s %s", r.Method, r.URL.String())
+		}
+	}))
+	defer proxy.Close()
+
+	proxyURL, err := url.Parse(proxy.URL)
+	if err != nil {
+		t.Fatalf("parse proxy URL: %v", err)
+	}
+	host, portText, err := net.SplitHostPort(proxyURL.Host)
+	if err != nil {
+		t.Fatalf("split proxy host: %v", err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatalf("parse proxy port: %v", err)
+	}
+
+	client := newUpstreamSub2APIStatusClient()
+	proxyID := int64(100)
+	account := &service.Account{
+		ID:       44,
+		Name:     "proxied-sub2api-upstream",
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeAPIKey,
+		ProxyID:  &proxyID,
+		Proxy: &service.Proxy{
+			ID:       proxyID,
+			Protocol: proxyURL.Scheme,
+			Host:     host,
+			Port:     port,
+			Status:   service.StatusActive,
+		},
+		Credentials: map[string]any{
+			"base_url":                  "http://upstream.example.test/v1",
+			"api_key":                   "sk-proxied",
+			"upstream_panel_type":       "sub2api",
+			"upstream_sub2api_email":    "upstream@example.com",
+			"upstream_sub2api_password": "secret",
+		},
+	}
+
+	status := client.ProbeAccount(t.Context(), account, true)
+	if status.Status != "ok" {
+		t.Fatalf("expected ok status through proxy, got %s: %s", status.Status, status.Message)
+	}
+	if !status.ProxyUsed {
+		t.Fatalf("expected status to record proxy usage")
+	}
+	if status.UpstreamGroupName != "proxy-group" {
+		t.Fatalf("unexpected upstream group: %q", status.UpstreamGroupName)
+	}
+	if got := atomic.LoadInt32(&proxyHits); got == 0 {
+		t.Fatalf("expected requests to hit account proxy")
+	}
+}
+
+func TestProbeSub2APIAccountDetectsCloudflareBlock(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+		w.Header().Set("cf-ray", "abc123-NRT")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("<html><title>Access denied</title><body>Cloudflare Error code: 1020</body></html>"))
+	}))
+	defer server.Close()
+
+	client := newUpstreamSub2APIStatusClient()
+	account := &service.Account{
+		ID:       45,
+		Name:     "cf-blocked-sub2api-upstream",
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"base_url":                  server.URL + "/v1",
+			"api_key":                   "sk-cf",
+			"upstream_panel_type":       "sub2api",
+			"upstream_sub2api_email":    "upstream@example.com",
+			"upstream_sub2api_password": "secret",
+		},
+	}
+
+	status := client.ProbeAccount(t.Context(), account, true)
+	if status.Status != "cloudflare_blocked" {
+		t.Fatalf("expected cloudflare_blocked status, got %s: %s", status.Status, status.Message)
+	}
+	if status.ProxyUsed {
+		t.Fatalf("expected direct request status to record proxy_used=false")
+	}
+	if !strings.Contains(status.Message, "Cloudflare") || !strings.Contains(status.Message, "abc123-NRT") {
+		t.Fatalf("expected Cloudflare message with ray id, got %q", status.Message)
 	}
 }
 
