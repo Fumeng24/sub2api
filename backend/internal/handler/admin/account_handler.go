@@ -705,6 +705,30 @@ type TestAccountRequest struct {
 	Mode    string `json:"mode"`
 }
 
+type BulkTestModelsRequest struct {
+	AccountIDs  []int64  `json:"account_ids"`
+	ModelIDs    []string `json:"model_ids"`
+	Prompt      string   `json:"prompt"`
+	Mode        string   `json:"mode"`
+	Concurrency int      `json:"concurrency"`
+}
+
+type BulkTestModelResult struct {
+	AccountID int64  `json:"account_id"`
+	ModelID   string `json:"model_id"`
+	Success   bool   `json:"success"`
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+	LatencyMs int64  `json:"latency_ms"`
+}
+
+type BulkTestModelsResponse struct {
+	Total   int                   `json:"total"`
+	Success int                   `json:"success"`
+	Failed  int                   `json:"failed"`
+	Results []BulkTestModelResult `json:"results"`
+}
+
 type SyncFromCRSRequest struct {
 	BaseURL            string   `json:"base_url" binding:"required"`
 	Username           string   `json:"username" binding:"required"`
@@ -743,6 +767,181 @@ func (h *AccountHandler) Test(c *gin.Context) {
 			_ = c.Error(err)
 		}
 	}
+}
+
+// BulkTestModels tests selected account/model pairs in parallel.
+// POST /api/v1/admin/accounts/bulk-test-models
+func (h *AccountHandler) BulkTestModels(c *gin.Context) {
+	if h.accountTestService == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Account test service unavailable")
+		return
+	}
+
+	var req BulkTestModelsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request body")
+		return
+	}
+
+	accountIDs := normalizeBulkTestAccountIDs(req.AccountIDs)
+	modelIDs := normalizeBulkTestModelIDs(req.ModelIDs)
+	if len(accountIDs) == 0 {
+		response.BadRequest(c, "account_ids is required")
+		return
+	}
+	if len(modelIDs) == 0 {
+		response.BadRequest(c, "model_ids is required")
+		return
+	}
+	if len(accountIDs) > 100 {
+		response.BadRequest(c, "Too many accounts selected, maximum is 100")
+		return
+	}
+	if len(modelIDs) > 20 {
+		response.BadRequest(c, "Too many models selected, maximum is 20")
+		return
+	}
+
+	total := len(accountIDs) * len(modelIDs)
+	if total > 500 {
+		response.BadRequest(c, "Too many test tasks, maximum is 500")
+		return
+	}
+
+	concurrency := req.Concurrency
+	if concurrency <= 0 {
+		concurrency = 6
+	}
+	if concurrency > 20 {
+		concurrency = 20
+	}
+	if concurrency > total {
+		concurrency = total
+	}
+
+	type bulkTestTask struct {
+		index     int
+		accountID int64
+		modelID   string
+	}
+
+	tasks := make([]bulkTestTask, 0, total)
+	for _, accountID := range accountIDs {
+		for _, modelID := range modelIDs {
+			tasks = append(tasks, bulkTestTask{
+				index:     len(tasks),
+				accountID: accountID,
+				modelID:   modelID,
+			})
+		}
+	}
+
+	ctx := c.Request.Context()
+	results := make([]BulkTestModelResult, total)
+	taskCh := make(chan bulkTestTask)
+	var wg sync.WaitGroup
+
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for task := range taskCh {
+				result := BulkTestModelResult{
+					AccountID: task.accountID,
+					ModelID:   task.modelID,
+					Status:    "failed",
+					Message:   "test failed",
+				}
+
+				testResult, err := h.accountTestService.RunTestBackgroundWithOptions(ctx, task.accountID, task.modelID, req.Prompt, req.Mode)
+				if testResult != nil {
+					result.LatencyMs = testResult.LatencyMs
+					result.Status = testResult.Status
+					if testResult.Status == "success" {
+						result.Success = true
+						result.Message = "success"
+						if strings.TrimSpace(testResult.ResponseText) != "" {
+							result.Message = strings.TrimSpace(testResult.ResponseText)
+						}
+					} else if strings.TrimSpace(testResult.ErrorMessage) != "" {
+						result.Message = strings.TrimSpace(testResult.ErrorMessage)
+					}
+				}
+				if err != nil {
+					result.Success = false
+					result.Status = "failed"
+					result.Message = err.Error()
+				}
+				if result.Success && h.rateLimitService != nil {
+					if _, recoverErr := h.rateLimitService.RecoverAccountAfterSuccessfulTest(ctx, task.accountID); recoverErr != nil {
+						log.Printf("failed to recover account after bulk test success: account_id=%d err=%v", task.accountID, recoverErr)
+					}
+				}
+
+				results[task.index] = result
+			}
+		}()
+	}
+
+	for _, task := range tasks {
+		select {
+		case <-ctx.Done():
+			close(taskCh)
+			wg.Wait()
+			response.Error(c, http.StatusRequestTimeout, "Request canceled")
+			return
+		case taskCh <- task:
+		}
+	}
+	close(taskCh)
+	wg.Wait()
+
+	payload := BulkTestModelsResponse{
+		Total:   total,
+		Results: results,
+	}
+	for _, result := range results {
+		if result.Success {
+			payload.Success++
+		} else {
+			payload.Failed++
+		}
+	}
+
+	response.Success(c, payload)
+}
+
+func normalizeBulkTestAccountIDs(raw []int64) []int64 {
+	seen := make(map[int64]struct{}, len(raw))
+	result := make([]int64, 0, len(raw))
+	for _, id := range raw {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
+}
+
+func normalizeBulkTestModelIDs(raw []string) []string {
+	seen := make(map[string]struct{}, len(raw))
+	result := make([]string, 0, len(raw))
+	for _, modelID := range raw {
+		modelID = strings.TrimSpace(modelID)
+		if modelID == "" {
+			continue
+		}
+		if _, ok := seen[modelID]; ok {
+			continue
+		}
+		seen[modelID] = struct{}{}
+		result = append(result, modelID)
+	}
+	return result
 }
 
 // RecoverState handles unified recovery of recoverable account runtime state.

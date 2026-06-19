@@ -245,6 +245,37 @@ export async function testAccount(id: number): Promise<{
   return data
 }
 
+export interface BulkTestModelsRequest {
+  account_ids: number[]
+  model_ids: string[]
+  prompt?: string
+  mode?: string
+  concurrency?: number
+}
+
+export interface BulkTestModelResult {
+  account_id: number
+  model_id: string
+  success: boolean
+  status: string
+  message: string
+  latency_ms: number
+}
+
+export interface BulkTestModelsResponse {
+  total: number
+  success: number
+  failed: number
+  results: BulkTestModelResult[]
+}
+
+export async function bulkTestModels(payload: BulkTestModelsRequest): Promise<BulkTestModelsResponse> {
+  const { data } = await apiClient.post<BulkTestModelsResponse>('/admin/accounts/bulk-test-models', payload, {
+    timeout: 300000
+  })
+  return data
+}
+
 /**
  * Refresh account credentials
  * @param id - Account ID
@@ -838,6 +869,7 @@ export const accountsAPI = {
   delete: deleteAccount,
   toggleStatus,
   testAccount,
+  bulkTestModels,
   refreshCredentials,
   applyOAuthCredentials,
   getStats,
