@@ -235,12 +235,10 @@ func supportedModelsForGroup(
 		return nil
 	}
 
-	pricingByName := make(map[string]service.SupportedModel, len(channelModels))
-	for i := range channelModels {
-		m := channelModels[i]
-		if m.Platform != group.Platform {
-			continue
-		}
+	allowedPlatforms := map[string]struct{}{group.Platform: {}}
+	channelUserModels := toUserSupportedModels(channelModels, allowedPlatforms)
+	pricingByName := make(map[string]userSupportedModel, len(channelUserModels))
+	for _, m := range channelUserModels {
 		pricingByName[strings.ToLower(m.Name)] = m
 	}
 
@@ -257,12 +255,8 @@ func supportedModelsForGroup(
 		}
 		seen[key] = struct{}{}
 
-		if priced, ok := pricingByName[key]; ok {
-			out = append(out, userSupportedModel{
-				Name:     priced.Name,
-				Platform: priced.Platform,
-				Pricing:  toUserPricing(priced.Pricing),
-			})
+		if model, ok := pricingByName[key]; ok {
+			out = append(out, model)
 			continue
 		}
 		out = append(out, userSupportedModel{
