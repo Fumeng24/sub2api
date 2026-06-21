@@ -1,30 +1,8 @@
 <template>
-  <AppLayout>
-    <TablePageLayout>
-      <template #filters>
-        <div class="flex flex-col gap-3">
-          <div class="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50/85 px-3 py-2 shadow-sm dark:border-sky-500/25 dark:bg-sky-950/30 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-start gap-2">
-              <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500 text-white shadow-sm shadow-sky-500/20">
-                <Icon name="chart" size="sm" />
-              </div>
-              <div>
-                <p class="text-xs font-semibold text-sky-950 dark:text-sky-100">{{ t('keys.serviceStatusTip.title') }}</p>
-                <p class="mt-0.5 text-xs leading-5 text-sky-800 dark:text-sky-200">
-                  {{ t('keys.serviceStatusTip.description') }}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-sky-600/20 transition-colors hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-400"
-              @click="router.push('/monitor')"
-            >
-              {{ t('keys.serviceStatusTip.action') }}
-              <Icon name="arrowRight" size="sm" />
-            </button>
-          </div>
-
+    <AppLayout>
+      <TablePageLayout>
+        <template #filters>
+          <div class="flex flex-col gap-3">
           <div class="flex flex-wrap items-center gap-3">
             <SearchInput
               v-model="filterSearch"
@@ -50,33 +28,63 @@
             :api-base-url="publicSettings?.api_base_url || ''"
             :custom-endpoints="publicSettings?.custom_endpoints || []"
           />
-        </div>
-      </template>
-
-      <template #actions>
-        <div class="flex flex-wrap justify-end gap-3">
-          <div class="w-36">
-            <Select
-              :model-value="settlementCurrency"
-              :options="settlementCurrencyOptions"
-              :placeholder="t('settlementCurrency.label')"
-              @update:model-value="setDisplayedSettlementCurrency"
-            />
           </div>
-          <button
-            @click="loadApiKeys"
-            :disabled="loading"
-            class="btn btn-secondary"
-            :title="t('common.refresh')"
-          >
-            <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-          </button>
-          <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
-            <Icon name="plus" size="md" class="mr-2" />
-            {{ t('keys.createKey') }}
-          </button>
+        </template>
+
+        <template #actions>
+        <div class="flex min-w-0 flex-col gap-3">
+          <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
+            <div class="flex flex-col gap-3 border-b border-gray-100 px-3 py-3 sm:flex-row sm:items-start sm:justify-between dark:border-dark-700">
+              <div class="flex min-w-0 items-start gap-3">
+                <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500 text-white shadow-sm shadow-primary-500/20">
+                  <Icon name="chart" size="sm" />
+                </div>
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-dark-400">
+                    {{ t('keys.serviceStatusTip.title') }}
+                  </p>
+                  <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                    {{ t('keys.serviceStatusTip.description') }}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-dark-100 dark:text-dark-950 dark:hover:bg-white"
+                @click="router.push('/monitor')"
+              >
+                {{ t('keys.serviceStatusTip.action') }}
+                <Icon name="arrowRight" size="sm" />
+              </button>
+            </div>
+
+            <div class="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-end">
+              <div class="flex flex-wrap items-center justify-end gap-3">
+                <div class="w-36 max-w-full">
+                  <Select
+                    :model-value="settlementCurrency"
+                    :options="settlementCurrencyOptions"
+                    :placeholder="t('settlementCurrency.label')"
+                    @update:model-value="setDisplayedSettlementCurrency"
+                  />
+                </div>
+                <button
+                  @click="loadApiKeys"
+                  :disabled="loading"
+                  class="btn btn-secondary"
+                  :title="t('common.refresh')"
+                >
+                  <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+                </button>
+                <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
+                  <Icon name="plus" size="md" class="mr-2" />
+                  {{ t('keys.createKey') }}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </template>
+        </template>
 
       <template #table>
         <DataTable

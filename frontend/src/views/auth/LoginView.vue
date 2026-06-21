@@ -10,6 +10,26 @@
           {{ t('auth.signInToAccount') }}
         </p>
       </div>
+
+      <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-4 dark:border-dark-800 dark:bg-dark-900/40">
+        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-dark-400">
+          {{ t('auth.loginOverviewLabel') }}
+        </p>
+        <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+          {{ t('auth.loginOverviewDescription', { siteName }) }}
+        </p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <span
+            v-for="highlight in loginHighlights"
+            :key="highlight"
+            class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 shadow-sm dark:border-dark-700 dark:bg-dark-900 dark:text-gray-300"
+          >
+            <span class="mr-2 h-1.5 w-1.5 rounded-full bg-primary-500" />
+            {{ highlight }}
+          </span>
+        </div>
+      </div>
+
       <!-- Login Form -->
       <form @submit.prevent="handleLogin" class="space-y-5">
         <!-- Email Input -->
@@ -225,6 +245,7 @@ const LOGIN_AGREEMENT_STORAGE_KEY = 'sub2api_login_agreement_consent'
 const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
+const siteName = computed(() => appStore.siteName || 'Sub2API')
 
 // ==================== State ====================
 
@@ -296,6 +317,12 @@ const showOAuthLogin = computed(
       githubOAuthEnabled.value ||
       googleOAuthEnabled.value)
 )
+
+const loginHighlights = computed(() => [
+  t('auth.loginOverviewItems.account'),
+  t('auth.loginOverviewItems.verification'),
+  t('auth.loginOverviewItems.billing')
+])
 
 watch(validationToastMessage, (value, previousValue) => {
   if (value && value !== previousValue) {
