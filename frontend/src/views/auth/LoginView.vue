@@ -90,6 +90,14 @@
           />
         </div>
 
+        <div
+          v-if="inlineErrorMessage"
+          role="alert"
+          class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-300"
+        >
+          {{ inlineErrorMessage }}
+        </div>
+
         <!-- Submit Button -->
         <button
           type="submit"
@@ -278,6 +286,7 @@ const errors = reactive({
 const validationToastMessage = computed(
   () => errors.email || errors.password || errors.turnstile || ''
 )
+const inlineErrorMessage = computed(() => errorMessage.value || validationToastMessage.value)
 
 const agreementGateActive = computed(
   () => loginAgreementEnabled.value && !agreementAccepted.value
@@ -429,7 +438,8 @@ function validateForm(): boolean {
   let isValid = true
 
   if (agreementGateActive.value) {
-    appStore.showWarning('请先阅读并同意最新条款后再登录。')
+    errorMessage.value = t('auth.loginAgreementRequired')
+    appStore.showWarning(errorMessage.value)
     if (loginAgreementMode.value !== 'checkbox') {
       showAgreementModal.value = true
     }

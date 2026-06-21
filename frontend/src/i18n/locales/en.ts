@@ -585,12 +585,12 @@ export default {
 
   // Auth
   auth: {
-    welcomeBack: 'Welcome Back',
-    signInToAccount: 'Sign in to your account to continue',
+    welcomeBack: 'Account Sign-in',
+    signInToAccount: 'Enter your email and password to verify your identity.',
     signIn: 'Sign In',
     signingIn: 'Signing in...',
     createAccount: 'Create Account',
-    signUpToStart: 'Sign up to start using {siteName}',
+    signUpToStart: 'Create your {siteName} account',
     valueProps: {
       trial: 'Trial credit included',
       discount: 'Discount groups for frequent GPT use',
@@ -605,8 +605,7 @@ export default {
     registrationDisabled: 'Registration is currently disabled. Please contact the administrator.',
     emailLabel: 'Email',
     emailPlaceholder: 'Enter your email',
-    emailDeliveryHint:
-      'No email? Check spam and mark it as not spam so top-up, low-balance, password recovery, and campaign notices keep arriving.',
+    emailDeliveryHint: 'If it does not arrive, check spam.',
     passwordLabel: 'Password',
     passwordPlaceholder: 'Enter your password',
     createPasswordPlaceholder: 'Create a strong password',
@@ -616,10 +615,12 @@ export default {
     passwordRequired: 'Password is required',
     passwordMinLength: 'Password must be at least 6 characters',
     loginFailed: 'Login failed. Please check your credentials and try again.',
+    loginAgreementRequired: 'Please review and accept the latest terms before signing in.',
     errors: {
       USER_NOT_ACTIVE: 'Account has been disabled.',
     },
     registrationFailed: 'Registration failed. Please try again.',
+    registerAgreementRequired: 'Please review and accept the latest terms before creating an account.',
     emailSuffixNotAllowed: 'This email domain is not allowed for registration.',
     emailSuffixNotAllowedWithAllowed:
       'This email domain is not allowed. Allowed domains: {suffixes}',
@@ -640,7 +641,7 @@ export default {
     clickToResend: 'Click to resend code',
     resendCode: 'Resend verification code',
     sendCodeDesc: "We'll send a verification code to",
-    codeSentSuccess: 'Verification code sent! Please check your inbox.',
+    codeSentSuccess: 'Verification code sent. Please check your inbox.',
     verifying: 'Verifying...',
     verifyAndCreate: 'Verify & Create Account',
     resendCountdown: 'Resend code in {countdown}s',
@@ -787,7 +788,7 @@ export default {
     sendingResetLink: 'Sending...',
     sendResetLinkFailed: 'Failed to send reset link. Please try again.',
     resetEmailSent: 'Reset Link Sent',
-    resetEmailSentHint: 'If an account exists with this email, you will receive a password reset link shortly. Please check your inbox and spam folder.',
+    resetEmailSentHint: 'If an account exists with this email, you will receive a password reset link shortly.',
     backToLogin: 'Back to Login',
     rememberedPassword: 'Remembered your password?',
     // Reset password

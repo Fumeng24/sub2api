@@ -60,16 +60,14 @@
             <div class="flex-shrink-0">
               <Icon name="checkCircle" size="sm" class="mt-0.5 text-green-500" />
             </div>
-            <div class="space-y-1">
-              <p class="text-sm font-medium text-green-700 dark:text-green-400">
-                {{ t('auth.codeSentSuccess') }}
-              </p>
-              <p class="text-xs leading-5 text-green-700/80 dark:text-green-300">
-                {{ t('auth.emailDeliveryHint') }}
-              </p>
-            </div>
+            <p class="text-sm font-medium text-green-700 dark:text-green-400">
+              {{ t('auth.codeSentSuccess') }}
+            </p>
           </div>
         </div>
+        <p v-if="codeSent" class="text-center text-xs text-gray-500 dark:text-dark-400">
+          {{ t('auth.emailDeliveryHint') }}
+        </p>
 
         <!-- Turnstile Widget for Resend -->
         <div v-if="turnstileEnabled && turnstileSiteKey && showResendTurnstile">
@@ -80,6 +78,14 @@
             @expire="onTurnstileExpire"
             @error="onTurnstileError"
           />
+        </div>
+
+        <div
+          v-if="inlineErrorMessage"
+          role="alert"
+          class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-300"
+        >
+          {{ inlineErrorMessage }}
         </div>
 
         <!-- Submit Button -->
@@ -251,6 +257,7 @@ const errors = ref({
 const validationToastMessage = computed(
   () => errors.value.code || errors.value.turnstile || ''
 )
+const inlineErrorMessage = computed(() => errorMessage.value || validationToastMessage.value)
 
 watch(validationToastMessage, (value, previousValue) => {
   if (value && value !== previousValue) {

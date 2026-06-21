@@ -6,7 +6,7 @@
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
           {{ t('auth.resetPasswordTitle') }}
         </h2>
-        <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
+        <p v-if="showResetForm" class="mt-2 text-sm text-gray-500 dark:text-dark-400">
           {{ t('auth.resetPasswordHint') }}
         </p>
       </div>
@@ -69,7 +69,7 @@
       </div>
 
       <!-- Form State -->
-      <form v-else @submit.prevent="handleSubmit" class="space-y-5">
+      <form v-else-if="showResetForm" @submit.prevent="handleSubmit" class="space-y-5">
         <!-- Email (readonly) -->
         <div>
           <label for="email" class="input-label">
@@ -150,6 +150,14 @@
               <Icon v-else name="eye" size="md" />
             </button>
           </div>
+        </div>
+
+        <div
+          v-if="inlineErrorMessage"
+          role="alert"
+          class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-300"
+        >
+          {{ inlineErrorMessage }}
         </div>
 
         <!-- Submit Button -->
@@ -240,6 +248,7 @@ const errors = reactive({
 const validationToastMessage = computed(
   () => errors.password || errors.confirmPassword || ''
 )
+const inlineErrorMessage = computed(() => errorMessage.value || validationToastMessage.value)
 
 watch(validationToastMessage, (value, previousValue) => {
   if (value && value !== previousValue) {
@@ -249,6 +258,7 @@ watch(validationToastMessage, (value, previousValue) => {
 
 // Check if the reset link is valid (has email and token)
 const isInvalidLink = computed(() => !email.value || !token.value)
+const showResetForm = computed(() => !isInvalidLink.value && !isSuccess.value)
 
 // ==================== Lifecycle ====================
 

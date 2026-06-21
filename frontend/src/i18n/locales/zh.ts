@@ -585,12 +585,12 @@ export default {
 
   // Auth
   auth: {
-    welcomeBack: '欢迎回来',
-    signInToAccount: '登录您的账户以继续',
+    welcomeBack: '账户登录',
+    signInToAccount: '请输入邮箱和密码完成身份验证。',
     signIn: '登录',
     signingIn: '登录中...',
     createAccount: '创建账户',
-    signUpToStart: '注册以开始使用 {siteName}',
+    signUpToStart: '创建 {siteName} 账户',
     valueProps: {
       trial: '注册送额度，先体验再充值',
       discount: '特价分组适合 GPT 高频使用',
@@ -605,8 +605,7 @@ export default {
     registrationDisabled: '注册功能暂时关闭，请联系管理员。',
     emailLabel: '邮箱',
     emailPlaceholder: '请输入邮箱',
-    emailDeliveryHint:
-      '收不到邮件？请到垃圾邮件查看并点“这不是垃圾邮件”，避免错过充值、余额不足、找回密码和活动通知。',
+    emailDeliveryHint: '未收到邮件可查看垃圾邮件。',
     passwordLabel: '密码',
     passwordPlaceholder: '请输入密码',
     createPasswordPlaceholder: '创建一个安全的密码',
@@ -616,10 +615,12 @@ export default {
     passwordRequired: '请输入密码',
     passwordMinLength: '密码至少需要 6 个字符',
     loginFailed: '登录失败，请检查您的凭据后重试。',
+    loginAgreementRequired: '请先阅读并同意最新条款后再登录。',
     errors: {
       USER_NOT_ACTIVE: '账号已被禁用',
     },
     registrationFailed: '注册失败，请重试。',
+    registerAgreementRequired: '请先阅读并同意最新条款后再注册。',
     emailSuffixNotAllowed: '该邮箱域名不在允许注册范围内。',
     emailSuffixNotAllowedWithAllowed: '该邮箱域名不被允许。可用域名：{suffixes}',
     emailSuffixAllowedMore: '等 {count} 项',
@@ -639,7 +640,7 @@ export default {
     clickToResend: '点击重新发送验证码',
     resendCode: '重新发送验证码',
     sendCodeDesc: '我们将发送验证码到',
-    codeSentSuccess: '验证码已发送！请查收您的邮箱。',
+    codeSentSuccess: '验证码已发送，请查收邮箱。',
     verifying: '验证中...',
     verifyAndCreate: '验证并创建账户',
     resendCountdown: '{countdown}秒后可重新发送',
@@ -785,8 +786,7 @@ export default {
     sendingResetLink: '发送中...',
     sendResetLinkFailed: '发送重置链接失败，请重试。',
     resetEmailSent: '重置链接已发送',
-    resetEmailSentHint:
-      '如果该邮箱已注册，您将很快收到密码重置链接。请检查您的收件箱和垃圾邮件文件夹。',
+    resetEmailSentHint: '如果该邮箱已注册，您将很快收到密码重置链接。',
     backToLogin: '返回登录',
     rememberedPassword: '想起密码了？',
     // 重置密码
