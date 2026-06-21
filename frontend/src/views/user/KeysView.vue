@@ -32,48 +32,46 @@
         </template>
 
         <template #actions>
-        <div class="flex min-w-0 flex-col gap-3">
-          <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
-            <div class="flex flex-col gap-3 border-b border-gray-100 px-3 py-3 sm:flex-row sm:items-start sm:justify-between dark:border-dark-700">
-              <div class="flex min-w-0 items-start gap-3">
-                <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500 text-white shadow-sm shadow-primary-500/20">
-                  <Icon name="chart" size="sm" />
-                </div>
-                <div class="min-w-0">
-                  <p class="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-dark-400">
-                    {{ t('keys.serviceStatusTip.title') }}
-                  </p>
-                  <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
-                    {{ t('keys.serviceStatusTip.description') }}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                class="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-dark-100 dark:text-dark-950 dark:hover:bg-white"
-                @click="router.push('/monitor')"
-              >
-                {{ t('keys.serviceStatusTip.action') }}
-                <Icon name="arrowRight" size="sm" />
-              </button>
+        <div class="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-dark-700 dark:bg-dark-900">
+          <div class="flex min-w-0 items-start gap-3">
+            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-900/25 dark:text-primary-300">
+              <Icon name="chart" size="sm" />
             </div>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">
+                {{ t('keys.serviceStatusTip.title') }}
+              </p>
+              <p class="mt-1 text-sm leading-5 text-gray-500 dark:text-dark-300">
+                {{ t('keys.serviceStatusTip.description') }}
+              </p>
+            </div>
+          </div>
 
-            <div class="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-end">
-              <div class="flex flex-wrap items-center justify-end gap-3">
-                <button
-                  @click="loadApiKeys"
-                  :disabled="loading"
-                  class="btn btn-secondary"
-                  :title="t('common.refresh')"
-                >
-                  <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-                </button>
-                <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
-                  <Icon name="plus" size="md" class="mr-2" />
-                  {{ t('keys.createKey') }}
-                </button>
-              </div>
-            </div>
+          <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <button
+              type="button"
+              class="btn btn-secondary min-w-0 flex-1 justify-center sm:flex-none"
+              @click="router.push('/monitor')"
+            >
+              {{ t('keys.serviceStatusTip.action') }}
+              <Icon name="arrowRight" size="sm" class="ml-1" />
+            </button>
+            <button
+              @click="loadApiKeys"
+              :disabled="loading"
+              class="btn btn-secondary shrink-0"
+              :title="t('common.refresh')"
+            >
+              <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+            </button>
+            <button
+              @click="showCreateModal = true"
+              class="btn btn-primary min-w-0 flex-1 justify-center sm:flex-none"
+              data-tour="keys-create-btn"
+            >
+              <Icon name="plus" size="md" class="mr-2" />
+              {{ t('keys.createKey') }}
+            </button>
           </div>
         </div>
         </template>
@@ -351,29 +349,29 @@
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1">
+            <div class="flex min-w-0 flex-wrap items-stretch justify-end gap-1 md:flex-nowrap md:items-center">
               <!-- Use Key Button -->
               <button
                 @click="openUseKeyModal(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-green-900/20 dark:hover:text-green-400"
               >
                 <Icon name="terminal" size="sm" />
-                <span class="text-xs">{{ t('keys.useKey') }}</span>
+                <span class="text-center text-xs leading-tight">{{ t('keys.useKey') }}</span>
               </button>
               <!-- Import to CC Switch Button -->
               <button
                 v-if="!publicSettings?.hide_ccs_import_button"
                 @click="importToCcswitch(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
               >
                 <Icon name="upload" size="sm" />
-                <span class="text-xs">{{ t('keys.importToCcSwitch') }}</span>
+                <span class="text-center text-xs leading-tight">{{ t('keys.importToCcSwitch') }}</span>
               </button>
               <!-- Toggle Status Button -->
               <button
                 @click="toggleKeyStatus(row)"
                 :class="[
-                  'flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition-colors',
+                  'flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 transition-colors md:min-w-0 md:flex-none md:basis-auto',
                   row.status === 'active'
                     ? 'text-gray-500 hover:bg-yellow-50 hover:text-yellow-600 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-400'
                     : 'text-gray-500 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400'
@@ -381,31 +379,31 @@
               >
                 <Icon v-if="row.status === 'active'" name="ban" size="sm" />
                 <Icon v-else name="checkCircle" size="sm" />
-                <span class="text-xs">{{ row.status === 'active' ? t('keys.disable') : t('keys.enable') }}</span>
+                <span class="text-center text-xs leading-tight">{{ row.status === 'active' ? t('keys.disable') : t('keys.enable') }}</span>
               </button>
               <!-- Edit Button -->
               <button
                 @click="editKey(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
+                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
                 <Icon name="edit" size="sm" />
-                <span class="text-xs">{{ t('common.edit') }}</span>
+                <span class="text-center text-xs leading-tight">{{ t('common.edit') }}</span>
               </button>
               <!-- Support Ticket Button -->
               <button
                 @click="openKeyTicket(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20 dark:hover:text-primary-400"
+                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-primary-900/20 dark:hover:text-primary-400"
               >
                 <Icon name="chatBubble" size="sm" />
-                <span class="text-xs">{{ t('tickets.createTicket') }}</span>
+                <span class="text-center text-xs leading-tight">{{ t('tickets.createTicket') }}</span>
               </button>
               <!-- Delete Button -->
               <button
                 @click="confirmDelete(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-red-900/20 dark:hover:text-red-400"
               >
                 <Icon name="trash" size="sm" />
-                <span class="text-xs">{{ t('common.delete') }}</span>
+                <span class="text-center text-xs leading-tight">{{ t('common.delete') }}</span>
               </button>
             </div>
           </template>
@@ -1196,12 +1194,12 @@
       <div
         v-if="groupSelectorKeyId !== null && dropdownPosition"
         ref="dropdownRef"
-        class="animate-in fade-in slide-in-from-top-2 fixed z-[100000020] w-max min-w-[380px] overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 duration-200 dark:bg-dark-800 dark:ring-white/10"
+        class="animate-in fade-in slide-in-from-top-2 fixed z-[100000020] overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 duration-200 dark:bg-dark-800 dark:ring-white/10"
         style="pointer-events: auto !important;"
         :style="{
-          top: dropdownPosition.top !== undefined ? dropdownPosition.top + 'px' : undefined,
-          bottom: dropdownPosition.bottom !== undefined ? dropdownPosition.bottom + 'px' : undefined,
-          left: dropdownPosition.left + 'px'
+          top: dropdownPosition.top + 'px',
+          left: dropdownPosition.left + 'px',
+          width: dropdownPosition.width + 'px'
         }"
       >
         <!-- Search box -->
@@ -1231,7 +1229,7 @@
             {{ tab.label }}
           </button>
         </div>
-        <div class="max-h-80 overflow-y-auto p-1.5">
+        <div class="overflow-y-auto p-1.5" :style="{ maxHeight: dropdownPosition.listMaxHeight + 'px' }">
           <button
             v-for="option in filteredGroupOptions"
             :key="option.value ?? 'null'"
@@ -1462,7 +1460,7 @@ const groupSelectorKeyId = ref<number | null>(null)
 const activeGroupPlatformTab = ref<KeyGroupPlatformTab>('openai')
 const publicSettings = ref<PublicSettings | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
-const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
+const dropdownPosition = ref<{ top: number; left: number; width: number; listMaxHeight: number } | null>(null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 let abortController: AbortController | null = null
 
@@ -1907,6 +1905,29 @@ const toggleKeyStatus = async (key: ApiKey) => {
   }
 }
 
+const getClampedGroupDropdownPosition = (rect: DOMRect) => {
+  const viewportPadding = 12
+  const preferredWidth = 380
+  const availableWidth = Math.max(window.innerWidth - viewportPadding * 2, 240)
+  const width = Math.min(preferredWidth, availableWidth)
+  const left = Math.min(Math.max(rect.left, viewportPadding), window.innerWidth - viewportPadding - width)
+  const minListHeight = 160
+  const maxListHeight = 320
+  const fixedDropdownChrome = 120
+  const dropdownGap = 4
+  const spaceBelow = window.innerHeight - rect.bottom - viewportPadding - dropdownGap
+  const spaceAbove = rect.top - viewportPadding - dropdownGap
+  const opensUp = spaceBelow < minListHeight && spaceAbove > spaceBelow
+  const availableHeight = Math.max(opensUp ? spaceAbove : spaceBelow, minListHeight)
+  const listMaxHeight = Math.min(maxListHeight, Math.max(minListHeight, availableHeight - fixedDropdownChrome))
+  const dropdownHeight = fixedDropdownChrome + listMaxHeight
+  const top = opensUp
+    ? Math.max(viewportPadding, rect.top - dropdownHeight - dropdownGap)
+    : Math.min(rect.bottom + dropdownGap, window.innerHeight - viewportPadding - dropdownHeight)
+
+  return { top, left, width, listMaxHeight }
+}
+
 const openGroupSelector = (key: ApiKey) => {
   if (groupSelectorKeyId.value === key.id) {
     groupSelectorKeyId.value = null
@@ -1915,23 +1936,7 @@ const openGroupSelector = (key: ApiKey) => {
     const buttonEl = groupButtonRefs.value.get(key.id)
     if (buttonEl) {
       const rect = buttonEl.getBoundingClientRect()
-      const dropdownEstHeight = 400 // estimated max dropdown height
-      const spaceBelow = window.innerHeight - rect.bottom
-      const spaceAbove = rect.top
-
-      if (spaceBelow < dropdownEstHeight && spaceAbove > spaceBelow) {
-        // Not enough space below, pop upward
-        dropdownPosition.value = {
-          bottom: window.innerHeight - rect.top + 4,
-          left: rect.left
-        }
-      } else {
-        // Default: pop downward
-        dropdownPosition.value = {
-          top: rect.bottom + 4,
-          left: rect.left
-        }
-      }
+      dropdownPosition.value = getClampedGroupDropdownPosition(rect)
     }
     groupSelectorKeyId.value = key.id
     groupSearchQuery.value = ''

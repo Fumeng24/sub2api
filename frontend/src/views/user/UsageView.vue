@@ -108,9 +108,9 @@
       <template #filters>
         <div class="card">
           <div class="px-6 py-4">
-          <div class="flex flex-wrap items-end gap-4">
+          <div class="grid gap-4 lg:grid-cols-[minmax(180px,240px)_auto_1fr] lg:items-end">
             <!-- API Key Filter -->
-            <div class="min-w-[180px]">
+            <div class="min-w-0">
               <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
               <Select
                 v-model="filters.api_key_id"
@@ -121,7 +121,7 @@
             </div>
 
             <!-- Date Range Filter -->
-            <div>
+            <div class="min-w-0">
               <label class="input-label">{{ t('usage.timeRange') }}</label>
               <DateRangePicker
                 v-model:start-date="startDate"
@@ -131,14 +131,25 @@
             </div>
 
             <!-- Actions -->
-            <div class="ml-auto flex items-center gap-3">
-              <button @click="applyFilters" :disabled="loading" class="btn btn-secondary">
+            <div class="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3 lg:justify-end">
+              <button
+                @click="applyFilters"
+                :disabled="loading"
+                class="btn btn-secondary min-w-0 flex-1 justify-center sm:flex-none"
+              >
                 {{ t('common.refresh') }}
               </button>
-              <button @click="resetFilters" class="btn btn-secondary">
+              <button
+                @click="resetFilters"
+                class="btn btn-secondary min-w-0 flex-1 justify-center sm:flex-none"
+              >
                 {{ t('common.reset') }}
               </button>
-              <button @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
+              <button
+                @click="exportToCSV"
+                :disabled="exporting"
+                class="btn btn-primary min-w-full justify-center sm:min-w-0 sm:flex-none"
+              >
                 <svg
                   v-if="exporting"
                   class="-ml-1 mr-2 h-4 w-4 animate-spin"
