@@ -817,6 +817,17 @@ func (a *Account) GetExtraString(key string) string {
 	return ""
 }
 
+// GetCacheAffinityGroup returns an operator-defined prompt compatibility group.
+// Accounts with the same non-empty value are treated as safe alternatives for
+// long-context cache affinity. Empty values are intentionally isolated per
+// account because upstreams may inject different hidden prompts.
+func (a *Account) GetCacheAffinityGroup() string {
+	if a == nil {
+		return ""
+	}
+	return strings.TrimSpace(a.GetExtraString("cache_affinity_group"))
+}
+
 func (a *Account) GetClaudeUserID() string {
 	if v := strings.TrimSpace(a.GetExtraString("claude_user_id")); v != "" {
 		return v

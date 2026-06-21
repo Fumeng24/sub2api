@@ -73,7 +73,7 @@ func TestForwardAsChatCompletions_UpstreamNetworkErrorReturnsFailover(t *testing
 	require.ErrorAs(t, err, &failoverErr)
 	require.Equal(t, 0, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "i/o timeout")
-	require.False(t, failoverErr.RetryableOnSameAccount)
+	require.True(t, failoverErr.RetryableOnSameAccount)
 	require.Equal(t, 0, rec.Body.Len(), "service failover path must not write the client response")
 
 	rawEvents, ok := c.Get(OpsUpstreamErrorsKey)

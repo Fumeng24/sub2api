@@ -104,9 +104,6 @@ func (s *FailoverState) HandleFailoverErrorForRequest(
 	extraFields ...zap.Field,
 ) FailoverAction {
 	s.LastFailoverErr = failoverErr
-	if reporter, ok := gatewayService.(AccountScheduleFailureReporter); ok {
-		reporter.ReportAccountScheduleFailure(ctx, accountID, model, endpoint, failoverErr)
-	}
 
 	// 缓存计费判断
 	if needForceCacheBilling(s.hasBoundSession, failoverErr) {
@@ -126,6 +123,10 @@ func (s *FailoverState) HandleFailoverErrorForRequest(
 			return FailoverCanceled
 		}
 		return FailoverContinue
+	}
+
+	if reporter, ok := gatewayService.(AccountScheduleFailureReporter); ok {
+		reporter.ReportAccountScheduleFailure(ctx, accountID, model, endpoint, failoverErr)
 	}
 
 	// 同账号重试用尽，执行临时封禁
@@ -263,6 +264,40 @@ func sortedInt64SetKeys(values map[int64]struct{}) []int64 {
 	return ids
 }
 
+func gatewayFailoverBudgetExceeded(start time.Time) bool {
+	return !start.IsZero() && time.Since(start) >= gatewayUpstreamResponseBudget
+}
+
+func logGatewayFailoverBudgetExceeded(
+	reqLog *zap.Logger,
+	event string,
+	accountID int64,
+	platform string,
+	failoverErr *service.UpstreamFailoverError,
+	switchCount int,
+	maxSwitches int,
+	model string,
+	endpoint string,
+) {
+	if reqLog == nil {
+		return
+	}
+	statusCode := 0
+	if failoverErr != nil {
+		statusCode = failoverErr.StatusCode
+	}
+	reqLog.Warn(event,
+		zap.Int64("account_id", accountID),
+		zap.String("platform", platform),
+		zap.Int("upstream_status", statusCode),
+		zap.Int("switch_count", switchCount),
+		zap.Int("max_switches", maxSwitches),
+		zap.Duration("failover_budget", gatewayUpstreamResponseBudget),
+		zap.String("model", model),
+		zap.String("endpoint", endpoint),
+	)
+}
+
 func failoverWriterFields(currentSize, writerSizeBeforeForward int) []zap.Field {
 	bytesWritten := failoverBytesWritten(currentSize, writerSizeBeforeForward)
 	return []zap.Field{
@@ -319,14 +354,6 @@ func upstreamClientErrorForFailoverStatus(statusCode int) UpstreamClientError {
 }
 
 func upstreamClientErrorForFailoverStatusWithPolicy(statusCode int, policy upstreamFailoverClientPolicy) UpstreamClientError {
-	forbiddenStatus := policy.ForbiddenStatus
-	if forbiddenStatus == 0 {
-		forbiddenStatus = http.StatusBadGateway
-	}
-	forbiddenType := strings.TrimSpace(policy.ForbiddenType)
-	if forbiddenType == "" {
-		forbiddenType = "upstream_error"
-	}
 	overloadedType := strings.TrimSpace(policy.OverloadedType)
 	if overloadedType == "" {
 		overloadedType = "overloaded_error"
@@ -334,36 +361,29 @@ func upstreamClientErrorForFailoverStatusWithPolicy(statusCode int, policy upstr
 
 	switch statusCode {
 	case http.StatusUnauthorized:
-		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Upstream authentication failed, please contact administrator"}
+		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Service temporarily unavailable, please retry later"}
 	case http.StatusPaymentRequired:
-		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Upstream service temporarily unavailable"}
+		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Service temporarily unavailable, please retry later"}
 	case http.StatusForbidden:
-		return UpstreamClientError{Status: forbiddenStatus, Type: forbiddenType, Message: "Upstream access forbidden, please contact administrator"}
+		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Service temporarily unavailable, please retry later"}
 	case http.StatusTooManyRequests:
 		return UpstreamClientError{Status: http.StatusServiceUnavailable, Type: "upstream_error", Message: "Service temporarily unavailable, please retry later"}
 	case 529:
-		return UpstreamClientError{Status: http.StatusServiceUnavailable, Type: overloadedType, Message: "Upstream service overloaded, please retry later"}
+		return UpstreamClientError{Status: http.StatusServiceUnavailable, Type: overloadedType, Message: "Service temporarily unavailable, please retry later"}
 	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Upstream service temporarily unavailable"}
+		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Service temporarily unavailable, please retry later"}
 	default:
-		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Upstream request failed"}
+		return UpstreamClientError{Status: http.StatusBadGateway, Type: "upstream_error", Message: "Service temporarily unavailable, please retry later"}
 	}
 }
 
 func applyUpstreamFailoverClientPolicy(err UpstreamClientError) UpstreamClientError {
-	if err.Status == http.StatusTooManyRequests {
-		err.Status = http.StatusServiceUnavailable
-		err.Type = "upstream_error"
-		err.Message = "Service temporarily unavailable, please retry later"
-		return err
+	normalized := service.NormalizeUpstreamClientError(err.Status, err.Type, err.Message)
+	return UpstreamClientError{
+		Status:  normalized.Status,
+		Type:    normalized.Type,
+		Message: normalized.Message,
 	}
-	if strings.TrimSpace(err.Type) == "" {
-		err.Type = "upstream_error"
-	}
-	if strings.TrimSpace(err.Message) == "" {
-		err.Message = "Upstream request failed"
-	}
-	return err
 }
 
 func upstreamClientErrorForPassthroughFailover(statusCode int, errType, message string) UpstreamClientError {

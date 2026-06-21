@@ -393,14 +393,14 @@ func TestOpenAIGatewayService_Forward_CodexSparkRejectsEscapedInputImage(t *test
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestOpenAIGatewayService_Forward_CodexBridgeInjectionSetsImageBilling(t *testing.T) {
+func TestOpenAIGatewayService_Forward_CodexBridgeDoesNotAutoInjectImageBilling(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	upstream := &httpUpstreamRecorder{
 		resp: &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": []string{"application/json"}},
 			Body: io.NopCloser(strings.NewReader(
-				`{"output":[{"id":"ig_1","type":"image_generation_call","result":"final-image","size":"1024x1024"}],"usage":{"input_tokens":1,"output_tokens":2}}`,
+				`{"output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":1,"output_tokens":2}}`,
 			)),
 		},
 	}
@@ -431,12 +431,14 @@ func TestOpenAIGatewayService_Forward_CodexBridgeInjectionSetsImageBilling(t *te
 	result, err := svc.Forward(context.Background(), c, account, body)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Equal(t, 1, result.ImageCount)
-	require.Equal(t, "2K", result.ImageSize)
-	require.Equal(t, "gpt-image-2", result.BillingModel)
+	require.NotNil(t, upstream.lastReq)
+	require.False(t, gjson.GetBytes(upstream.lastBody, `tools.#(type=="image_generation")`).Exists())
+	require.Equal(t, 0, result.ImageCount)
+	require.Empty(t, result.ImageSize)
+	require.NotEqual(t, "gpt-image-2", result.BillingModel)
 }
 
-func TestOpenAIGatewayService_Forward_HTTPDeletesPreviousResponseIDWhenPresent(t *testing.T) {
+func TestOpenAIGatewayService_Forward_HTTPPreservesValidPreviousResponseID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{}
 	cfg.Security.URLAllowlist.Enabled = false
@@ -453,27 +455,48 @@ func TestOpenAIGatewayService_Forward_HTTPDeletesPreviousResponseIDWhenPresent(t
 		Extra: map[string]any{"use_responses_api": true},
 	}
 
-	for _, body := range [][]byte{
-		[]byte(`{"model":"gpt-5","stream":false,"previous_response_id":"","input":"hi"}`),
-		[]byte(`{"model":"gpt-5","stream":false,"previous_response_id":null,"input":"hi"}`),
+	for _, tc := range []struct {
+		name string
+		body []byte
+		want string
+	}{
+		{
+			name: "valid_response_id",
+			body: []byte(`{"model":"gpt-5","stream":false,"previous_response_id":"resp_keep","input":"hi"}`),
+			want: "resp_keep",
+		},
+		{
+			name: "empty_string",
+			body: []byte(`{"model":"gpt-5","stream":false,"previous_response_id":"","input":"hi"}`),
+		},
+		{
+			name: "null",
+			body: []byte(`{"model":"gpt-5","stream":false,"previous_response_id":null,"input":"hi"}`),
+		},
 	} {
-		upstream := &httpUpstreamRecorder{
-			resp: &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"usage":{"input_tokens":1,"output_tokens":2}}`)),
-			},
-		}
-		svc := &OpenAIGatewayService{cfg: cfg, httpUpstream: upstream}
-		rec := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(rec)
-		c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", nil)
-		SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := &httpUpstreamRecorder{
+				resp: &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(`{"usage":{"input_tokens":1,"output_tokens":2}}`)),
+				},
+			}
+			svc := &OpenAIGatewayService{cfg: cfg, httpUpstream: upstream}
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", nil)
+			SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
 
-		result, err := svc.Forward(context.Background(), c, account, body)
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		require.False(t, gjson.GetBytes(upstream.lastBody, "previous_response_id").Exists())
+			result, err := svc.Forward(context.Background(), c, account, tc.body)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			if tc.want == "" {
+				require.False(t, gjson.GetBytes(upstream.lastBody, "previous_response_id").Exists())
+				return
+			}
+			require.Equal(t, tc.want, gjson.GetBytes(upstream.lastBody, "previous_response_id").String())
+		})
 	}
 }
 

@@ -220,6 +220,14 @@ func TestLoadDefaultOpenAIResponseHeaderTimeoutFifteenSeconds(t *testing.T) {
 	require.Equal(t, 15, cfg.Gateway.OpenAIResponseHeaderTimeout)
 }
 
+func TestLoadDefaultGatewayResponseHeaderTimeoutBelowCloudflareLimit(t *testing.T) {
+	resetViperWithJWTSecret(t)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, 100, cfg.Gateway.ResponseHeaderTimeout)
+}
+
 func TestLoadOpenAIResponseHeaderTimeoutFromEnv(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT", "1800")

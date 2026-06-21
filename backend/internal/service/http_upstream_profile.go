@@ -46,11 +46,11 @@ func HTTPUpstreamProfileFromContext(ctx context.Context) HTTPUpstreamProfile {
 }
 
 func HTTPUpstreamProfileForOpenAI(weakFallback bool, noHeaderTimeout bool) HTTPUpstreamProfile {
-	if weakFallback {
-		return HTTPUpstreamProfileOpenAIWeakFallback
-	}
 	if noHeaderTimeout {
 		return HTTPUpstreamProfileOpenAINoHeaderTimeout
+	}
+	if weakFallback {
+		return HTTPUpstreamProfileOpenAIWeakFallback
 	}
 	return HTTPUpstreamProfileOpenAI
 }

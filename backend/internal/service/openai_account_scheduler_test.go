@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -958,6 +959,17 @@ func TestOpenAIGatewayService_OpenAIAccountSchedulerMetrics_DisabledNoOp(t *test
 	require.Equal(t, OpenAIAccountSchedulerMetricsSnapshot{}, snapshot)
 }
 
+func TestOpenAIGatewayService_MaxOpenAIAccountSwitchesRespectsConfiguredLimit(t *testing.T) {
+	t.Cleanup(resetOpenAIAdvancedSchedulerSettingCacheForTest)
+
+	svc := &OpenAIGatewayService{
+		rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("true"),
+	}
+
+	require.Equal(t, 7, svc.MaxOpenAIAccountSwitches(context.Background(), 7, nil))
+	require.Equal(t, 3, svc.MaxOpenAIAccountSwitches(context.Background(), 0, nil))
+}
+
 func TestOpenAIGatewayService_SelectAccountWithScheduler_SessionStickyRateLimitedAccountFallsBackToFreshCandidate(t *testing.T) {
 	ctx := context.Background()
 	groupID := int64(10101)
@@ -1741,6 +1753,566 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_SessionSticky(t *testin
 	require.Equal(t, account.ID, selection.Account.ID)
 	require.Equal(t, openAIAccountScheduleLayerSessionSticky, decision.Layer)
 	require.True(t, decision.StickySessionHit)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_CacheAffinitySticky(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10110)
+	account := Account{
+		ID:          36101,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		GroupIDs:    []int64{groupID},
+	}
+	body := []byte(`{
+		"model": "gpt-5.4",
+		"messages": [
+			{"role": "system", "content": "You are a coding assistant."},
+			{"role": "user", "content": "fix the bug"}
+		]
+	}`)
+	affinityHash := BuildOpenAICacheAffinityHash(9001, 7001, &groupID, "gpt-5.4", "/v1/responses", body)
+	require.NotEmpty(t, affinityHash)
+	cache := &schedulerTestGatewayCache{
+		sessionBindings: map[string]int64{
+			"openai:" + affinityHash: account.ID,
+		},
+	}
+
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: []Account{account}}},
+		cache:              cache,
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	reqCtx := WithOpenAICacheAffinityHash(ctx, affinityHash)
+	selection, decision, err := svc.SelectAccountWithScheduler(
+		reqCtx,
+		&groupID,
+		"",
+		"new_turn_session_hash",
+		"gpt-5.4",
+		nil,
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, account.ID, selection.Account.ID)
+	require.Equal(t, openAIAccountScheduleLayerCacheAffinity, decision.Layer)
+	require.True(t, decision.CacheAffinityHit)
+	require.Equal(t, account.ID, cache.sessionBindings["openai:new_turn_session_hash"])
+	require.Equal(t, account.ID, cache.sessionBindings["openai:"+affinityHash])
+
+	snapshot := svc.SnapshotOpenAIAccountSchedulerMetrics()
+	require.GreaterOrEqual(t, snapshot.CacheAffinityHitTotal, int64(1))
+	require.GreaterOrEqual(t, snapshot.StickyHitRatio, 1.0)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_SessionStickyBeatsCacheAffinity(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10114)
+	accounts := []Account{
+		{
+			ID:          36141,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+		},
+		{
+			ID:          36142,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+		},
+	}
+	affinityHash := BuildOpenAICacheAffinityHash(
+		9005,
+		7005,
+		&groupID,
+		"gpt-5.5",
+		"/v1/responses",
+		[]byte(`{"model":"gpt-5.5","input":[{"role":"user","content":"keep cache hot"}]}`),
+	)
+	require.NotEmpty(t, affinityHash)
+	cache := &schedulerTestGatewayCache{
+		sessionBindings: map[string]int64{
+			"openai:normal_session_hash": accounts[0].ID,
+			"openai:" + affinityHash:     accounts[1].ID,
+		},
+	}
+
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: accounts}},
+		cache:              cache,
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(
+		WithOpenAICacheAffinityHash(ctx, affinityHash),
+		&groupID,
+		"",
+		"normal_session_hash",
+		"gpt-5.5",
+		nil,
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, accounts[0].ID, selection.Account.ID)
+	require.Equal(t, openAIAccountScheduleLayerSessionSticky, decision.Layer)
+	require.False(t, decision.CacheAffinityHit)
+	require.True(t, decision.StickySessionHit)
+	require.Equal(t, accounts[0].ID, cache.sessionBindings["openai:normal_session_hash"])
+	require.Equal(t, accounts[0].ID, cache.sessionBindings["openai:"+affinityHash])
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_SessionStickyIgnoresCacheAffinityGroup(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10117)
+	accounts := []Account{
+		{
+			ID:          36171,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Extra:       map[string]any{"cache_affinity_group": "prompt-a"},
+		},
+		{
+			ID:          36172,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Extra:       map[string]any{"cache_affinity_group": "prompt-b"},
+		},
+	}
+	affinityHash := BuildOpenAICacheAffinityHash(
+		9008,
+		7008,
+		&groupID,
+		"gpt-5.5",
+		"/v1/responses",
+		[]byte(`{"model":"gpt-5.5","input":[{"role":"user","content":"same working tree"}]}`),
+	)
+	require.NotEmpty(t, affinityHash)
+	cache := &schedulerTestGatewayCache{
+		sessionBindings: map[string]int64{
+			"openai:normal_session_hash": accounts[0].ID,
+			"openai:" + affinityHash:     accounts[1].ID,
+		},
+	}
+
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: accounts}},
+		cache:              cache,
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(
+		WithOpenAICacheAffinityHash(ctx, affinityHash),
+		&groupID,
+		"",
+		"normal_session_hash",
+		"gpt-5.5",
+		nil,
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, accounts[0].ID, selection.Account.ID)
+	require.Equal(t, openAIAccountScheduleLayerSessionSticky, decision.Layer)
+	require.True(t, decision.StickySessionHit)
+	require.False(t, decision.CacheAffinityHit)
+	require.Equal(t, accounts[0].ID, cache.sessionBindings["openai:normal_session_hash"])
+	require.Equal(t, accounts[0].ID, cache.sessionBindings["openai:"+affinityHash])
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_CacheAffinityExcludedRebinds(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10111)
+	accounts := []Account{
+		{
+			ID:          36111,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+		},
+		{
+			ID:          36112,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+		},
+	}
+	affinityHash := BuildOpenAICacheAffinityHash(
+		9002,
+		7002,
+		&groupID,
+		"gpt-5.4",
+		"/v1/responses",
+		[]byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"same project"}]}`),
+	)
+	require.NotEmpty(t, affinityHash)
+	cache := &schedulerTestGatewayCache{
+		sessionBindings: map[string]int64{
+			"openai:" + affinityHash: accounts[0].ID,
+		},
+	}
+
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: accounts}},
+		cache:              cache,
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(
+		WithOpenAICacheAffinityHash(ctx, affinityHash),
+		&groupID,
+		"",
+		"fresh_session_after_failover",
+		"gpt-5.4",
+		map[int64]struct{}{accounts[0].ID: {}},
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, accounts[1].ID, selection.Account.ID)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+	require.False(t, decision.CacheAffinityHit)
+	require.Equal(t, accounts[1].ID, cache.sessionBindings["openai:"+affinityHash])
+	require.Equal(t, accounts[1].ID, cache.sessionBindings["openai:fresh_session_after_failover"])
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_CacheAffinityPrefersCompatibleGroup(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10115)
+	accounts := []Account{
+		{
+			ID:          36151,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Extra:       map[string]any{"cache_affinity_group": "prompt-a"},
+		},
+		{
+			ID:          36152,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Priority:    99,
+			Extra:       map[string]any{"cache_affinity_group": "prompt-a"},
+		},
+		{
+			ID:          36153,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Priority:    -10,
+			Extra:       map[string]any{"cache_affinity_group": "prompt-b"},
+		},
+	}
+	affinityHash := BuildOpenAICacheAffinityHash(
+		9006,
+		7006,
+		&groupID,
+		"gpt-5.5",
+		"/v1/responses",
+		[]byte(`{"model":"gpt-5.5","input":[{"role":"user","content":"same repo"}]}`),
+	)
+	cache := &schedulerTestGatewayCache{
+		sessionBindings: map[string]int64{
+			"openai:" + affinityHash: accounts[0].ID,
+		},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: accounts}},
+		cache:              cache,
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(
+		WithOpenAICacheAffinityHash(ctx, affinityHash),
+		&groupID,
+		"",
+		"new_session",
+		"gpt-5.5",
+		map[int64]struct{}{accounts[0].ID: {}},
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, accounts[1].ID, selection.Account.ID)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+	require.Equal(t, accounts[1].ID, cache.sessionBindings["openai:"+affinityHash])
+	require.Equal(t, accounts[1].ID, cache.sessionBindings["openai:new_session"])
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_CacheAffinityFallsBackAcrossGroup(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10116)
+	accounts := []Account{
+		{
+			ID:          36161,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Extra:       map[string]any{"cache_affinity_group": "prompt-a"},
+		},
+		{
+			ID:          36162,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Extra:       map[string]any{"cache_affinity_group": "prompt-a"},
+		},
+		{
+			ID:          36163,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Extra:       map[string]any{"cache_affinity_group": "prompt-b"},
+		},
+	}
+	affinityHash := BuildOpenAICacheAffinityHash(
+		9007,
+		7007,
+		&groupID,
+		"gpt-5.5",
+		"/v1/responses",
+		[]byte(`{"model":"gpt-5.5","input":[{"role":"user","content":"same repo"}]}`),
+	)
+	cache := &schedulerTestGatewayCache{
+		sessionBindings: map[string]int64{
+			"openai:" + affinityHash: accounts[0].ID,
+		},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:      schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: accounts}},
+		cache:            cache,
+		cfg:              &config.Config{},
+		rateLimitService: newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{
+			acquireResults: map[int64]bool{
+				accounts[1].ID: false,
+			},
+		}),
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(
+		WithOpenAICacheAffinityHash(ctx, affinityHash),
+		&groupID,
+		"",
+		"new_session",
+		"gpt-5.5",
+		map[int64]struct{}{accounts[0].ID: {}},
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, accounts[2].ID, selection.Account.ID)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+	require.Equal(t, accounts[2].ID, cache.sessionBindings["openai:"+affinityHash])
+	require.Equal(t, accounts[2].ID, cache.sessionBindings["openai:new_session"])
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_LoadBalanceBindsCacheAffinity(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10112)
+	account := Account{
+		ID:          36121,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		GroupIDs:    []int64{groupID},
+	}
+	affinityHash := BuildOpenAICacheAffinityHash(
+		9003,
+		7003,
+		&groupID,
+		"gpt-5.4",
+		"/v1/responses",
+		[]byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"bind after first selection"}]}`),
+	)
+	require.NotEmpty(t, affinityHash)
+	cache := &schedulerTestGatewayCache{}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: []Account{account}}},
+		cache:              cache,
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(
+		WithOpenAICacheAffinityHash(ctx, affinityHash),
+		&groupID,
+		"",
+		"first_session_for_affinity",
+		"gpt-5.4",
+		nil,
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, account.ID, selection.Account.ID)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+	require.Equal(t, account.ID, cache.sessionBindings["openai:"+affinityHash])
+	require.Equal(t, account.ID, cache.sessionBindings["openai:first_session_for_affinity"])
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_DefaultDisabled_CacheAffinitySticky(t *testing.T) {
+	resetOpenAIAdvancedSchedulerSettingCacheForTest()
+
+	ctx := context.Background()
+	groupID := int64(10113)
+	accounts := []Account{
+		{
+			ID:          36131,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Priority:    99,
+		},
+		{
+			ID:          36132,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Priority:    0,
+		},
+	}
+	affinityHash := BuildOpenAICacheAffinityHash(
+		9004,
+		7004,
+		&groupID,
+		"gpt-5.4",
+		"/v1/responses",
+		[]byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"legacy affinity"}]}`),
+	)
+	require.NotEmpty(t, affinityHash)
+	cache := &schedulerTestGatewayCache{
+		sessionBindings: map[string]int64{
+			"openai:" + affinityHash: accounts[0].ID,
+		},
+	}
+	cfg := &config.Config{}
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: accounts}},
+		cache:              cache,
+		cfg:                cfg,
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(
+		WithOpenAICacheAffinityHash(ctx, affinityHash),
+		&groupID,
+		"",
+		"",
+		"gpt-5.4",
+		nil,
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, accounts[0].ID, selection.Account.ID)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
 	if selection.ReleaseFunc != nil {
 		selection.ReleaseFunc()
 	}
@@ -2793,7 +3365,39 @@ func TestBuildOpenAIOrderedSelectionOrder_Deterministic(t *testing.T) {
 	}
 }
 
-func TestOpenAIGatewayService_SelectAccountWithScheduler_OrderedSelectionPrefersFirstAccountAcrossSessions(t *testing.T) {
+func TestBuildOpenAIOrderedSelectionOrderWithSeed_OverridesLRUOnlyWithinSameRank(t *testing.T) {
+	now := time.Now()
+	old := now.Add(-time.Hour)
+	candidates := []openAIAccountCandidateScore{
+		{
+			account:  &Account{ID: 5101, Priority: 0, LastUsedAt: &now},
+			loadInfo: &AccountLoadInfo{AccountID: 5101, LoadRate: 20, WaitingCount: 1},
+			score:    1,
+		},
+		{
+			account:  &Account{ID: 5102, Priority: 0, LastUsedAt: &old},
+			loadInfo: &AccountLoadInfo{AccountID: 5102, LoadRate: 20, WaitingCount: 1},
+			score:    1,
+		},
+		{
+			account:  &Account{ID: 5103, Priority: 0},
+			loadInfo: &AccountLoadInfo{AccountID: 5103, LoadRate: 20, WaitingCount: 1},
+			score:    1,
+		},
+	}
+
+	legacy := buildOpenAIOrderedSelectionOrder(candidates)
+	require.Equal(t, []int64{5103, 5102, 5101}, openAIStableLowTTFTCandidateIDs(legacy))
+
+	seed := newSchedulerSeededOrder("group", "model", "endpoint", "session-a")
+	seeded := buildOpenAIOrderedSelectionOrderWithSeed(candidates, seed)
+	seededAgain := buildOpenAIOrderedSelectionOrderWithSeed(candidates, seed)
+
+	require.Equal(t, openAIStableLowTTFTCandidateIDs(seeded), openAIStableLowTTFTCandidateIDs(seededAgain))
+	require.NotEqual(t, openAIStableLowTTFTCandidateIDs(legacy), openAIStableLowTTFTCandidateIDs(seeded))
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_OrderedSelectionUsesSessionSeedAcrossSessions(t *testing.T) {
 	ctx := context.Background()
 	groupID := int64(15)
 	accounts := []Account{
@@ -2805,6 +3409,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_OrderedSelectionPrefers
 			Schedulable: true,
 			Concurrency: 3,
 			Priority:    0,
+			GroupIDs:    []int64{groupID},
 		},
 		{
 			ID:          5102,
@@ -2814,6 +3419,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_OrderedSelectionPrefers
 			Schedulable: true,
 			Concurrency: 3,
 			Priority:    0,
+			GroupIDs:    []int64{groupID},
 		},
 		{
 			ID:          5103,
@@ -2823,6 +3429,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_OrderedSelectionPrefers
 			Schedulable: true,
 			Concurrency: 3,
 			Priority:    0,
+			GroupIDs:    []int64{groupID},
 		},
 	}
 	cfg := &config.Config{}
@@ -2840,7 +3447,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_OrderedSelectionPrefers
 		},
 	}
 	svc := &OpenAIGatewayService{
-		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+		accountRepo:        schedulerTestGroupAwareOpenAIAccountRepo{schedulerTestOpenAIAccountRepo{accounts: accounts}},
 		cache:              &schedulerTestGatewayCache{sessionBindings: map[string]int64{}},
 		cfg:                cfg,
 		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
@@ -2849,11 +3456,12 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_OrderedSelectionPrefers
 
 	selected := make(map[int64]int, len(accounts))
 	for i := 0; i < 60; i++ {
+		sessionHash := fmt.Sprintf("session-seed-%02d", i)
 		selection, decision, err := svc.SelectAccountWithScheduler(
 			ctx,
 			&groupID,
 			"",
-			"",
+			sessionHash,
 			"gpt-5.1",
 			nil,
 			OpenAIUpstreamTransportAny,
@@ -2869,7 +3477,45 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_OrderedSelectionPrefers
 		}
 	}
 
-	require.Equal(t, map[int64]int{5101: 60}, selected)
+	require.GreaterOrEqual(t, len(selected), 2, "different sessions should not all pin to the first account")
+
+	repeatedSession := "session-seed-stable"
+	first, decision, err := svc.SelectAccountWithScheduler(
+		ctx,
+		&groupID,
+		"",
+		repeatedSession,
+		"gpt-5.1",
+		nil,
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, first)
+	require.NotNil(t, first.Account)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+	if first.ReleaseFunc != nil {
+		first.ReleaseFunc()
+	}
+
+	second, decision, err := svc.SelectAccountWithScheduler(
+		ctx,
+		&groupID,
+		"",
+		repeatedSession,
+		"gpt-5.1",
+		nil,
+		OpenAIUpstreamTransportAny,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, second)
+	require.NotNil(t, second.Account)
+	require.Equal(t, first.Account.ID, second.Account.ID, "same session should keep its sticky account")
+	require.Equal(t, openAIAccountScheduleLayerSessionSticky, decision.Layer)
+	if second.ReleaseFunc != nil {
+		second.ReleaseFunc()
+	}
 }
 
 func TestBuildOpenAIOrderedSelectionOrder_HandlesInvalidScores(t *testing.T) {

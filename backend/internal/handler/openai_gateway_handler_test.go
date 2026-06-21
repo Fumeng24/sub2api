@@ -24,7 +24,7 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-func TestOpenAIGatewayHandlerMapUpstreamErrorKeepsDeterministicBusinessStatuses(t *testing.T) {
+func TestOpenAIGatewayHandlerMapUpstreamErrorHidesUpstreamAccountFailures(t *testing.T) {
 	h := &OpenAIGatewayHandler{}
 
 	status, errType, msg := h.mapUpstreamError(http.StatusPaymentRequired)
@@ -34,9 +34,10 @@ func TestOpenAIGatewayHandlerMapUpstreamErrorKeepsDeterministicBusinessStatuses(
 	require.NotContains(t, strings.ToLower(msg), "billing")
 
 	status, errType, msg = h.mapUpstreamError(http.StatusForbidden)
-	require.Equal(t, http.StatusForbidden, status)
-	require.Equal(t, "forbidden_error", errType)
-	require.Contains(t, msg, "forbidden")
+	require.Equal(t, http.StatusBadGateway, status)
+	require.Equal(t, "upstream_error", errType)
+	require.NotContains(t, strings.ToLower(msg), "forbidden")
+	require.Equal(t, "Service temporarily unavailable, please retry later", msg)
 }
 
 func TestOpenAIGatewayHandlerMapUpstreamErrorHidesUpstream429(t *testing.T) {
@@ -64,6 +65,25 @@ func TestOpenAIGatewayHandlerHandleFailoverExhaustedHidesUpstream429(t *testing.
 	require.Equal(t, http.StatusServiceUnavailable, w.Code)
 	require.Equal(t, "upstream_error", gjson.GetBytes(w.Body.Bytes(), "error.type").String())
 	require.NotContains(t, strings.ToLower(w.Body.String()), "rate limit")
+}
+
+func TestOpenAIGatewayHandlerHandleFailoverExhaustedMapsContextWindowError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	c.Set(opsModelKey, "gpt-5.5")
+
+	h := &OpenAIGatewayHandler{}
+	h.handleFailoverExhausted(c, &service.UpstreamFailoverError{
+		StatusCode:   http.StatusBadRequest,
+		ResponseBody: []byte(`{"error":{"type":"invalid_request_error","message":"Your input exceeds the context window."}}`),
+	}, false)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Equal(t, "invalid_request_error", gjson.GetBytes(w.Body.Bytes(), "error.type").String())
+	require.Contains(t, w.Body.String(), "272k tokens")
+	require.NotContains(t, w.Body.String(), "Service temporarily unavailable")
 }
 
 func TestOpenAIHandleStreamingAwareError_JSONEscaping(t *testing.T) {
@@ -702,7 +722,7 @@ func TestOpenAIResponses_RejectsMessageIDAsPreviousResponseID(t *testing.T) {
 	require.Contains(t, w.Body.String(), "previous_response_id must be a response.id")
 }
 
-func TestOpenAIResponses_RejectsHTTPContinuationPreviousResponseID(t *testing.T) {
+func TestOpenAIResponses_AllowsHTTPContinuationPreviousResponseID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	w := httptest.NewRecorder()
@@ -726,9 +746,9 @@ func TestOpenAIResponses_RejectsHTTPContinuationPreviousResponseID(t *testing.T)
 	h := newOpenAIHandlerForPreviousResponseIDValidation(t, nil)
 	h.Responses(c)
 
-	require.Equal(t, http.StatusBadRequest, w.Code)
-	require.Contains(t, w.Body.String(), "Responses WebSocket v2")
-	require.Contains(t, w.Body.String(), "previous_response_id")
+	require.NotEqual(t, http.StatusBadRequest, w.Code)
+	require.NotContains(t, w.Body.String(), "Responses WebSocket v2")
+	require.NotContains(t, w.Body.String(), "previous_response_id is only supported")
 }
 
 func TestOpenAIResponses_FunctionCallOutputHTTPGuidanceDoesNotSuggestPreviousResponseReuse(t *testing.T) {
@@ -756,7 +776,7 @@ func TestOpenAIResponses_FunctionCallOutputHTTPGuidanceDoesNotSuggestPreviousRes
 	h.Responses(c)
 
 	require.Equal(t, http.StatusBadRequest, w.Code)
-	require.Contains(t, w.Body.String(), "Responses WebSocket v2")
+	require.Contains(t, w.Body.String(), "function_call_output requires call_id")
 	require.NotContains(t, w.Body.String(), "reuse previous_response_id")
 }
 

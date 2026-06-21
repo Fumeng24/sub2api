@@ -113,7 +113,7 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_UpstreamNetworkErrorReturnsFa
 	require.ErrorAs(t, err, &failoverErr)
 	require.Equal(t, 0, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "i/o timeout")
-	require.False(t, failoverErr.RetryableOnSameAccount)
+	require.True(t, failoverErr.RetryableOnSameAccount)
 	require.Equal(t, 0, rec.Body.Len(), "service failover path must not write the client response")
 }
 
@@ -370,6 +370,52 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardCountTokensPreservesBo
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.JSONEq(t, upstreamRespBody, rec.Body.String())
 	require.Empty(t, rec.Header().Get("Set-Cookie"))
+}
+
+func TestGatewayService_CountTokensUpstreamErrorNormalizesSensitiveStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       []byte
+		wantStatus int
+		wantType   string
+		wantMsg    string
+	}{
+		{
+			name:       "upstream_rate_limited",
+			statusCode: http.StatusTooManyRequests,
+			body:       []byte(`{"error":{"type":"rate_limit_error","message":"Upstream rate limit exceeded, cf-ray: abc"}}`),
+			wantStatus: http.StatusServiceUnavailable,
+			wantType:   "upstream_error",
+			wantMsg:    clientFacingTemporaryUnavailableMessage,
+		},
+		{
+			name:       "client_invalid_argument",
+			statusCode: http.StatusBadRequest,
+			body:       []byte(`{"error":{"type":"invalid_request_error","message":"Request contains an invalid argument."},"status":"INVALID_ARGUMENT"}`),
+			wantStatus: http.StatusBadRequest,
+			wantType:   "invalid_request_error",
+			wantMsg:    "Invalid request",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+
+			svc := &GatewayService{}
+			svc.countTokensUpstreamError(c, tt.statusCode, tt.body)
+
+			require.Equal(t, tt.wantStatus, rec.Code)
+			require.Equal(t, tt.wantType, gjson.GetBytes(rec.Body.Bytes(), "error.type").String())
+			require.Equal(t, tt.wantMsg, gjson.GetBytes(rec.Body.Bytes(), "error.message").String())
+			require.NotContains(t, rec.Body.String(), "cf-ray")
+			require.NotContains(t, rec.Body.String(), "rate limit")
+		})
+	}
 }
 
 // TestGatewayService_AnthropicAPIKeyPassthrough_ModelMappingEdgeCases 覆盖透传模式下模型映射的各种边界情况
@@ -707,36 +753,42 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_CountTokens404PassthroughNotE
 		statusCode      int
 		respBody        string
 		wantPassthrough bool
+		wantStatus      int
 	}{
 		{
 			name:            "404 endpoint not found passes through as 404",
 			statusCode:      http.StatusNotFound,
 			respBody:        `{"error":{"message":"Not found: /v1/messages/count_tokens","type":"not_found_error"}}`,
 			wantPassthrough: true,
+			wantStatus:      http.StatusNotFound,
 		},
 		{
 			name:            "404 generic not found does not passthrough",
 			statusCode:      http.StatusNotFound,
 			respBody:        `{"error":{"message":"resource not found","type":"not_found_error"}}`,
 			wantPassthrough: false,
+			wantStatus:      http.StatusNotFound,
 		},
 		{
 			name:            "400 Invalid URL does not passthrough",
 			statusCode:      http.StatusBadRequest,
 			respBody:        `{"error":{"message":"Invalid URL (POST /v1/messages/count_tokens)","type":"invalid_request_error"}}`,
 			wantPassthrough: false,
+			wantStatus:      http.StatusBadRequest,
 		},
 		{
 			name:            "400 model error does not passthrough",
 			statusCode:      http.StatusBadRequest,
 			respBody:        `{"error":{"message":"model not found: claude-unknown","type":"invalid_request_error"}}`,
 			wantPassthrough: false,
+			wantStatus:      http.StatusBadRequest,
 		},
 		{
 			name:            "500 internal error does not passthrough",
 			statusCode:      http.StatusInternalServerError,
 			respBody:        `{"error":{"message":"internal error","type":"api_error"}}`,
 			wantPassthrough: false,
+			wantStatus:      http.StatusBadGateway,
 		},
 	}
 
@@ -794,7 +846,7 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_CountTokens404PassthroughNotE
 				require.Equal(t, "not_found_error", errObj["type"])
 			} else {
 				require.Error(t, err)
-				require.Equal(t, tt.statusCode, rec.Code)
+				require.Equal(t, tt.wantStatus, rec.Code)
 			}
 		})
 	}
@@ -1172,7 +1224,7 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardDirect_UpstreamRequest
 	require.ErrorAs(t, err, &failoverErr)
 	require.Equal(t, 0, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "dial tcp timeout")
-	require.False(t, failoverErr.RetryableOnSameAccount)
+	require.True(t, failoverErr.RetryableOnSameAccount)
 	require.Equal(t, 0, rec.Body.Len())
 }
 

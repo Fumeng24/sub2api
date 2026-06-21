@@ -32,7 +32,7 @@
         class="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-primary-400/10 blur-3xl"
       ></div>
       <div
-        class="absolute inset-0 bg-[linear-gradient(rgba(20,184,166,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
+        class="absolute inset-0 bg-[linear-gradient(rgba(37,99,235,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(37,99,235,0.035)_1px,transparent_1px)] bg-[size:64px_64px]"
       ></div>
     </div>
 
@@ -139,7 +139,7 @@
             <!-- CTA Button -->
             <div class="flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
               <router-link
-                :to="isAuthenticated ? dashboardPath : '/login'"
+                :to="isAuthenticated ? dashboardPath : '/register'"
                 class="btn btn-primary px-8 py-3 text-base shadow-lg shadow-primary-500/30"
               >
                 {{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}
@@ -200,6 +200,25 @@
           </div>
         </div>
 
+        <!-- Value Rail -->
+        <div class="mb-12 grid gap-3 md:grid-cols-4">
+          <div
+            v-for="item in valueRail"
+            :key="item.value"
+            class="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm backdrop-blur-sm dark:border-dark-700/60 dark:bg-dark-800/65"
+          >
+            <p class="text-2xl font-black tracking-tight text-gray-950 dark:text-white">
+              {{ item.value }}
+            </p>
+            <p class="mt-1 text-sm font-bold text-gray-800 dark:text-dark-100">
+              {{ item.label }}
+            </p>
+            <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-dark-400">
+              {{ item.description }}
+            </p>
+          </div>
+        </div>
+
         <!-- Feature Tags - Centered -->
         <div class="mb-12 flex flex-wrap items-center justify-center gap-4 md:gap-6">
           <div
@@ -225,6 +244,136 @@
             <span class="text-sm font-medium text-gray-700 dark:text-dark-200">{{
               t('home.tags.realtimeBilling')
             }}</span>
+          </div>
+        </div>
+
+        <!-- Cost & Quick Start -->
+        <div class="mb-12 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <section
+            class="relative overflow-hidden rounded-[2rem] border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 p-6 shadow-sm dark:border-emerald-800/60 dark:from-emerald-950/35 dark:via-dark-800/80 dark:to-cyan-950/25"
+          >
+            <div class="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-emerald-300/25 blur-3xl dark:bg-emerald-500/10"></div>
+            <div class="relative">
+              <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                <Icon name="calculator" size="sm" />
+                {{ t('home.cost.kicker') }}
+              </div>
+              <h2 class="text-2xl font-black tracking-tight text-gray-950 dark:text-white md:text-3xl">
+                {{ t('home.cost.title') }}
+              </h2>
+              <p class="mt-3 text-sm leading-7 text-gray-600 dark:text-dark-300">
+                {{ t('home.cost.description') }}
+              </p>
+              <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                <div
+                  v-for="item in costFacts"
+                  :key="item.label"
+                  class="rounded-2xl border border-emerald-100 bg-white/80 p-4 dark:border-emerald-800/40 dark:bg-dark-900/45"
+                >
+                  <p class="text-lg font-black text-emerald-700 dark:text-emerald-300">
+                    {{ item.value }}
+                  </p>
+                  <p class="mt-1 text-xs font-bold text-gray-700 dark:text-dark-200">
+                    {{ item.label }}
+                  </p>
+                </div>
+              </div>
+              <div class="mt-5 rounded-2xl border border-dashed border-emerald-300 bg-white/70 p-4 text-sm leading-7 text-gray-700 dark:border-emerald-800/70 dark:bg-dark-900/40 dark:text-dark-200">
+                <p class="font-bold text-gray-950 dark:text-white">{{ t('home.cost.formulaTitle') }}</p>
+                <p class="mt-1">{{ t('home.cost.formula') }}</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('home.cost.note') }}</p>
+              </div>
+            </div>
+          </section>
+
+          <section
+            class="rounded-[2rem] border border-gray-200/70 bg-white/75 p-6 shadow-sm backdrop-blur-sm dark:border-dark-700/60 dark:bg-dark-800/65"
+          >
+            <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-gray-900 px-3 py-1 text-xs font-bold text-white dark:bg-white dark:text-gray-950">
+              <Icon name="bolt" size="sm" />
+              {{ t('home.quickStart.kicker') }}
+            </div>
+            <h2 class="text-2xl font-black tracking-tight text-gray-950 dark:text-white md:text-3xl">
+              {{ t('home.quickStart.title') }}
+            </h2>
+            <div class="mt-5 space-y-3">
+              <div
+                v-for="(step, index) in quickStartSteps"
+                :key="step.title"
+                class="flex gap-4 rounded-2xl border border-gray-100 bg-gray-50/80 p-4 dark:border-dark-700 dark:bg-dark-900/45"
+              >
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-sm font-black text-white shadow-sm shadow-primary-500/30">
+                  {{ index + 1 }}
+                </div>
+                <div>
+                  <p class="font-bold text-gray-950 dark:text-white">{{ step.title }}</p>
+                  <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-dark-300">
+                    {{ step.description }}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="mt-5 flex flex-col gap-3 sm:flex-row">
+              <router-link
+                :to="isAuthenticated ? '/keys' : '/register'"
+                class="btn btn-primary justify-center"
+              >
+                {{ isAuthenticated ? t('home.quickStart.createKey') : t('home.quickStart.register') }}
+              </router-link>
+              <a
+                v-if="docsLink"
+                :href="docsLink.href"
+                :target="docsLink.external ? '_blank' : undefined"
+                :rel="docsLink.external ? 'noopener noreferrer' : undefined"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-200 dark:hover:border-primary-700 dark:hover:text-primary-300"
+                @click="handleDocsLinkClick"
+              >
+                <Icon name="book" size="sm" />
+                {{ t('home.quickStart.readGuide') }}
+              </a>
+            </div>
+          </section>
+        </div>
+
+        <!-- Concrete Integration Path -->
+        <div class="mb-12">
+          <div class="mb-6 text-center">
+            <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-gray-900 px-3 py-1 text-xs font-bold text-white dark:bg-white dark:text-gray-950">
+              <Icon name="terminal" size="sm" />
+              {{ t('home.integration.kicker') }}
+            </div>
+            <h2 class="text-2xl font-black tracking-tight text-gray-950 dark:text-white md:text-3xl">
+              {{ t('home.integration.title') }}
+            </h2>
+            <p class="mx-auto mt-3 max-w-3xl text-sm leading-7 text-gray-600 dark:text-dark-300">
+              {{ t('home.integration.description') }}
+            </p>
+          </div>
+          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <component
+              :is="item.external ? 'a' : 'router-link'"
+              v-for="item in integrationCards"
+              :key="item.title"
+              :to="item.external ? undefined : item.href"
+              :href="item.external ? item.href : undefined"
+              :target="item.external ? '_blank' : undefined"
+              :rel="item.external ? 'noopener noreferrer' : undefined"
+              class="group flex min-h-full flex-col rounded-2xl border border-gray-200/70 bg-white/75 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/60 dark:bg-dark-800/65 dark:hover:border-primary-800"
+            >
+              <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary-500 text-white shadow-sm shadow-primary-500/25">
+                <Icon :name="item.icon" size="md" />
+              </div>
+              <h3 class="text-base font-black text-gray-950 dark:text-white">
+                {{ item.title }}
+              </h3>
+              <p class="mt-2 flex-1 text-sm leading-6 text-gray-600 dark:text-dark-300">
+                {{ item.description }}
+              </p>
+              <span class="mt-4 inline-flex items-center gap-1 text-sm font-bold text-primary-700 dark:text-primary-300">
+                {{ item.action }}
+                <Icon name="arrowRight" size="sm" />
+              </span>
+            </component>
           </div>
         </div>
 
@@ -304,6 +453,84 @@
               {{ t('home.features.balanceQuotaDesc') }}
             </p>
           </div>
+        </div>
+
+        <!-- Detailed Use Cases -->
+        <div class="mb-12">
+          <div class="mb-6 text-center">
+            <h2 class="text-2xl font-black tracking-tight text-gray-950 dark:text-white md:text-3xl">
+              {{ t('home.useCases.title') }}
+            </h2>
+            <p class="mx-auto mt-3 max-w-2xl text-sm leading-7 text-gray-600 dark:text-dark-300">
+              {{ t('home.useCases.description') }}
+            </p>
+          </div>
+          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div
+              v-for="item in useCases"
+              :key="item.title"
+              class="group rounded-2xl border border-gray-200/60 bg-white/70 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/60 dark:bg-dark-800/65"
+            >
+              <div
+                class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl"
+                :class="item.iconClass"
+              >
+                <Icon :name="item.icon" size="lg" class="text-white" />
+              </div>
+              <h3 class="text-base font-black text-gray-950 dark:text-white">
+                {{ item.title }}
+              </h3>
+              <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-dark-300">
+                {{ item.description }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trust Notes -->
+        <div class="mb-12 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          <section class="rounded-[2rem] border border-gray-200/70 bg-gray-950 p-6 text-white shadow-xl shadow-gray-950/10 dark:border-dark-700 dark:bg-black">
+            <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+              <Icon name="shield" size="lg" />
+            </div>
+            <h2 class="text-2xl font-black tracking-tight">{{ t('home.trust.title') }}</h2>
+            <p class="mt-3 text-sm leading-7 text-gray-300">
+              {{ t('home.trust.description') }}
+            </p>
+            <div class="mt-5 grid gap-3">
+              <div
+                v-for="item in trustPoints"
+                :key="item"
+                class="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm leading-6 text-gray-200"
+              >
+                <Icon name="checkCircle" size="sm" class="mt-0.5 shrink-0 text-emerald-300" />
+                <span>{{ item }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="rounded-[2rem] border border-primary-200/70 bg-white/75 p-6 shadow-sm backdrop-blur-sm dark:border-primary-800/60 dark:bg-dark-800/65">
+            <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-primary-100 px-3 py-1 text-xs font-bold text-primary-800 dark:bg-primary-900/50 dark:text-primary-200">
+              <Icon name="lightbulb" size="sm" />
+              {{ t('home.firstRun.kicker') }}
+            </div>
+            <h2 class="text-2xl font-black tracking-tight text-gray-950 dark:text-white md:text-3xl">
+              {{ t('home.firstRun.title') }}
+            </h2>
+            <p class="mt-3 text-sm leading-7 text-gray-600 dark:text-dark-300">
+              {{ t('home.firstRun.description') }}
+            </p>
+            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+              <div
+                v-for="item in firstRunTips"
+                :key="item.title"
+                class="rounded-2xl border border-primary-100 bg-primary-50/60 p-4 dark:border-primary-900/60 dark:bg-primary-950/20"
+              >
+                <p class="font-bold text-gray-950 dark:text-white">{{ item.title }}</p>
+                <p class="mt-1 text-sm leading-6 text-gray-600 dark:text-dark-300">{{ item.description }}</p>
+              </div>
+            </div>
+          </section>
         </div>
 
         <!-- Supported Providers -->
@@ -474,6 +701,148 @@ const userInitial = computed(() => {
   return user.email.charAt(0).toUpperCase()
 })
 
+type HomeIconName = InstanceType<typeof Icon>['$props']['name']
+
+const valueRail = computed(() => [
+  {
+    value: t('home.valueRail.credit.value'),
+    label: t('home.valueRail.credit.label'),
+    description: t('home.valueRail.credit.description')
+  },
+  {
+    value: t('home.valueRail.models.value'),
+    label: t('home.valueRail.models.label'),
+    description: t('home.valueRail.models.description')
+  },
+  {
+    value: t('home.valueRail.compatible.value'),
+    label: t('home.valueRail.compatible.label'),
+    description: t('home.valueRail.compatible.description')
+  },
+  {
+    value: t('home.valueRail.billing.value'),
+    label: t('home.valueRail.billing.label'),
+    description: t('home.valueRail.billing.description')
+  }
+])
+
+const costFacts = computed(() => [
+  { value: t('home.cost.facts.creditValue'), label: t('home.cost.facts.creditLabel') },
+  { value: t('home.cost.facts.multiplierValue'), label: t('home.cost.facts.multiplierLabel') },
+  { value: t('home.cost.facts.recordsValue'), label: t('home.cost.facts.recordsLabel') }
+])
+
+const quickStartSteps = computed(() => [
+  {
+    title: t('home.quickStart.steps.register.title'),
+    description: t('home.quickStart.steps.register.description')
+  },
+  {
+    title: t('home.quickStart.steps.group.title'),
+    description: t('home.quickStart.steps.group.description')
+  },
+  {
+    title: t('home.quickStart.steps.connect.title'),
+    description: t('home.quickStart.steps.connect.description')
+  }
+])
+
+const integrationCards = computed<Array<{
+  title: string
+  description: string
+  action: string
+  href: string
+  icon: HomeIconName
+  external?: boolean
+}>>(() => [
+  {
+    title: t('home.integration.cards.key.title'),
+    description: t('home.integration.cards.key.description'),
+    action: t('home.integration.cards.key.action'),
+    href: isAuthenticated.value ? '/keys' : '/register',
+    icon: 'key'
+  },
+  {
+    title: t('home.integration.cards.status.title'),
+    description: t('home.integration.cards.status.description'),
+    action: t('home.integration.cards.status.action'),
+    href: isAuthenticated.value ? '/monitor' : '/register',
+    icon: 'shield'
+  },
+  {
+    title: t('home.integration.cards.models.title'),
+    description: t('home.integration.cards.models.description'),
+    action: t('home.integration.cards.models.action'),
+    href: isAuthenticated.value ? '/available-channels' : '/register',
+    icon: 'server'
+  },
+  {
+    title: t('home.integration.cards.billing.title'),
+    description: t('home.integration.cards.billing.description'),
+    action: t('home.integration.cards.billing.action'),
+    href: isAuthenticated.value ? '/usage' : '/key-usage',
+    icon: 'chart'
+  }
+])
+
+const useCases = computed<Array<{
+  title: string
+  description: string
+  icon: HomeIconName
+  iconClass: string
+}>>(() => [
+  {
+    title: t('home.useCases.coding.title'),
+    description: t('home.useCases.coding.description'),
+    icon: 'terminal',
+    iconClass: 'bg-gradient-to-br from-gray-800 to-gray-950 shadow-lg shadow-gray-900/20'
+  },
+  {
+    title: t('home.useCases.writing.title'),
+    description: t('home.useCases.writing.description'),
+    icon: 'document',
+    iconClass: 'bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/20'
+  },
+  {
+    title: t('home.useCases.automation.title'),
+    description: t('home.useCases.automation.description'),
+    icon: 'cpu',
+    iconClass: 'bg-gradient-to-br from-sky-500 to-cyan-600 shadow-lg shadow-sky-500/20'
+  },
+  {
+    title: t('home.useCases.image.title'),
+    description: t('home.useCases.image.description'),
+    icon: 'sparkles',
+    iconClass: 'bg-gradient-to-br from-rose-500 to-pink-600 shadow-lg shadow-rose-500/20'
+  }
+])
+
+const trustPoints = computed(() => [
+  t('home.trust.points.modelTruth'),
+  t('home.trust.points.billing'),
+  t('home.trust.points.status'),
+  t('home.trust.points.privacy')
+])
+
+const firstRunTips = computed(() => [
+  {
+    title: t('home.firstRun.tips.trySmall.title'),
+    description: t('home.firstRun.tips.trySmall.description')
+  },
+  {
+    title: t('home.firstRun.tips.serviceStatus.title'),
+    description: t('home.firstRun.tips.serviceStatus.description')
+  },
+  {
+    title: t('home.firstRun.tips.groupChoice.title'),
+    description: t('home.firstRun.tips.groupChoice.description')
+  },
+  {
+    title: t('home.firstRun.tips.records.title'),
+    description: t('home.firstRun.tips.records.description')
+  }
+])
+
 // Current year for footer
 const currentYear = computed(() => new Date().getFullYear())
 
@@ -633,7 +1002,7 @@ onMounted(() => {
   color: #a78bfa;
 }
 .code-url {
-  color: #14b8a6;
+  color: #60a5fa;
 }
 .code-comment {
   color: #64748b;
@@ -674,8 +1043,8 @@ onMounted(() => {
 :deep(.dark) .terminal-window {
   box-shadow:
     0 25px 50px -12px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(20, 184, 166, 0.2),
-    0 0 40px rgba(20, 184, 166, 0.1),
+    0 0 0 1px rgba(37, 99, 235, 0.2),
+    0 0 40px rgba(37, 99, 235, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 

@@ -110,6 +110,20 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+
+		// 发票管理
+		registerInvoiceRoutes(admin, h)
+	}
+}
+
+func registerInvoiceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	invoices := admin.Group("/invoices")
+	{
+		invoices.GET("", h.Admin.Invoice.List)
+		invoices.GET("/:id", h.Admin.Invoice.GetByID)
+		invoices.POST("/:id/approve", h.Admin.Invoice.Approve)
+		invoices.POST("/:id/reject", h.Admin.Invoice.Reject)
+		invoices.POST("/:id/complete", h.Admin.Invoice.Complete)
 	}
 }
 

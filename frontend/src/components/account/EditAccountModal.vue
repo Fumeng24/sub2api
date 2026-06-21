@@ -1499,6 +1499,21 @@
         </div>
       </div>
 
+      <!-- OpenAI 缓存兼容组 -->
+      <div
+        v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'apikey')"
+        class="border-t border-gray-200 pt-4 dark:border-dark-600"
+      >
+        <label class="input-label">{{ t('admin.accounts.openai.cacheAffinityGroup') }}</label>
+        <input
+          v-model="cacheAffinityGroup"
+          type="text"
+          class="input font-mono"
+          :placeholder="t('admin.accounts.openai.cacheAffinityGroupPlaceholder')"
+        />
+        <p class="input-hint">{{ t('admin.accounts.openai.cacheAffinityGroupDesc') }}</p>
+      </div>
+
       <!-- OpenAI WS Mode 三态（off/ctx_pool/passthrough） -->
       <div
         v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'apikey')"
@@ -2665,6 +2680,7 @@ const customBaseUrl = ref('')
 
 // OpenAI 自动透传开关（OAuth/API Key）
 const openaiPassthroughEnabled = ref(false)
+const cacheAffinityGroup = ref('')
 const openAICompactMode = ref<OpenAICompactMode>('auto')
 const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
 const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>(['chat_completions', 'embeddings'])
@@ -3049,6 +3065,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 
   // Load OpenAI passthrough toggle (OpenAI OAuth/API Key)
   openaiPassthroughEnabled.value = false
+  cacheAffinityGroup.value = ''
   openAICompactMode.value = 'auto'
   openAIResponsesMode.value = 'auto'
   openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
@@ -3062,6 +3079,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   webSearchEmulationMode.value = 'default'
   if (newAccount.platform === 'openai' && (newAccount.type === 'oauth' || newAccount.type === 'apikey')) {
     openaiPassthroughEnabled.value = extra?.openai_passthrough === true || extra?.openai_oauth_passthrough === true
+    cacheAffinityGroup.value = typeof extra?.cache_affinity_group === 'string' ? extra.cache_affinity_group : ''
     openAICompactMode.value = (extra?.openai_compact_mode as OpenAICompactMode) || 'auto'
     if (newAccount.type === 'apikey') {
       openAIResponsesMode.value = normalizeOpenAIResponsesMode(extra?.openai_responses_mode)
@@ -4206,6 +4224,12 @@ const handleSubmit = async () => {
       } else {
         delete newExtra.openai_passthrough
         delete newExtra.openai_oauth_passthrough
+      }
+      const normalizedCacheAffinityGroup = cacheAffinityGroup.value.trim()
+      if (normalizedCacheAffinityGroup) {
+        newExtra.cache_affinity_group = normalizedCacheAffinityGroup
+      } else {
+        delete newExtra.cache_affinity_group
       }
       if (openAICompactMode.value === 'auto') {
         delete newExtra.openai_compact_mode

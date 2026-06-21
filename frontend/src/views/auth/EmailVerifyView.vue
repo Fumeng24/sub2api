@@ -54,15 +54,20 @@
         <!-- Code Status -->
         <div
           v-if="codeSent"
-          class="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-800/50 dark:bg-green-900/20"
+          class="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800/50 dark:bg-green-900/20"
         >
-          <div class="flex items-start gap-3">
+          <div class="flex items-start gap-2.5">
             <div class="flex-shrink-0">
-              <Icon name="checkCircle" size="md" class="text-green-500" />
+              <Icon name="checkCircle" size="sm" class="mt-0.5 text-green-500" />
             </div>
-            <p class="text-sm text-green-700 dark:text-green-400">
-              {{ t('auth.codeSentSuccess') }}
-            </p>
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-green-700 dark:text-green-400">
+                {{ t('auth.codeSentSuccess') }}
+              </p>
+              <p class="text-xs leading-5 text-green-700/80 dark:text-green-300">
+                {{ t('auth.emailDeliveryHint') }}
+              </p>
+            </div>
           </div>
         </div>
 

@@ -62,10 +62,13 @@ func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponseForAccount(ct
 }
 
 func (s *OpenAIGatewayService) retryableOnSameOpenAIAccount(ctx context.Context, account *Account, statusCode int, upstreamMsg string, upstreamBody []byte) bool {
-	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
-		return false
+	if retryableOpenAIUpstreamErrorOnSameAccount(statusCode, upstreamMsg, upstreamBody) {
+		return true
 	}
 	if statusCode == http.StatusPaymentRequired || statusCode == http.StatusForbidden || statusCode == http.StatusTooManyRequests {
+		return false
+	}
+	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
 		return false
 	}
 	return account.IsPoolMode() &&
@@ -73,13 +76,29 @@ func (s *OpenAIGatewayService) retryableOnSameOpenAIAccount(ctx context.Context,
 }
 
 func (s *OpenAIGatewayService) retryableOnSameOpenAIAccountStatus(ctx context.Context, account *Account, statusCode int) bool {
-	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
-		return false
+	if retryableOpenAIUpstreamErrorOnSameAccount(statusCode, "", nil) {
+		return true
 	}
 	if statusCode == http.StatusPaymentRequired || statusCode == http.StatusForbidden || statusCode == http.StatusTooManyRequests {
 		return false
 	}
+	if s.usesOpenAIAdvancedSchedulerPolicy(ctx, account) {
+		return false
+	}
 	return account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode)
+}
+
+func retryableOpenAIUpstreamErrorOnSameAccount(statusCode int, upstreamMsg string, upstreamBody []byte) bool {
+	if statusCode == 0 {
+		return true
+	}
+	class := classifyOpenAIUpstreamError(statusCode, upstreamMsg, upstreamBody)
+	switch class {
+	case openAIUpstreamErrorTransient:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte, requestedModel ...string) bool {

@@ -5,6 +5,16 @@
         <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
       </div>
       <template v-else>
+        <div class="rounded-2xl border border-sky-200 bg-sky-50/90 px-4 py-3 shadow-sm dark:border-sky-500/30 dark:bg-sky-500/10">
+          <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm font-semibold text-sky-900 dark:text-sky-100">
+              QQ群：<span class="font-mono text-base tracking-wide">1022567186</span> 获取支持
+            </p>
+            <p class="text-xs text-sky-700 dark:text-sky-200">
+              充值、订阅、到账或支付异常可进群联系处理
+            </p>
+          </div>
+        </div>
         <!-- Tab Switcher (hide during payment and subscription confirm) -->
         <div v-if="tabs.length > 1 && paymentPhase === 'select' && !selectedPlan" class="flex space-x-1 rounded-xl bg-gray-100 p-1 dark:bg-dark-800">
           <button v-for="tab in tabs" :key="tab.key"

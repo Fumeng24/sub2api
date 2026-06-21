@@ -834,6 +834,13 @@ func (s *GeminiMessagesCompatService) writeGeminiChatCompletionsMappedError(
 	statusCode := http.StatusBadGateway
 	errType := "upstream_error"
 	errMsg := "Upstream request failed"
+	clientRequestMapped := false
+	if status, mappedType, mappedMsg, ok := ClientRequestErrorFromUpstream(upstreamStatus, upstreamMsg, body); ok {
+		statusCode = status
+		errType = mappedType
+		errMsg = mappedMsg
+		clientRequestMapped = true
+	}
 	if mapped := mapGeminiErrorBodyToClaudeError(body); mapped != nil {
 		if mapped.Type != "" {
 			errType = mapped.Type
@@ -865,21 +872,19 @@ func (s *GeminiMessagesCompatService) writeGeminiChatCompletionsMappedError(
 		if errMsg == "Upstream request failed" {
 			errMsg = "Resource not found"
 		}
+	case http.StatusUnauthorized, http.StatusPaymentRequired, http.StatusForbidden:
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case http.StatusTooManyRequests:
-		statusCode = http.StatusTooManyRequests
-		if errType == "upstream_error" {
-			errType = "rate_limit_error"
-		}
-		if errMsg == "Upstream request failed" {
-			errMsg = "Upstream rate limit exceeded, please retry later"
-		}
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 529:
-		statusCode = http.StatusServiceUnavailable
-		if errType == "upstream_error" {
-			errType = "overloaded_error"
-		}
-		if errMsg == "Upstream request failed" {
-			errMsg = "Upstream service overloaded, please retry later"
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		if !clientRequestMapped {
+			normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+			statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 		}
 	}
 

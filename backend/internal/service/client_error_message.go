@@ -7,6 +7,10 @@ import (
 
 const clientFacingTemporaryUnavailableMessage = "Service temporarily unavailable, please retry later"
 
+func ClientFacingTemporaryUnavailableMessage() string {
+	return clientFacingTemporaryUnavailableMessage
+}
+
 // ClientFacingErrorMessage removes internal routing/upstream details from
 // messages before they are returned to API clients. Ops logs keep the original
 // sanitized upstream message via setOpsUpstreamError/appendOpsUpstreamError.
@@ -29,6 +33,10 @@ func clientErrorSpecificReplacement(message string) (string, bool) {
 	switch {
 	case strings.Contains(lower, "claude code version") && strings.Contains(lower, "please update"):
 		return message, true
+	case strings.Contains(lower, "gpt-5.5 context window") && strings.Contains(lower, "272k"):
+		return message, true
+	case IsContextWindowExceededError(message, nil):
+		return ContextWindowExceededClientMessage(""), true
 	case strings.Contains(lower, "image generation concurrency limit exceeded"):
 		return "Image generation concurrency limit exceeded, please retry later", true
 	case strings.Contains(lower, "upstream stream disconnected"):

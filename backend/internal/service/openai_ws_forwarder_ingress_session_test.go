@@ -298,7 +298,7 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_FollowupCreateCa
 	require.Equal(t, "resp_omit_model_1", gjson.Get(requestToJSONString(captureConn.writes[1]), "previous_response_id").String())
 }
 
-func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_InjectsCodexImageBridge(t *testing.T) {
+func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_DoesNotAutoInjectCodexImageBridge(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	cfg := &config.Config{}
@@ -429,9 +429,8 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_InjectsCodexImag
 
 	require.Len(t, captureConn.writes, 1)
 	upstreamPayload := requestToJSONString(captureConn.writes[0])
-	require.True(t, gjson.Get(upstreamPayload, `tools.#(type=="image_generation")`).Exists())
-	require.Equal(t, "png", gjson.Get(upstreamPayload, `tools.#(type=="image_generation").output_format`).String())
-	require.Contains(t, gjson.Get(upstreamPayload, "instructions").String(), "image_generation")
+	require.False(t, gjson.Get(upstreamPayload, `tools.#(type=="image_generation")`).Exists())
+	require.NotContains(t, gjson.Get(upstreamPayload, "instructions").String(), "Responses native")
 }
 
 func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_DedicatedModeDoesNotReuseConnAcrossSessions(t *testing.T) {

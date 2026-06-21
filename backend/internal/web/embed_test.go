@@ -31,6 +31,16 @@ func TestInjectSiteTitle(t *testing.T) {
 		assert.NotContains(t, string(result), "Sub2API")
 	})
 
+	t.Run("keeps_explicit_seo_title", func(t *testing.T) {
+		html := []byte(`<html><head><title>低成本大模型 API 聚合平台 - GPT Claude Gemini Codex API - Wegoo AI</title></head><body></body></html>`)
+		settingsJSON := []byte(`{"site_name":"MyCustomSite"}`)
+
+		result := injectSiteTitle(html, settingsJSON)
+
+		assert.Equal(t, string(html), string(result))
+		assert.NotContains(t, string(result), "MyCustomSite - AI API Gateway")
+	})
+
 	t.Run("returns_unchanged_when_site_name_empty", func(t *testing.T) {
 		html := []byte(`<html><head><title>Sub2API - AI API Gateway</title></head><body></body></html>`)
 		settingsJSON := []byte(`{"site_name":""}`)
@@ -343,7 +353,7 @@ func TestFrontendServer_ServeIndexHTML(t *testing.T) {
 
 		server.serveIndexHTML(c)
 
-		assert.Equal(t, "no-cache", w.Header().Get("Cache-Control"))
+		assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 	})
 
 	t.Run("fallback_on_settings_error", func(t *testing.T) {
@@ -541,6 +551,70 @@ func TestFrontendServer_Middleware(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Contains(t, w.Header().Get("Content-Type"), "image/png")
 	})
+
+	t.Run("serves_legacy_vite_entry_as_javascript_shim", func(t *testing.T) {
+		provider := &mockSettingsProvider{
+			settings: map[string]string{"test": "value"},
+		}
+
+		server, err := NewFrontendServer(provider)
+		require.NoError(t, err)
+		require.NotEmpty(t, server.entryScriptPath)
+
+		router := gin.New()
+		router.Use(server.Middleware())
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/src/main.ts", nil)
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Header().Get("Content-Type"), "text/javascript")
+		assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+		assert.Contains(t, w.Body.String(), `import "`)
+		assert.Contains(t, w.Body.String(), server.entryScriptPath)
+		assert.NotContains(t, w.Body.String(), "<!doctype html>")
+	})
+
+	t.Run("serves_stale_index_asset_as_current_entry_shim", func(t *testing.T) {
+		provider := &mockSettingsProvider{
+			settings: map[string]string{"test": "value"},
+		}
+
+		server, err := NewFrontendServer(provider)
+		require.NoError(t, err)
+
+		router := gin.New()
+		router.Use(server.Middleware())
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/assets/index-stalehash.js", nil)
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Header().Get("Content-Type"), "text/javascript")
+		assert.Contains(t, w.Body.String(), server.entryScriptPath)
+		assert.NotContains(t, w.Body.String(), "<!doctype html>")
+	})
+
+	t.Run("returns_404_for_missing_static_assets", func(t *testing.T) {
+		provider := &mockSettingsProvider{
+			settings: map[string]string{"test": "value"},
+		}
+
+		server, err := NewFrontendServer(provider)
+		require.NoError(t, err)
+
+		router := gin.New()
+		router.Use(server.Middleware())
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/assets/missing.css", nil)
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.NotContains(t, w.Body.String(), "<!doctype html>")
+	})
 }
 
 func TestNewFrontendServer(t *testing.T) {
@@ -664,6 +738,36 @@ func TestServeEmbeddedFrontend(t *testing.T) {
 				assert.True(t, nextCalled, "next handler should be called for API route")
 			})
 		}
+	})
+
+	t.Run("serves_legacy_vite_entry_as_javascript_shim", func(t *testing.T) {
+		middleware := ServeEmbeddedFrontend()
+
+		router := gin.New()
+		router.Use(middleware)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/src/main.ts", nil)
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Header().Get("Content-Type"), "text/javascript")
+		assert.Contains(t, w.Body.String(), `import "/assets/index-`)
+		assert.NotContains(t, w.Body.String(), "<!doctype html>")
+	})
+
+	t.Run("returns_404_for_missing_static_assets", func(t *testing.T) {
+		middleware := ServeEmbeddedFrontend()
+
+		router := gin.New()
+		router.Use(middleware)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/assets/missing.js", nil)
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.NotContains(t, w.Body.String(), "<!doctype html>")
 	})
 }
 

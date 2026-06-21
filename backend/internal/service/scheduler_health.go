@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -8,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 const (
@@ -76,6 +79,11 @@ type schedulerAccountScore struct {
 	BaseWeight int
 }
 
+type schedulerSeededOrder struct {
+	enabled bool
+	seed    string
+}
+
 func newAccountSchedulerHealthStats() *accountSchedulerHealthStats {
 	return &accountSchedulerHealthStats{
 		entries: make(map[accountSchedulerHealthKey]*accountSchedulerHealthEntry),
@@ -90,10 +98,37 @@ func normalizeSchedulerDimension(value, fallback string) string {
 	return value
 }
 
+func normalizeSchedulerModelDimension(model string) string {
+	model = normalizeSchedulerDimension(model, defaultSchedulerModel)
+	if !schedulerModelDimensionLooksValid(model) {
+		return defaultSchedulerModel
+	}
+	return model
+}
+
+func schedulerModelDimensionLooksValid(model string) bool {
+	if model == "" || model == defaultSchedulerModel {
+		return true
+	}
+	if len(model) > 128 {
+		return false
+	}
+	for _, r := range model {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= '0' && r <= '9':
+		case r == '-' || r == '_' || r == '.' || r == ':' || r == '/':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func makeAccountSchedulerHealthKey(accountID int64, model, endpoint string) accountSchedulerHealthKey {
 	return accountSchedulerHealthKey{
 		AccountID: accountID,
-		Model:     normalizeSchedulerDimension(model, defaultSchedulerModel),
+		Model:     normalizeSchedulerModelDimension(model),
 		Endpoint:  normalizeSchedulerDimension(endpoint, defaultSchedulerEndpoint),
 	}
 }
@@ -854,8 +889,58 @@ func buildRoleAwareSchedulerOrder(scores []schedulerAccountScore, preferOAuth bo
 		return nil
 	}
 	orderedScores := append([]schedulerAccountScore(nil), scores...)
-	sortSchedulerScores(orderedScores, preferOAuth)
+	sortSchedulerScores(orderedScores, preferOAuth, newSchedulerSeededOrder(seedParts...))
 	return orderedScores
+}
+
+func newSchedulerSeededOrder(seedParts ...string) schedulerSeededOrder {
+	parts := make([]string, 0, len(seedParts))
+	for _, part := range seedParts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	if len(parts) == 0 {
+		return schedulerSeededOrder{}
+	}
+	return schedulerSeededOrder{enabled: true, seed: strings.Join(parts, "|")}
+}
+
+func newSchedulerSessionSeededOrder(groupID *int64, model, endpoint, sessionHash string, seedSuffixParts ...string) schedulerSeededOrder {
+	return newSchedulerSeededOrder(schedulerSessionSeedParts(groupID, model, endpoint, sessionHash, seedSuffixParts...)...)
+}
+
+func schedulerSessionSeedParts(groupID *int64, model, endpoint, sessionHash string, seedSuffixParts ...string) []string {
+	sessionHash = strings.TrimSpace(sessionHash)
+	if sessionHash == "" {
+		return nil
+	}
+	parts := []string{
+		strconv.FormatInt(derefGroupID(groupID), 10),
+		model,
+		endpoint,
+		sessionHash,
+	}
+	for _, part := range seedSuffixParts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
+}
+
+func schedulerSeededTieBreakLess(seed schedulerSeededOrder, a, b schedulerAccountScore) bool {
+	aID := accountIDForSchedulerScore(a)
+	bID := accountIDForSchedulerScore(b)
+	if !seed.enabled || aID <= 0 || bID <= 0 {
+		return aID < bID
+	}
+	aScore := xxhash.Sum64String(fmt.Sprintf("%s|%d", seed.seed, aID))
+	bScore := xxhash.Sum64String(fmt.Sprintf("%s|%d", seed.seed, bID))
+	if aScore != bScore {
+		return aScore < bScore
+	}
+	return aID < bID
 }
 
 func hasExplicitSchedulerGroupConfig(scores []schedulerAccountScore) bool {
@@ -867,9 +952,9 @@ func hasExplicitSchedulerGroupConfig(scores []schedulerAccountScore) bool {
 	return false
 }
 
-func sortSchedulerScores(scores []schedulerAccountScore, preferOAuth bool) {
+func sortSchedulerScores(scores []schedulerAccountScore, preferOAuth bool, seed schedulerSeededOrder) {
 	if schedulerScoresUseGroupOrder(scores) {
-		sortSchedulerScoresByGroupOrder(scores)
+		sortSchedulerScoresByGroupOrder(scores, seed)
 		return
 	}
 	sort.SliceStable(scores, func(i, j int) bool {
@@ -886,18 +971,21 @@ func sortSchedulerScores(scores []schedulerAccountScore, preferOAuth bool) {
 		if a.Score != b.Score {
 			return a.Score > b.Score
 		}
+		if seed.enabled {
+			return schedulerSeededTieBreakLess(seed, a, b)
+		}
 		switch {
 		case a.Account.LastUsedAt == nil && b.Account.LastUsedAt != nil:
 			return true
 		case a.Account.LastUsedAt != nil && b.Account.LastUsedAt == nil:
 			return false
 		case a.Account.LastUsedAt == nil && b.Account.LastUsedAt == nil:
-			return a.Account.ID < b.Account.ID
+			return schedulerSeededTieBreakLess(seed, a, b)
 		default:
 			if !a.Account.LastUsedAt.Equal(*b.Account.LastUsedAt) {
 				return a.Account.LastUsedAt.Before(*b.Account.LastUsedAt)
 			}
-			return a.Account.ID < b.Account.ID
+			return schedulerSeededTieBreakLess(seed, a, b)
 		}
 	})
 }
@@ -911,13 +999,13 @@ func schedulerScoresUseGroupOrder(scores []schedulerAccountScore) bool {
 	return false
 }
 
-func sortSchedulerScoresByGroupOrder(scores []schedulerAccountScore) {
+func sortSchedulerScoresByGroupOrder(scores []schedulerAccountScore, seed schedulerSeededOrder) {
 	sort.SliceStable(scores, func(i, j int) bool {
-		return schedulerScoreGroupOrderLess(scores[i], scores[j])
+		return schedulerScoreGroupOrderLess(scores[i], scores[j], seed)
 	})
 }
 
-func schedulerScoreGroupOrderLess(a, b schedulerAccountScore) bool {
+func schedulerScoreGroupOrderLess(a, b schedulerAccountScore, seed schedulerSeededOrder) bool {
 	if a.Config.GroupID > 0 && b.Config.GroupID == 0 {
 		return true
 	}
@@ -941,7 +1029,7 @@ func schedulerScoreGroupOrderLess(a, b schedulerAccountScore) bool {
 	if aLoad.WaitingCount != bLoad.WaitingCount {
 		return aLoad.WaitingCount < bLoad.WaitingCount
 	}
-	return accountIDForSchedulerScore(a) < accountIDForSchedulerScore(b)
+	return schedulerSeededTieBreakLess(seed, a, b)
 }
 
 func accountIDForSchedulerScore(score schedulerAccountScore) int64 {

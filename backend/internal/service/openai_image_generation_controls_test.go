@@ -105,18 +105,17 @@ func TestOpenAIGatewayServiceForward_DisabledGroupAllowsTextOnlyResponses(t *tes
 	require.NotNil(t, upstream.lastReq)
 }
 
-func TestOpenAIGatewayServiceForward_CodexImageInjectionRespectsGroupCapability(t *testing.T) {
+func TestOpenAIGatewayServiceForward_CodexDoesNotAutoInjectImageTool(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
 		name          string
 		allowImages   bool
 		bridgeEnabled bool
-		wantInjected  bool
 	}{
-		{name: "disabled group skips injection", allowImages: false, bridgeEnabled: true, wantInjected: false},
-		{name: "enabled group skips injection by default", allowImages: true, bridgeEnabled: false, wantInjected: false},
-		{name: "enabled group injects image tool when bridge enabled", allowImages: true, bridgeEnabled: true, wantInjected: true},
+		{name: "disabled group", allowImages: false, bridgeEnabled: true},
+		{name: "enabled group with bridge disabled", allowImages: true, bridgeEnabled: false},
+		{name: "enabled group with legacy bridge enabled", allowImages: true, bridgeEnabled: true},
 	}
 
 	for _, tt := range tests {
@@ -139,9 +138,9 @@ func TestOpenAIGatewayServiceForward_CodexImageInjectionRespectsGroupCapability(
 			require.NotNil(t, result)
 			require.NotNil(t, upstream.lastReq)
 			hasImageTool := gjson.GetBytes(upstream.lastBody, `tools.#(type=="image_generation")`).Exists()
-			require.Equal(t, tt.wantInjected, hasImageTool)
+			require.False(t, hasImageTool)
 			instructions := gjson.GetBytes(upstream.lastBody, "instructions").String()
-			require.Equal(t, tt.wantInjected, strings.Contains(instructions, "image_generation"))
+			require.NotContains(t, instructions, "Responses native")
 		})
 	}
 }
@@ -173,7 +172,7 @@ func TestOpenAIGatewayServiceForward_ExplicitImageToolWorksWithBridgeDisabled(t 
 	require.NotContains(t, instructions, "image_generation")
 }
 
-func TestOpenAIGatewayServiceForward_ChannelBridgeOverrideEnablesCodexInjection(t *testing.T) {
+func TestOpenAIGatewayServiceForward_ChannelBridgeOverrideDoesNotAutoInjectCodexImageTool(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	upstream := &httpUpstreamRecorder{
@@ -200,9 +199,9 @@ func TestOpenAIGatewayServiceForward_ChannelBridgeOverrideEnablesCodexInjection(
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.NotNil(t, upstream.lastReq)
-	require.True(t, gjson.GetBytes(upstream.lastBody, `tools.#(type=="image_generation")`).Exists())
+	require.False(t, gjson.GetBytes(upstream.lastBody, `tools.#(type=="image_generation")`).Exists())
 	instructions := gjson.GetBytes(upstream.lastBody, "instructions").String()
-	require.Contains(t, instructions, "image_generation")
+	require.NotContains(t, instructions, "Responses native")
 }
 
 func TestOpenAIGatewayService_CodexImageGenerationBridgeOverridePrecedence(t *testing.T) {

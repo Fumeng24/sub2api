@@ -189,9 +189,13 @@ describe('UseKeyModal', () => {
       apiKey: 'sk-claude'
     })
     expect(Object.keys(anthropicProvider.models)).toEqual([
+      'claude-fable-5',
       'claude-opus-4-6-thinking',
       'claude-sonnet-4-6'
     ])
+    expect(anthropicProvider.models['claude-fable-5'].options.thinking).toEqual({
+      type: 'adaptive'
+    })
     expect(anthropicProvider.models['claude-sonnet-4-6'].limit).toEqual({
       context: 200000,
       output: 64000

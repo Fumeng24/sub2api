@@ -42,6 +42,7 @@ func ProvideAdminHandlers(
 	bulkVerifyHandler *admin.BulkVerifyHandler,
 	affiliateHandler *admin.AffiliateHandler,
 	complianceHandler *admin.ComplianceHandler,
+	adminInvoiceHandler *admin.InvoiceHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
 		Dashboard:              dashboardHandler,
@@ -77,6 +78,7 @@ func ProvideAdminHandlers(
 		BulkVerify:             bulkVerifyHandler,
 		Affiliate:              affiliateHandler,
 		Compliance:             complianceHandler,
+		Invoice:                adminInvoiceHandler,
 	}
 }
 
@@ -118,6 +120,7 @@ func ProvideHandlers(
 	paymentHandler *PaymentHandler,
 	paymentWebhookHandler *PaymentWebhookHandler,
 	availableChannelHandler *AvailableChannelHandler,
+	invoiceHandler *InvoiceHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
@@ -139,6 +142,7 @@ func ProvideHandlers(
 		Payment:          paymentHandler,
 		PaymentWebhook:   paymentWebhookHandler,
 		AvailableChannel: availableChannelHandler,
+		Invoice:          invoiceHandler,
 	}
 }
 
@@ -161,6 +165,7 @@ var ProviderSet = wire.NewSet(
 	NewPaymentHandler,
 	NewPaymentWebhookHandler,
 	NewAvailableChannelHandler,
+	NewInvoiceHandler,
 
 	// Admin handlers
 	admin.NewDashboardHandler,
@@ -196,6 +201,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewBulkVerifyHandler,
 	admin.NewAffiliateHandler,
 	admin.NewComplianceHandler,
+	admin.NewInvoiceHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

@@ -3704,21 +3704,17 @@ func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, accou
 		errType = "invalid_request_error"
 		errMsg = getPassthroughOrDefault(upstreamMsg, "Invalid request")
 	case 401:
-		statusCode = http.StatusBadGateway
-		errType = "authentication_error"
-		errMsg = "Upstream authentication failed"
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 403:
-		statusCode = http.StatusBadGateway
-		errType = "permission_error"
-		errMsg = "Upstream access forbidden"
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 429:
-		statusCode = http.StatusTooManyRequests
-		errType = "rate_limit_error"
-		errMsg = "Upstream rate limit exceeded"
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 529:
-		statusCode = http.StatusServiceUnavailable
-		errType = "overloaded_error"
-		errMsg = "Upstream service overloaded"
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	default:
 		statusCode = http.StatusBadGateway
 		errType = "upstream_error"

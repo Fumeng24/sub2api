@@ -961,7 +961,7 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 				if upstreamReqID == "" {
 					upstreamReqID = resp.Header.Get("x-goog-request-id")
 				}
-				return nil, s.writeGeminiMappedError(c, account, http.StatusInternalServerError, upstreamReqID, respBody)
+				return nil, s.writeGeminiMappedError(c, account, resp.StatusCode, upstreamReqID, respBody)
 			case ErrorPolicyMatched, ErrorPolicyTempUnscheduled:
 				s.handleGeminiUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
 				upstreamReqID := resp.Header.Get(requestIDHeader)
@@ -1476,14 +1476,31 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 			switch s.rateLimitService.CheckErrorPolicy(ctx, account, resp.StatusCode, respBody) {
 			case ErrorPolicySkipped:
 				respBody = unwrapIfNeeded(isOAuth, respBody)
-				contentType := resp.Header.Get("Content-Type")
-				if contentType == "" {
-					contentType = "application/json"
+				upstreamMsg := sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(respBody)))
+				upstreamDetail := ""
+				if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
+					maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
+					if maxBytes <= 0 {
+						maxBytes = 2048
+					}
+					upstreamDetail = truncateString(string(respBody), maxBytes)
 				}
-				respBody = ClientFacingErrorBody(http.StatusInternalServerError, "upstream_error", respBody)
-				MarkResponseCommitted(c)
-				c.Data(http.StatusInternalServerError, contentType, respBody)
-				return nil, fmt.Errorf("gemini upstream error: %d (skipped by error policy)", resp.StatusCode)
+				setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, upstreamDetail)
+				appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+					Platform:           account.Platform,
+					AccountID:          account.ID,
+					AccountName:        account.Name,
+					UpstreamStatusCode: resp.StatusCode,
+					UpstreamRequestID:  requestID,
+					Kind:               "http_error",
+					Message:            upstreamMsg,
+					Detail:             upstreamDetail,
+				})
+				if status, _, msg, ok := ClientRequestErrorFromUpstream(resp.StatusCode, upstreamMsg, respBody); ok {
+					return nil, s.writeGoogleError(c, status, msg)
+				}
+				normalized := NormalizeUpstreamClientError(resp.StatusCode, "upstream_error", upstreamMsg)
+				return nil, s.writeGoogleError(c, normalized.Status, normalized.Message)
 			case ErrorPolicyMatched, ErrorPolicyTempUnscheduled:
 				s.handleGeminiUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
 				evBody := unwrapIfNeeded(isOAuth, respBody)
@@ -1589,6 +1606,10 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 			Message:            upstreamMsg,
 			Detail:             upstreamDetail,
 		})
+
+		if status, _, msg, ok := ClientRequestErrorFromUpstream(resp.StatusCode, upstreamMsg, respBody); ok {
+			return nil, s.writeGoogleError(c, status, msg)
+		}
 
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == "" {
@@ -1795,6 +1816,13 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 	var statusCode int
 	var errType, errMsg string
 
+	clientRequestMapped := false
+	if status, mappedType, mappedMsg, ok := ClientRequestErrorFromUpstream(upstreamStatus, upstreamMsg, body); ok {
+		statusCode = status
+		errType = mappedType
+		errMsg = mappedMsg
+		clientRequestMapped = true
+	}
 	if mapped := mapGeminiErrorBodyToClaudeError(body); mapped != nil {
 		errType = mapped.Type
 		if mapped.Message != "" {
@@ -1817,25 +1845,11 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 			errMsg = "Invalid request"
 		}
 	case 401:
-		if statusCode == 0 {
-			statusCode = http.StatusBadGateway
-		}
-		if errType == "" {
-			errType = "authentication_error"
-		}
-		if errMsg == "" {
-			errMsg = "Upstream authentication failed, please contact administrator"
-		}
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 403:
-		if statusCode == 0 {
-			statusCode = http.StatusBadGateway
-		}
-		if errType == "" {
-			errType = "permission_error"
-		}
-		if errMsg == "" {
-			errMsg = "Upstream access forbidden, please contact administrator"
-		}
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 404:
 		if statusCode == 0 {
 			statusCode = http.StatusNotFound
@@ -1847,41 +1861,15 @@ func (s *GeminiMessagesCompatService) writeGeminiMappedError(c *gin.Context, acc
 			errMsg = "Resource not found"
 		}
 	case 429:
-		if statusCode == 0 {
-			statusCode = http.StatusTooManyRequests
-		}
-		if errType == "" {
-			errType = "rate_limit_error"
-		}
-		if errMsg == "" {
-			errMsg = "Upstream rate limit exceeded, please retry later"
-		}
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 529:
-		if statusCode == 0 {
-			statusCode = http.StatusServiceUnavailable
-		}
-		if errType == "" {
-			errType = "overloaded_error"
-		}
-		if errMsg == "" {
-			errMsg = "Upstream service overloaded, please retry later"
-		}
+		normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 500, 502, 503, 504:
-		if statusCode == 0 {
-			statusCode = http.StatusBadGateway
-		}
-		if errType == "" {
-			switch upstreamStatus {
-			case 504:
-				errType = "timeout_error"
-			case 503:
-				errType = "overloaded_error"
-			default:
-				errType = "api_error"
-			}
-		}
-		if errMsg == "" {
-			errMsg = "Upstream service temporarily unavailable"
+		if !clientRequestMapped {
+			normalized := NormalizeUpstreamClientError(upstreamStatus, errType, errMsg)
+			statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 		}
 	default:
 		if statusCode == 0 {

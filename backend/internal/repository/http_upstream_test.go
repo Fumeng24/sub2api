@@ -44,7 +44,7 @@ func (s *HTTPUpstreamSuite) newService() *httpUpstreamService {
 }
 
 // TestDefaultResponseHeaderTimeout 测试默认响应头超时配置
-// 验证显式 0 会禁用等待响应头超时
+// 验证零值配置会禁用等待响应头超时；完整默认值由 config.Load 注入。
 func (s *HTTPUpstreamSuite) TestDefaultResponseHeaderTimeout() {
 	svc := s.newService()
 	entry := mustGetOrCreateClient(s.T(), svc, "", 0, 0)
@@ -134,7 +134,7 @@ func (s *HTTPUpstreamSuite) TestOpenAIProfileTLSFingerprintDoesNotInheritGeneric
 	require.Equal(s.T(), 15*time.Second, transport.ResponseHeaderTimeout, "OpenAI TLS path should use explicit OpenAI header timeout")
 }
 
-func (s *HTTPUpstreamSuite) TestOpenAIWeakFallbackProfileDisablesHeaderTimeout() {
+func (s *HTTPUpstreamSuite) TestOpenAIWeakFallbackProfileUsesOpenAIHeaderTimeout() {
 	s.cfg.Gateway = config.GatewayConfig{
 		ResponseHeaderTimeout:       600,
 		OpenAIResponseHeaderTimeout: 15,
@@ -147,7 +147,7 @@ func (s *HTTPUpstreamSuite) TestOpenAIWeakFallbackProfileDisablesHeaderTimeout()
 	require.NoError(s.T(), err)
 	transport, ok := entry.client.Transport.(*http.Transport)
 	require.True(s.T(), ok, "expected *http.Transport")
-	require.Equal(s.T(), time.Duration(0), transport.ResponseHeaderTimeout)
+	require.Equal(s.T(), 15*time.Second, transport.ResponseHeaderTimeout)
 	require.True(s.T(), transport.ForceAttemptHTTP2, "weak fallback should keep OpenAI protocol policy")
 	require.Equal(s.T(), upstreamProtocolModeOpenAIH2, entry.protocolMode)
 }

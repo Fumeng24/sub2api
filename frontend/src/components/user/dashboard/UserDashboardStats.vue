@@ -6,25 +6,25 @@
     <!-- Balance -->
     <div
       v-if="!isSimple"
-      class="relative overflow-hidden rounded-[1.75rem] border border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 shadow-card dark:border-emerald-900/40 dark:from-emerald-950/40 dark:via-dark-800/70 dark:to-teal-950/30"
+      class="relative overflow-hidden rounded-[1.75rem] border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-5 shadow-card dark:border-amber-900/40 dark:from-amber-950/40 dark:via-dark-800/70 dark:to-orange-950/30"
     >
-      <div class="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-500/10" />
-      <div class="pointer-events-none absolute -bottom-20 left-6 h-36 w-36 rounded-full bg-teal-300/20 blur-3xl dark:bg-teal-500/10" />
+      <div class="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-500/10" />
+      <div class="pointer-events-none absolute -bottom-20 left-6 h-36 w-36 rounded-full bg-orange-300/20 blur-3xl dark:bg-orange-500/10" />
 
       <div class="relative flex items-start justify-between gap-4">
         <div class="min-w-0">
-          <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:bg-dark-900/70 dark:text-emerald-300 dark:ring-emerald-900/50">
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm ring-1 ring-amber-100 dark:bg-dark-900/70 dark:text-amber-300 dark:ring-amber-900/50">
+            <span class="h-1.5 w-1.5 rounded-full bg-amber-500" />
             {{ t('dashboard.balance') }}
           </div>
-          <p class="truncate text-3xl font-black tracking-tight text-emerald-700 dark:text-emerald-300 sm:text-4xl">
+          <p class="truncate text-3xl font-black tracking-tight text-amber-700 dark:text-amber-300 sm:text-4xl">
             {{ formatSettlementAmount(balance, 2) }}
           </p>
-          <p class="mt-2 text-sm font-semibold text-emerald-700/80 dark:text-emerald-300/80">
+          <p class="mt-2 text-sm font-semibold text-amber-700/80 dark:text-amber-300/80">
             {{ balanceSubtitle }}
           </p>
         </div>
-        <div class="rounded-2xl bg-emerald-600/10 p-3 text-emerald-700 ring-1 ring-emerald-500/10 dark:bg-emerald-400/10 dark:text-emerald-300">
+        <div class="rounded-2xl bg-amber-600/10 p-3 text-amber-700 ring-1 ring-amber-500/10 dark:bg-amber-400/10 dark:text-amber-300">
           <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
           </svg>
@@ -32,15 +32,15 @@
       </div>
 
       <div class="relative mt-5 grid grid-cols-2 gap-2">
-        <div class="rounded-2xl bg-white/75 px-3 py-2 ring-1 ring-emerald-100 dark:bg-dark-900/50 dark:ring-emerald-900/40">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/70 dark:text-emerald-300/70">
+        <div class="rounded-2xl bg-white/75 px-3 py-2 ring-1 ring-amber-100 dark:bg-dark-900/50 dark:ring-amber-900/40">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-700/70 dark:text-amber-300/70">
             {{ t('common.status') }}
           </p>
           <p class="mt-1 text-sm font-bold text-gray-900 dark:text-white">{{ t('common.available') }}</p>
         </div>
         <button
           type="button"
-          class="group flex items-center justify-between gap-2 rounded-2xl bg-emerald-600 px-3 py-2 text-left text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:-translate-y-0.5 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+          class="group flex items-center justify-between gap-2 rounded-2xl bg-amber-600 px-3 py-2 text-left text-xs font-bold text-white shadow-lg shadow-amber-600/20 transition hover:-translate-y-0.5 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400"
           @click="balanceEquivalentExpanded = !balanceEquivalentExpanded"
         >
           <span class="min-w-0">
@@ -58,10 +58,10 @@
 
       <div
         v-if="balanceEquivalentExpanded"
-        class="relative mt-4 rounded-2xl border border-emerald-100 bg-white/80 p-3 backdrop-blur dark:border-emerald-900/40 dark:bg-dark-900/60"
+        class="relative mt-4 rounded-2xl border border-amber-100 bg-white/80 p-3 backdrop-blur dark:border-amber-900/40 dark:bg-dark-900/60"
       >
         <div class="mb-3 flex items-start gap-2">
-          <div class="rounded-xl bg-emerald-100 p-1.5 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+          <div class="rounded-xl bg-amber-100 p-1.5 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
             <Icon name="sparkles" size="xs" :stroke-width="2" />
           </div>
           <div class="min-w-0">
@@ -77,7 +77,7 @@
           <div
             v-for="item in balanceEquivalentItems"
             :key="item.group.id"
-            class="rounded-xl bg-emerald-50/80 px-3 py-2 text-xs ring-1 ring-emerald-100/70 dark:bg-emerald-950/20 dark:ring-emerald-900/30"
+            class="rounded-xl bg-amber-50/80 px-3 py-2 text-xs ring-1 ring-amber-100/70 dark:bg-amber-950/20 dark:ring-amber-900/30"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -89,13 +89,13 @@
                 </p>
               </div>
               <div class="shrink-0 text-right">
-                <p class="font-mono text-sm font-black text-emerald-700 dark:text-emerald-300">
+                <p class="font-mono text-sm font-black text-amber-700 dark:text-amber-300">
                   {{ item.quotaLabel }}
                 </p>
                 <p class="text-[10px] text-gray-400">{{ item.quotaUnitLabel }}</p>
               </div>
             </div>
-            <p class="mt-1.5 rounded-lg bg-white/60 px-2 py-1 text-[10px] leading-4 text-emerald-800/80 dark:bg-dark-900/40 dark:text-emerald-200/80">
+            <p class="mt-1.5 rounded-lg bg-white/60 px-2 py-1 text-[10px] leading-4 text-amber-800/80 dark:bg-dark-900/40 dark:text-amber-200/80">
               {{ item.formulaLabel }}
             </p>
           </div>

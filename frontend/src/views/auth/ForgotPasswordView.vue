@@ -25,6 +25,9 @@
               <p class="mt-2 text-sm text-green-700 dark:text-green-300">
                 {{ t('auth.resetEmailSentHint') }}
               </p>
+              <p class="mt-2 text-xs leading-5 text-green-700/80 dark:text-green-300">
+                {{ t('auth.emailDeliveryHint') }}
+              </p>
             </div>
           </div>
         </div>

@@ -14,6 +14,7 @@ import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveDocumentTitle } from './title'
 import { applyRouteSeo } from '@/utils/seo'
+import { recoverFromChunkLoadError } from '@/utils/chunkRecovery'
 
 /**
  * Route definitions with lazy loading
@@ -39,9 +40,9 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Home',
-      seoTitle: '大模型 API 聚合平台 - Token 智能调度',
+      seoTitle: '低成本大模型 API 聚合平台 - GPT Claude Gemini Codex API',
       description:
-        'Wegoo AI 支持 GPT、Claude、Gemini、Codex 与图像生成 API，兼容 OpenAI 格式，一键迁移，注册送额度，低成本稳定接入。',
+        'Wegoo AI 支持 GPT/Codex、Claude、Gemini 与 AI 生图，兼容 OpenAI API 格式。1 元 = 1 刀，注册送额度，适合编程、自动化、写作和高频 AI 使用。',
       canonicalPath: '/home'
     }
   },
@@ -64,9 +65,9 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: false,
       title: 'Register',
       titleKey: 'auth.createAccount',
-      seoTitle: '注册 Wegoo AI，免费试用大模型 API 聚合平台',
+      seoTitle: '注册 Wegoo AI，试用低成本大模型 API',
       description:
-        '注册后获取赠送额度，低成本试用 ChatGPT API、Claude API、Gemini API、Codex API 和图像生成 API，兼容原有 OpenAI 调用方式。',
+        '注册后获取赠送额度，按 1 元 = 1 刀的站内余额试用 ChatGPT API、Claude API、Gemini API、Codex API 和 AI 生图，兼容原有 OpenAI 调用方式。',
       canonicalPath: '/register'
     }
   },
@@ -350,6 +351,18 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'My Orders',
       titleKey: 'nav.myOrders',
+      requiresPayment: true
+    }
+  },
+  {
+    path: '/invoices',
+    name: 'Invoices',
+    component: () => import('@/views/user/InvoicesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Invoices',
+      titleKey: 'nav.invoices',
       requiresPayment: true
     }
   },
@@ -720,6 +733,18 @@ const routes: RouteRecordRaw[] = [
       requiresPayment: true
     }
   },
+  {
+    path: '/admin/invoices',
+    name: 'AdminInvoices',
+    component: () => import('@/views/admin/InvoicesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Invoice Management',
+      titleKey: 'nav.invoiceManagement',
+      requiresPayment: true
+    }
+  },
 
   // ==================== 404 Not Found ====================
   {
@@ -970,29 +995,7 @@ router.afterEach((to) => {
  */
 router.onError((error) => {
   console.error('Router error:', error)
-
-  // Check if this is a dynamic import failure (chunk loading error)
-  const isChunkLoadError =
-    error.message?.includes('Failed to fetch dynamically imported module') ||
-    error.message?.includes('Loading chunk') ||
-    error.message?.includes('Loading CSS chunk') ||
-    error.name === 'ChunkLoadError'
-
-  if (isChunkLoadError) {
-    // Avoid infinite reload loop by checking sessionStorage
-    const reloadKey = 'chunk_reload_attempted'
-    const lastReload = sessionStorage.getItem(reloadKey)
-    const now = Date.now()
-
-    // Allow reload if never attempted or more than 10 seconds ago
-    if (!lastReload || now - parseInt(lastReload) > 10000) {
-      sessionStorage.setItem(reloadKey, now.toString())
-      console.warn('Chunk load error detected, reloading page to fetch latest version...')
-      window.location.reload()
-    } else {
-      console.error('Chunk load error persists after reload. Please clear browser cache.')
-    }
-  }
+  recoverFromChunkLoadError(error, 'router')
 })
 
 export default router

@@ -1470,6 +1470,45 @@ func TestOpenAIHandleErrorResponseGroupDisabledFailsOver(t *testing.T) {
 	require.Zero(t, counter.lastCount)
 }
 
+func TestOpenAIHandleErrorResponseContextWindowIsClientError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &rateLimitAccountRepoStub{}
+	rateLimitSvc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, rateLimitService: rateLimitSvc}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/responses", nil)
+
+	account := &Account{
+		ID:       38809,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Name:     "context-window",
+	}
+	respBody := []byte(`{"error":{"type":"invalid_request_error","message":"prompt is too long: 2318541 tokens > 1000000 maximum"}}`)
+	resp := &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+		Header:     http.Header{"X-Request-Id": []string{"rid-context-window"}},
+	}
+
+	result, err := svc.handleErrorResponse(context.Background(), resp, c, account, []byte(`{"model":"gpt-5.5"}`), "gpt-5.5")
+	require.Nil(t, result)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.False(t, errors.As(err, &failoverErr), "context window is a client request error, not account failover")
+	var terminalErr *UpstreamTerminalError
+	require.ErrorAs(t, err, &terminalErr)
+	require.Equal(t, http.StatusBadRequest, terminalErr.StatusCode)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Equal(t, "invalid_request_error", gjson.GetBytes(rec.Body.Bytes(), "error.type").String())
+	require.Contains(t, rec.Body.String(), "272k tokens")
+	require.Zero(t, repo.tempCalls)
+	require.Zero(t, repo.setErrorCalls)
+	require.True(t, HasOpsClientBusinessLimited(c))
+}
+
 func TestOpenAIHandleErrorResponseTemporary403UsesProbeCircuit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &rateLimitAccountRepoStub{}

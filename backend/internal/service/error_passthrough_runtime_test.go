@@ -106,7 +106,28 @@ func TestGeminiWriteGeminiMappedError_NoRuleKeepsDefault(t *testing.T) {
 	errField, ok := payload["error"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "invalid_request_error", errField["type"])
-	assert.Equal(t, clientFacingTemporaryUnavailableMessage, errField["message"])
+	assert.Equal(t, "Invalid request", errField["message"])
+}
+
+func TestGeminiWriteGeminiMappedError_MapsInvalidArgumentWrappedAs500To400(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+
+	svc := &GeminiMessagesCompatService{}
+	respBody := []byte(`{"error":{"code":500,"message":"Request contains an invalid argument.","status":"INVALID_ARGUMENT"}}`)
+	account := &Account{ID: 14, Platform: PlatformGemini, Type: AccountTypeAPIKey}
+
+	err := svc.writeGeminiMappedError(c, account, http.StatusInternalServerError, "req-invalid", respBody)
+	require.Error(t, err)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	errField, ok := payload["error"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "invalid_request_error", errField["type"])
+	assert.Equal(t, "Invalid request", errField["message"])
 }
 
 func TestGatewayHandleErrorResponse_AppliesRuleFor422(t *testing.T) {
@@ -137,6 +158,31 @@ func TestGatewayHandleErrorResponse_AppliesRuleFor422(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "upstream_error", errField["type"])
 	assert.Equal(t, clientFacingTemporaryUnavailableMessage, errField["message"])
+}
+
+func TestApplyErrorPassthroughRule_NormalizesInvalidResponseCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+
+	ruleSvc := &ErrorPassthroughService{}
+	ruleSvc.setLocalCache([]*model.ErrorPassthroughRule{newNonFailoverPassthroughRule(http.StatusUnprocessableEntity, "invalid schema", http.StatusProcessing, "联系QQ群群主解决")})
+	BindErrorPassthroughService(c, ruleSvc)
+
+	status, errType, errMsg, matched := applyErrorPassthroughRule(
+		c,
+		PlatformOpenAI,
+		http.StatusUnprocessableEntity,
+		[]byte(`{"error":{"message":"invalid schema"}}`),
+		http.StatusBadGateway,
+		"upstream_error",
+		"Upstream request failed",
+	)
+
+	assert.True(t, matched)
+	assert.Equal(t, http.StatusBadGateway, status)
+	assert.Equal(t, "upstream_error", errType)
+	assert.Equal(t, clientFacingTemporaryUnavailableMessage, errMsg)
 }
 
 func TestOpenAIHandleErrorResponse_AppliesRuleFor422(t *testing.T) {

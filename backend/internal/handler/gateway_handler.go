@@ -32,7 +32,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const gatewayCompatibilityMetricsLogInterval = 1024
+const (
+	gatewayCompatibilityMetricsLogInterval = 1024
+	gatewayUpstreamResponseBudget          = 100 * time.Second
+)
 
 var gatewayCompatibilityMetricsLogCounter atomic.Uint64
 
@@ -115,6 +118,7 @@ func NewGatewayHandler(
 // Messages handles Claude API compatible messages endpoint
 // POST /v1/messages
 func (h *GatewayHandler) Messages(c *gin.Context) {
+	requestStart := time.Now()
 	// 从context获取apiKey和user（ApiKeyAuth中间件已设置）
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
@@ -166,6 +170,11 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	reqModel := parsedReq.Model
 	reqStream := parsedReq.Stream
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
+	if !reqStream && c != nil && c.Request != nil {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), gatewayUpstreamResponseBudget)
+		defer cancel()
+		c.Request = c.Request.WithContext(ctx)
+	}
 
 	// 解析渠道级模型映射
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
@@ -868,6 +877,11 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return
 					}
+					if gatewayFailoverBudgetExceeded(requestStart) {
+						logGatewayFailoverBudgetExceeded(reqLog, "gateway.failover_budget_exceeded", account.ID, account.Platform, failoverErr, fs.SwitchCount, fs.MaxSwitches, reqModel, schedulerEndpoint)
+						h.handleFailoverExhausted(c, failoverErr, account.Platform, streamStarted)
+						return
+					}
 					actionCtx := service.WithSchedulerEndpoint(c.Request.Context(), schedulerEndpoint)
 					action := fs.HandleFailoverErrorForRequest(actionCtx, h.gatewayService, account.ID, account.Platform, reqModel, schedulerEndpoint, failoverErr, failoverWriterFields(c.Writer.Size(), writerSizeBeforeForward)...)
 					switch action {
@@ -1527,6 +1541,16 @@ func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *se
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
 	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
+	if status, errType, msg, ok := service.ClaudeCodeVersionClientError(upstreamMsg, responseBody); ok {
+		service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
+		h.handleStreamingAwareError(c, status, errType, msg, streamStarted)
+		return
+	}
+	if status, errType, msg, ok := service.ContextWindowExceededClientError(requestModelFromContext(c), upstreamMsg, responseBody); ok {
+		service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
+		h.handleStreamingAwareError(c, status, errType, msg, streamStarted)
+		return
+	}
 	if service.IsOpenAISilentRefusalErrorBody(responseBody) {
 		service.SetOpsUpstreamError(c, statusCode, service.OpenAISilentRefusalClientMessage(), "")
 		h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", service.OpenAISilentRefusalClientMessage(), streamStarted)

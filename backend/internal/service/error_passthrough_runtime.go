@@ -74,5 +74,9 @@ func applyErrorPassthroughRule(
 
 	// 与现有 failover 场景保持一致：命中规则时统一返回 upstream_error。
 	errType = "upstream_error"
+	normalized := NormalizeUpstreamClientError(status, errType, errMsg)
+	status = normalized.Status
+	errType = normalized.Type
+	errMsg = normalized.Message
 	return status, errType, errMsg, true
 }

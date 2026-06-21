@@ -686,8 +686,8 @@ const (
 
 // GatewayConfig API网关相关配置
 type GatewayConfig struct {
-	// 等待上游响应头的超时时间（秒），0表示无超时
-	// 注意：这不影响流式数据传输，只控制等待响应头的时间
+	// 等待上游响应头的超时时间（秒），0表示无超时。
+	// 需低于 Cloudflare 120s proxy read timeout，避免源站仍在等待时客户端先收到 524。
 	ResponseHeaderTimeout int `mapstructure:"response_header_timeout"`
 	// OpenAIResponseHeaderTimeout: OpenAI/Codex 上游等待响应头的超时时间（秒），0表示无超时
 	// OpenAI/Codex 请求可能在上游排队较久；默认不使用通用响应头超时截断。
@@ -1838,7 +1838,7 @@ func setDefaults() {
 	viper.SetDefault("idempotency.cleanup_batch_size", 500)
 
 	// Gateway
-	viper.SetDefault("gateway.response_header_timeout", 600) // 600秒(10分钟)等待上游响应头，LLM高负载时可能排队较久
+	viper.SetDefault("gateway.response_header_timeout", 100) // 低于 Cloudflare 120s，避免长时间等待响应头触发 524
 	viper.SetDefault("gateway.openai_response_header_timeout", 15)
 	viper.SetDefault("gateway.log_upstream_error_body", true)
 	viper.SetDefault("gateway.log_upstream_error_body_max_bytes", 2048)

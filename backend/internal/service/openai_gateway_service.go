@@ -1775,9 +1775,12 @@ func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.C
 		return nil, fmt.Errorf("%w supporting model: %s (channel pricing restriction)", ErrNoAvailableAccounts, requestedModel)
 	}
 
+	cacheAffinityHash := openAICacheAffinityHashFromContext(ctx)
+	cacheAffinityGroup := s.openAICacheAffinityGroupForBinding(ctx, groupID, cacheAffinityHash, stickyAccountID)
+
 	// 1. 尝试粘性会话命中
 	// Try sticky session hit
-	if account := s.tryStickySessionHit(ctx, groupID, sessionHash, requestedModel, excludedIDs, requireCompact, stickyAccountID, requiredCapability, options); account != nil {
+	if account := s.tryStickySessionHit(ctx, groupID, sessionHash, requestedModel, excludedIDs, requireCompact, stickyAccountID, requiredCapability, options, cacheAffinityGroup); account != nil {
 		return account, nil
 	}
 
@@ -1790,19 +1793,19 @@ func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.C
 
 	// 3. 按优先级 + LRU 选择最佳账号
 	// Select by priority + LRU
-	selected, compactBlocked := s.selectBestAccount(ctx, groupID, accounts, requestedModel, excludedIDs, requireCompact, requiredCapability, sessionHash, false, options)
+	selected, compactBlocked := s.selectBestAccount(ctx, groupID, accounts, requestedModel, excludedIDs, requireCompact, requiredCapability, sessionHash, cacheAffinityHash, cacheAffinityGroup, false, options)
 	if selected == nil && s.schedulerSnapshot != nil {
 		freshAccounts, freshErr := s.listFreshSchedulableAccounts(ctx, groupID)
 		if freshErr != nil {
 			return nil, fmt.Errorf("query fresh accounts failed: %w", freshErr)
 		}
 		var freshCompactBlocked bool
-		selected, freshCompactBlocked = s.selectBestAccount(ctx, groupID, freshAccounts, requestedModel, excludedIDs, requireCompact, requiredCapability, sessionHash, true, options)
+		selected, freshCompactBlocked = s.selectBestAccount(ctx, groupID, freshAccounts, requestedModel, excludedIDs, requireCompact, requiredCapability, sessionHash, cacheAffinityHash, cacheAffinityGroup, true, options)
 		compactBlocked = compactBlocked || freshCompactBlocked
 	}
 	if selected == nil {
 		var fallbackCompactBlocked bool
-		selected, fallbackCompactBlocked, err = s.selectOpenAICooldownFallbackAccount(ctx, groupID, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability, options)
+		selected, fallbackCompactBlocked, err = s.selectOpenAICooldownFallbackAccount(ctx, groupID, sessionHash, cacheAffinityHash, cacheAffinityGroup, requestedModel, excludedIDs, requireCompact, requiredCapability, options)
 		if err != nil {
 			return nil, err
 		}
@@ -1823,8 +1826,32 @@ func (s *OpenAIGatewayService) selectAccountForModelWithExclusions(ctx context.C
 	if sessionHash != "" {
 		_ = s.setStickySessionAccountID(ctx, groupID, sessionHash, selected.ID, openaiStickySessionTTL)
 	}
+	if cacheAffinityHash != "" {
+		_ = s.setStickySessionAccountID(ctx, groupID, cacheAffinityHash, selected.ID, openaiStickySessionTTL)
+	}
 
 	return hydrated, nil
+}
+
+func (s *OpenAIGatewayService) openAICacheAffinityGroupForBinding(ctx context.Context, groupID *int64, cacheAffinityHash string, preferredAccountID int64) string {
+	cacheAffinityHash = strings.TrimSpace(cacheAffinityHash)
+	if cacheAffinityHash == "" {
+		return ""
+	}
+	accountID := preferredAccountID
+	if accountID <= 0 && s.cache != nil {
+		if boundAccountID, err := s.getStickySessionAccountID(ctx, groupID, cacheAffinityHash); err == nil && boundAccountID > 0 {
+			accountID = boundAccountID
+		}
+	}
+	if accountID <= 0 {
+		return ""
+	}
+	account, err := s.getSchedulableAccount(ctx, accountID)
+	if err != nil || account == nil {
+		return ""
+	}
+	return openAIAccountCacheAffinityGroup(account)
 }
 
 func (s *OpenAIGatewayService) openAISchedulerEndpoint(ctx context.Context, requireCompact bool, requiredCapability OpenAIEndpointCapability) string {
@@ -1869,7 +1896,7 @@ func (s *OpenAIGatewayService) tryBeginOpenAIAccountSchedulerHalfOpenProbe(accou
 //
 // tryStickySessionHit attempts to get account from sticky session.
 // Returns account if hit and usable; clears session and returns nil if account is unavailable.
-func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID *int64, sessionHash, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, stickyAccountID int64, requiredCapability OpenAIEndpointCapability, options OpenAIAccountScheduleOptions) *Account {
+func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID *int64, sessionHash, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, stickyAccountID int64, requiredCapability OpenAIEndpointCapability, options OpenAIAccountScheduleOptions, cacheAffinityGroup string) *Account {
 	if sessionHash == "" {
 		return nil
 	}
@@ -1905,6 +1932,9 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 		!isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, false, nil, requiredCapability, options) {
 		return nil
 	}
+	if cacheAffinityGroup != "" && openAIAccountCacheAffinityGroup(account) != cacheAffinityGroup {
+		return nil
+	}
 	if s.isOpenAIAccountRuntimeBlocked(account) {
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
@@ -1918,6 +1948,9 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 	account = s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability, options)
 	if account == nil || !openAIStickyAccountMatchesGroup(account, groupID) {
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+		return nil
+	}
+	if cacheAffinityGroup != "" && openAIAccountCacheAffinityGroup(account) != cacheAffinityGroup {
 		return nil
 	}
 	if groupID != nil && s.needsUpstreamChannelRestrictionCheck(ctx, groupID) &&
@@ -1939,11 +1972,13 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 // Returns nil if no available account. The second return reports whether at
 // least one candidate was filtered out solely because it lacks compact support
 // (only meaningful when requireCompact=true).
-func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *int64, accounts []*Account, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, sessionHash string, bypassSnapshot bool, options OpenAIAccountScheduleOptions) (*Account, bool) {
+func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *int64, accounts []*Account, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, sessionHash string, cacheAffinityHash string, cacheAffinityGroup string, bypassSnapshot bool, options OpenAIAccountScheduleOptions) (*Account, bool) {
 	schedulerEndpoint := s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)
 	req := OpenAIAccountScheduleRequest{
 		GroupID:                           groupID,
 		SessionHash:                       sessionHash,
+		CacheAffinityHash:                 cacheAffinityHash,
+		CacheAffinityGroup:                cacheAffinityGroup,
 		RequestedModel:                    requestedModel,
 		SchedulerEndpoint:                 schedulerEndpoint,
 		RequiredTransport:                 OpenAIUpstreamTransportAny,
@@ -1984,10 +2019,12 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 	return nil, compactBlocked
 }
 
-func (s *OpenAIGatewayService) openAICooldownFallbackRequest(groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, options OpenAIAccountScheduleOptions) OpenAIAccountScheduleRequest {
+func (s *OpenAIGatewayService) openAICooldownFallbackRequest(groupID *int64, sessionHash string, cacheAffinityHash string, cacheAffinityGroup string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, options OpenAIAccountScheduleOptions) OpenAIAccountScheduleRequest {
 	req := OpenAIAccountScheduleRequest{
 		GroupID:                           groupID,
 		SessionHash:                       sessionHash,
+		CacheAffinityHash:                 cacheAffinityHash,
+		CacheAffinityGroup:                cacheAffinityGroup,
 		RequestedModel:                    requestedModel,
 		RequiredTransport:                 OpenAIUpstreamTransportAny,
 		RequiredCapability:                requiredCapability,
@@ -2010,18 +2047,18 @@ func (s *OpenAIGatewayService) openAISchedulerGroupForFallback(ctx context.Conte
 	return group
 }
 
-func (s *OpenAIGatewayService) selectOpenAICooldownFallbackAccount(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, options OpenAIAccountScheduleOptions) (*Account, bool, error) {
-	selection, compactBlocked, err := s.selectOpenAICooldownFallbackResult(ctx, groupID, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability, false, options)
+func (s *OpenAIGatewayService) selectOpenAICooldownFallbackAccount(ctx context.Context, groupID *int64, sessionHash string, cacheAffinityHash string, cacheAffinityGroup string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, options OpenAIAccountScheduleOptions) (*Account, bool, error) {
+	selection, compactBlocked, err := s.selectOpenAICooldownFallbackResult(ctx, groupID, sessionHash, cacheAffinityHash, cacheAffinityGroup, requestedModel, excludedIDs, requireCompact, requiredCapability, false, options)
 	if err != nil || selection == nil {
 		return nil, compactBlocked, err
 	}
 	return selection.Account, compactBlocked, nil
 }
 
-func (s *OpenAIGatewayService) selectOpenAICooldownFallbackResult(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, allowWaitPlan bool, options OpenAIAccountScheduleOptions) (*AccountSelectionResult, bool, error) {
+func (s *OpenAIGatewayService) selectOpenAICooldownFallbackResult(ctx context.Context, groupID *int64, sessionHash string, cacheAffinityHash string, cacheAffinityGroup string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability, allowWaitPlan bool, options OpenAIAccountScheduleOptions) (*AccountSelectionResult, bool, error) {
 	options = normalizeOpenAIAccountScheduleOptions(requireCompact, options)
 	scheduler := &defaultOpenAIAccountScheduler{service: s}
-	req := s.openAICooldownFallbackRequest(groupID, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability, options)
+	req := s.openAICooldownFallbackRequest(groupID, sessionHash, cacheAffinityHash, cacheAffinityGroup, requestedModel, excludedIDs, requireCompact, requiredCapability, options)
 	selection, _, compactBlocked, err := scheduler.trySelectOpenAICooldownFallback(ctx, req, s.openAISchedulerGroupForFallback(ctx, groupID), allowWaitPlan)
 	if err != nil || selection == nil || selection.Account == nil {
 		return selection, compactBlocked, err
@@ -2062,8 +2099,32 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			stickyAccountID = accountID
 		}
 	}
+	cacheAffinityHash := openAICacheAffinityHashFromContext(ctx)
+	var cacheAffinityAccountID int64
+	if cacheAffinityHash != "" && s.cache != nil {
+		if accountID, err := s.getStickySessionAccountID(ctx, groupID, cacheAffinityHash); err == nil {
+			cacheAffinityAccountID = accountID
+		}
+	}
+	cacheAffinityGroup := ""
+	if cacheAffinityAccountID > 0 {
+		if account, err := s.getSchedulableAccount(ctx, cacheAffinityAccountID); err == nil && account != nil {
+			cacheAffinityGroup = openAIAccountCacheAffinityGroup(account)
+		}
+	}
+	bindCacheAffinity := func(accountID int64) {
+		if cacheAffinityHash != "" && accountID > 0 {
+			_ = s.setStickySessionAccountID(ctx, groupID, cacheAffinityHash, accountID, openaiStickySessionTTL)
+		}
+	}
 	if s.concurrencyService == nil || !cfg.LoadBatchEnabled {
-		account, err := s.selectAccountForModelWithExclusions(ctx, groupID, sessionHash, requestedModel, excludedIDs, requireCompact, stickyAccountID, requiredCapability, options)
+		effectiveSessionHash := sessionHash
+		effectiveStickyAccountID := stickyAccountID
+		if effectiveStickyAccountID <= 0 && cacheAffinityAccountID > 0 {
+			effectiveSessionHash = cacheAffinityHash
+			effectiveStickyAccountID = cacheAffinityAccountID
+		}
+		account, err := s.selectAccountForModelWithExclusions(ctx, groupID, effectiveSessionHash, requestedModel, excludedIDs, requireCompact, effectiveStickyAccountID, requiredCapability, options)
 		if err != nil {
 			return nil, err
 		}
@@ -2091,6 +2152,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				selection.WeakFallback = true
 				selection.WeakFallbackReason = openAIAccountWeakFallbackReason
 				selection.BypassOpenAIHeaderTO = true
+			}
+			if selectErr == nil && selection != nil {
+				bindCacheAffinity(account.ID)
 			}
 			return selection, selectErr
 		}
@@ -2124,6 +2188,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			selection.WeakFallbackReason = openAIAccountWeakFallbackReason
 			selection.BypassOpenAIHeaderTO = true
 		}
+		if selectErr == nil && selection != nil {
+			bindCacheAffinity(account.ID)
+		}
 		return selection, selectErr
 	}
 
@@ -2138,7 +2205,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		}
 	}
 	if len(accounts) == 0 {
-		if fallback, compactBlocked, fallbackErr := s.selectOpenAICooldownFallbackResult(ctx, groupID, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability, true, options); fallbackErr != nil {
+		if fallback, compactBlocked, fallbackErr := s.selectOpenAICooldownFallbackResult(ctx, groupID, sessionHash, cacheAffinityHash, cacheAffinityGroup, requestedModel, excludedIDs, requireCompact, requiredCapability, true, options); fallbackErr != nil {
 			return nil, fallbackErr
 		} else if fallback != nil {
 			return fallback, nil
@@ -2157,29 +2224,44 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	}
 
 	// ============ Layer 1: Sticky session ============
-	if sessionHash != "" {
-		accountID := stickyAccountID
+	tryStickyAccount := func(bindingHash string, accountID int64, deleteOnHardInvalid bool, enforceCacheAffinityGroup bool) (*AccountSelectionResult, bool, error) {
+		bindingHash = strings.TrimSpace(bindingHash)
 		if accountID > 0 && !isExcluded(accountID) {
 			account, err := s.getSchedulableAccount(ctx, accountID)
 			if err == nil {
 				clearSticky := shouldClearStickySession(account, requestedModel)
-				if clearSticky {
-					_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+				if clearSticky && deleteOnHardInvalid && bindingHash != "" {
+					_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
 				}
 				if !clearSticky &&
 					openAICompactStickyHitAllowed(requireCompact, account, requestedModel) &&
 					isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, false, nil, requiredCapability, options) {
+					if enforceCacheAffinityGroup && cacheAffinityGroup != "" && openAIAccountCacheAffinityGroup(account) != cacheAffinityGroup {
+						return nil, false, nil
+					}
 					account = s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability, options)
 					if account == nil {
-						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+						if deleteOnHardInvalid && bindingHash != "" {
+							_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
+						}
+					} else if enforceCacheAffinityGroup && cacheAffinityGroup != "" && openAIAccountCacheAffinityGroup(account) != cacheAffinityGroup {
+						return nil, false, nil
 					} else if !openAIStickyAccountMatchesGroup(account, groupID) {
-						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+						if deleteOnHardInvalid && bindingHash != "" {
+							_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
+						}
 					} else if s.isOpenAIAccountRuntimeBlocked(account) {
-						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+						if deleteOnHardInvalid && bindingHash != "" {
+							_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
+						}
 					} else if !s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
-						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+						if deleteOnHardInvalid && bindingHash != "" {
+							_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
+						}
 					} else if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel, requireCompact) {
-						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+						if deleteOnHardInvalid && bindingHash != "" {
+							_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
+						}
 					} else {
 						result, err := s.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
 						if err == nil && result != nil && result.Acquired {
@@ -2187,37 +2269,60 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 								if result.ReleaseFunc != nil {
 									result.ReleaseFunc()
 								}
-								_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+								if deleteOnHardInvalid && bindingHash != "" {
+									_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
+								}
 								retryExcluded := cloneExcludedAccountIDs(excludedIDs)
 								if retryExcluded == nil {
 									retryExcluded = make(map[int64]struct{}, 1)
 								}
 								retryExcluded[account.ID] = struct{}{}
-								return s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, retryExcluded, requireCompact, requiredCapability, options)
+								selection, retryErr := s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, retryExcluded, requireCompact, requiredCapability, options)
+								return selection, true, retryErr
 							}
 							selection, selectErr := s.newAcquiredSelectionResult(ctx, account, result.ReleaseFunc)
 							if selectErr != nil {
-								return nil, selectErr
+								return nil, true, selectErr
 							}
-							_ = s.refreshStickySessionTTL(ctx, groupID, sessionHash, openaiStickySessionTTL)
-							return selection, nil
+							if bindingHash != "" {
+								_ = s.refreshStickySessionTTL(ctx, groupID, bindingHash, openaiStickySessionTTL)
+							}
+							bindCacheAffinity(account.ID)
+							return selection, true, nil
 						}
 						if err == nil && result == nil && s.isOpenAIAccountRuntimeBlocked(account) {
-							_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
+							if deleteOnHardInvalid && bindingHash != "" {
+								_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
+							}
 						} else {
 							waitingCount, _ := s.concurrencyService.GetAccountWaitingCount(ctx, accountID)
 							if waitingCount < cfg.StickySessionMaxWaiting {
-								return s.newSelectionResult(ctx, account, false, nil, &AccountWaitPlan{
+								selection, selectErr := s.newSelectionResult(ctx, account, false, nil, &AccountWaitPlan{
 									AccountID:      accountID,
 									MaxConcurrency: account.Concurrency,
 									Timeout:        cfg.StickySessionWaitTimeout,
 									MaxWaiting:     cfg.StickySessionMaxWaiting,
 								})
+								if selectErr == nil && selection != nil {
+									bindCacheAffinity(account.ID)
+								}
+								return selection, true, selectErr
 							}
 						}
 					}
 				}
 			}
+		}
+		return nil, false, nil
+	}
+	if sessionHash != "" {
+		if selection, handled, err := tryStickyAccount(sessionHash, stickyAccountID, true, false); err != nil || handled {
+			return selection, err
+		}
+	}
+	if cacheAffinityHash != "" && cacheAffinityAccountID > 0 && cacheAffinityAccountID != stickyAccountID {
+		if selection, handled, err := tryStickyAccount(cacheAffinityHash, cacheAffinityAccountID, true, true); err != nil || handled {
+			return selection, err
 		}
 	}
 
@@ -2269,7 +2374,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	}
 
 	if len(candidates) == 0 {
-		if fallback, compactBlocked, fallbackErr := s.selectOpenAICooldownFallbackResult(ctx, groupID, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability, true, options); fallbackErr != nil {
+		if fallback, compactBlocked, fallbackErr := s.selectOpenAICooldownFallbackResult(ctx, groupID, sessionHash, cacheAffinityHash, cacheAffinityGroup, requestedModel, excludedIDs, requireCompact, requiredCapability, true, options); fallbackErr != nil {
 			return nil, fallbackErr
 		} else if fallback != nil {
 			return fallback, nil
@@ -2292,9 +2397,25 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	accountLoads := accountLoadsFor(candidates)
 
 	orderScores := func(scores []schedulerAccountScore, seedSuffix string) []schedulerAccountScore {
-		order := buildRoleAwareSchedulerOrder(scores, true, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, seedSuffix)
+		orderSeedHash := sessionHash
+		if strings.TrimSpace(orderSeedHash) == "" {
+			orderSeedHash = cacheAffinityHash
+		}
+		order := buildRoleAwareSchedulerOrder(scores, true, schedulerSessionSeedParts(groupID, requestedModel, schedulerEndpoint, orderSeedHash, seedSuffix)...)
 		if requireCompact {
 			order = orderOpenAISchedulerScoresForCompact(order, requestedModel, !openAICompactStrictSupportedOnlyForSelection(requireCompact, excludedIDs), s.schedulerSnapshot != nil)
+		}
+		if cacheAffinityGroup != "" && len(order) > 1 {
+			compatible := make([]schedulerAccountScore, 0, len(order))
+			fallback := make([]schedulerAccountScore, 0, len(order))
+			for _, score := range order {
+				if openAIAccountCacheAffinityGroup(score.Account) == cacheAffinityGroup {
+					compatible = append(compatible, score)
+					continue
+				}
+				fallback = append(fallback, score)
+			}
+			order = append(compatible, fallback...)
 		}
 		return order
 	}
@@ -2338,6 +2459,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				if sessionHash != "" {
 					_ = s.setStickySessionAccountID(ctx, groupID, sessionHash, fresh.ID, openaiStickySessionTTL)
 				}
+				bindCacheAffinity(fresh.ID)
 				return selection, true, nil
 			}
 		}
@@ -2371,6 +2493,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				if sessionHash != "" {
 					_ = s.setStickySessionAccountID(ctx, groupID, sessionHash, fresh.ID, openaiStickySessionTTL)
 				}
+				bindCacheAffinity(fresh.ID)
 				return selection, nil
 			}
 		}
@@ -2434,7 +2557,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		})
 	}
 
-	if fallback, compactBlocked, fallbackErr := s.selectOpenAICooldownFallbackResult(ctx, groupID, sessionHash, requestedModel, excludedIDs, requireCompact, requiredCapability, true, options); fallbackErr != nil {
+	if fallback, compactBlocked, fallbackErr := s.selectOpenAICooldownFallbackResult(ctx, groupID, sessionHash, cacheAffinityHash, cacheAffinityGroup, requestedModel, excludedIDs, requireCompact, requiredCapability, true, options); fallbackErr != nil {
 		return nil, fallbackErr
 	} else if fallback != nil {
 		return fallback, nil
@@ -2907,7 +3030,6 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	if apiKey != nil {
 		imageGenerationAllowed = GroupAllowsImageGeneration(apiKey.Group)
 	}
-	codexImageGenerationBridgeEnabled := isCodexCLI && imageGenerationAllowed && s.isCodexImageGenerationBridgeEnabled(ctx, account, apiKey)
 	imageIntent := IsImageGenerationIntent(openAIResponsesEndpoint, reqModel, body)
 	if imageIntent && !imageGenerationAllowed {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
@@ -2979,14 +3101,10 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		return nil, errors.New("image generation disabled for group")
 	}
 
-	if imageGenerationAllowed && (codexImageGenerationBridgeEnabled || isOpenAIImageGenerationModel(requestView.Model) || openAIRequestBodyImageGenerationToolNeedsNormalization(body) || isOpenAIImageGenerationModel(upstreamModel)) {
+	if imageGenerationAllowed && (isOpenAIImageGenerationModel(requestView.Model) || openAIRequestBodyImageGenerationToolNeedsNormalization(body) || isOpenAIImageGenerationModel(upstreamModel)) {
 		decoded, decodeErr := ensureReqBody()
 		if decodeErr != nil {
 			return nil, decodeErr
-		}
-		if codexImageGenerationBridgeEnabled && ensureOpenAIResponsesImageGenerationTool(decoded) {
-			markDecodedModified()
-			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Injected /responses image_generation tool for Codex client")
 		}
 		if normalizeOpenAIResponsesImageGenerationTools(decoded) {
 			markDecodedModified()
@@ -3008,12 +3126,8 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			imageIntent = true
 			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] /responses image_generation request inbound_model=%s mapped_model=%s account_type=%s", requestView.Model, upstreamModel, account.Type)
 		}
-		if codexImageGenerationBridgeEnabled && applyCodexImageGenerationBridgeInstructions(decoded) {
-			markDecodedModified()
-			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Added Codex image_generation bridge instructions")
-		}
 	} else if imageGenerationAllowed && imageIntent && openAIRequestBodyHasExplicitImageGenerationTool(body) {
-		// 完整 image_generation tool 只做 raw 计费读取，校验/桥接/旧字段迁移命中时才展开大 input map。
+		// 完整 image_generation tool 只做 raw 计费读取，校验/旧字段迁移命中时才展开大 input map。
 		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] /responses image_generation request inbound_model=%s mapped_model=%s account_type=%s", requestView.Model, upstreamModel, account.Type)
 	}
 
@@ -3094,8 +3208,10 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			}
 		}
 	}
-	if wsDecision.Transport != OpenAIUpstreamTransportResponsesWebsocketV2 && gjson.GetBytes(body, "previous_response_id").Exists() {
-		markPatchDelete("previous_response_id")
+	if previousResponseID := gjson.GetBytes(body, "previous_response_id"); previousResponseID.Exists() {
+		if previousResponseID.Type != gjson.String || strings.TrimSpace(previousResponseID.String()) == "" {
+			markPatchDelete("previous_response_id")
+		}
 	}
 	if openAIRequestBodyMayContainEmptyBase64InputImage(body) {
 		decoded, decodeErr := ensureReqBody()
@@ -3393,6 +3509,47 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	}
 
 	httpInvalidEncryptedContentRetryTried := false
+	httpPreviousResponseRecoveryTried := false
+	recoverHTTPPreviousResponseID := func(statusCode int, upstreamMsg string, respBody []byte) bool {
+		if httpPreviousResponseRecoveryTried {
+			return false
+		}
+		if !isOpenAICompatPreviousResponseNotFound(statusCode, upstreamMsg, respBody) &&
+			!isOpenAICompatPreviousResponseUnsupported(statusCode, upstreamMsg, respBody) {
+			return false
+		}
+		previousResponseID := strings.TrimSpace(gjson.GetBytes(body, "previous_response_id").String())
+		if previousResponseID == "" {
+			return false
+		}
+		decoded, decodeErr := ensureReqBody()
+		if decodeErr != nil {
+			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Skip HTTP previous_response_id recovery because request body decode failed (account: %s)", account.Name)
+			return false
+		}
+		if HasFunctionCallOutput(decoded) {
+			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Skip HTTP previous_response_id recovery because request contains function_call_output (account: %s)", account.Name)
+			return false
+		}
+		delete(decoded, "previous_response_id")
+		nextBody, marshalErr := marshalOpenAIUpstreamJSON(decoded)
+		if marshalErr != nil {
+			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Skip HTTP previous_response_id recovery because request body serialize failed (account: %s)", account.Name)
+			return false
+		}
+		body = nextBody
+		requestView = newOpenAIRequestView(body)
+		reqBody = nil
+		bodyModified = false
+		httpPreviousResponseRecoveryTried = true
+		logger.LegacyPrintf(
+			"service.openai_gateway",
+			"[OpenAI] Retrying HTTP request once without previous_response_id after upstream rejected continuation (account: %s, previous_response_id_kind: %s)",
+			account.Name,
+			ClassifyOpenAIPreviousResponseIDKind(previousResponseID),
+		)
+		return true
+	}
 	for {
 		// Build upstream request
 		upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
@@ -3431,6 +3588,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
 			upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
 			upstreamCode := extractUpstreamErrorCode(respBody)
+			if recoverHTTPPreviousResponseID(resp.StatusCode, upstreamMsg, respBody) {
+				continue
+			}
 			if !httpInvalidEncryptedContentRetryTried && resp.StatusCode == http.StatusBadRequest && upstreamCode == "invalid_encrypted_content" {
 				decoded, decodeErr := ensureReqBody()
 				if decodeErr != nil {
@@ -4066,6 +4226,9 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 	if isOpenAIResponsesCompactPath(c) && isOpenAIContextWindowError(upstreamMsg, body) {
 		return s.newOpenAICompactContextWindowFailoverError(c, account, resp, body, true, upstreamMsg, upstreamDetail)
 	}
+	if status, _, _, ok := writeContextWindowExceededClientError(c, requestModelFromOpenAIBody(requestBody), upstreamMsg, body, writeClientOpenAIError); ok {
+		return newUpstreamTerminalError(status, upstreamMsg)
+	}
 	// 透传模式保留原始上游错误响应，但运行态账号状态仍需更新，
 	// 避免粘性路由继续复用刚被限流的账号。cyber 例外：不冷却账号。
 	if !cyberHit {
@@ -4331,13 +4494,19 @@ func isOpenAIContextWindowError(message string, payload []byte) bool {
 		"context length",
 		"maximum context",
 		"max context",
+		"context window exceeded",
+		"context limit",
 		"input exceeds",
 		"exceeds the context",
+		"request exceeds",
 		"too many input tokens",
+		"too many tokens",
+		"input is too long",
 		"input too large",
 		"request too large",
 		"token limit exceeded",
 		"tokens exceed",
+		"maximum number of tokens",
 		"prompt is too long",
 		"prompt too long",
 	)
@@ -4417,10 +4586,14 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 		}
 		appendOpsUpstreamError(c, event)
 	}
+	clientMessage := ClientFacingErrorMessage(http.StatusBadGateway, "upstream_error", message)
+	if IsContextWindowExceededError(message, payload) {
+		clientMessage = message
+	}
 	body, _ := json.Marshal(gin.H{
 		"error": gin.H{
 			"type":    "upstream_error",
-			"message": ClientFacingErrorMessage(http.StatusBadGateway, "upstream_error", message),
+			"message": clientMessage,
 		},
 	})
 	return &UpstreamFailoverError{
@@ -5101,6 +5274,9 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	if reqModel == "" {
 		reqModel, _, _ = extractOpenAIRequestMetaFromBody(requestBody)
 	}
+	if status, _, _, ok := writeContextWindowExceededClientError(c, reqModel, upstreamMsg, body, writeClientOpenAIError); ok {
+		return nil, newUpstreamTerminalError(status, upstreamMsg)
+	}
 	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
 	if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, upstreamMsg, body) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -5236,20 +5412,20 @@ func openAIErrorResponseForClass(statusCode int, class openAIUpstreamErrorClass,
 	msg := strings.TrimSpace(upstreamMsg)
 	switch class {
 	case openAIUpstreamErrorBilling:
-		return http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable"
+		return http.StatusBadGateway, "upstream_error", clientFacingTemporaryUnavailableMessage
 	case openAIUpstreamErrorForbidden:
-		return http.StatusForbidden, "forbidden_error", "Upstream access forbidden, please contact administrator"
+		return http.StatusBadGateway, "upstream_error", clientFacingTemporaryUnavailableMessage
 	case openAIUpstreamErrorBusiness:
 		if msg == "" {
 			msg = "Upstream request is not enabled or not supported"
 		}
 		return clientFacingOpenAI4xxStatus(statusCode, http.StatusBadRequest), "invalid_request_error", msg
 	case openAIUpstreamErrorRateLimit:
-		return http.StatusTooManyRequests, "rate_limit_error", "Upstream rate limit exceeded, please retry later"
+		return http.StatusServiceUnavailable, "upstream_error", clientFacingTemporaryUnavailableMessage
 	case openAIUpstreamErrorAuth:
-		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
+		return http.StatusBadGateway, "upstream_error", clientFacingTemporaryUnavailableMessage
 	case openAIUpstreamErrorTransient:
-		return http.StatusBadGateway, "api_error", "Upstream service temporarily unavailable"
+		return http.StatusBadGateway, "api_error", clientFacingTemporaryUnavailableMessage
 	case openAIUpstreamErrorModelUnsupported:
 		if msg == "" {
 			msg = "Requested model is not supported by upstream"
@@ -5263,23 +5439,23 @@ func openAIErrorResponseForClass(statusCode int, class openAIUpstreamErrorClass,
 		}
 		return http.StatusBadRequest, "invalid_request_error", msg
 	case 401:
-		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
+		return http.StatusBadGateway, "upstream_error", clientFacingTemporaryUnavailableMessage
 	case 402:
-		return http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable"
+		return http.StatusBadGateway, "upstream_error", clientFacingTemporaryUnavailableMessage
 	case 403:
-		return http.StatusForbidden, "forbidden_error", "Upstream access forbidden, please contact administrator"
+		return http.StatusBadGateway, "upstream_error", clientFacingTemporaryUnavailableMessage
 	case 404:
 		if msg == "" || !compat {
 			msg = "Upstream resource not found"
 		}
 		return http.StatusNotFound, "not_found_error", msg
 	case 429:
-		return http.StatusTooManyRequests, "rate_limit_error", "Upstream rate limit exceeded, please retry later"
+		return http.StatusServiceUnavailable, "upstream_error", clientFacingTemporaryUnavailableMessage
 	case 529:
-		return http.StatusServiceUnavailable, "api_error", "Upstream service overloaded, please retry later"
+		return http.StatusServiceUnavailable, "api_error", clientFacingTemporaryUnavailableMessage
 	}
 	if statusCode >= 500 {
-		return http.StatusBadGateway, "api_error", "Upstream service temporarily unavailable"
+		return http.StatusBadGateway, "api_error", clientFacingTemporaryUnavailableMessage
 	}
 	if compat && msg != "" && statusCode >= 400 && statusCode < 500 {
 		return statusCode, "api_error", msg
@@ -5288,10 +5464,15 @@ func openAIErrorResponseForClass(statusCode int, class openAIUpstreamErrorClass,
 }
 
 func openAIContextWindowClientMessageForModel(model string, body []byte) string {
-	if strings.EqualFold(strings.TrimSpace(model), "gpt-5.5") && isOpenAIContextWindowError("", body) {
-		return "gpt-5.5 context window is 272k tokens. Your input exceeds this limit; please use gpt-5.4 to compress the context first, then retry with gpt-5.5."
+	if IsContextWindowExceededError("", body) {
+		return ContextWindowExceededClientMessage(model)
 	}
 	return ""
+}
+
+func requestModelFromOpenAIBody(body []byte) string {
+	model, _, _ := extractOpenAIRequestMetaFromBody(body)
+	return strings.TrimSpace(model)
 }
 
 func clientFacingOpenAI4xxStatus(statusCode int, fallback int) int {
@@ -5355,6 +5536,9 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 	setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, upstreamDetail)
 
 	reqCtx := openAIContextFromGin(context.Background(), c)
+	if status, _, _, ok := writeContextWindowExceededClientError(c, requestModelFromVariadic(requestedModel), upstreamMsg, body, writeError); ok {
+		return nil, newUpstreamTerminalError(status, upstreamMsg)
+	}
 	upstreamClass := classifyOpenAIUpstreamError(resp.StatusCode, upstreamMsg, body)
 	if openAIUpstreamErrorClassImmediateFailover(upstreamClass) {
 		modelForCooldown := ""

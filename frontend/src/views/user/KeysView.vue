@@ -3,21 +3,21 @@
     <TablePageLayout>
       <template #filters>
         <div class="flex flex-col gap-3">
-          <div class="flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/85 p-4 shadow-sm dark:border-sky-500/25 dark:bg-sky-950/30 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-start gap-3">
-              <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-white shadow-sm shadow-sky-500/25">
-                <Icon name="chart" size="md" />
+          <div class="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50/85 px-3 py-2 shadow-sm dark:border-sky-500/25 dark:bg-sky-950/30 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start gap-2">
+              <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500 text-white shadow-sm shadow-sky-500/20">
+                <Icon name="chart" size="sm" />
               </div>
               <div>
-                <p class="text-sm font-semibold text-sky-950 dark:text-sky-100">{{ t('keys.serviceStatusTip.title') }}</p>
-                <p class="mt-1 text-sm leading-6 text-sky-800 dark:text-sky-200">
+                <p class="text-xs font-semibold text-sky-950 dark:text-sky-100">{{ t('keys.serviceStatusTip.title') }}</p>
+                <p class="mt-0.5 text-xs leading-5 text-sky-800 dark:text-sky-200">
                   {{ t('keys.serviceStatusTip.description') }}
                 </p>
               </div>
             </div>
             <button
               type="button"
-              class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-sky-600/20 transition-colors hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-400"
+              class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-sky-600/20 transition-colors hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-400"
               @click="router.push('/monitor')"
             >
               {{ t('keys.serviceStatusTip.action') }}
@@ -524,6 +524,35 @@
               </p>
             </div>
           </div>
+          <div
+            v-if="selectedGroupForForm"
+            class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-100"
+          >
+            <div class="flex items-start gap-2">
+              <Icon name="calculator" size="sm" class="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-300" />
+              <div>
+                <p class="font-semibold">
+                  {{ t('keys.groupCostPreview.title', { group: selectedGroupForForm.label }) }}
+                </p>
+                <p class="mt-1">
+                  {{ selectedGroupCostPreview }}
+                </p>
+                <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-200">
+                  {{ t('keys.groupCostPreview.note') }}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 grid gap-2 sm:grid-cols-3">
+            <div
+              v-for="tip in groupChoiceTips"
+              :key="tip.title"
+              class="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 dark:border-dark-700 dark:bg-dark-900/45"
+            >
+              <p class="text-xs font-bold text-gray-900 dark:text-white">{{ tip.title }}</p>
+              <p class="mt-1 text-[11px] leading-5 text-gray-500 dark:text-dark-400">{{ tip.description }}</p>
+            </div>
+          </div>
         </div>
 
         <!-- Custom Key Section (only for create) -->
@@ -1017,47 +1046,145 @@
       @close="closeUseKeyModal"
     />
 
-    <!-- CC Switch Client Selection Dialog for Antigravity -->
+    <!-- CC Switch Import Dialog -->
     <BaseDialog
-      :show="showCcsClientSelect"
-      :title="t('keys.ccsClientSelect.title')"
-      width="narrow"
-      @close="closeCcsClientSelect"
+      :show="showCcsImportDialog"
+      :title="t('keys.ccSwitchDialog.title')"
+      width="wide"
+      @close="closeCcsImportDialog"
     >
       <div class="space-y-4">
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-          {{ t('keys.ccsClientSelect.description') }}
-	        </p>
-	        <div class="grid grid-cols-2 gap-3">
-	          <button
-	            @click="handleCcsClientSelect('claude')"
-	            class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-200 dark:border-dark-600 hover:border-primary-500 dark:hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
-	          >
-	            <Icon name="terminal" size="xl" class="text-gray-600 dark:text-gray-400" />
-	            <span class="font-medium text-gray-900 dark:text-white">{{
-	              t('keys.ccsClientSelect.claudeCode')
-	            }}</span>
-	            <span class="text-xs text-gray-500 dark:text-gray-400">{{
-	              t('keys.ccsClientSelect.claudeCodeDesc')
-	            }}</span>
-	          </button>
-	          <button
-	            @click="handleCcsClientSelect('gemini')"
-	            class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-200 dark:border-dark-600 hover:border-primary-500 dark:hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all"
-	          >
-	            <Icon name="sparkles" size="xl" class="text-gray-600 dark:text-gray-400" />
-	            <span class="font-medium text-gray-900 dark:text-white">{{
-	              t('keys.ccsClientSelect.geminiCli')
-	            }}</span>
-	            <span class="text-xs text-gray-500 dark:text-gray-400">{{
-	              t('keys.ccsClientSelect.geminiCliDesc')
-	            }}</span>
-	          </button>
-	        </div>
-	      </div>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="space-y-2">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              {{ t('keys.ccSwitchDialog.description') }}
+            </p>
+            <div
+              v-if="selectedCcsRow?.group"
+              class="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-dark-400"
+            >
+              <span>{{ t('keys.ccSwitchDialog.currentGroup') }}</span>
+              <GroupBadge
+                :name="selectedCcsRow.group.name"
+                :platform="selectedCcsRow.group.platform"
+                :subscription-type="selectedCcsRow.group.subscription_type"
+                :group-id="selectedCcsRow.group.id"
+                :rate-multiplier="selectedCcsRow.group.rate_multiplier"
+                :show-rate="false"
+              />
+            </div>
+          </div>
+          <a
+            :href="ccSwitchOfficialUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+          >
+            <Icon name="externalLink" size="sm" />
+            {{ t('keys.ccSwitchDialog.openOfficial') }}
+          </a>
+        </div>
+
+        <div
+          v-if="ccsImportTargets.length === 0"
+          class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-800/50 dark:bg-yellow-900/20 dark:text-yellow-300"
+        >
+          {{ t('keys.ccSwitchDialog.noGroup') }}
+        </div>
+
+        <div v-else class="grid gap-3 md:grid-cols-2">
+          <div
+            v-for="target in ccsImportTargets"
+            :key="target.targetId"
+            class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-800"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
+                  <span class="inline-flex items-center gap-1.5">
+                    <Icon :name="ccSwitchTargetIcon[target.targetId]" size="sm" class="text-gray-500 dark:text-dark-400" />
+                    {{ getCcSwitchTargetName(target.targetId) }}
+                  </span>
+                </h4>
+                <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-dark-400">
+                  {{ getCcSwitchTargetDescription(target.targetId) }}
+                </p>
+              </div>
+              <span class="rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 dark:bg-dark-700 dark:text-dark-300">
+                {{ target.app }}
+              </span>
+            </div>
+
+            <dl class="mt-4 space-y-2 text-xs">
+              <div class="flex gap-2">
+                <dt class="w-16 shrink-0 text-gray-400 dark:text-dark-500">
+                  {{ t('keys.ccSwitchDialog.endpoint') }}
+                </dt>
+                <dd class="min-w-0 flex-1 break-all font-mono text-gray-700 dark:text-dark-200">
+                  {{ target.endpoint }}
+                </dd>
+              </div>
+              <div v-if="target.model" class="flex gap-2">
+                <dt class="w-16 shrink-0 text-gray-400 dark:text-dark-500">
+                  {{ t('keys.ccSwitchDialog.model') }}
+                </dt>
+                <dd class="min-w-0 flex-1 break-all font-mono text-gray-700 dark:text-dark-200">
+                  {{ target.model }}
+                </dd>
+              </div>
+              <div class="flex gap-2">
+                <dt class="w-16 shrink-0 text-gray-400 dark:text-dark-500">
+                  {{ t('keys.ccSwitchDialog.protocol') }}
+                </dt>
+                <dd class="min-w-0 flex-1">
+                  <span
+                    :class="[
+                      'inline-flex rounded-md px-2 py-0.5 font-medium',
+                      target.protocol.support === 'native'
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/25 dark:text-emerald-300'
+                        : 'bg-amber-50 text-amber-700 dark:bg-amber-900/25 dark:text-amber-300'
+                    ]"
+                  >
+                    {{ getCcSwitchProtocolLabel(target.protocol.mode) }}
+                  </span>
+                </dd>
+              </div>
+              <div v-if="target.reasoningEffort" class="flex gap-2">
+                <dt class="w-16 shrink-0 text-gray-400 dark:text-dark-500">
+                  {{ t('keys.ccSwitchDialog.reasoning') }}
+                </dt>
+                <dd class="min-w-0 flex-1 font-mono text-gray-700 dark:text-dark-200">
+                  {{ target.reasoningEffort }}
+                </dd>
+              </div>
+            </dl>
+
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button
+                class="btn btn-primary btn-sm inline-flex items-center gap-1.5"
+                @click="openCcSwitchTarget(target.targetId)"
+              >
+                <Icon name="upload" size="sm" />
+                {{ t('keys.ccSwitchDialog.import') }}
+              </button>
+              <button
+                class="btn btn-secondary btn-sm inline-flex items-center gap-1.5"
+                @click="copyCcSwitchTargetLink(target.targetId)"
+              >
+                <Icon :name="copiedCcsTargetId === target.targetId ? 'check' : 'copy'" size="sm" />
+                {{ copiedCcsTargetId === target.targetId ? t('keys.ccSwitchDialog.linkCopied') : t('keys.ccSwitchDialog.copyLink') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-xs text-gray-500 dark:text-dark-400">
+          {{ t('keys.ccSwitchDialog.installHint') }}
+        </p>
+      </div>
       <template #footer>
         <div class="flex justify-end">
-          <button @click="closeCcsClientSelect" class="btn btn-secondary">
+          <button @click="closeCcsImportDialog" class="btn btn-secondary">
             {{ t('common.cancel') }}
           </button>
         </div>
@@ -1189,9 +1316,12 @@ import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
+import { formatRateMultiplier, resolveGroupRateDiscount } from '@/utils/groupRateDiscount'
 import {
   buildCcSwitchImportDeeplink,
-  type CcSwitchClientType
+  listCcSwitchImportTargets,
+  type CcSwitchProtocolMode,
+  type CcSwitchTargetId
 } from '@/utils/ccswitchImport'
 
 const { t } = useI18n()
@@ -1264,6 +1394,37 @@ const columns = computed<Column[]>(() => [
   { key: 'actions', label: t('common.actions'), sortable: false }
 ])
 
+const ccSwitchTargetIcon: Record<CcSwitchTargetId, 'terminal' | 'sparkles' | 'cpu' | 'cube'> = {
+  'claude-code': 'terminal',
+  'claude-desktop': 'terminal',
+  codex: 'cpu',
+  'gemini-cli': 'sparkles',
+  opencode: 'terminal',
+  openclaw: 'cube',
+  hermes: 'sparkles'
+}
+
+const ccSwitchTargetI18nKey: Record<CcSwitchTargetId, string> = {
+  'claude-code': 'claudeCode',
+  'claude-desktop': 'claudeDesktop',
+  codex: 'codex',
+  'gemini-cli': 'geminiCli',
+  opencode: 'opencode',
+  openclaw: 'openclaw',
+  hermes: 'hermes'
+}
+
+const ccSwitchProtocolI18nKey: Record<CcSwitchProtocolMode, string> = {
+  'anthropic-messages': 'anthropicMessages',
+  'openai-responses': 'openaiResponses',
+  'gemini-native': 'geminiNative',
+  'openai-compatible': 'openaiCompatible',
+  'openai-completions': 'openaiCompletions',
+  'chat-completions': 'chatCompletions'
+}
+
+const ccSwitchOfficialUrl = 'https://ccswitch.io'
+
 const apiKeys = ref<ApiKey[]>([])
 const groups = ref<Group[]>([])
 const loading = ref(false)
@@ -1295,10 +1456,11 @@ const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
-const showCcsClientSelect = ref(false)
-const pendingCcsRow = ref<ApiKey | null>(null)
+const showCcsImportDialog = ref(false)
+const selectedCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
+const copiedCcsTargetId = ref<CcSwitchTargetId | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const activeGroupPlatformTab = ref<KeyGroupPlatformTab>('openai')
 const publicSettings = ref<PublicSettings | null>(null)
@@ -1307,10 +1469,34 @@ const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | n
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 let abortController: AbortController | null = null
 
+const groupChoiceTips = computed(() => [
+  {
+    title: t('keys.groupChoiceTips.cost.title'),
+    description: t('keys.groupChoiceTips.cost.description')
+  },
+  {
+    title: t('keys.groupChoiceTips.stability.title'),
+    description: t('keys.groupChoiceTips.stability.description')
+  },
+  {
+    title: t('keys.groupChoiceTips.image.title'),
+    description: t('keys.groupChoiceTips.image.description')
+  }
+])
+
 // Get the currently selected key for group change
 const selectedKeyForGroup = computed(() => {
   if (groupSelectorKeyId.value === null) return null
   return apiKeys.value.find((k) => k.id === groupSelectorKeyId.value) || null
+})
+
+const ccsImportTargets = computed(() => {
+  const row = selectedCcsRow.value
+  if (!row?.group?.platform) return []
+  return listCcSwitchImportTargets({
+    baseUrl: publicSettings.value?.api_base_url || window.location.origin,
+    platform: row.group.platform
+  })
 })
 
 const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance | null) => {
@@ -1477,6 +1663,51 @@ const groupOptions = computed<KeyGroupSelectOption[]>(() => [
   ...groupPlatformTabs.value,
   ...rawGroupOptions.value
 ])
+
+const selectedGroupForForm = computed<GroupOption | null>(() => {
+  if (formData.value.group_id === null) return null
+  return rawGroupOptions.value.find((option) => option.value === formData.value.group_id) ?? null
+})
+
+const selectedGroupEffectiveRate = computed<number | null>(() => {
+  const group = selectedGroupForForm.value
+  if (!group) return null
+  const baseRate = group.userRate ?? group.rate
+  const discount = resolveGroupRateDiscount(
+    group.value,
+    baseRate,
+    appStore.cachedPublicSettings?.group_rate_discount ?? null,
+    {
+      multiplier: group.discountMultiplier,
+      discountedRate: group.discountedRateMultiplier,
+      name: group.discountName,
+      scheduleMode: group.discountScheduleMode,
+      startAt: group.discountStartAt,
+      endAt: group.discountEndAt,
+      weekdays: group.discountWeekdays,
+      dailyStartTime: group.discountDailyStartTime,
+      dailyEndTime: group.discountDailyEndTime,
+      timezone: group.discountTimezone
+    },
+    false,
+    now.value.getTime()
+  )
+  const effectiveRate = Number(discount?.discountedRate ?? baseRate)
+  return Number.isFinite(effectiveRate) && effectiveRate > 0 ? effectiveRate : null
+})
+
+const selectedGroupCostPreview = computed(() => {
+  const rate = selectedGroupEffectiveRate.value
+  if (!rate) return t('keys.groupCostPreview.unavailable')
+  const cnyPerCreditValue = Number(cnyPerCredit.value)
+  const safeCnyPerCredit = Number.isFinite(cnyPerCreditValue) && cnyPerCreditValue > 0 ? cnyPerCreditValue : 6.8
+  const officialDiscount = (rate / safeCnyPerCredit) * 10
+  return t('keys.groupCostPreview.description', {
+    rate: `${formatRateMultiplier(rate)}x`,
+    cny: formatRateMultiplier(safeCnyPerCredit),
+    discount: `${Number(officialDiscount.toFixed(2))}`,
+  })
+})
 
 // Group dropdown search
 const groupSearchQuery = ref('')
@@ -1969,24 +2200,12 @@ const resetRateLimitUsage = async () => {
 }
 
 const importToCcswitch = (row: ApiKey) => {
-  const platform = row.group?.platform || 'anthropic'
-
-  // For antigravity platform, show client selection dialog
-  if (platform === 'antigravity') {
-    pendingCcsRow.value = row
-    showCcsClientSelect.value = true
-    return
-  }
-
-  // For other platforms, execute directly
-  executeCcsImport(row, platform === 'gemini' ? 'gemini' : 'claude')
+  selectedCcsRow.value = row
+  copiedCcsTargetId.value = null
+  showCcsImportDialog.value = true
 }
 
-const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {
-  const baseUrl = publicSettings.value?.api_base_url || window.location.origin
-  const platform = row.group?.platform || 'anthropic'
-
-  const usageScript = `({
+const buildCcSwitchUsageScript = () => `({
     request: {
       url: "{{baseUrl}}/v1/usage",
       method: "GET",
@@ -2002,42 +2221,78 @@ const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {
       };
     }
   })`
-  const providerName = (publicSettings.value?.site_name || 'sub2api').trim() || 'sub2api'
-  const deeplink = buildCcSwitchImportDeeplink({
+
+const getCcSwitchProviderName = (targetId: CcSwitchTargetId): string => {
+  const siteName = (publicSettings.value?.site_name || 'sub2api').trim() || 'sub2api'
+  return `${siteName} ${getCcSwitchTargetName(targetId)}`
+}
+
+const buildCcSwitchTargetLink = (targetId: CcSwitchTargetId): string => {
+  const row = selectedCcsRow.value
+  if (!row?.group?.platform) return ''
+
+  const baseUrl = publicSettings.value?.api_base_url || window.location.origin
+  return buildCcSwitchImportDeeplink({
     baseUrl,
-    platform,
-    clientType,
-    providerName,
+    platform: row.group.platform,
+    targetId,
+    providerName: getCcSwitchProviderName(targetId),
     apiKey: row.key,
-    usageScript
+    usageScript: buildCcSwitchUsageScript()
   })
+}
+
+const getCcSwitchTargetName = (targetId: CcSwitchTargetId): string =>
+  t(`keys.ccSwitchDialog.targets.${ccSwitchTargetI18nKey[targetId]}.name`)
+
+const getCcSwitchTargetDescription = (targetId: CcSwitchTargetId): string =>
+  t(`keys.ccSwitchDialog.targets.${ccSwitchTargetI18nKey[targetId]}.description`)
+
+const getCcSwitchProtocolLabel = (protocol: CcSwitchProtocolMode): string =>
+  t(`keys.ccSwitchDialog.protocols.${ccSwitchProtocolI18nKey[protocol]}`)
+
+const openCcSwitchTarget = (targetId: CcSwitchTargetId) => {
+  const deeplink = buildCcSwitchTargetLink(targetId)
+  if (!deeplink) {
+    appStore.showError(t('keys.ccSwitchDialog.noGroup'))
+    return
+  }
 
   try {
     window.open(deeplink, '_self')
 
-    // Check if the protocol handler worked by detecting if we're still focused
     setTimeout(() => {
       if (document.hasFocus()) {
-        // Still focused means the protocol handler likely failed
         appStore.showError(t('keys.ccSwitchNotInstalled'))
       }
-    }, 100)
+    }, 500)
   } catch (error) {
     appStore.showError(t('keys.ccSwitchNotInstalled'))
   }
 }
 
-const handleCcsClientSelect = (clientType: CcSwitchClientType) => {
-  if (pendingCcsRow.value) {
-    executeCcsImport(pendingCcsRow.value, clientType)
+const copyCcSwitchTargetLink = async (targetId: CcSwitchTargetId) => {
+  const deeplink = buildCcSwitchTargetLink(targetId)
+  if (!deeplink) {
+    appStore.showError(t('keys.ccSwitchDialog.noGroup'))
+    return
   }
-  showCcsClientSelect.value = false
-  pendingCcsRow.value = null
+
+  const success = await clipboardCopy(deeplink, t('keys.ccSwitchDialog.linkCopied'))
+  if (success) {
+    copiedCcsTargetId.value = targetId
+    setTimeout(() => {
+      if (copiedCcsTargetId.value === targetId) {
+        copiedCcsTargetId.value = null
+      }
+    }, 1200)
+  }
 }
 
-const closeCcsClientSelect = () => {
-  showCcsClientSelect.value = false
-  pendingCcsRow.value = null
+const closeCcsImportDialog = () => {
+  showCcsImportDialog.value = false
+  selectedCcsRow.value = null
+  copiedCcsTargetId.value = null
 }
 
 function formatResetTime(resetAt: string | null): string {

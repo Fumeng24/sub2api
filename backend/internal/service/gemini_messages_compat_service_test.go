@@ -84,7 +84,7 @@ func TestGeminiForwardAsChatCompletions_UpstreamNetworkErrorReturnsFailover(t *t
 	require.ErrorAs(t, err, &failoverErr)
 	require.Equal(t, 0, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "i/o timeout")
-	require.False(t, failoverErr.RetryableOnSameAccount)
+	require.True(t, failoverErr.RetryableOnSameAccount)
 	require.Equal(t, geminiMaxRetries, httpStub.calls)
 	require.Equal(t, 0, rec.Body.Len(), "service failover path must not write the client response")
 }
@@ -130,6 +130,93 @@ func TestGeminiForwardAsChatCompletions_BillingExhaustionReturnsFailover(t *test
 	require.False(t, c.Writer.Written())
 	require.NotContains(t, rec.Body.String(), "insufficient")
 	require.NotContains(t, rec.Body.String(), "balance")
+}
+
+func TestGeminiForwardNative_SkippedCustomErrorCodePreservesClientBadRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstreamBody := `{"error":{"code":400,"message":"Request contains an invalid argument.","status":"INVALID_ARGUMENT"}}`
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusBadRequest,
+			Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"gemini-rid"}},
+			Body:       io.NopCloser(strings.NewReader(upstreamBody)),
+		},
+	}
+	repo := &geminiCompatBillingRepoStub{}
+	svc := &GeminiMessagesCompatService{
+		httpUpstream:     httpStub,
+		rateLimitService: NewRateLimitService(repo, nil, &config.Config{}, nil, nil),
+		cfg:              &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+	}
+	account := &Account{
+		ID:          38831,
+		Platform:    PlatformGemini,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Credentials: map[string]any{
+			"api_key":                    "gemini-key",
+			"custom_error_codes_enabled": true,
+			"custom_error_codes":         []any{float64(http.StatusTooManyRequests)},
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	body := []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-3.5-flash:generateContent", bytes.NewReader(body))
+
+	result, err := svc.ForwardNative(context.Background(), c, account, "gemini-3.5-flash", "generateContent", false, body)
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Equal(t, "Invalid request", gjson.GetBytes(rec.Body.Bytes(), "error.message").String())
+	require.NotContains(t, rec.Body.String(), "invalid argument")
+	require.NotContains(t, rec.Body.String(), "gemini-rid")
+	require.Equal(t, 1, httpStub.calls)
+}
+
+func TestGeminiChatCompletionsMappedErrorHidesSensitiveUpstreamStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantStatus int
+	}{
+		{
+			name:       "unauthorized",
+			statusCode: http.StatusUnauthorized,
+			body:       `{"error":{"code":401,"message":"Incorrect API key provided: sk-test, request id: req_123","status":"UNAUTHENTICATED"}}`,
+			wantStatus: http.StatusBadGateway,
+		},
+		{
+			name:       "rate_limited",
+			statusCode: http.StatusTooManyRequests,
+			body:       `{"error":{"code":429,"message":"Upstream rate limit exceeded, cf-ray: abc","status":"RESOURCE_EXHAUSTED"}}`,
+			wantStatus: http.StatusServiceUnavailable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+
+			svc := &GeminiMessagesCompatService{}
+			err := svc.writeGeminiChatCompletionsMappedError(c, &Account{ID: 1, Platform: PlatformGemini}, tt.statusCode, "rid", []byte(tt.body))
+
+			require.Error(t, err)
+			require.Equal(t, tt.wantStatus, rec.Code)
+			require.Equal(t, "upstream_error", gjson.GetBytes(rec.Body.Bytes(), "error.type").String())
+			require.Equal(t, clientFacingTemporaryUnavailableMessage, gjson.GetBytes(rec.Body.Bytes(), "error.message").String())
+			for _, leaked := range []string{"Incorrect API key", "sk-test", "request id", "cf-ray", "rate limit"} {
+				require.NotContains(t, rec.Body.String(), leaked)
+			}
+		})
+	}
 }
 
 func TestGeminiForwardAsChatCompletions_OAuthRoutesToGeminiAndReturnsChatFormat(t *testing.T) {

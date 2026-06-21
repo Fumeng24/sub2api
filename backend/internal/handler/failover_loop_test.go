@@ -18,7 +18,8 @@ import (
 
 // mockTempUnscheduler 记录 TempUnscheduleRetryableError 的调用信息。
 type mockTempUnscheduler struct {
-	calls []tempUnscheduleCall
+	calls               []tempUnscheduleCall
+	scheduleFailureCall []scheduleFailureCall
 }
 
 type tempUnscheduleCall struct {
@@ -26,8 +27,24 @@ type tempUnscheduleCall struct {
 	failoverErr *service.UpstreamFailoverError
 }
 
+type scheduleFailureCall struct {
+	accountID   int64
+	model       string
+	endpoint    string
+	failoverErr *service.UpstreamFailoverError
+}
+
 func (m *mockTempUnscheduler) TempUnscheduleRetryableError(_ context.Context, accountID int64, failoverErr *service.UpstreamFailoverError) {
 	m.calls = append(m.calls, tempUnscheduleCall{accountID: accountID, failoverErr: failoverErr})
+}
+
+func (m *mockTempUnscheduler) ReportAccountScheduleFailure(_ context.Context, accountID int64, model, endpoint string, failoverErr *service.UpstreamFailoverError) {
+	m.scheduleFailureCall = append(m.scheduleFailureCall, scheduleFailureCall{
+		accountID:   accountID,
+		model:       model,
+		endpoint:    endpoint,
+		failoverErr: failoverErr,
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -58,14 +75,31 @@ func TestUpstreamClientErrorForPassthroughFailover_HidesPassthrough429(t *testin
 	require.Equal(t, "Service temporarily unavailable, please retry later", clientErr.Message)
 }
 
-func TestUpstreamClientErrorForFailoverStatus_PreservesProtocolOverrides(t *testing.T) {
+func TestUpstreamClientErrorForPassthroughFailover_HidesUpstream401(t *testing.T) {
+	clientErr := upstreamClientErrorForPassthroughFailover(http.StatusUnauthorized, "authentication_error", "Incorrect API key provided")
+
+	require.Equal(t, http.StatusBadGateway, clientErr.Status)
+	require.Equal(t, "upstream_error", clientErr.Type)
+	require.Equal(t, "Service temporarily unavailable, please retry later", clientErr.Message)
+}
+
+func TestUpstreamClientErrorForPassthroughFailover_NormalizesInvalidStatus(t *testing.T) {
+	clientErr := upstreamClientErrorForPassthroughFailover(http.StatusProcessing, "upstream_error", "联系QQ群群主解决")
+
+	require.Equal(t, http.StatusBadGateway, clientErr.Status)
+	require.Equal(t, "upstream_error", clientErr.Type)
+	require.Equal(t, "Service temporarily unavailable, please retry later", clientErr.Message)
+}
+
+func TestUpstreamClientErrorForFailoverStatus_HidesForbiddenOverrides(t *testing.T) {
 	clientErr := upstreamClientErrorForFailoverStatusWithPolicy(http.StatusForbidden, upstreamFailoverClientPolicy{
 		ForbiddenStatus: http.StatusForbidden,
 		ForbiddenType:   "forbidden_error",
 	})
 
-	require.Equal(t, http.StatusForbidden, clientErr.Status)
-	require.Equal(t, "forbidden_error", clientErr.Type)
+	require.Equal(t, http.StatusBadGateway, clientErr.Status)
+	require.Equal(t, "upstream_error", clientErr.Type)
+	require.Equal(t, "Service temporarily unavailable, please retry later", clientErr.Message)
 }
 
 // ---------------------------------------------------------------------------
@@ -391,6 +425,26 @@ func TestHandleFailoverError_SameAccountRetry(t *testing.T) {
 		require.Len(t, mock.calls, 1)
 		require.Equal(t, int64(100), mock.calls[0].accountID)
 		require.Equal(t, err, mock.calls[0].failoverErr)
+	})
+
+	t.Run("同账号重试耗尽后才上报调度失败", func(t *testing.T) {
+		mock := &mockTempUnscheduler{}
+		fs := NewFailoverState(3, false)
+		err := newTestFailoverErr(502, true, false)
+
+		for i := 0; i < maxSameAccountRetries; i++ {
+			action := fs.HandleFailoverErrorForRequest(context.Background(), mock, 100, "openai", "gpt-5.4", "/v1/responses", err)
+			require.Equal(t, FailoverContinue, action)
+			require.Empty(t, mock.scheduleFailureCall)
+		}
+
+		action := fs.HandleFailoverErrorForRequest(context.Background(), mock, 100, "openai", "gpt-5.4", "/v1/responses", err)
+		require.Equal(t, FailoverContinue, action)
+		require.Len(t, mock.scheduleFailureCall, 1)
+		require.Equal(t, int64(100), mock.scheduleFailureCall[0].accountID)
+		require.Equal(t, "gpt-5.4", mock.scheduleFailureCall[0].model)
+		require.Equal(t, "/v1/responses", mock.scheduleFailureCall[0].endpoint)
+		require.Equal(t, err, mock.scheduleFailureCall[0].failoverErr)
 	})
 
 	t.Run("不同账号独立跟踪重试次数", func(t *testing.T) {

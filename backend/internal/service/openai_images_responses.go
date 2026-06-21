@@ -65,7 +65,7 @@ func (e *OpenAIImagesUpstreamError) clientStatusCode() int {
 		return http.StatusBadGateway
 	}
 	if e.StatusCode > 0 {
-		return e.StatusCode
+		return NormalizeUpstreamClientError(e.StatusCode, e.clientErrorType(), e.Message).Status
 	}
 	return http.StatusBadGateway
 }
@@ -75,9 +75,9 @@ func (e *OpenAIImagesUpstreamError) clientErrorType() string {
 		return "upstream_error"
 	}
 	if trimmed := strings.TrimSpace(e.ErrorType); trimmed != "" {
-		return trimmed
+		return NormalizeUpstreamClientError(e.StatusCode, trimmed, e.Message).Type
 	}
-	return "upstream_error"
+	return NormalizeUpstreamClientError(e.StatusCode, "upstream_error", e.Message).Type
 }
 
 func (e *OpenAIImagesUpstreamError) clientMessage() string {

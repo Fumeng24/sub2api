@@ -18,6 +18,8 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
+	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
+	"github.com/Wei-Shaw/sub2api/internal/payment"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -41,7 +43,7 @@ type AdminService interface {
 	GetUserRPMStatus(ctx context.Context, userID int64) (*UserRPMStatus, error)
 	// GetUserBalanceHistory returns paginated balance/concurrency change records for a user.
 	// codeType is optional - pass empty string to return all types.
-	// Also returns totalRecharged (sum of all positive balance top-ups).
+	// Also returns totalRecharged (sum of completed balance recharge orders).
 	GetUserBalanceHistory(ctx context.Context, userID int64, page, pageSize int, codeType string) ([]RedeemCode, int64, float64, error)
 	BindUserAuthIdentity(ctx context.Context, userID int64, input AdminBindAuthIdentityInput) (*AdminBoundAuthIdentity, error)
 
@@ -1276,7 +1278,7 @@ func (s *adminServiceImpl) GetUserBalanceHistory(ctx context.Context, userID int
 		if err != nil {
 			return nil, 0, 0, err
 		}
-		totalRecharged, err := s.redeemCodeRepo.SumPositiveBalanceByUser(ctx, userID)
+		totalRecharged, err := s.sumCompletedBalancePaymentOrdersByUser(ctx, userID)
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -1292,8 +1294,8 @@ func (s *adminServiceImpl) GetUserBalanceHistory(ctx context.Context, userID int
 		return nil, 0, 0, err
 	}
 	total := result.Total
-	// Aggregate total recharged amount (only once, regardless of type filter)
-	totalRecharged, err := s.redeemCodeRepo.SumPositiveBalanceByUser(ctx, userID)
+	// Aggregate true recharge amount once, regardless of history type filter.
+	totalRecharged, err := s.sumCompletedBalancePaymentOrdersByUser(ctx, userID)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -1316,11 +1318,36 @@ func (s *adminServiceImpl) getAllUserBalanceHistory(ctx context.Context, userID 
 	}
 	codes := mergeBalanceHistoryCodes(redeemCodes, affiliateCodes, params)
 
-	totalRecharged, err := s.redeemCodeRepo.SumPositiveBalanceByUser(ctx, userID)
+	totalRecharged, err := s.sumCompletedBalancePaymentOrdersByUser(ctx, userID)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 	return codes, redeemTotal + affiliateTotal, totalRecharged, nil
+}
+
+func (s *adminServiceImpl) sumCompletedBalancePaymentOrdersByUser(ctx context.Context, userID int64) (float64, error) {
+	if s == nil || s.entClient == nil || userID <= 0 {
+		return 0, nil
+	}
+
+	var result []struct {
+		Sum float64 `json:"sum"`
+	}
+	err := s.entClient.PaymentOrder.Query().
+		Where(
+			paymentorder.UserIDEQ(userID),
+			paymentorder.StatusEQ(payment.OrderStatusCompleted),
+			paymentorder.OrderTypeEQ(payment.OrderTypeBalance),
+		).
+		Aggregate(dbent.As(dbent.Sum(paymentorder.FieldAmount), "sum")).
+		Scan(ctx, &result)
+	if err != nil {
+		return 0, err
+	}
+	if len(result) == 0 {
+		return 0, nil
+	}
+	return result[0].Sum, nil
 }
 
 func (s *adminServiceImpl) listRedeemBalanceHistoryForMerge(ctx context.Context, userID int64, needed int) ([]RedeemCode, int64, error) {

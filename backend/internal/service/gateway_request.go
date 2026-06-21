@@ -181,7 +181,7 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 		if modelResult.Type != gjson.String {
 			return fmt.Errorf("invalid model field type")
 		}
-		parsed.Model = modelResult.String()
+		parsed.Model = strings.Clone(modelResult.String())
 	}
 
 	streamResult := gjson.Get(jsonStr, "stream")
@@ -192,12 +192,12 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 		parsed.Stream = streamResult.Bool()
 	}
 
-	parsed.MetadataUserID = gjson.Get(jsonStr, "metadata.user_id").String()
+	parsed.MetadataUserID = strings.Clone(gjson.Get(jsonStr, "metadata.user_id").String())
 
 	thinkingType := gjson.Get(jsonStr, "thinking.type").String()
 	parsed.ThinkingEnabled = thinkingType == "enabled" || thinkingType == "adaptive"
 
-	parsed.OutputEffort = strings.TrimSpace(gjson.Get(jsonStr, "output_config.effort").String())
+	parsed.OutputEffort = strings.Clone(strings.TrimSpace(gjson.Get(jsonStr, "output_config.effort").String()))
 
 	maxTokensResult := gjson.Get(jsonStr, "max_tokens")
 	if maxTokensResult.Exists() && maxTokensResult.Type == gjson.Number {

@@ -481,7 +481,7 @@ func TestOpsUpstreamErrorAnnotatesOpenAITransientFailoverCooldown(t *testing.T) 
 	require.Equal(t, "openai_transient_5xx", events[0].CooldownReason)
 }
 
-func TestOpenAIAdvancedSchedulerPolicy_DisablesLegacySameAccountRetry(t *testing.T) {
+func TestOpenAIAdvancedSchedulerPolicy_RetriesTransientFailuresOnSameAccount(t *testing.T) {
 	t.Cleanup(resetOpenAIAdvancedSchedulerSettingCacheForTest)
 
 	account := &Account{
@@ -504,7 +504,8 @@ func TestOpenAIAdvancedSchedulerPolicy_DisablesLegacySameAccountRetry(t *testing
 	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusPaymentRequired))
 	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusForbidden))
 	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusTooManyRequests))
-	require.False(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusBadGateway))
+	require.True(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, http.StatusBadGateway))
+	require.True(t, advancedSvc.retryableOnSameOpenAIAccountStatus(context.Background(), account, 0))
 }
 
 func TestOpenAIAdvancedSchedulerPolicy_FailoversModelNotFound(t *testing.T) {

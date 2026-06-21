@@ -596,6 +596,7 @@ const groupOptions = computed(() => (prefillData.value.groups || []).map((group)
 })))
 
 const recentOrders = computed<TicketPrefillOrder[]>(() => prefillData.value.recent_orders || [])
+const selectedTemplateHasRecentOrders = computed(() => templateFields.value.some((field) => field.type === 'recent_orders'))
 const selectedRecentOrderIds = computed<number[]>(() => {
   const raw = createContextData.recent_order_ids
   if (!Array.isArray(raw)) return []
@@ -703,6 +704,10 @@ function templateFieldOptions(field: TicketTemplateField) {
   return (field.options || []).map((option) => ({ value: option.value, label: option.label }))
 }
 
+function shouldSeedRecentOrdersContext() {
+  return selectedTemplateHasRecentOrders.value
+}
+
 function buildListFilters() {
   return {
     status: filters.status || undefined,
@@ -742,7 +747,7 @@ async function fetchTicketFormMetadata() {
     if (!createForm.template_key && templates.value.length > 0) {
       createForm.template_key = templates.value[0].key
       applySelectedTemplateDefaults()
-    } else if (createForm.template_key === 'billing_missing_payment') {
+    } else if (shouldSeedRecentOrdersContext()) {
       seedRecentOrdersContext()
     }
   } catch (error: unknown) {
@@ -837,7 +842,7 @@ function applySelectedTemplateDefaults() {
   createForm.category = tpl.category || 'general'
   createForm.priority = tpl.priority || 'normal'
   createForm.context_type = tpl.context_type || ''
-  if (tpl.key === 'billing_missing_payment') {
+  if (shouldSeedRecentOrdersContext()) {
     seedRecentOrdersContext()
   } else {
     createForm.context_id = ''
@@ -915,7 +920,7 @@ function buildContextData() {
       out[field.key] = value
     }
   }
-  if (selectedTemplate.value?.key === 'billing_missing_payment') {
+  if (selectedTemplateHasRecentOrders.value) {
     const selectedIDs = selectedRecentOrderIds.value
     out.recent_order_ids = selectedIDs
     out.recent_orders = recentOrders.value.filter((order) => selectedIDs.includes(order.id))

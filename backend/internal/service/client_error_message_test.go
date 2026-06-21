@@ -89,6 +89,14 @@ func TestClientFacingErrorMessage_PreservesActionableClientErrors(t *testing.T) 
 	}
 }
 
+func TestClientFacingErrorMessage_RewritesContextWindowErrors(t *testing.T) {
+	msg := "prompt is too long: 2318541 tokens > 1000000 maximum"
+	got := ClientFacingErrorMessage(http.StatusBadRequest, "invalid_request_error", msg)
+	if got != clientFacingContextWindowExceededMessage {
+		t.Fatalf("ClientFacingErrorMessage() = %q, want %q", got, clientFacingContextWindowExceededMessage)
+	}
+}
+
 func TestClientFacingErrorMessage_PreservesClaudeCodeVersionUpdate(t *testing.T) {
 	msg := "Your Claude Code version (2.1.31) is below the minimum required version (2.1.85). Please update: npm update -g @anthropic-ai/claude-code"
 	got := ClientFacingErrorMessage(http.StatusBadRequest, "invalid_request_error", msg)
@@ -112,13 +120,35 @@ func TestClientFacingErrorBody_RedactsCommonJSONMessageFields(t *testing.T) {
 
 	got := ClientFacingErrorBody(http.StatusForbidden, "upstream_error", body)
 	gotText := string(got)
-	if !strings.Contains(gotText, `"code":"bad_upstream"`) {
-		t.Fatalf("expected code to be preserved, got %s", gotText)
+	if !strings.Contains(gotText, `"code":502`) {
+		t.Fatalf("expected sensitive upstream code to be normalized, got %s", gotText)
 	}
 	if !strings.Contains(gotText, clientFacingTemporaryUnavailableMessage) {
 		t.Fatalf("expected sanitized message, got %s", gotText)
 	}
 	for _, leaked := range []string{"distribute.wegoo.site", "cf-ray", "request id", "Upstream access forbidden"} {
+		if strings.Contains(gotText, leaked) {
+			t.Fatalf("sanitized body leaked %q: %s", leaked, gotText)
+		}
+	}
+}
+
+func TestClientFacingErrorBody_NormalizesSensitiveUpstreamFields(t *testing.T) {
+	body := []byte(`{"error":{"type":"authentication_error","code":401,"message":"Incorrect API key provided: sk-live, request id: req_123","status":"UNAUTHENTICATED"}}`)
+
+	got := ClientFacingErrorBody(http.StatusUnauthorized, "authentication_error", body)
+	gotText := string(got)
+
+	if !strings.Contains(gotText, `"type":"upstream_error"`) {
+		t.Fatalf("expected normalized error type, got %s", gotText)
+	}
+	if !strings.Contains(gotText, `"code":502`) {
+		t.Fatalf("expected normalized code, got %s", gotText)
+	}
+	if !strings.Contains(gotText, clientFacingTemporaryUnavailableMessage) {
+		t.Fatalf("expected sanitized message, got %s", gotText)
+	}
+	for _, leaked := range []string{"authentication_error", "Incorrect API key", "sk-live", "request id", "UNAUTHENTICATED"} {
 		if strings.Contains(gotText, leaked) {
 			t.Fatalf("sanitized body leaked %q: %s", leaked, gotText)
 		}

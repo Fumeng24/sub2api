@@ -116,6 +116,16 @@ func RegisterUserRoutes(
 			tickets.POST("/:id/reopen", h.Ticket.Reopen)
 		}
 
+		// 开票申请
+		invoices := authenticated.Group("/invoices")
+		{
+			invoices.GET("/summary", h.Invoice.Summary)
+			invoices.GET("", h.Invoice.List)
+			invoices.POST("", h.Invoice.Create)
+			invoices.GET("/:id", h.Invoice.GetByID)
+			invoices.POST("/:id/cancel", h.Invoice.Cancel)
+		}
+
 		// 卡密兑换
 		redeem := authenticated.Group("/redeem")
 		{

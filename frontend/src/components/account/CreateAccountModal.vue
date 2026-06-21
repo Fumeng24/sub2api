@@ -2621,6 +2621,21 @@
         </div>
       </div>
 
+      <!-- OpenAI 缓存兼容组 -->
+      <div
+        v-if="form.platform === 'openai'"
+        class="border-t border-gray-200 pt-4 dark:border-dark-600"
+      >
+        <label class="input-label">{{ t('admin.accounts.openai.cacheAffinityGroup') }}</label>
+        <input
+          v-model="cacheAffinityGroup"
+          type="text"
+          class="input font-mono"
+          :placeholder="t('admin.accounts.openai.cacheAffinityGroupPlaceholder')"
+        />
+        <p class="input-hint">{{ t('admin.accounts.openai.cacheAffinityGroupDesc') }}</p>
+      </div>
+
       <!-- OpenAI WS Mode 三态（off/ctx_pool/passthrough） -->
       <div
         v-if="form.platform === 'openai' && (accountCategory === 'oauth-based' || accountCategory === 'apikey')"
@@ -3502,6 +3517,7 @@ const customErrorCodeInput = ref<number | null>(null)
 const interceptWarmupRequests = ref(false)
 const autoPauseOnExpired = ref(true)
 const openaiPassthroughEnabled = ref(false)
+const cacheAffinityGroup = ref('')
 const openAICompactMode = ref<OpenAICompactMode>('auto')
 const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
 const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>(['chat_completions', 'embeddings'])
@@ -3929,6 +3945,7 @@ watch(
     }
     if (newPlatform !== 'openai') {
       openaiPassthroughEnabled.value = false
+      cacheAffinityGroup.value = ''
       openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
       openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
       openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
@@ -4332,6 +4349,7 @@ const resetForm = () => {
   interceptWarmupRequests.value = false
   autoPauseOnExpired.value = true
   openaiPassthroughEnabled.value = false
+  cacheAffinityGroup.value = ''
   openAICompactMode.value = 'auto'
   openAIResponsesMode.value = 'auto'
   openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
@@ -4410,6 +4428,12 @@ const buildOpenAIExtra = (base?: Record<string, unknown>): Record<string, unknow
   } else {
     delete extra.openai_passthrough
     delete extra.openai_oauth_passthrough
+  }
+  const normalizedCacheAffinityGroup = cacheAffinityGroup.value.trim()
+  if (normalizedCacheAffinityGroup) {
+    extra.cache_affinity_group = normalizedCacheAffinityGroup
+  } else {
+    delete extra.cache_affinity_group
   }
 
   if (accountCategory.value === 'oauth-based' && codexCLIOnlyEnabled.value) {

@@ -62,13 +62,13 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 			return
 		}
 		markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-		googleError(c, http.StatusServiceUnavailable, "No available Gemini accounts: "+err.Error())
+		googleError(c, http.StatusServiceUnavailable, service.ClientFacingTemporaryUnavailableMessage())
 		return
 	}
 
 	res, err := h.geminiCompatService.ForwardAIStudioGET(c.Request.Context(), account, "/v1beta/models")
 	if err != nil {
-		googleError(c, http.StatusBadGateway, err.Error())
+		googleError(c, http.StatusBadGateway, service.ClientFacingTemporaryUnavailableMessage())
 		return
 	}
 	if shouldFallbackGeminiModels(res) {
@@ -115,13 +115,13 @@ func (h *GatewayHandler) GeminiV1BetaGetModel(c *gin.Context) {
 			return
 		}
 		markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-		googleError(c, http.StatusServiceUnavailable, "No available Gemini accounts: "+err.Error())
+		googleError(c, http.StatusServiceUnavailable, service.ClientFacingTemporaryUnavailableMessage())
 		return
 	}
 
 	res, err := h.geminiCompatService.ForwardAIStudioGET(c.Request.Context(), account, "/v1beta/models/"+modelName)
 	if err != nil {
-		googleError(c, http.StatusBadGateway, err.Error())
+		googleError(c, http.StatusBadGateway, service.ClientFacingTemporaryUnavailableMessage())
 		return
 	}
 	if shouldFallbackGeminiModel(modelName, res) {
@@ -216,7 +216,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	userReleaseFunc, err := geminiConcurrency.AcquireUserSlotWithWait(c, authSubject.UserID, authSubject.Concurrency, stream, &streamStarted)
 	if err != nil {
 		reqLog.Warn("gemini.user_slot_acquire_failed", zap.Error(err))
-		googleError(c, http.StatusTooManyRequests, err.Error())
+		googleError(c, http.StatusTooManyRequests, "Too many pending requests, please retry later")
 		return
 	}
 	// 确保请求取消时也会释放槽位，避免长连接被动中断造成泄漏
@@ -366,7 +366,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				}
 				fields = append(fields, gatewaySelectionDiagnosticZapFields(err)...)
 				reqLog.Warn("gemini.select_account_no_available", fields...)
-				googleError(c, http.StatusServiceUnavailable, "No available Gemini accounts: "+err.Error())
+				googleError(c, http.StatusServiceUnavailable, service.ClientFacingTemporaryUnavailableMessage())
 				return
 			}
 			action := fs.HandleSelectionExhausted(c.Request.Context())
@@ -414,7 +414,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if !selection.Acquired {
 			if selection.WaitPlan == nil {
 				markOpsRoutingCapacityLimited(c)
-				googleError(c, http.StatusServiceUnavailable, "No available Gemini accounts")
+				googleError(c, http.StatusServiceUnavailable, service.ClientFacingTemporaryUnavailableMessage())
 				return
 			}
 			accountWaitCounted := false
@@ -448,7 +448,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			)
 			if err != nil {
 				reqLog.Warn("gemini.account_slot_acquire_failed", zap.Int64("account_id", account.ID), zap.Error(err))
-				googleError(c, http.StatusTooManyRequests, err.Error())
+				googleError(c, http.StatusServiceUnavailable, service.ClientFacingTemporaryUnavailableMessage())
 				return
 			}
 			if accountWaitCounted {
@@ -603,6 +603,11 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
 	upstreamMsg := service.ExtractUpstreamErrorMessage(responseBody)
+	if status, _, msg, ok := service.ClientRequestErrorFromUpstream(statusCode, upstreamMsg, responseBody); ok {
+		service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
+		googleError(c, status, msg)
+		return
+	}
 	if service.IsUpstreamBillingExhaustionError(statusCode, upstreamMsg, responseBody) {
 		service.SetOpsUpstreamError(c, statusCode, upstreamMsg, "")
 		googleError(c, http.StatusBadGateway, "Upstream service temporarily unavailable")
@@ -647,11 +652,10 @@ type pathParseError struct{ msg string }
 func (e *pathParseError) Error() string { return e.msg }
 
 func googleError(c *gin.Context, status int, message string) {
-	message = service.ClientFacingErrorMessage(status, "", message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,
-			"message": message,
+			"message": service.ClientFacingErrorMessage(status, "", message),
 			"status":  googleapi.HTTPStatusToGoogleStatus(status),
 		},
 	})
@@ -676,7 +680,9 @@ func writeUpstreamResponse(c *gin.Context, res *service.UpstreamHTTPResult) {
 		contentType = "application/json"
 	}
 	if res.StatusCode >= http.StatusBadRequest {
-		res.Body = service.ClientFacingErrorBody(res.StatusCode, "upstream_error", res.Body)
+		clientErr := service.NormalizeUpstreamClientError(res.StatusCode, "upstream_error", service.ExtractUpstreamErrorMessage(res.Body))
+		res.StatusCode = clientErr.Status
+		res.Body = service.ClientFacingErrorBody(clientErr.Status, clientErr.Type, res.Body)
 	}
 	c.Data(res.StatusCode, contentType, res.Body)
 }

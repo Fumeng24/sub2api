@@ -47,3 +47,21 @@ func TestOpenAIGatewayHandlerImages_DisabledGroupRejectsBeforeScheduling(t *test
 	require.Equal(t, "permission_error", gjson.GetBytes(rec.Body.Bytes(), "error.type").String())
 	require.Contains(t, rec.Body.String(), service.ImageGenerationPermissionMessage())
 }
+
+func TestShouldReportOpenAIImagesScheduleFailure_SkipsSingleCandidate(t *testing.T) {
+	require.False(t, shouldReportOpenAIImagesScheduleFailure(service.OpenAIAccountScheduleDecision{
+		CandidateCount: 1,
+		TopK:           1,
+	}))
+	require.False(t, shouldReportOpenAIImagesScheduleFailure(service.OpenAIAccountScheduleDecision{}))
+}
+
+func TestShouldReportOpenAIImagesScheduleFailure_ReportsMultipleCandidates(t *testing.T) {
+	require.True(t, shouldReportOpenAIImagesScheduleFailure(service.OpenAIAccountScheduleDecision{
+		CandidateCount: 2,
+		TopK:           1,
+	}))
+	require.True(t, shouldReportOpenAIImagesScheduleFailure(service.OpenAIAccountScheduleDecision{
+		Diagnostics: service.OpenAIAccountSelectionDiagnostics{FinalCandidateCount: 2},
+	}))
+}

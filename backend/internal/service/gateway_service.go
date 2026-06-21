@@ -701,7 +701,8 @@ func newNetworkUpstreamFailoverError(message string) *UpstreamFailoverError {
 	return &UpstreamFailoverError{
 		StatusCode:             0,
 		ResponseBody:           []byte(message),
-		RetryableOnSameAccount: false,
+		RetryableOnSameAccount: true,
+		SchedulerCategory:      schedulerStatusZeroFailureCategory([]byte(message)),
 	}
 }
 
@@ -2252,7 +2253,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 				}
 
 				waitScores := buildSchedulerAccountWaitScores(routingCandidates, groupID, requestedModel, schedulerEndpoint, routingLoadMap, s.schedulerHealth)
-				waitOrder := buildRoleAwareSchedulerOrder(waitScores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "routing_wait")
+				waitOrder := buildRoleAwareSchedulerOrder(waitScores, preferOAuth, schedulerSessionSeedParts(groupID, requestedModel, schedulerEndpoint, sessionHash, "routing_wait")...)
 				for _, item := range waitOrder {
 					acc := item.Account
 					if acc == nil {
@@ -2450,7 +2451,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		}
 	} else {
 		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
-		selectionOrder := buildRoleAwareSchedulerOrder(scores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash)
+		selectionOrder := buildRoleAwareSchedulerOrder(scores, preferOAuth, schedulerSessionSeedParts(groupID, requestedModel, schedulerEndpoint, sessionHash)...)
 		for _, item := range selectionOrder {
 			acc := item.Account
 			result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
@@ -2477,7 +2478,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		loadMap = make(map[int64]*AccountLoadInfo)
 	}
 	waitScores := buildSchedulerAccountWaitScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth)
-	waitOrder := buildRoleAwareSchedulerOrder(waitScores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, "wait")
+	waitOrder := buildRoleAwareSchedulerOrder(waitScores, preferOAuth, schedulerSessionSeedParts(groupID, requestedModel, schedulerEndpoint, sessionHash, "wait")...)
 	for _, item := range waitOrder {
 		acc := item.Account
 		// 会话数量限制检查（等待计划也需要占用会话配额）
@@ -2508,7 +2509,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 
 func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates []*Account, groupID *int64, sessionHash string, preferOAuth bool, requestedModel string, schedulerEndpoint string) (*AccountSelectionResult, bool, error) {
 	scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, true)
-	ordered := buildRoleAwareSchedulerOrder(scores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "legacy")
+	ordered := buildRoleAwareSchedulerOrder(scores, preferOAuth, schedulerSessionSeedParts(groupID, requestedModel, schedulerEndpoint, sessionHash, "legacy")...)
 
 	for _, item := range ordered {
 		acc := item.Account
@@ -2556,7 +2557,7 @@ func (s *GatewayService) selectGatewayCooldownFallbackResult(
 		return nil, false, nil
 	}
 	scores := buildSchedulerAccountCooldownFallbackScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth)
-	order := buildRoleAwareSchedulerOrder(scores, preferOAuth, strconv.FormatInt(derefGroupID(groupID), 10), requestedModel, schedulerEndpoint, sessionHash, "weak_fallback")
+	order := buildRoleAwareSchedulerOrder(scores, preferOAuth, schedulerSessionSeedParts(groupID, requestedModel, schedulerEndpoint, sessionHash, "weak_fallback")...)
 	if len(order) == 0 {
 		return nil, false, nil
 	}
@@ -3057,11 +3058,13 @@ func (s *GatewayService) orderGatewaySchedulerCandidates(
 	seedParts ...string,
 ) []schedulerAccountScore {
 	scores := buildSchedulerAccountScores(accounts, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, true)
-	return buildRoleAwareSchedulerOrder(scores, preferOAuth, append([]string{
-		strconv.FormatInt(derefGroupID(groupID), 10),
-		requestedModel,
-		schedulerEndpoint,
-	}, seedParts...)...)
+	sessionHash := ""
+	suffixParts := seedParts
+	if len(seedParts) > 0 {
+		sessionHash = seedParts[0]
+		suffixParts = seedParts[1:]
+	}
+	return buildRoleAwareSchedulerOrder(scores, preferOAuth, schedulerSessionSeedParts(groupID, requestedModel, schedulerEndpoint, sessionHash, suffixParts...)...)
 }
 
 func (s *GatewayService) selectFirstGatewaySchedulerAccount(
@@ -3099,11 +3102,13 @@ func (s *GatewayService) selectFirstGatewayCooldownFallbackAccount(
 	seedParts ...string,
 ) *Account {
 	scores := buildSchedulerAccountCooldownFallbackScores(accounts, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth)
-	order := buildRoleAwareSchedulerOrder(scores, preferOAuth, append([]string{
-		strconv.FormatInt(derefGroupID(groupID), 10),
-		requestedModel,
-		schedulerEndpoint,
-	}, seedParts...)...)
+	sessionHash := ""
+	suffixParts := seedParts
+	if len(seedParts) > 0 {
+		sessionHash = seedParts[0]
+		suffixParts = seedParts[1:]
+	}
+	order := buildRoleAwareSchedulerOrder(scores, preferOAuth, schedulerSessionSeedParts(groupID, requestedModel, schedulerEndpoint, sessionHash, suffixParts...)...)
 	for _, item := range order {
 		if item.Account == nil {
 			continue
@@ -8115,6 +8120,9 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 		upstreamDetail = truncateString(string(body), maxBytes)
 	}
 	setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, upstreamDetail)
+	if status, _, _, ok := writeContextWindowExceededClientError(c, requestModelFromVariadic(requestedModel), upstreamMsg, body, writeClientClaudeError); ok {
+		return nil, newUpstreamTerminalError(status, upstreamMsg)
+	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 		Platform:           account.Platform,
 		AccountID:          account.ID,
@@ -8205,25 +8213,20 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 		}
 		return nil, fmt.Errorf("upstream error: %d message=%s", resp.StatusCode, summary)
 	case 401:
-		statusCode = http.StatusBadGateway
-		errType = "upstream_error"
-		errMsg = "Upstream authentication failed, please contact administrator"
+		normalized := NormalizeUpstreamClientError(resp.StatusCode, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 403:
-		statusCode = http.StatusBadGateway
-		errType = "upstream_error"
-		errMsg = "Upstream access forbidden, please contact administrator"
+		normalized := NormalizeUpstreamClientError(resp.StatusCode, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 429:
-		statusCode = http.StatusTooManyRequests
-		errType = "rate_limit_error"
-		errMsg = "Upstream rate limit exceeded, please retry later"
+		normalized := NormalizeUpstreamClientError(resp.StatusCode, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 529:
-		statusCode = http.StatusServiceUnavailable
-		errType = "overloaded_error"
-		errMsg = "Upstream service overloaded, please retry later"
+		normalized := NormalizeUpstreamClientError(resp.StatusCode, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	case 500, 502, 503, 504:
-		statusCode = http.StatusBadGateway
-		errType = "upstream_error"
-		errMsg = "Upstream service temporarily unavailable"
+		normalized := NormalizeUpstreamClientError(resp.StatusCode, errType, errMsg)
+		statusCode, errType, errMsg = normalized.Status, normalized.Type, normalized.Message
 	default:
 		statusCode = http.StatusBadGateway
 		errType = "upstream_error"
@@ -8289,6 +8292,9 @@ func (s *GatewayService) handleOptional400Failover(
 
 	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
 	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+	if IsContextWindowExceededError(upstreamMsg, respBody) {
+		return nil, false
+	}
 	upstreamDetail := ""
 	if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
 		maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
@@ -10443,15 +10449,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 			)
 		}
 
-		// 返回简化的错误响应
-		errMsg := "Upstream request failed"
-		switch resp.StatusCode {
-		case 429:
-			errMsg = "Rate limit exceeded"
-		case 529:
-			errMsg = "Service overloaded"
-		}
-		s.countTokensError(c, resp.StatusCode, "upstream_error", errMsg)
+		s.countTokensUpstreamError(c, resp.StatusCode, respBody)
 		if upstreamMsg == "" {
 			return fmt.Errorf("upstream error: %d", resp.StatusCode)
 		}
@@ -10555,14 +10553,7 @@ func (s *GatewayService) forwardCountTokensAnthropicAPIKeyPassthrough(ctx contex
 			Detail:             upstreamDetail,
 		})
 
-		errMsg := "Upstream request failed"
-		switch resp.StatusCode {
-		case 429:
-			errMsg = "Rate limit exceeded"
-		case 529:
-			errMsg = "Service overloaded"
-		}
-		s.countTokensError(c, resp.StatusCode, "upstream_error", errMsg)
+		s.countTokensUpstreamError(c, resp.StatusCode, respBody)
 		if upstreamMsg == "" {
 			return fmt.Errorf("upstream error: %d", resp.StatusCode)
 		}
@@ -10804,6 +10795,16 @@ func sanitizeCountTokensRequestBody(body []byte) []byte {
 // countTokensError 返回 count_tokens 错误响应
 func (s *GatewayService) countTokensError(c *gin.Context, status int, errType, message string) {
 	writeClientClaudeError(c, status, errType, message)
+}
+
+func (s *GatewayService) countTokensUpstreamError(c *gin.Context, upstreamStatus int, body []byte) {
+	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(body))
+	if status, errType, msg, ok := ClientRequestErrorFromUpstream(upstreamStatus, upstreamMsg, body); ok {
+		s.countTokensError(c, status, errType, msg)
+		return
+	}
+	normalized := NormalizeUpstreamClientError(upstreamStatus, "upstream_error", upstreamMsg)
+	s.countTokensError(c, normalized.Status, normalized.Type, normalized.Message)
 }
 
 // buildCustomRelayURL 构建自定义中继转发 URL

@@ -139,6 +139,25 @@ func TestGatewayHandlerHandleFailoverExhaustedHidesUpstream429(t *testing.T) {
 	require.NotContains(t, strings.ToLower(w.Body.String()), "rate limit")
 }
 
+func TestGatewayHandlerHandleFailoverExhaustedMapsContextWindowError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	c.Set(opsModelKey, "claude-opus-4-8")
+
+	h := &GatewayHandler{}
+	h.handleFailoverExhausted(c, &service.UpstreamFailoverError{
+		StatusCode:   http.StatusBadRequest,
+		ResponseBody: []byte(`{"error":{"type":"invalid_request_error","message":"prompt is too long: 2318541 tokens > 1000000 maximum"}}`),
+	}, service.PlatformAnthropic, false)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Contains(t, w.Body.String(), `"type":"invalid_request_error"`)
+	require.Contains(t, w.Body.String(), "model context window")
+	require.NotContains(t, w.Body.String(), "Service temporarily unavailable")
+}
+
 func TestGatewayHandlerHandleGeminiFailoverExhaustedHidesUpstream429(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()

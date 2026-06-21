@@ -142,34 +142,52 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 	switchCount := 0
 	failedAccountIDs := make(map[int64]struct{})
 	sameAccountRetryCount := make(map[int64]int)
+	var sameAccountRetrySelection *service.AccountSelectionResult
+	var sameAccountRetryDecision service.OpenAIAccountScheduleDecision
 	var lastFailoverErr *service.UpstreamFailoverError
 	schedulerEndpoint := GetInboundEndpoint(c)
 
 	for {
-		reqLog.Debug("openai.images.account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
-		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(requestCtx, schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
-		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForImages(
-			scheduleCtx,
-			apiKey.GroupID,
-			sessionHash,
-			requestModel,
-			failedAccountIDs,
-			parsed.RequiredCapability,
-		)
-		cancelSchedule()
-		if err != nil {
-			reqLog.Warn("openai.images.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
-			if len(failedAccountIDs) == 0 {
-				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-				h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available compatible accounts", streamStarted)
+		var selection *service.AccountSelectionResult
+		var scheduleDecision service.OpenAIAccountScheduleDecision
+		if sameAccountRetrySelection != nil {
+			selection = sameAccountRetrySelection
+			scheduleDecision = sameAccountRetryDecision
+			sameAccountRetrySelection = nil
+			sameAccountRetryDecision = service.OpenAIAccountScheduleDecision{}
+			if selection.Account != nil {
+				reqLog.Debug("openai.images.same_account_retry_reusing",
+					zap.Int64("account_id", selection.Account.ID),
+					zap.Int("excluded_account_count", len(failedAccountIDs)),
+				)
+			}
+		} else {
+			reqLog.Debug("openai.images.account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
+			scheduleCtx, cancelSchedule := openAIAccountSelectionContext(requestCtx, schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
+			var err error
+			selection, scheduleDecision, err = h.gatewayService.SelectAccountWithSchedulerForImages(
+				scheduleCtx,
+				apiKey.GroupID,
+				sessionHash,
+				requestModel,
+				failedAccountIDs,
+				parsed.RequiredCapability,
+			)
+			cancelSchedule()
+			if err != nil {
+				reqLog.Warn("openai.images.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
+				if len(failedAccountIDs) == 0 {
+					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available compatible accounts", streamStarted)
+					return
+				}
+				if lastFailoverErr != nil {
+					h.handleFailoverExhausted(c, lastFailoverErr, streamStarted)
+				} else {
+					h.handleFailoverExhaustedSimple(c, 502, streamStarted)
+				}
 				return
 			}
-			if lastFailoverErr != nil {
-				h.handleFailoverExhausted(c, lastFailoverErr, streamStarted)
-			} else {
-				h.handleFailoverExhaustedSimple(c, 502, streamStarted)
-			}
-			return
 		}
 		if selection == nil || selection.Account == nil {
 			markOpsRoutingCapacityLimited(c)
@@ -252,24 +270,20 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 						h.handleFailoverExhausted(c, failoverErr, true)
 						return
 					}
-					h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, parsed.Model, schedulerEndpoint, failoverErr)
-					if failoverErr.RetryableOnSameAccount {
-						retryLimit := account.GetPoolModeRetryCount()
-						if sameAccountRetryCount[account.ID] < retryLimit {
-							sameAccountRetryCount[account.ID]++
-							reqLog.Warn("openai.images.pool_mode_same_account_retry",
-								zap.Int64("account_id", account.ID),
-								zap.Int("upstream_status", failoverErr.StatusCode),
-								zap.Int("retry_limit", retryLimit),
-								zap.Int("retry_count", sameAccountRetryCount[account.ID]),
-							)
-							select {
-							case <-requestCtx.Done():
-								return
-							case <-time.After(sameAccountRetryDelay):
-							}
-							continue
-						}
+					if openAIFailoverBudgetExceeded(requestStart) {
+						logOpenAIFailoverBudgetExceeded(reqLog, "openai.images.failover_budget_exceeded", account.ID, failoverErr, switchCount, maxAccountSwitches, parsed.Model, schedulerEndpoint)
+						h.handleFailoverExhausted(c, failoverErr, streamStarted)
+						return
+					}
+					if retrySelection, retry, canceled := prepareOpenAISameAccountRetry(requestCtx, reqLog, sameAccountRetryCount, account, selection, failoverErr, "openai.images.same_account_retry"); canceled {
+						return
+					} else if retry {
+						sameAccountRetrySelection = retrySelection
+						sameAccountRetryDecision = scheduleDecision
+						continue
+					}
+					if shouldReportOpenAIImagesScheduleFailure(scheduleDecision) {
+						h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, parsed.Model, schedulerEndpoint, failoverErr)
 					}
 					h.gatewayService.RecordOpenAIAccountSwitch()
 					failedAccountIDs[account.ID] = struct{}{}
@@ -368,4 +382,14 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 
 func isMultipartImagesContentType(contentType string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "multipart/form-data")
+}
+
+func shouldReportOpenAIImagesScheduleFailure(decision service.OpenAIAccountScheduleDecision) bool {
+	if decision.CandidateCount > 1 || decision.TopK > 1 {
+		return true
+	}
+	if decision.Diagnostics.FinalCandidateCount > 1 {
+		return true
+	}
+	return false
 }

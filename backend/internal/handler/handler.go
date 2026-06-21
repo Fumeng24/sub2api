@@ -39,6 +39,7 @@ type AdminHandlers struct {
 	BulkVerify             *admin.BulkVerifyHandler
 	Affiliate              *admin.AffiliateHandler
 	Compliance             *admin.ComplianceHandler
+	Invoice                *admin.InvoiceHandler
 }
 
 // Handlers contains all HTTP handlers
@@ -60,6 +61,7 @@ type Handlers struct {
 	Payment          *PaymentHandler
 	PaymentWebhook   *PaymentWebhookHandler
 	AvailableChannel *AvailableChannelHandler
+	Invoice          *InvoiceHandler
 }
 
 // BuildInfo contains build-time information

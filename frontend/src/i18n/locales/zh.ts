@@ -22,6 +22,95 @@ export default {
       stickySession: '独家调度算法',
       realtimeBilling: '按量计费更省'
     },
+    valueRail: {
+      credit: {
+        value: '1 元 = 1 刀',
+        label: '余额更好理解',
+        description: '充值或兑换后按站内余额使用，不需要先买一堆官方订阅。'
+      },
+      models: {
+        value: 'GPT / Claude / Gemini',
+        label: '常用模型都能接',
+        description: '写代码、写作、翻译、资料整理、脚本自动化和生图都能覆盖。'
+      },
+      compatible: {
+        value: 'OpenAI 兼容',
+        label: '迁移成本低',
+        description: '常见 API 工具、Codex、Claude Code、Gemini CLI 等可以按教程快速接入。'
+      },
+      billing: {
+        value: '明细可查',
+        label: '用量看得见',
+        description: '余额、请求、Token、缓存命中和消费记录都在仪表盘里展示。'
+      }
+    },
+    cost: {
+      kicker: '价格先讲清楚',
+      title: '不是月费订阅，用多少扣多少',
+      description:
+        '站内余额按刀计，实际消耗按「官方标准计费 × 分组倍率」扣费。倍率越低，同样余额能覆盖的官方原价额度越多，适合高频但又想控制成本的用户。',
+      facts: {
+        creditValue: '1 元 = 1 刀',
+        creditLabel: '站内余额口径',
+        multiplierValue: '倍率计费',
+        multiplierLabel: '官方价 × 分组倍率',
+        recordsValue: '失败可查',
+        recordsLabel: '用量和扣费都有记录'
+      },
+      formulaTitle: '折扣怎么估算？',
+      formula:
+        '人民币折扣 ≈ 分组倍率 ÷ 当前汇率 × 10 折。比如 0.148x 在 1 USD≈¥7.2 时，约等于官方人民币计费 0.21 折。',
+      note: '折扣是便于理解的估算，实际扣费以站内使用记录、模型价格和当前分组倍率为准。'
+    },
+    quickStart: {
+      kicker: '三步开始',
+      title: '从注册到成功调用，不需要重做项目',
+      register: '注册并领取额度',
+      createKey: '创建 API 密钥',
+      readGuide: '查看接入教程',
+      steps: {
+        register: {
+          title: '注册后先领额度',
+          description: '新用户先用赠送额度或小额充值测试，确认模型效果、速度和扣费逻辑。'
+        },
+        group: {
+          title: '创建 Key 并选择分组',
+          description: '低成本日常任务选特价类分组，重要任务选更稳定的分组；生图使用名称带“生图”的分组。'
+        },
+        connect: {
+          title: '复制配置开始用',
+          description: '在 API Key 页面点“使用密钥”，复制 Codex、Claude Code、Gemini CLI 或 OpenAI 兼容配置。'
+        }
+      }
+    },
+    integration: {
+      kicker: '不是只看首页，能直接跑起来',
+      title: '新用户真正需要的路径都放在这里',
+      description:
+        '很多用户不是不会用模型，而是不知道第一步该点哪里、失败后该看哪里、余额到底怎么算。WegooAI 把接入、服务状态、可用模型和用量记录拆成明确入口，减少反复问客服的成本。',
+      cards: {
+        key: {
+          title: '创建 Key 并复制配置',
+          description: '在 API Key 页面创建密钥，点“使用密钥”复制 Codex、Claude Code、Gemini CLI 或 OpenAI 兼容配置。',
+          action: '去创建密钥'
+        },
+        status: {
+          title: '调用失败先看服务状态',
+          description: '连接不上、超时、403/429/5xx 时，先看当前分组状态；如果某个分组波动，及时切换更稳定的分组。',
+          action: '查看服务状态'
+        },
+        models: {
+          title: '确认分组支持哪些模型',
+          description: '可用渠道页面会展示当前分组可用模型，避免把不支持的模型填进客户端导致报错。',
+          action: '查看可用模型'
+        },
+        billing: {
+          title: '看账单判断真实成本',
+          description: '请求、Token、缓存命中和扣费明细都能查。长期高频使用时，先看记录再决定长期用哪个分组。',
+          action: '查看用量记录'
+        }
+      }
+    },
     // 用户痛点区块
     painPoints: {
       title: '你是否也遇到这些问题？',
@@ -53,7 +142,7 @@ export default {
       unifiedGateway: '一把 Key 调多模型',
       unifiedGatewayDesc: 'GPT、Claude、Gemini 和图像模型统一接入，日常开发、写作和自动化少切换。',
       multiAccount: '独家调度算法',
-      multiAccountDesc: '按模型、分组和实时状态智能选择可用通道，尽量把不稳定挡在用户感知之外。',
+      multiAccountDesc: '按模型、分组和实时状态智能选择稳定路径，尽量把短时波动挡在用户感知之外。',
       balanceQuota: '低成本高频使用',
       balanceQuotaDesc: '按实际用量扣费，特价分组适合长期使用；余额、请求和 Token 消耗都能在仪表盘看清楚。'
     },
@@ -102,6 +191,62 @@ export default {
       gemini: 'Gemini',
       antigravity: 'Antigravity',
       more: '更多'
+    },
+    useCases: {
+      title: '适合真正高频使用 AI 的人',
+      description:
+        '本站不是只给尝鲜用户看的，更适合每天都要把 AI 放进工作流里的开发者、学生、创作者和自动化用户。',
+      coding: {
+        title: '代码开发和 Vibe Coding',
+        description: '适合 Codex、Claude Code、Cursor、OpenCode 等工作流，用于项目搭建、Bug 修复、代码解释和 Agent 任务。'
+      },
+      writing: {
+        title: '写作、翻译和论文润色',
+        description: 'Claude / Gemini 分组适合长文总结、资料整理、翻译润色、报告生成和复杂分析。'
+      },
+      automation: {
+        title: '脚本自动化和 API 调用',
+        description: 'OpenAI 兼容接口方便接到现有脚本、Bot、内部工具和批量处理任务里。'
+      },
+      image: {
+        title: 'AI 生图和素材生成',
+        description: '名称带“生图”的分组用于图片生成，适合视觉素材、配图、创意草图和批量出图。'
+      }
+    },
+    trust: {
+      title: '用户最担心的事，页面里说清楚',
+      description:
+        '新用户不是只看便宜，更关心能不能用、会不会乱扣费、模型是不是假的、出了问题能不能查。',
+      points: {
+        modelTruth: '不使用国产模型冒充 GPT、Claude、Gemini 等模型。',
+        billing: '每次请求的用量和扣费记录可查，异常扣费可通过售后核查。',
+        status: '服务状态公开展示；如果某个分组波动，用户可以及时切换更稳定的分组。',
+        privacy: '后台主要用于计费、排障、风控和售后核查；用户能看到的请求记录，就是后台排障能看到的主要范围。'
+      }
+    },
+    firstRun: {
+      kicker: '第一次使用建议',
+      title: '先跑通，再决定长期用哪个分组',
+      description:
+        '不同分组在价格、速度、稳定性和可用模型上会有差异。新用户最重要的是先完成一次成功调用，再根据自己的任务选择分组。',
+      tips: {
+        trySmall: {
+          title: '先小额测试',
+          description: '用注册送额度或小额余额测试常用模型，不需要一开始就大量充值。'
+        },
+        serviceStatus: {
+          title: '报错先看服务状态',
+          description: '连接不上、超时、模型不可用时，先看服务状态，再考虑切换分组。'
+        },
+        groupChoice: {
+          title: '按任务选分组',
+          description: '日常高频看成本，重要任务看稳定性，图片生成看“生图”分组。'
+        },
+        records: {
+          title: '看记录判断成本',
+          description: '仪表盘会展示请求、Token、缓存和消费，长期使用更容易控预算。'
+        }
+      }
     },
     // CTA 区块
     cta: {
@@ -425,7 +570,9 @@ export default {
     docs: '教程',
     docsBadge: '必看',
     myOrders: '我的订单',
+    invoices: '开票申请',
     orderManagement: '订单管理',
+    invoiceManagement: '发票管理',
     paymentDashboard: '支付概览',
     paymentConfig: '支付配置',
     paymentPlans: '订阅套餐',
@@ -458,6 +605,8 @@ export default {
     registrationDisabled: '注册功能暂时关闭，请联系管理员。',
     emailLabel: '邮箱',
     emailPlaceholder: '请输入邮箱',
+    emailDeliveryHint:
+      '收不到邮件？请到垃圾邮件查看并点“这不是垃圾邮件”，避免错过充值、余额不足、找回密码和活动通知。',
     passwordLabel: '密码',
     passwordPlaceholder: '请输入密码',
     createPasswordPlaceholder: '创建一个安全的密码',
@@ -657,7 +806,25 @@ export default {
     invalidResetLink: '无效的重置链接',
     invalidResetLinkHint: '此密码重置链接无效或已过期。请重新请求一个新链接。',
     requestNewResetLink: '请求新的重置链接',
-    invalidOrExpiredToken: '密码重置链接无效或已过期。请重新请求一个新链接。'
+    invalidOrExpiredToken: '密码重置链接无效或已过期。请重新请求一个新链接。',
+    registerOnboarding: {
+      title: '注册后不用猜下一步',
+      description: '完成注册后，先领取/确认额度，再创建 API 密钥，最后复制对应客户端配置即可开始调用。',
+      steps: {
+        credit: {
+          title: '先看额度',
+          description: '注册送额度和充值余额都会在仪表盘展示。'
+        },
+        key: {
+          title: '创建 Key',
+          description: '选择适合任务的分组，Key 会按分组计费。'
+        },
+        connect: {
+          title: '复制配置',
+          description: 'Codex、Claude Code、Gemini CLI 和 API 工具按教程接入。'
+        }
+      }
+    }
   },
 
   // Dashboard
@@ -717,8 +884,20 @@ export default {
     startUsingApi: '开始使用 API 后，您的使用历史将显示在这里。',
     viewAllUsage: '查看全部',
     quickActions: '快捷操作',
+    quickActionsHint: '第一次使用建议按顺序完成：创建密钥、复制配置、发起一次测试请求。',
+    firstRun: {
+      title: '新用户三步跑通',
+      description: '先不要急着调复杂项目，先用一个简单请求确认 Key、分组和客户端配置都正常。',
+      steps: {
+        createKey: '创建 API 密钥',
+        selectGroup: '选择适合任务的分组',
+        copyConfig: '点“使用密钥”复制配置'
+      }
+    },
     createApiKey: '创建 API 密钥',
     generateNewKey: '生成新的 API 密钥',
+    serviceStatus: '服务状态',
+    checkGroupHealth: '连接不上或报错时先看这里',
     viewUsage: '查看使用记录',
     checkDetailedLogs: '查看详细的使用日志',
     redeemCode: '兑换码',
@@ -788,6 +967,39 @@ export default {
     selectGroup: '选择分组',
     statusLabel: '状态',
     selectStatus: '选择状态',
+    firstRunGuide: {
+      title: '第一次接入建议从这里开始',
+      description: '先创建一个 API 密钥，选择分组后点“使用密钥”复制配置。确认能跑通一个简单请求后，再接入 Codex、Claude Code、Gemini CLI 或自己的项目。',
+      steps: {
+        create: '创建 Key',
+        group: '选分组',
+        use: '复制配置'
+      }
+    },
+    balanceExplain: {
+      title: '余额和官方价格怎么对应？',
+      description: '站内 1 元按 1 刀余额展示；实际扣费约等于官方模型价格 × 当前分组倍率。分组倍率越低，同样余额能使用的官方原价额度越多。'
+    },
+    groupChoiceTips: {
+      cost: {
+        title: '日常高频看成本',
+        description: '写代码、问答、资料整理这类高频任务，可以优先测试低倍率分组。'
+      },
+      stability: {
+        title: '重要任务看稳定',
+        description: '长任务、交付任务和工作流自动化，建议优先选择更稳定的分组。'
+      },
+      image: {
+        title: '生图看名称',
+        description: '图片生成请使用名称带“生图”的分组，普通文本分组不一定支持生图。'
+      }
+    },
+    groupCostPreview: {
+      title: '{group} 计费预览',
+      description: '当前有效倍率约 {rate}，按 1 USD≈¥{cny} 估算，约等于官方人民币计费 {discount} 折。',
+      note: '这是帮助理解的估算；实际扣费以模型价格、当前倍率和使用记录为准。',
+      unavailable: '当前分组倍率暂时无法计算，请以分组说明和使用记录为准。'
+    },
     serviceStatusTip: {
       title: '连接不上或调用报错？先看服务状态',
       description: '如果请求失败、连接超时或模型暂时不可用，先确认当前分组状态；若处于波动中，建议及时切换到更稳定的分组。',
@@ -878,6 +1090,60 @@ export default {
     ipRestrictionEnabled: '已配置 IP 限制',
     ccSwitchNotInstalled:
       'CC Switch 未安装或协议处理程序未注册。请先安装 CC Switch 或手动复制 API 密钥。',
+    ccSwitchDialog: {
+      title: '导入到 CC Switch',
+      description: '按当前密钥分组选择要写入的客户端。CC Switch 会在本机生成对应配置，并可继续管理和切换供应商。',
+      currentGroup: '当前分组',
+      noGroup: '此 API 密钥尚未分配分组，请先在密钥列表中点击分组列进行分配。',
+      endpoint: '端点',
+      model: '模型',
+      protocol: '协议',
+      reasoning: '推理',
+      import: '导入',
+      copyLink: '复制链接',
+      linkCopied: '链接已复制',
+      openOfficial: '打开 CC Switch',
+      installHint:
+        '如果浏览器没有调起 CC Switch，请先安装并打开一次 CC Switch；也可以复制链接后在本机执行 open、xdg-open 或 Start-Process。',
+      protocols: {
+        anthropicMessages: 'Anthropic Messages',
+        openaiResponses: 'OpenAI Responses',
+        geminiNative: 'Gemini Native',
+        openaiCompatible: 'OpenAI Compatible',
+        openaiCompletions: 'OpenAI Completions',
+        chatCompletions: 'Chat Completions'
+      },
+      targets: {
+        claudeCode: {
+          name: 'Claude Code',
+          description: '写入 Claude Code 供应商配置，使用 Anthropic Messages。'
+        },
+        claudeDesktop: {
+          name: 'Claude Desktop',
+          description: '通过 CC Switch 的 Claude provider 导入，使用 Anthropic Messages。'
+        },
+        codex: {
+          name: 'Codex',
+          description: '写入 Codex 的 auth.json 和 config.toml，CC Switch 原生使用 Responses。'
+        },
+        geminiCli: {
+          name: 'Gemini CLI',
+          description: '写入 Gemini CLI 环境配置，使用 Gemini Native v1beta 端点。'
+        },
+        opencode: {
+          name: 'OpenCode',
+          description: '追加 OpenCode provider；CC Switch deeplink 当前写 OpenAI Compatible。'
+        },
+        openclaw: {
+          name: 'OpenClaw',
+          description: '追加 OpenClaw provider；CC Switch deeplink 当前写 OpenAI Completions。'
+        },
+        hermes: {
+          name: 'Hermes Agent',
+          description: '追加 Hermes 自定义 provider；CC Switch deeplink 当前写 chat_completions。'
+        }
+      }
+    },
     ccsClientSelect: {
       title: '选择客户端',
       description: '请选择您要导入到 CC Switch 的客户端类型：',
@@ -3906,6 +4172,10 @@ export default {
         oauthPassthrough: '自动透传（仅替换认证）',
         oauthPassthroughDesc:
           '开启后，该 OpenAI 账号将自动透传请求与响应，仅替换认证并保留计费/并发/审计及必要安全过滤；如遇兼容性问题可随时关闭回滚。',
+        cacheAffinityGroup: '缓存兼容组',
+        cacheAffinityGroupPlaceholder: '例如 codex-prompt-a',
+        cacheAffinityGroupDesc:
+          '同一值表示这些上游账号的内置提示词一致。Codex 长上下文切号时会优先在同组内切换，留空则默认按账号隔离。',
         responsesWebsocketsV2: 'Responses WebSocket v2',
         responsesWebsocketsV2Desc:
           '默认关闭。开启后可启用 responses_websockets_v2 协议能力（受网关全局开关与账号类型开关约束）。',
@@ -7610,6 +7880,24 @@ export default {
       TICKET_CLOSED: '工单已关闭，请先重新打开',
       TICKET_NOT_FOUND: '工单不存在'
     }
+  },
+
+  invoice: {
+    errors: {
+      INVOICE_NOT_FOUND: '开票申请不存在',
+      INVOICE_INVALID_STATUS: '当前开票申请状态不允许此操作，请刷新后重试',
+      INVOICE_AMOUNT_TOO_SMALL: '开票金额至少 {min_amount} 元',
+      INVOICE_AMOUNT_UNAVAILABLE: '开票金额超过当前可申请额度，可申请额度为 {available_amount} 元',
+      INVOICE_BALANCE_INSUFFICIENT: '账户余额不足以扣除税点，当前余额 {current_balance} 元，需要扣除 {tax_fee} 元',
+      INVOICE_TYPE_INVALID: '发票类型不正确',
+      INVOICE_TITLE_REQUIRED: '请填写发票抬头',
+      INVOICE_ITEM_REQUIRED: '请填写开票项目',
+      INVOICE_RECEIVER_EMAIL_REQUIRED: '请填写接收邮箱',
+      INVOICE_RECEIVER_EMAIL_INVALID: '接收邮箱格式不正确',
+      INVOICE_TAX_ID_REQUIRED: '企业发票需要填写税号',
+      INVOICE_REJECT_REASON_REQUIRED: '驳回时需要填写原因',
+      USER_NOT_FOUND: '用户不存在或已被禁用',
+    },
   },
 
   // User Subscriptions Page

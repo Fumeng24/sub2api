@@ -170,7 +170,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		if err != nil {
 			if len(fs.FailedAccountIDs) == 0 {
 				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-				h.chatCompletionsErrorResponse(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error())
+				h.chatCompletionsErrorResponse(c, http.StatusServiceUnavailable, "api_error", service.ClientFacingTemporaryUnavailableMessage())
 				return
 			}
 			action := fs.HandleSelectionExhausted(c.Request.Context())

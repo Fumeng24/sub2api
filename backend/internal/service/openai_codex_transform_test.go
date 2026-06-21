@@ -545,127 +545,6 @@ func TestNormalizeOpenAIResponsesImageGenerationTools_RewritesLegacyFields(t *te
 	require.False(t, hasCompression)
 }
 
-func TestEnsureOpenAIResponsesImageGenerationTool_NoTools(t *testing.T) {
-	reqBody := map[string]any{
-		"model": "gpt-5.4",
-		"input": "draw a cat",
-	}
-
-	modified := ensureOpenAIResponsesImageGenerationTool(reqBody)
-	require.True(t, modified)
-
-	tools, ok := reqBody["tools"].([]any)
-	require.True(t, ok)
-	require.Len(t, tools, 1)
-	tool, ok := tools[0].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, "image_generation", tool["type"])
-	require.Equal(t, "png", tool["output_format"])
-}
-
-func TestEnsureOpenAIResponsesImageGenerationTool_SkipsSpark(t *testing.T) {
-	reqBody := map[string]any{
-		"model": "gpt-5.3-codex-spark",
-		"input": "draw a cat",
-	}
-
-	modified := ensureOpenAIResponsesImageGenerationTool(reqBody)
-	require.False(t, modified)
-	require.NotContains(t, reqBody, "tools")
-}
-
-func TestEnsureOpenAIResponsesImageGenerationTool_AppendsToExistingTools(t *testing.T) {
-	reqBody := map[string]any{
-		"model": "gpt-5.4",
-		"tools": []any{
-			map[string]any{"type": "web_search"},
-		},
-	}
-
-	modified := ensureOpenAIResponsesImageGenerationTool(reqBody)
-	require.True(t, modified)
-
-	tools, ok := reqBody["tools"].([]any)
-	require.True(t, ok)
-	require.Len(t, tools, 2)
-	first, ok := tools[0].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, "web_search", first["type"])
-	second, ok := tools[1].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, "image_generation", second["type"])
-	require.Equal(t, "png", second["output_format"])
-}
-
-func TestEnsureOpenAIResponsesImageGenerationTool_PreservesExistingImageTool(t *testing.T) {
-	reqBody := map[string]any{
-		"model": "gpt-5.4",
-		"tools": []any{
-			map[string]any{"type": "image_generation", "output_format": "webp"},
-			map[string]any{"type": "web_search"},
-		},
-	}
-
-	modified := ensureOpenAIResponsesImageGenerationTool(reqBody)
-	require.False(t, modified)
-
-	tools, ok := reqBody["tools"].([]any)
-	require.True(t, ok)
-	require.Len(t, tools, 2)
-	tool, ok := tools[0].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, "webp", tool["output_format"])
-}
-
-func TestApplyCodexImageGenerationBridgeInstructions_AppendsBridgeOnce(t *testing.T) {
-	reqBody := map[string]any{
-		"model":        "gpt-5.4",
-		"instructions": "existing instructions",
-		"tools": []any{
-			map[string]any{"type": "image_generation", "output_format": "png"},
-		},
-	}
-
-	modified := applyCodexImageGenerationBridgeInstructions(reqBody)
-	require.True(t, modified)
-
-	instructions, ok := reqBody["instructions"].(string)
-	require.True(t, ok)
-	require.Contains(t, instructions, "existing instructions")
-	require.Contains(t, instructions, codexImageGenerationBridgeMarker)
-	require.Contains(t, instructions, "Responses native `image_generation` tool")
-
-	modified = applyCodexImageGenerationBridgeInstructions(reqBody)
-	require.False(t, modified)
-}
-
-func TestApplyCodexImageGenerationBridgeInstructions_SkipsSpark(t *testing.T) {
-	reqBody := map[string]any{
-		"model":        "gpt-5.3-codex-spark",
-		"instructions": "existing instructions",
-		"tools": []any{
-			map[string]any{"type": "image_generation", "output_format": "png"},
-		},
-	}
-
-	modified := applyCodexImageGenerationBridgeInstructions(reqBody)
-	require.False(t, modified)
-	require.Equal(t, "existing instructions", reqBody["instructions"])
-}
-
-func TestApplyCodexImageGenerationBridgeInstructions_SkipsWithoutImageTool(t *testing.T) {
-	reqBody := map[string]any{
-		"instructions": "existing instructions",
-		"tools": []any{
-			map[string]any{"type": "web_search"},
-		},
-	}
-
-	modified := applyCodexImageGenerationBridgeInstructions(reqBody)
-	require.False(t, modified)
-	require.Equal(t, "existing instructions", reqBody["instructions"])
-}
-
 func TestValidateCodexSparkInputRejectsInputImage(t *testing.T) {
 	reqBody := map[string]any{
 		"model": "gpt-5.3-codex-spark",
@@ -735,7 +614,6 @@ func TestApplyCodexOAuthTransform_AddsSparkImageUnsupportedInstructions(t *testi
 	require.Contains(t, instructions, codexSparkImageUnsupportedMarker)
 	require.Contains(t, instructions, "does not support image generation")
 	require.Contains(t, instructions, "switch to a non-Spark Codex model")
-	require.NotContains(t, instructions, codexImageGenerationBridgeMarker)
 }
 
 func TestApplyCodexOAuthTransform_DoesNotAddSparkImageUnsupportedForNonSpark(t *testing.T) {

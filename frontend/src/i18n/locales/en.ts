@@ -22,6 +22,95 @@ export default {
       stickySession: 'Proprietary scheduling',
       realtimeBilling: 'Pay less as you go'
     },
+    valueRail: {
+      credit: {
+        value: '¥1 = $1 credit',
+        label: 'Easy balance math',
+        description: 'Top up or redeem balance credits instead of buying multiple official subscriptions upfront.'
+      },
+      models: {
+        value: 'GPT / Claude / Gemini',
+        label: 'Common models covered',
+        description: 'Coding, writing, translation, research, automation, and image generation are all covered.'
+      },
+      compatible: {
+        value: 'OpenAI compatible',
+        label: 'Low migration cost',
+        description: 'API tools, Codex, Claude Code, Gemini CLI, and common clients can connect with the guide.'
+      },
+      billing: {
+        value: 'Auditable usage',
+        label: 'Spend is visible',
+        description: 'Balance, requests, tokens, cache hits, and cost records are visible on the dashboard.'
+      }
+    },
+    cost: {
+      kicker: 'Pricing first',
+      title: 'Not a monthly subscription. Pay only as you use.',
+      description:
+        'Balance is counted as site credits, and usage is charged as official list-price cost multiplied by the selected group rate. Lower-rate groups let the same balance cover more official list-price usage.',
+      facts: {
+        creditValue: '¥1 = $1 credit',
+        creditLabel: 'Site balance unit',
+        multiplierValue: 'Rate billing',
+        multiplierLabel: 'Official price × group rate',
+        recordsValue: 'Traceable',
+        recordsLabel: 'Usage and billing records'
+      },
+      formulaTitle: 'How is the discount estimated?',
+      formula:
+        'CNY discount ≈ group rate ÷ current FX rate × 10. For example, 0.148x at 1 USD≈¥7.2 is roughly 0.21/10 of official CNY pricing.',
+      note: 'The discount is an estimate for understanding. Actual billing follows usage records, model pricing, and the current group rate.'
+    },
+    quickStart: {
+      kicker: 'Three steps',
+      title: 'Register, create a key, and connect without rebuilding your project',
+      register: 'Register and claim credit',
+      createKey: 'Create API Key',
+      readGuide: 'Read setup guide',
+      steps: {
+        register: {
+          title: 'Claim credit after signup',
+          description: 'Start with trial credit or a small top-up to verify model quality, speed, and billing behavior.'
+        },
+        group: {
+          title: 'Create a key and choose a group',
+          description: 'Use discount groups for daily high-frequency tasks, stable groups for important tasks, and image groups for generation.'
+        },
+        connect: {
+          title: 'Copy config and start',
+          description: 'Use the “Use Key” action to copy Codex, Claude Code, Gemini CLI, or OpenAI-compatible configuration.'
+        }
+      }
+    },
+    integration: {
+      kicker: 'Not just a homepage. It helps users run the first call.',
+      title: 'The path new users actually need',
+      description:
+        'Many users do not fail because of the model itself. They fail because they do not know where to create a key, how to check outages, which models are available, or how billing is calculated. WegooAI makes these steps explicit.',
+      cards: {
+        key: {
+          title: 'Create a key and copy config',
+          description: 'Create an API key, then use the “Use Key” action to copy Codex, Claude Code, Gemini CLI, or OpenAI-compatible configuration.',
+          action: 'Create key'
+        },
+        status: {
+          title: 'Check service status first',
+          description: 'When requests fail, time out, or return 403/429/5xx, check the group status first and switch to a stable group if needed.',
+          action: 'View status'
+        },
+        models: {
+          title: 'Confirm supported models',
+          description: 'The available channels page shows the models currently available for each group, avoiding unsupported model errors.',
+          action: 'View models'
+        },
+        billing: {
+          title: 'Use records to judge real cost',
+          description: 'Requests, tokens, cache hits, and billing records are visible. Use records before choosing a long-term group.',
+          action: 'View usage'
+        }
+      }
+    },
     // Pain points section
     painPoints: {
       title: 'Sound Familiar?',
@@ -53,7 +142,7 @@ export default {
       unifiedGateway: 'One key for daily AI',
       unifiedGatewayDesc: 'Use GPT, Claude, Gemini, and image models from one place for coding, writing, and automation.',
       multiAccount: 'Proprietary scheduling',
-      multiAccountDesc: 'The routing algorithm picks a healthy path by model, group, and live status so instability is less visible to users.',
+      multiAccountDesc: 'The routing algorithm picks a stable path by model, group, and live status so short-term instability is less visible to users.',
       balanceQuota: 'Built for frequent use',
       balanceQuotaDesc: 'Usage-based billing and discount groups make daily use cheaper, with balance, requests, and token spend visible on the dashboard.'
     },
@@ -102,6 +191,62 @@ export default {
       gemini: 'Gemini',
       antigravity: 'Antigravity',
       more: 'More'
+    },
+    useCases: {
+      title: 'Built for people who actually use AI every day',
+      description:
+        'This is not only for one-off trials. It is more useful for developers, students, creators, and automation users who put AI into daily workflows.',
+      coding: {
+        title: 'Coding and vibe coding',
+        description: 'Works well with Codex, Claude Code, Cursor, OpenCode, project scaffolding, bug fixing, code explanation, and agent tasks.'
+      },
+      writing: {
+        title: 'Writing, translation, papers',
+        description: 'Claude and Gemini groups are useful for long-form summaries, research organization, translation, polishing, reports, and analysis.'
+      },
+      automation: {
+        title: 'Scripts and API workflows',
+        description: 'The OpenAI-compatible interface fits existing scripts, bots, internal tools, and batch processing jobs.'
+      },
+      image: {
+        title: 'AI image generation',
+        description: 'Groups with image-generation names are used for visual assets, illustrations, drafts, and batch image creation.'
+      }
+    },
+    trust: {
+      title: 'The concerns new users actually have',
+      description:
+        'Low price is not enough. New users also care whether it works, whether billing is fair, whether models are real, and whether issues can be checked.',
+      points: {
+        modelTruth: 'We do not use domestic replacement models to impersonate GPT, Claude, or Gemini.',
+        billing: 'Each request has auditable usage and billing records. Abnormal billing can be reviewed through support.',
+        status: 'Service status is public. If a group is unstable, users can switch to a more stable group in time.',
+        privacy: 'Records are mainly used for billing, troubleshooting, risk control, and support review; the request records users can see are the main records available for troubleshooting.'
+      }
+    },
+    firstRun: {
+      kicker: 'First-use advice',
+      title: 'Make one successful call first, then choose your long-term group',
+      description:
+        'Groups differ in cost, speed, stability, and model availability. New users should first complete one successful call, then choose a group based on their actual tasks.',
+      tips: {
+        trySmall: {
+          title: 'Start small',
+          description: 'Use signup credit or a small balance to test common models before topping up more.'
+        },
+        serviceStatus: {
+          title: 'Check status first',
+          description: 'If a request fails, times out, or a model is unavailable, check service status before switching groups.'
+        },
+        groupChoice: {
+          title: 'Choose by task',
+          description: 'Daily high-frequency work cares about cost; important work cares about stability; image generation uses image groups.'
+        },
+        records: {
+          title: 'Use records to control cost',
+          description: 'The dashboard shows requests, tokens, cache, and spend, making long-term budget control easier.'
+        }
+      }
     },
     // CTA section
     cta: {
@@ -425,7 +570,9 @@ export default {
     docs: 'Guide',
     docsBadge: 'Start',
     myOrders: 'My Orders',
+    invoices: 'Invoices',
     orderManagement: 'Orders',
+    invoiceManagement: 'Invoice Management',
     paymentDashboard: 'Payment Dashboard',
     paymentConfig: 'Payment Config',
     paymentPlans: 'Plans',
@@ -458,6 +605,8 @@ export default {
     registrationDisabled: 'Registration is currently disabled. Please contact the administrator.',
     emailLabel: 'Email',
     emailPlaceholder: 'Enter your email',
+    emailDeliveryHint:
+      'No email? Check spam and mark it as not spam so top-up, low-balance, password recovery, and campaign notices keep arriving.',
     passwordLabel: 'Password',
     passwordPlaceholder: 'Enter your password',
     createPasswordPlaceholder: 'Create a strong password',
@@ -658,7 +807,25 @@ export default {
     invalidResetLink: 'Invalid Reset Link',
     invalidResetLinkHint: 'This password reset link is invalid or has expired. Please request a new one.',
     requestNewResetLink: 'Request New Reset Link',
-    invalidOrExpiredToken: 'The password reset link is invalid or has expired. Please request a new one.'
+    invalidOrExpiredToken: 'The password reset link is invalid or has expired. Please request a new one.',
+    registerOnboarding: {
+      title: 'No guessing after registration',
+      description: 'After signing up, check your credit, create an API key, then copy the client configuration to start calling models.',
+      steps: {
+        credit: {
+          title: 'Check credit',
+          description: 'Signup credit and top-up balance are shown on the dashboard.'
+        },
+        key: {
+          title: 'Create a key',
+          description: 'Choose a group for your task. Billing follows the selected group.'
+        },
+        connect: {
+          title: 'Copy config',
+          description: 'Connect Codex, Claude Code, Gemini CLI, and API tools with the guide.'
+        }
+      }
+    }
   },
 
   // Dashboard
@@ -718,8 +885,20 @@ export default {
     startUsingApi: 'Start using the API to see your usage history here.',
     viewAllUsage: 'View all usage',
     quickActions: 'Quick Actions',
+    quickActionsHint: 'For first use, finish these in order: create a key, copy config, and send one test request.',
+    firstRun: {
+      title: 'Three steps for new users',
+      description: 'Do not start with a complex project. First verify that the key, group, and client configuration all work.',
+      steps: {
+        createKey: 'Create an API key',
+        selectGroup: 'Choose a group for the task',
+        copyConfig: 'Click “Use Key” and copy config'
+      }
+    },
     createApiKey: 'Create API Key',
     generateNewKey: 'Generate a new API key',
+    serviceStatus: 'Service Status',
+    checkGroupHealth: 'Check here first when requests fail',
     viewUsage: 'View Usage',
     checkDetailedLogs: 'Check detailed usage logs',
     redeemCode: 'Redeem Code',
@@ -789,6 +968,39 @@ export default {
     selectGroup: 'Select a group',
     statusLabel: 'Status',
     selectStatus: 'Select status',
+    firstRunGuide: {
+      title: 'Start here for your first integration',
+      description: 'Create an API key, choose a group, then click “Use Key” to copy config. Make one simple request before connecting Codex, Claude Code, Gemini CLI, or your own project.',
+      steps: {
+        create: 'Create key',
+        group: 'Choose group',
+        use: 'Copy config'
+      }
+    },
+    balanceExplain: {
+      title: 'How does balance map to official pricing?',
+      description: '¥1 is shown as $1 site credit. Actual cost is roughly official model price × current group rate. Lower group rates let the same balance cover more official list-price usage.'
+    },
+    groupChoiceTips: {
+      cost: {
+        title: 'Daily use: watch cost',
+        description: 'For coding, Q&A, and research organization, start by testing lower-rate groups.'
+      },
+      stability: {
+        title: 'Important tasks: watch stability',
+        description: 'For long tasks, deliverables, and automation workflows, prefer more stable groups.'
+      },
+      image: {
+        title: 'Image generation: check group name',
+        description: 'Use groups named for image generation. Regular text groups may not support image generation.'
+      }
+    },
+    groupCostPreview: {
+      title: '{group} billing preview',
+      description: 'Current effective rate is about {rate}. At 1 USD≈¥{cny}, this is roughly {discount}/10 of official CNY pricing.',
+      note: 'This is an estimate for understanding. Actual billing follows model pricing, current rate, and usage records.',
+      unavailable: 'The current group rate cannot be calculated. Please rely on group notes and usage records.'
+    },
     serviceStatusTip: {
       title: 'Can’t connect or seeing errors? Check service status first',
       description: 'If requests fail, time out, or a model is temporarily unavailable, check the current group status first. When a group is unstable, switch to a more stable group in time.',
@@ -874,6 +1086,59 @@ export default {
     ipBlacklistHint: 'One IP or CIDR per line. These IPs will be blocked from using this key.',
     ipRestrictionEnabled: 'IP restriction enabled',
     ccSwitchNotInstalled: 'CC Switch is not installed or the protocol handler is not registered. Please install CC Switch first or manually copy the API key.',
+    ccSwitchDialog: {
+      title: 'Import to CC Switch',
+      description: 'Choose the local client to configure for this key group. CC Switch will write the matching client config and keep managing provider switches.',
+      currentGroup: 'Current group',
+      noGroup: 'This API key has not been assigned to a group. Click the group column in the key list to assign one first.',
+      endpoint: 'Endpoint',
+      model: 'Model',
+      protocol: 'Protocol',
+      reasoning: 'Reasoning',
+      import: 'Import',
+      copyLink: 'Copy link',
+      linkCopied: 'Link copied',
+      openOfficial: 'Open CC Switch',
+      installHint: 'If the browser does not open CC Switch, install it and launch it once first. You can also copy the link and run open, xdg-open, or Start-Process locally.',
+      protocols: {
+        anthropicMessages: 'Anthropic Messages',
+        openaiResponses: 'OpenAI Responses',
+        geminiNative: 'Gemini Native',
+        openaiCompatible: 'OpenAI Compatible',
+        openaiCompletions: 'OpenAI Completions',
+        chatCompletions: 'Chat Completions',
+      },
+      targets: {
+        claudeCode: {
+          name: 'Claude Code',
+          description: 'Writes a Claude Code provider config using Anthropic Messages.',
+        },
+        claudeDesktop: {
+          name: 'Claude Desktop',
+          description: 'Imports through the CC Switch Claude provider using Anthropic Messages.',
+        },
+        codex: {
+          name: 'Codex',
+          description: 'Writes Codex auth.json and config.toml; CC Switch uses Responses natively.',
+        },
+        geminiCli: {
+          name: 'Gemini CLI',
+          description: 'Writes Gemini CLI environment config with the Gemini Native v1beta endpoint.',
+        },
+        opencode: {
+          name: 'OpenCode',
+          description: 'Adds an OpenCode provider; CC Switch deeplinks currently write OpenAI Compatible.',
+        },
+        openclaw: {
+          name: 'OpenClaw',
+          description: 'Adds an OpenClaw provider; CC Switch deeplinks currently write OpenAI Completions.',
+        },
+        hermes: {
+          name: 'Hermes Agent',
+          description: 'Adds a Hermes custom provider; CC Switch deeplinks currently write chat_completions.',
+        },
+      },
+    },
     ccsClientSelect: {
       title: 'Select Client',
       description: 'Please select the client type to import to CC Switch:',
@@ -3747,6 +4012,10 @@ export default {
         oauthPassthrough: 'Auto passthrough (auth only)',
         oauthPassthroughDesc:
           'When enabled, this OpenAI account uses automatic passthrough: the gateway forwards request/response as-is and only swaps auth, while keeping billing/concurrency/audit and necessary safety filtering.',
+        cacheAffinityGroup: 'Cache compatibility group',
+        cacheAffinityGroupPlaceholder: 'e.g. codex-prompt-a',
+        cacheAffinityGroupDesc:
+          'Use the same value for upstream accounts with identical hidden prompts. Codex long-context failover prefers the same group; empty means account-isolated by default.',
         responsesWebsocketsV2: 'Responses WebSocket v2',
         responsesWebsocketsV2Desc:
           'Disabled by default. Enable to allow responses_websockets_v2 capability (still gated by global and account-type switches).',
@@ -7456,6 +7725,24 @@ export default {
       TICKET_CLOSED: 'Ticket is closed. Reopen it first',
       TICKET_NOT_FOUND: 'Ticket not found'
     }
+  },
+
+  invoice: {
+    errors: {
+      INVOICE_NOT_FOUND: 'Invoice request not found',
+      INVOICE_INVALID_STATUS: 'This invoice request cannot be changed in its current status. Refresh and try again.',
+      INVOICE_AMOUNT_TOO_SMALL: 'Invoice amount must be at least {min_amount}',
+      INVOICE_AMOUNT_UNAVAILABLE: 'Invoice amount exceeds the available invoiceable amount: {available_amount}',
+      INVOICE_BALANCE_INSUFFICIENT: 'Insufficient balance for the invoice tax fee. Current balance: {current_balance}, tax fee: {tax_fee}',
+      INVOICE_TYPE_INVALID: 'Invalid invoice type',
+      INVOICE_TITLE_REQUIRED: 'Invoice title is required',
+      INVOICE_ITEM_REQUIRED: 'Invoice item is required',
+      INVOICE_RECEIVER_EMAIL_REQUIRED: 'Receiver email is required',
+      INVOICE_RECEIVER_EMAIL_INVALID: 'Receiver email is invalid',
+      INVOICE_TAX_ID_REQUIRED: 'Tax ID is required for company invoices',
+      INVOICE_REJECT_REASON_REQUIRED: 'Reject reason is required',
+      USER_NOT_FOUND: 'User not found or disabled',
+    },
   },
 
   // User Subscriptions Page

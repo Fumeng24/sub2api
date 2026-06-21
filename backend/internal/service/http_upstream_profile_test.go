@@ -28,11 +28,11 @@ func TestWithOpenAIHTTPUpstreamProfile_NoHeaderTimeout(t *testing.T) {
 	}
 }
 
-func TestWithOpenAIHTTPUpstreamProfile_WeakFallbackTakesPriority(t *testing.T) {
+func TestWithOpenAIHTTPUpstreamProfile_NoHeaderTimeoutTakesPriority(t *testing.T) {
 	ctx := WithOpenAINoHeaderTimeoutUpstream(context.Background(), true)
 	ctx = WithOpenAIWeakFallbackUpstream(ctx, true)
 	ctx = WithOpenAIHTTPUpstreamProfile(ctx)
-	if profile := HTTPUpstreamProfileFromContext(ctx); profile != HTTPUpstreamProfileOpenAIWeakFallback {
-		t.Fatalf("expected profile %q, got %q", HTTPUpstreamProfileOpenAIWeakFallback, profile)
+	if profile := HTTPUpstreamProfileFromContext(ctx); profile != HTTPUpstreamProfileOpenAINoHeaderTimeout {
+		t.Fatalf("expected profile %q, got %q", HTTPUpstreamProfileOpenAINoHeaderTimeout, profile)
 	}
 }

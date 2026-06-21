@@ -438,6 +438,18 @@ func TestSchedulerFailureCategoryClassifiesBillingExhaustion(t *testing.T) {
 	}
 }
 
+func TestSchedulerHealthKeySanitizesInvalidModelFragments(t *testing.T) {
+	key := makeAccountSchedulerHealthKey(38848, `role":"user"}],"model":"claude-sonnet-4-6"`, "/v1/messages")
+	if key.Model != defaultSchedulerModel {
+		t.Fatalf("expected invalid request-body fragment to fall back to default model, got %q", key.Model)
+	}
+
+	valid := makeAccountSchedulerHealthKey(38848, "Claude-Sonnet-4-6", "/v1/messages")
+	if valid.Model != "claude-sonnet-4-6" {
+		t.Fatalf("expected valid model to be normalized, got %q", valid.Model)
+	}
+}
+
 func TestSchedulerHealthClearRemovesScopedDisplayState(t *testing.T) {
 	health := newAccountSchedulerHealthStats()
 	accountID := int64(39001)
@@ -561,6 +573,92 @@ func TestSchedulerDefaultMigratedGroupConfigIsNotExplicit(t *testing.T) {
 	}
 	if order[0].Account.ID != b.ID || order[1].Account.ID != a.ID {
 		t.Fatalf("expected non-explicit config to preserve sorted priority order, got %#v", accountIDsFromSchedulerScores(order))
+	}
+}
+
+func TestSchedulerSeededOrderDistributesSameRankCandidates(t *testing.T) {
+	groupID := int64(100)
+	accounts := []*Account{
+		{ID: 1, Priority: 10},
+		{ID: 2, Priority: 10},
+		{ID: 3, Priority: 10},
+	}
+	scores := buildSchedulerAccountScores(accounts, &groupID, "gpt-5.5", "/v1/responses", nil, nil, true)
+
+	first := buildRoleAwareSchedulerOrder(scores, false, "group", "model", "endpoint", "session-a")
+	second := buildRoleAwareSchedulerOrder(scores, false, "group", "model", "endpoint", "session-a")
+	other := buildRoleAwareSchedulerOrder(scores, false, "group", "model", "endpoint", "session-b")
+
+	if len(first) != len(accounts) || len(second) != len(accounts) || len(other) != len(accounts) {
+		t.Fatalf("unexpected candidate counts: first=%d second=%d other=%d", len(first), len(second), len(other))
+	}
+	if got, want := accountIDsFromSchedulerScores(second), accountIDsFromSchedulerScores(first); !equalInt64Slices(got, want) {
+		t.Fatalf("same seed should produce stable order: got=%v want=%v", got, want)
+	}
+	if got, baseline := accountIDsFromSchedulerScores(other), accountIDsFromSchedulerScores(first); equalInt64Slices(got, baseline) {
+		t.Fatalf("different seeds should be able to distribute same-rank candidates, got identical order %v", got)
+	}
+}
+
+func TestSchedulerSeededOrderDoesNotOverrideConfiguredSortOrder(t *testing.T) {
+	groupID := int64(100)
+	lowOrder := &Account{
+		ID:       1,
+		Priority: 99,
+		AccountGroups: []AccountGroup{{
+			AccountID:            1,
+			GroupID:              groupID,
+			Priority:             99,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               100,
+			SortOrder:            10,
+			SchedulingConfigured: true,
+		}},
+	}
+	highOrder := &Account{
+		ID:       2,
+		Priority: 1,
+		AccountGroups: []AccountGroup{{
+			AccountID:            2,
+			GroupID:              groupID,
+			Priority:             1,
+			Role:                 AccountGroupRolePrimary,
+			Weight:               100,
+			SortOrder:            20,
+			SchedulingConfigured: true,
+		}},
+	}
+
+	scores := buildSchedulerAccountScores([]*Account{highOrder, lowOrder}, &groupID, "gpt-5.5", "/v1/responses", nil, nil, true)
+	order := buildRoleAwareSchedulerOrder(scores, false, "seed-that-would-otherwise-shuffle")
+	if len(order) != 2 || order[0].Account.ID != lowOrder.ID {
+		t.Fatalf("configured sort_order should remain authoritative, got %#v", accountIDsFromSchedulerScores(order))
+	}
+}
+
+func TestSchedulerSeededOrderOverridesLRUOnlyWithinSameRank(t *testing.T) {
+	groupID := int64(100)
+	now := time.Now()
+	old := now.Add(-time.Hour)
+	accounts := []*Account{
+		{ID: 1, Priority: 10, LastUsedAt: &now},
+		{ID: 2, Priority: 10, LastUsedAt: &old},
+		{ID: 3, Priority: 10},
+	}
+	scores := buildSchedulerAccountScores(accounts, &groupID, "gpt-5.5", "/v1/responses", nil, nil, true)
+
+	legacy := buildRoleAwareSchedulerOrder(scores, false)
+	if got := accountIDsFromSchedulerScores(legacy); len(got) != 3 || got[0] != 3 || got[1] != 2 || got[2] != 1 {
+		t.Fatalf("unseeded order should keep legacy LRU behavior, got %#v", got)
+	}
+
+	seeded := buildRoleAwareSchedulerOrder(scores, false, "group", "model", "endpoint", "session-a")
+	seededAgain := buildRoleAwareSchedulerOrder(scores, false, "group", "model", "endpoint", "session-a")
+	if got, want := accountIDsFromSchedulerScores(seededAgain), accountIDsFromSchedulerScores(seeded); !equalInt64Slices(got, want) {
+		t.Fatalf("seeded order should stay stable for same session: got=%v want=%v", got, want)
+	}
+	if got := accountIDsFromSchedulerScores(seeded); equalInt64Slices(got, accountIDsFromSchedulerScores(legacy)) {
+		t.Fatalf("seeded order should not be forced by LRU inside same rank, got legacy order %v", got)
 	}
 }
 
@@ -707,4 +805,16 @@ func accountIDsFromSchedulerScores(scores []schedulerAccountScore) []int64 {
 		}
 	}
 	return ids
+}
+
+func equalInt64Slices(a, b []int64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

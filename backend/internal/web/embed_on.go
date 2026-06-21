@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,12 +36,14 @@ type PublicSettingsProvider interface {
 
 // FrontendServer serves the embedded frontend with settings injection
 type FrontendServer struct {
-	distFS      fs.FS
-	fileServer  http.Handler
-	baseHTML    []byte
-	cache       *HTMLCache
-	settings    PublicSettingsProvider
-	overrideDir string // local file override directory
+	distFS          fs.FS
+	fileServer      http.Handler
+	baseHTML        []byte
+	entryScriptPath string
+	stylesheetPaths []string
+	cache           *HTMLCache
+	settings        PublicSettingsProvider
+	overrideDir     string // local file override directory
 }
 
 // NewFrontendServer creates a new frontend server with settings injection
@@ -65,12 +69,14 @@ func NewFrontendServer(settingsProvider PublicSettingsProvider) (*FrontendServer
 	cache.SetBaseHTML(baseHTML)
 
 	return &FrontendServer{
-		distFS:      distFS,
-		fileServer:  http.FileServer(http.FS(distFS)),
-		baseHTML:    baseHTML,
-		cache:       cache,
-		settings:    settingsProvider,
-		overrideDir: filepath.Join("data", "public"),
+		distFS:          distFS,
+		fileServer:      http.FileServer(http.FS(distFS)),
+		baseHTML:        baseHTML,
+		entryScriptPath: extractFrontendEntryScript(baseHTML),
+		stylesheetPaths: extractFrontendStylesheets(baseHTML),
+		cache:           cache,
+		settings:        settingsProvider,
+		overrideDir:     filepath.Join("data", "public"),
 	}, nil
 }
 
@@ -97,8 +103,21 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 			cleanPath = "index.html"
 		}
 
-		// For index.html or SPA routes, serve with injected settings
-		if cleanPath == "index.html" || !s.fileExists(cleanPath) {
+		if cleanPath == "index.html" {
+			s.serveIndexHTML(c)
+			return
+		}
+
+		if !s.fileExists(cleanPath) {
+			if isFrontendEntryRequest(cleanPath) {
+				serveFrontendEntryShim(c, s.entryScriptPath, s.stylesheetPaths)
+				return
+			}
+			if isFrontendAssetRequest(cleanPath) {
+				c.String(http.StatusNotFound, "Frontend asset not found")
+				c.Abort()
+				return
+			}
 			s.serveIndexHTML(c)
 			return
 		}
@@ -157,7 +176,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 		content := replaceNoncePlaceholder(cached.Content, nonce)
 
 		c.Header("ETag", cached.ETag)
-		c.Header("Cache-Control", "no-cache") // Must revalidate
+		c.Header("Cache-Control", "no-store")
 		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 		c.Abort()
 		return
@@ -193,7 +212,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 	if cached != nil {
 		c.Header("ETag", cached.ETag)
 	}
-	c.Header("Cache-Control", "no-cache")
+	c.Header("Cache-Control", "no-store")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	c.Abort()
 }
@@ -223,10 +242,16 @@ func injectSiteTitle(html, settingsJSON []byte) []byte {
 		return html
 	}
 
-	// Find and replace the existing <title>...</title>
+	// Find and replace the existing <title>...</title>.
+	// Keep explicit SEO titles from index.html; only replace the upstream default.
 	titleStart := bytes.Index(html, []byte("<title>"))
 	titleEnd := bytes.Index(html, []byte("</title>"))
 	if titleStart == -1 || titleEnd == -1 || titleEnd <= titleStart {
+		return html
+	}
+
+	existingTitle := strings.TrimSpace(string(html[titleStart+len("<title>") : titleEnd]))
+	if !strings.HasPrefix(existingTitle, "Sub2API") {
 		return html
 	}
 
@@ -252,6 +277,9 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 	}
 	fileServer := http.FileServer(http.FS(distFS))
 	overrideDir := filepath.Join("data", "public")
+	baseHTML := readFrontendBaseHTML(distFS)
+	entryScriptPath := extractFrontendEntryScript(baseHTML)
+	stylesheetPaths := extractFrontendStylesheets(baseHTML)
 
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
@@ -263,7 +291,8 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 
 		cleanPath := strings.TrimPrefix(path, "/")
 		if cleanPath == "" {
-			cleanPath = "index.html"
+			serveIndexHTML(c, distFS)
+			return
 		}
 
 		if file, err := distFS.Open(cleanPath); err == nil {
@@ -273,6 +302,17 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 				return
 			}
 			fileServer.ServeHTTP(c.Writer, c.Request)
+			c.Abort()
+			return
+		}
+
+		if isFrontendEntryRequest(cleanPath) {
+			serveFrontendEntryShim(c, entryScriptPath, stylesheetPaths)
+			return
+		}
+
+		if isFrontendAssetRequest(cleanPath) {
+			c.String(http.StatusNotFound, "Frontend asset not found")
 			c.Abort()
 			return
 		}
@@ -308,6 +348,109 @@ func shouldBypassEmbeddedFrontend(path string) bool {
 		trimmed == "/responses" ||
 		strings.HasPrefix(trimmed, "/responses/") ||
 		strings.HasPrefix(trimmed, "/images/")
+}
+
+var frontendEntryScriptPattern = regexp.MustCompile(`(?i)<script\b[^>]*\bsrc=["']([^"']*/assets/index-[^"']+\.js)["'][^>]*>`)
+var frontendStylesheetPattern = regexp.MustCompile(`(?i)<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["']([^"']+\.css)["'][^>]*>`)
+
+func extractFrontendEntryScript(html []byte) string {
+	matches := frontendEntryScriptPattern.FindSubmatch(html)
+	if len(matches) < 2 {
+		return ""
+	}
+	return string(matches[1])
+}
+
+func extractFrontendStylesheets(html []byte) []string {
+	matches := frontendStylesheetPattern.FindAllSubmatch(html, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	paths := make([]string, 0, len(matches))
+	seen := make(map[string]struct{}, len(matches))
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		path := string(match[1])
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		paths = append(paths, path)
+	}
+	return paths
+}
+
+func readFrontendBaseHTML(fsys fs.FS) []byte {
+	file, err := fsys.Open("index.html")
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = file.Close() }()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return nil
+	}
+	return content
+}
+
+func isFrontendEntryRequest(cleanPath string) bool {
+	return cleanPath == "src/main.ts" ||
+		(strings.HasPrefix(cleanPath, "assets/index-") && strings.HasSuffix(cleanPath, ".js"))
+}
+
+func isFrontendAssetRequest(cleanPath string) bool {
+	if strings.HasPrefix(cleanPath, "assets/") || strings.HasPrefix(cleanPath, "src/") {
+		return true
+	}
+
+	switch cleanPath {
+	case "favicon.ico", "logo.png", "robots.txt", "manifest.webmanifest", "site.webmanifest":
+		return true
+	}
+
+	switch strings.ToLower(filepath.Ext(cleanPath)) {
+	case ".js", ".mjs", ".css", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".json", ".txt", ".xml", ".webmanifest", ".ts":
+		return true
+	default:
+		return false
+	}
+}
+
+func serveFrontendEntryShim(c *gin.Context, entryScriptPath string, stylesheetPaths []string) {
+	if entryScriptPath == "" {
+		c.String(http.StatusNotFound, "Frontend entry not found")
+		c.Abort()
+		return
+	}
+
+	var script strings.Builder
+	for _, stylesheetPath := range stylesheetPaths {
+		script.WriteString("if(!document.querySelector('link[href=\"")
+		script.WriteString(jsStringLiteralContent(stylesheetPath))
+		script.WriteString("\"]')){const l=document.createElement('link');l.rel='stylesheet';l.href=")
+		script.WriteString(strconv.Quote(stylesheetPath))
+		script.WriteString(";document.head.appendChild(l);}\n")
+	}
+	script.WriteString("import ")
+	script.WriteString(strconv.Quote(entryScriptPath))
+	script.WriteString(";\n")
+
+	c.Header("Cache-Control", "no-store")
+	c.Data(
+		http.StatusOK,
+		"text/javascript; charset=utf-8",
+		[]byte(script.String()),
+	)
+	c.Abort()
+}
+
+func jsStringLiteralContent(value string) string {
+	quoted := strconv.Quote(value)
+	return quoted[1 : len(quoted)-1]
 }
 
 func serveIndexHTML(c *gin.Context, fsys fs.FS) {
