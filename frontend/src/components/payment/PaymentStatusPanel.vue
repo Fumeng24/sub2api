@@ -84,7 +84,21 @@
             </div>
           </div>
           <p v-if="scanHint" class="text-center text-sm text-gray-500 dark:text-gray-400">{{ scanHint }}</p>
-          <button v-if="payUrl" class="btn btn-secondary text-sm" @click="reopenPopup">
+          <div v-if="showMobileQrFallbackActions" class="w-full space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+            <p class="text-center text-sm leading-relaxed text-amber-800 dark:text-amber-100">{{ t('payment.qr.mobileFallbackHint') }}</p>
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <button v-if="payUrl" class="btn btn-secondary min-h-10 text-sm" @click="copyPayUrl">
+                {{ t('payment.qr.copyPayUrl') }}
+              </button>
+              <button class="btn btn-secondary min-h-10 text-sm" @click="copyQrUrl">
+                {{ t('payment.qr.copyQrUrl') }}
+              </button>
+              <button v-if="payUrl" class="btn btn-primary min-h-10 text-sm" @click="reopenPopup">
+                {{ t('payment.qr.openPayUrl') }}
+              </button>
+            </div>
+          </div>
+          <button v-if="payUrl && !showMobileQrFallbackActions" class="btn btn-secondary text-sm" @click="reopenPopup">
             {{ t('payment.qr.openPayWindow') }}
           </button>
         </div>
@@ -128,6 +142,7 @@ import { usePaymentStore } from '@/stores/payment'
 import { useAppStore } from '@/stores'
 import { paymentAPI } from '@/api/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
+import { isMobileDevice } from '@/utils/device'
 import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
 import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
 import { formatBalanceCreditAmount } from '@/components/payment/orderAmounts'
@@ -162,6 +177,7 @@ const remainingSeconds = ref(0)
 const cancelling = ref(false)
 const paidOrder = ref<PaymentOrder | null>(null)
 const paymentCurrency = computed(() => normalizePaymentCurrency(props.currency))
+const showMobileQrFallbackActions = computed(() => !!qrUrl.value && isMobileDevice())
 const localeCode = computed(() => {
   const raw = i18n.locale as unknown
   if (typeof raw === 'string') return raw
@@ -230,6 +246,36 @@ function reopenPopup() {
       window.location.href = props.payUrl
     }
   }
+}
+
+async function copyText(text: string) {
+  if (!text) return
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.setAttribute('readonly', '')
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    appStore.showSuccess(t('common.copied'))
+  } catch {
+    appStore.showError(t('common.copyFailed'))
+  }
+}
+
+function copyPayUrl() {
+  copyText(props.payUrl || '')
+}
+
+function copyQrUrl() {
+  copyText(qrUrl.value)
 }
 
 function setOutcome(next: PaymentOutcome) {

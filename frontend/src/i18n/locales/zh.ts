@@ -8174,6 +8174,10 @@ export default {
       payInNewWindow: '请在新窗口中完成支付',
       payInNewWindowHint: '支付页面已在新窗口打开，请在新窗口中完成支付后返回此页面',
       openPayWindow: '重新打开支付页面',
+      copyPayUrl: '复制支付链接',
+      copyQrUrl: '复制二维码链接',
+      openPayUrl: '打开支付链接',
+      mobileFallbackHint: '本机无法扫码时可复制链接到另一台设备或截图给另一台设备扫。',
       expiresIn: '剩余支付时间',
       expired: '订单已过期',
       expiredDesc: '订单已超时，请重新创建订单',
@@ -8237,6 +8241,7 @@ export default {
     errors: {
       tooManyPending: '待支付订单过多（最多 {max} 个），请先完成或取消现有订单',
       cancelRateLimited: '取消订单过于频繁，请稍后再试',
+      createOrderHint: '请检查支付方式和金额后重试。如仍无法下单，请带上本页错误信息联系支持。',
       wechatH5NotAuthorized: '当前商户未开通微信 H5 支付，请在微信中打开当前页面继续支付。',
       wechatPaymentMpNotConfigured: '当前站点未完成公众号/JSAPI 支付配置，暂时无法在微信内直接拉起支付。',
       wechatJsapiUnavailable: '当前环境未能拉起微信支付，请确认正在微信内打开本页后重试。',

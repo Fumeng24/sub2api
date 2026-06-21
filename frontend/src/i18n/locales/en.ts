@@ -7994,6 +7994,10 @@ export default {
       payInNewWindow: 'Complete Payment in New Window',
       payInNewWindowHint: 'The payment page has opened in a new window. Please complete the payment there and return to this page.',
       openPayWindow: 'Reopen Payment Page',
+      copyPayUrl: 'Copy payment link',
+      copyQrUrl: 'Copy QR link',
+      openPayUrl: 'Open payment link',
+      mobileFallbackHint: 'If this device cannot scan the code, copy the link to another device or take a screenshot for another device to scan.',
       expiresIn: 'Expires in',
       expired: 'Order Expired',
       expiredDesc: 'This order has expired. Please create a new one.',
@@ -8057,6 +8061,7 @@ export default {
     errors: {
       tooManyPending: 'Too many pending orders (max {max}). Please complete or cancel existing orders first.',
       cancelRateLimited: 'Too many cancellations. Please try again later.',
+      createOrderHint: 'Check the payment method and amount, then try again. If the issue persists, contact support with the error shown here.',
       wechatH5NotAuthorized: 'This merchant has not enabled WeChat H5 payment. Open this page in WeChat to continue.',
       wechatPaymentMpNotConfigured: 'This site has not completed WeChat MP/JSAPI payment setup, so in-app WeChat payment is unavailable right now.',
       wechatJsapiUnavailable: 'WeChat payment could not be invoked in the current environment. Reopen this page inside WeChat and try again.',
