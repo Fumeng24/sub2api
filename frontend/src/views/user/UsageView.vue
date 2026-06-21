@@ -130,15 +130,6 @@
               />
             </div>
 
-            <div class="min-w-[150px]">
-              <label class="input-label">{{ t('settlementCurrency.label') }}</label>
-              <Select
-                :model-value="settlementCurrency"
-                :options="settlementCurrencyOptions"
-                @update:model-value="setSettlementCurrency"
-              />
-            </div>
-
             <!-- Actions -->
             <div class="ml-auto flex items-center gap-3">
               <button @click="applyFilters" :disabled="loading" class="btn btn-secondary">
@@ -684,8 +675,6 @@ const router = useRouter()
 const appStore = useAppStore()
 const {
   settlementCurrency,
-  settlementCurrencyOptions,
-  setSettlementCurrency,
   formatSettlementAmount,
 } = useSettlementCurrency()
 

@@ -60,14 +60,6 @@
 
             <div class="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-end">
               <div class="flex flex-wrap items-center justify-end gap-3">
-                <div class="w-36 max-w-full">
-                  <Select
-                    :model-value="settlementCurrency"
-                    :options="settlementCurrencyOptions"
-                    :placeholder="t('settlementCurrency.label')"
-                    @update:model-value="setDisplayedSettlementCurrency"
-                  />
-                </div>
                 <button
                   @click="loadApiKeys"
                   :disabled="loading"
@@ -1298,7 +1290,6 @@ import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import {
   convertSettlementAmount,
-  convertSettlementAmountToCredits,
   setSettlementCnyPerCredit,
   useSettlementCurrency,
   type SettlementCurrency,
@@ -1380,10 +1371,8 @@ const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 const {
   settlementCurrency,
-  settlementCurrencyOptions,
   settlementAmountPrefix,
   cnyPerCredit,
-  setSettlementCurrency,
   formatSettlementAmount,
   formatSettlementAmountPair,
   toBalanceCreditAmount,
@@ -1847,30 +1836,6 @@ const toStoredBalanceAmount = (amount: number | null | undefined): number => {
   const value = Number(amount)
   if (!Number.isFinite(value) || value <= 0) return 0
   return Number(toBalanceCreditAmount(value).toFixed(4))
-}
-
-const convertDisplayedBalanceAmount = (
-  amount: number | null | undefined,
-  fromCurrency: SettlementCurrency,
-  toCurrency: SettlementCurrency,
-): number | null => {
-  const value = Number(amount)
-  if (!Number.isFinite(value) || value <= 0) return null
-  const credits = convertSettlementAmountToCredits(value, fromCurrency, cnyPerCredit.value)
-  return toSettlementInputAmount(credits, toCurrency)
-}
-
-const setDisplayedSettlementCurrency = (value: unknown) => {
-  const previousCurrency = settlementCurrency.value
-  setSettlementCurrency(value)
-  const nextCurrency = settlementCurrency.value
-  if (previousCurrency === nextCurrency || (!showCreateModal.value && !showEditModal.value)) {
-    return
-  }
-  formData.value.quota = convertDisplayedBalanceAmount(formData.value.quota, previousCurrency, nextCurrency)
-  formData.value.rate_limit_5h = convertDisplayedBalanceAmount(formData.value.rate_limit_5h, previousCurrency, nextCurrency)
-  formData.value.rate_limit_1d = convertDisplayedBalanceAmount(formData.value.rate_limit_1d, previousCurrency, nextCurrency)
-  formData.value.rate_limit_7d = convertDisplayedBalanceAmount(formData.value.rate_limit_7d, previousCurrency, nextCurrency)
 }
 
 const handlePageChange = (page: number) => {

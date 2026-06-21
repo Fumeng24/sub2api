@@ -596,13 +596,6 @@ export default {
       discount: '特价分组适合 GPT 高频使用',
       stability: '独家调度算法，稳定性极佳'
     },
-    loginOverviewLabel: '账户入口',
-    loginOverviewDescription: '{siteName} 的统一登录入口。您可以使用邮箱、密码或已绑定的快捷方式继续。',
-    loginOverviewItems: {
-      account: '邮箱与密码',
-      verification: '2FA 与 Turnstile',
-      billing: '额度、用量、发票',
-    },
     signUp: '注册',
     processing: '处理中...',
     continue: '继续',

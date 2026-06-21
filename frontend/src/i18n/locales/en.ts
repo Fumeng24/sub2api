@@ -596,13 +596,6 @@ export default {
       discount: 'Discount groups for frequent GPT use',
       stability: 'Proprietary scheduling, excellent stability'
     },
-    loginOverviewLabel: 'Account access',
-    loginOverviewDescription: 'A single entry point for {siteName}. Use your email, password, or a connected sign-in method to continue.',
-    loginOverviewItems: {
-      account: 'Email and password',
-      verification: '2FA and Turnstile',
-      billing: 'Quota, usage, invoices',
-    },
     signUp: 'Sign up',
     processing: 'Processing...',
     continue: 'Continue',
