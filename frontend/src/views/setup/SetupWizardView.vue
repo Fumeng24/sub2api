@@ -1,27 +1,27 @@
 <template>
   <div
-    class="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4 dark:from-dark-900 dark:to-dark-800"
+    class="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10 dark:bg-dark-950 sm:px-6"
   >
     <div class="w-full max-w-2xl">
       <!-- Logo & Title -->
       <div class="mb-8 text-center">
         <div
-          class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg"
+          class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary-600 shadow-sm"
         >
           <Icon name="cog" size="xl" class="text-white" />
         </div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ t('setup.title') }}</h1>
-        <p class="mt-2 text-gray-500 dark:text-dark-400">{{ t('setup.description') }}</p>
+        <h1 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">{{ t('setup.title') }}</h1>
+        <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-dark-400">{{ t('setup.description') }}</p>
       </div>
 
       <!-- Progress Steps -->
       <div class="mb-8">
-        <div class="flex items-center justify-center">
+        <div class="flex flex-wrap items-center justify-center gap-2 sm:flex-nowrap sm:gap-0">
           <template v-for="(step, index) in steps" :key="step.id">
             <div class="flex items-center">
               <div
                 :class="[
-                  'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-all',
+                  'flex h-10 w-10 items-center justify-center rounded-lg text-sm font-semibold transition-all',
                   currentStep > index
                     ? 'bg-primary-500 text-white'
                     : currentStep === index
@@ -38,7 +38,7 @@
                 <span v-else>{{ index + 1 }}</span>
               </div>
               <span
-                class="ml-2 text-sm font-medium"
+                class="ml-2 hidden text-sm font-medium sm:inline"
                 :class="
                   currentStep >= index
                     ? 'text-gray-900 dark:text-white'
@@ -50,7 +50,7 @@
             </div>
             <div
               v-if="index < steps.length - 1"
-              class="mx-3 h-0.5 w-12"
+              class="mx-3 hidden h-0.5 w-12 sm:block"
               :class="currentStep > index ? 'bg-primary-500' : 'bg-gray-200 dark:bg-dark-700'"
             ></div>
           </template>
@@ -58,7 +58,7 @@
       </div>
 
       <!-- Step Content -->
-      <div class="rounded-2xl bg-white p-8 shadow-xl dark:bg-dark-800">
+      <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-800 dark:bg-dark-900 sm:p-8">
         <!-- Step 1: Database -->
         <div v-if="currentStep === 0" class="space-y-6">
           <div class="mb-6 text-center">
@@ -70,7 +70,7 @@
             </p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="input-label">{{ t('setup.database.host') }}</label>
               <input
@@ -91,7 +91,7 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between rounded-xl border border-gray-200 p-3 dark:border-dark-700">
+          <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-200 p-3 dark:border-dark-700">
             <div>
               <p class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ t("setup.redis.enableTls") }}
@@ -103,7 +103,7 @@
             <Toggle v-model="formData.redis.enable_tls" />
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="input-label">{{ t('setup.database.username') }}</label>
               <input
@@ -124,7 +124,7 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="input-label">{{ t('setup.database.databaseName') }}</label>
               <input
@@ -195,7 +195,7 @@
             </p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="input-label">{{ t('setup.redis.host') }}</label>
               <input
@@ -216,7 +216,7 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="input-label">{{ t('setup.redis.password') }}</label>
               <input
@@ -237,7 +237,7 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between rounded-xl border border-gray-200 p-3 dark:border-dark-700">
+          <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-200 p-3 dark:border-dark-700">
             <div>
               <p class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ t("setup.redis.enableTls") }}
@@ -351,31 +351,31 @@
           </div>
 
           <div class="space-y-4">
-            <div class="rounded-xl bg-gray-50 p-4 dark:bg-dark-700">
+            <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-800">
               <h3 class="mb-2 text-sm font-medium text-gray-500 dark:text-dark-400">
                 {{ t('setup.ready.database') }}
               </h3>
-              <p class="text-gray-900 dark:text-white">
+              <p class="break-words text-gray-900 dark:text-white">
                 {{ formData.database.user }}@{{ formData.database.host }}:{{
                   formData.database.port
                 }}/{{ formData.database.dbname }}
               </p>
             </div>
 
-            <div class="rounded-xl bg-gray-50 p-4 dark:bg-dark-700">
+            <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-800">
               <h3 class="mb-2 text-sm font-medium text-gray-500 dark:text-dark-400">
                 {{ t('setup.ready.redis') }}
               </h3>
-              <p class="text-gray-900 dark:text-white">
+              <p class="break-words text-gray-900 dark:text-white">
                 {{ formData.redis.host }}:{{ formData.redis.port }}
               </p>
             </div>
 
-            <div class="rounded-xl bg-gray-50 p-4 dark:bg-dark-700">
+            <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-800">
               <h3 class="mb-2 text-sm font-medium text-gray-500 dark:text-dark-400">
                 {{ t('setup.ready.adminEmail') }}
               </h3>
-              <p class="text-gray-900 dark:text-white">{{ formData.admin.email }}</p>
+              <p class="break-words text-gray-900 dark:text-white">{{ formData.admin.email }}</p>
             </div>
           </div>
         </div>
@@ -383,7 +383,7 @@
         <!-- Error Message -->
         <div
           v-if="errorMessage"
-          class="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20"
+          class="mt-6 rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20"
         >
           <div class="flex items-start gap-3">
             <Icon name="exclamationCircle" size="md" class="flex-shrink-0 text-red-500" />
@@ -394,7 +394,7 @@
         <!-- Success Message -->
         <div
           v-if="installSuccess"
-          class="mt-6 rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-800/50 dark:bg-green-900/20"
+          class="mt-6 rounded-md border border-green-200 bg-green-50 p-4 dark:border-green-800/50 dark:bg-green-900/20"
         >
           <div class="flex items-start gap-3">
             <svg
@@ -434,11 +434,11 @@
         </div>
 
         <!-- Navigation Buttons -->
-        <div class="mt-8 flex justify-between">
+        <div class="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
           <button
             v-if="currentStep > 0 && !installSuccess"
             @click="currentStep--"
-            class="btn btn-secondary"
+            class="btn btn-secondary w-full sm:w-auto"
           >
             <Icon name="chevronLeft" size="sm" class="mr-2" :stroke-width="2" />
             {{ t('common.back') }}
@@ -449,7 +449,7 @@
             v-if="currentStep < 3"
             @click="nextStep"
             :disabled="!canProceed"
-            class="btn btn-primary"
+            class="btn btn-primary w-full sm:w-auto"
           >
             {{ t('common.next') }}
             <Icon name="chevronRight" size="sm" class="ml-2" :stroke-width="2" />
@@ -459,7 +459,7 @@
             v-else-if="!installSuccess"
             @click="performInstall"
             :disabled="installing"
-            class="btn btn-primary"
+            class="btn btn-primary w-full sm:w-auto"
           >
             <svg
               v-if="installing"

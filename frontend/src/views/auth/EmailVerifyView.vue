@@ -3,10 +3,10 @@
     <div class="space-y-6">
       <!-- Title -->
       <div class="text-center">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+        <h2 class="text-xl font-semibold tracking-tight text-gray-950 dark:text-white">
           {{ t('auth.verifyYourEmail') }}
         </h2>
-        <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
+        <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-dark-400">
           {{ t('auth.sendCodeDesc') }}
           <span class="font-medium text-gray-700 dark:text-gray-300">{{ email }}</span>
         </p>
@@ -15,7 +15,7 @@
       <!-- No Data Warning -->
       <div
         v-if="!hasRegisterData"
-        class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-900/20"
+        class="rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-900/20"
       >
         <div class="flex items-start gap-3">
           <div class="flex-shrink-0">
@@ -29,7 +29,7 @@
       </div>
 
       <!-- Verification Form -->
-      <form v-else @submit.prevent="handleVerify" class="space-y-5">
+      <form v-else @submit.prevent="handleVerify" class="space-y-4">
         <!-- Verification Code Input -->
         <div>
           <label for="code" class="input-label text-center">
@@ -44,7 +44,7 @@
             inputmode="numeric"
             maxlength="6"
             :disabled="isLoading"
-            class="input py-3 text-center font-mono text-xl tracking-[0.5em]"
+            class="input py-3 text-center font-mono text-xl tracking-[0.35em] sm:tracking-[0.5em]"
             :class="{ 'input-error': errors.code }"
             placeholder="000000"
           />
@@ -54,7 +54,7 @@
         <!-- Code Status -->
         <div
           v-if="codeSent"
-          class="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800/50 dark:bg-green-900/20"
+          class="rounded-md border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800/50 dark:bg-green-900/20"
         >
           <div class="flex items-start gap-2.5">
             <div class="flex-shrink-0">
@@ -83,7 +83,7 @@
         <div
           v-if="inlineErrorMessage"
           role="alert"
-          class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-300"
+          class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-300"
         >
           {{ inlineErrorMessage }}
         </div>
@@ -147,7 +147,7 @@
     <template #footer>
       <button
         @click="handleBack"
-        class="flex items-center gap-2 text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-gray-300"
+        class="mx-auto flex items-center gap-2 text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-gray-300"
       >
         <Icon name="arrowLeft" size="sm" />
         {{ t('auth.backToRegistration') }}

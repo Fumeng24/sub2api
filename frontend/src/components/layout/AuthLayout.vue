@@ -1,24 +1,24 @@
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-dark-950">
+  <div class="flex min-h-screen items-center justify-center bg-white px-4 py-10 text-gray-950 dark:bg-dark-950 dark:text-white sm:px-6">
     <!-- Content Container -->
-    <div class="w-full max-w-md">
+    <div class="w-full max-w-[420px]">
       <!-- Logo/Brand -->
-      <div class="mb-6 text-center">
+      <div class="mb-8 text-center">
         <!-- Custom Logo or Default Logo -->
-        <template v-if="settingsLoaded">
+        <template v-if="settingsLoaded || siteName">
           <div
-            class="mb-3 inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-dark-900 dark:ring-dark-800"
+            class="mb-3 inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200 dark:bg-dark-900 dark:ring-dark-800"
           >
             <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
           </div>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 class="text-xl font-semibold tracking-tight text-gray-950 dark:text-white">
             {{ siteName }}
           </h1>
         </template>
       </div>
 
       <!-- Card Container -->
-      <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-800 dark:bg-dark-900 sm:p-8">
+      <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-800 dark:bg-dark-900/80 sm:p-7">
         <slot />
       </div>
 
@@ -52,3 +52,14 @@ onMounted(() => {
   appStore.fetchPublicSettings()
 })
 </script>
+
+<style scoped>
+:deep(.input),
+:deep(.btn) {
+  border-radius: 0.5rem;
+}
+
+:deep(.input) {
+  min-height: 2.75rem;
+}
+</style>
