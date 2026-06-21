@@ -1,32 +1,28 @@
 <template>
-  <div
-    class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-dark-700 dark:bg-dark-800 sm:px-6"
-  >
-    <div class="flex flex-1 items-center justify-between sm:hidden">
-      <!-- Mobile pagination -->
+  <div class="flex min-w-0 items-center justify-between gap-3 bg-white px-3 py-3 dark:bg-dark-900 sm:px-4">
+    <div class="flex min-w-0 flex-1 items-center justify-between gap-3 sm:hidden">
       <button
         @click="goToPage(page - 1)"
         :disabled="page === 1"
-        class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600"
+        class="btn btn-secondary btn-sm"
       >
         {{ t('pagination.previous') }}
       </button>
-      <span class="text-sm text-gray-700 dark:text-gray-300">
+      <span class="min-w-0 truncate text-sm text-gray-600 dark:text-gray-300">
         {{ t('pagination.pageOf', { page, total: totalPages }) }}
       </span>
       <button
         @click="goToPage(page + 1)"
         :disabled="page === totalPages"
-        class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600"
+        class="btn btn-secondary btn-sm"
       >
         {{ t('pagination.next') }}
       </button>
     </div>
 
-    <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-      <!-- Desktop pagination info -->
-      <div class="flex items-center space-x-4">
-        <p class="text-sm text-gray-700 dark:text-gray-300">
+    <div class="hidden min-w-0 flex-1 flex-wrap items-center justify-between gap-3 sm:flex">
+      <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+        <p class="min-w-0 text-sm text-gray-600 dark:text-gray-300">
           {{ t('pagination.showing') }}
           <span class="font-medium">{{ fromItem }}</span>
           {{ t('pagination.to') }}
@@ -37,8 +33,8 @@
         </p>
 
         <!-- Page size selector -->
-        <div v-if="showPageSizeSelector" class="flex items-center space-x-2">
-          <span class="text-sm text-gray-700 dark:text-gray-300"
+        <div v-if="showPageSizeSelector" class="flex items-center gap-2">
+          <span class="text-sm text-gray-600 dark:text-gray-300"
             >{{ t('pagination.perPage') }}:</span
           >
           <div class="page-size-select w-20">
@@ -50,8 +46,8 @@
           </div>
         </div>
 
-        <div v-if="showJump" class="flex items-center space-x-2">
-          <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('pagination.jumpTo') }}</span>
+        <div v-if="showJump" class="flex items-center gap-2">
+          <span class="text-sm text-gray-600 dark:text-gray-300">{{ t('pagination.jumpTo') }}</span>
           <input
             v-model="jumpPage"
             type="number"
@@ -67,32 +63,29 @@
         </div>
       </div>
 
-      <!-- Desktop pagination buttons -->
       <nav
-        class="relative z-0 inline-flex -space-x-px rounded-md shadow-sm"
+        class="relative z-0 inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800"
         aria-label="Pagination"
       >
-        <!-- Previous button -->
         <button
           @click="goToPage(page - 1)"
           :disabled="page === 1"
-          class="relative inline-flex items-center rounded-l-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600"
+          class="relative inline-flex items-center border-r border-gray-200 px-2.5 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-700 dark:text-gray-400 dark:hover:bg-dark-700"
           :aria-label="t('pagination.previous')"
         >
           <Icon name="chevronLeft" size="md" />
         </button>
 
-        <!-- Page numbers -->
         <button
           v-for="(pageNum, index) in visiblePages"
           :key="`${pageNum}-${index}`"
           @click="typeof pageNum === 'number' && goToPage(pageNum)"
           :disabled="typeof pageNum !== 'number'"
           :class="[
-            'relative inline-flex items-center border px-4 py-2 text-sm font-medium',
+            'relative inline-flex items-center border-r border-gray-200 px-3.5 py-2 text-sm font-medium last:border-r-0 dark:border-dark-700',
             pageNum === page
-              ? 'z-10 border-primary-500 bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400'
-              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-300 dark:hover:bg-dark-600',
+              ? 'z-10 bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400'
+              : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-dark-700',
             typeof pageNum !== 'number' && 'cursor-default'
           ]"
           :aria-label="
@@ -103,11 +96,10 @@
           {{ pageNum }}
         </button>
 
-        <!-- Next button -->
         <button
           @click="goToPage(page + 1)"
           :disabled="page === totalPages"
-          class="relative inline-flex items-center rounded-r-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600"
+          class="relative inline-flex items-center px-2.5 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:bg-dark-700"
           :aria-label="t('pagination.next')"
         >
           <Icon name="chevronRight" size="md" />

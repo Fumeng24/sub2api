@@ -70,19 +70,17 @@
 @layer components {
   /* ============ 按钮样式 ============ */
   .btn {
-    @apply inline-flex items-center justify-center gap-2;
-    @apply rounded-xl px-4 py-2.5 text-sm font-medium;
-    @apply transition-all duration-200 ease-out;
+    @apply inline-flex min-w-0 max-w-full items-center justify-center gap-2;
+    @apply rounded-lg px-3.5 py-2 text-sm font-medium leading-5;
+    @apply transition-colors duration-150 ease-out;
     @apply focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-2;
-    @apply disabled:transform-none disabled:cursor-not-allowed disabled:opacity-50;
-    @apply active:scale-[0.98];
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-500 to-primary-600;
-    @apply text-white shadow-md shadow-primary-500/25;
-    @apply hover:from-primary-600 hover:to-primary-700 hover:shadow-lg hover:shadow-primary-500/30;
-    @apply dark:shadow-primary-500/20;
+    @apply bg-primary-600 text-white shadow-sm;
+    @apply hover:bg-primary-700;
+    @apply dark:bg-primary-500 dark:hover:bg-primary-600;
   }
 
   .btn-secondary {
@@ -154,24 +152,24 @@
   }
 
   .btn-sm {
-    @apply rounded-lg px-3 py-1.5 text-xs;
+    @apply rounded-md px-3 py-1.5 text-xs;
   }
 
   .btn-md {
-    @apply rounded-xl px-4 py-2 text-sm;
+    @apply rounded-lg px-3.5 py-2 text-sm;
   }
 
   .btn-lg {
-    @apply rounded-2xl px-6 py-3 text-base;
+    @apply rounded-lg px-5 py-2.5 text-base;
   }
 
   .btn-icon {
-    @apply rounded-xl p-2.5;
+    @apply rounded-lg p-2;
   }
 
   /* ============ 输入框样式 ============ */
   .input {
-    @apply w-full rounded-xl px-4 py-2.5 text-sm;
+    @apply w-full min-w-0 rounded-lg px-3 py-2 text-sm leading-5;
     @apply bg-white dark:bg-dark-800;
     @apply border border-gray-200 dark:border-dark-600;
     @apply text-gray-900 dark:text-gray-100;
@@ -216,23 +214,23 @@
   .glass-card {
     @apply bg-white/70 dark:bg-dark-800/70;
     @apply backdrop-blur-xl;
-    @apply rounded-2xl;
+    @apply rounded-lg;
     @apply border border-white/20 dark:border-dark-700/50;
-    @apply shadow-glass;
-    @apply transition-all duration-300;
+    @apply shadow-sm;
+    @apply transition-colors duration-150;
   }
 
   /* ============ 卡片样式 ============ */
   .card {
-    @apply bg-white dark:bg-dark-800/50;
-    @apply rounded-2xl;
-    @apply border border-gray-100 dark:border-dark-700/50;
-    @apply shadow-card;
-    @apply transition-all duration-300;
+    @apply bg-white dark:bg-dark-800;
+    @apply rounded-lg;
+    @apply border border-gray-200 dark:border-dark-700;
+    @apply shadow-sm;
+    @apply transition-colors duration-150;
   }
 
   .card-hover {
-    @apply hover:-translate-y-0.5 hover:shadow-card-hover;
+    @apply hover:shadow-md;
     @apply hover:border-gray-200 dark:hover:border-dark-600;
   }
 
@@ -240,7 +238,7 @@
     @apply bg-white/70 dark:bg-dark-800/70;
     @apply backdrop-blur-xl;
     @apply border border-white/20 dark:border-dark-700/50;
-    @apply shadow-glass;
+    @apply shadow-sm;
   }
 
   .card-header {
@@ -259,14 +257,14 @@
 
   /* ============ 统计卡片 ============ */
   .stat-card {
-    @apply card p-5;
+    @apply card p-4;
     @apply flex items-start gap-4;
   }
 
   .stat-icon {
-    @apply h-12 w-12 rounded-xl;
+    @apply h-10 w-10 rounded-lg;
     @apply flex items-center justify-center;
-    @apply text-xl;
+    @apply text-lg;
   }
 
   .stat-icon-primary {
@@ -286,7 +284,7 @@
   }
 
   .stat-value {
-    @apply text-2xl font-bold text-gray-900 dark:text-white truncate;
+    @apply truncate text-xl font-semibold text-gray-900 dark:text-white;
   }
 
   .stat-label {
@@ -374,7 +372,7 @@
   .dropdown {
     @apply absolute z-50;
     @apply bg-white dark:bg-dark-800;
-    @apply rounded-xl;
+    @apply rounded-lg;
     @apply border border-gray-200 dark:border-dark-700;
     @apply shadow-lg;
     @apply py-1;
@@ -549,7 +547,7 @@
   }
 
   .sidebar-header {
-    @apply h-16 px-6;
+    @apply h-16 px-5;
     @apply flex items-center gap-3;
     @apply border-b border-gray-100 dark:border-dark-800;
     transition:
@@ -558,11 +556,11 @@
   }
 
   .sidebar-nav {
-    @apply flex-1 overflow-y-auto px-3 py-4;
+    @apply flex-1 overflow-y-auto px-3 py-3;
   }
 
   .sidebar-link {
-    @apply flex items-center gap-3 rounded-xl py-2.5;
+    @apply flex items-center gap-3 rounded-lg py-2;
     @apply overflow-hidden;
     @apply text-sm font-medium;
     @apply text-gray-600 dark:text-dark-300;
@@ -580,7 +578,7 @@
   }
 
   .sidebar-section {
-    @apply mb-6;
+    @apply mb-4;
   }
 
   .sidebar-section-title {
@@ -604,7 +602,7 @@
 
   /* ============ 空状态 ============ */
   .empty-state {
-    @apply flex flex-col items-center justify-center px-4 py-12;
+    @apply flex flex-col items-center justify-center px-4 py-10;
     @apply text-center;
   }
 
