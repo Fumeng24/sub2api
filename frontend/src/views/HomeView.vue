@@ -1,6 +1,6 @@
 <template>
   <!-- Custom Home Content: Full Page Mode -->
-  <div v-if="homeContent" class="min-h-screen">
+  <div v-if="homeContent" class="custom-home-content min-h-screen">
     <!-- iframe mode -->
     <iframe
       v-if="isHomeContentUrl"
@@ -9,7 +9,7 @@
       allowfullscreen
     ></iframe>
     <!-- HTML mode - SECURITY: homeContent is admin-only setting, XSS risk is acceptable -->
-    <div v-else v-html="homeContent"></div>
+    <div v-else class="custom-home-content__body" v-html="homeContent"></div>
   </div>
 
   <!-- Default Home Page -->
@@ -865,7 +865,72 @@ onMounted(() => {
 })
 </script>
 
+<style>
+.custom-home-content,
+.custom-home-content__body {
+  width: 100% !important;
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+}
+
+.custom-home-content * {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+}
+
+.custom-home-content .homex-ambient {
+  width: min(800px, 100vw) !important;
+  max-width: 100vw !important;
+}
+
+.custom-home-content pre,
+.custom-home-content code,
+.custom-home-content pre span {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+.custom-home-content pre {
+  overflow-x: auto !important;
+}
+
+.custom-home-content pre > code {
+  display: block !important;
+  width: 100% !important;
+}
+</style>
+
 <style scoped>
+.custom-home-content {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+.custom-home-content__body {
+  min-width: 0;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+.custom-home-content :deep(*) {
+  max-width: 100%;
+}
+
+.custom-home-content :deep(pre),
+.custom-home-content :deep(code) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.custom-home-content :deep(pre) {
+  overflow-x: auto;
+}
+
 /* Terminal Container */
 .terminal-container {
   position: relative;
