@@ -3,14 +3,14 @@
     <Transition name="popup-fade">
       <div
         v-if="announcementStore.currentPopup"
-        class="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-gradient-to-br from-black/70 via-black/60 to-black/70 p-4 pt-[8vh] backdrop-blur-md"
+        class="fixed bottom-4 left-1/2 z-[120] w-[calc(100vw-2rem)] max-w-[560px] -translate-x-1/2 sm:bottom-6 lg:left-auto lg:right-6 lg:max-w-[520px] lg:translate-x-0"
       >
         <div
-          class="w-full max-w-[680px] overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10"
+          class="flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10 sm:max-h-[calc(100vh-3rem)]"
           @click.stop
         >
           <!-- Header with warm gradient -->
-          <div class="relative overflow-hidden border-b border-amber-100/80 bg-gradient-to-br from-amber-50/80 via-orange-50/50 to-yellow-50/30 px-8 py-6 dark:border-dark-700/50 dark:from-amber-900/20 dark:via-orange-900/10 dark:to-yellow-900/5">
+          <div class="relative shrink-0 overflow-hidden border-b border-amber-100/80 bg-gradient-to-br from-amber-50/80 via-orange-50/50 to-yellow-50/30 px-4 py-5 dark:border-dark-700/50 dark:from-amber-900/20 dark:via-orange-900/10 dark:to-yellow-900/5 sm:px-8 sm:py-6">
             <!-- Decorative background -->
             <div class="absolute right-0 top-0 h-full w-64 bg-gradient-to-l from-orange-100/30 to-transparent dark:from-orange-900/20"></div>
             <div class="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br from-amber-400/20 to-orange-500/20 blur-3xl"></div>
@@ -34,7 +34,7 @@
               </div>
 
               <!-- Title -->
-              <h2 class="mb-2 text-2xl font-bold leading-tight text-gray-900 dark:text-white">
+              <h2 class="mb-2 text-lg font-bold leading-tight text-gray-900 dark:text-white sm:text-xl">
                 {{ announcementStore.currentPopup.title }}
               </h2>
 
@@ -49,7 +49,7 @@
           </div>
 
           <!-- Body -->
-          <div class="max-h-[50vh] overflow-y-auto bg-white px-8 py-8 dark:bg-dark-800">
+          <div class="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-6 dark:bg-dark-800 sm:px-8 sm:py-8">
             <div class="relative">
               <div class="absolute left-0 top-0 bottom-0 w-1 rounded-full bg-gradient-to-b from-amber-500 via-orange-500 to-yellow-500"></div>
               <div class="pl-6">
@@ -62,7 +62,7 @@
           </div>
 
           <!-- Footer -->
-          <div class="border-t border-gray-100 bg-gray-50/50 px-8 py-5 dark:border-dark-700 dark:bg-dark-900/30">
+          <div class="shrink-0 border-t border-gray-100 bg-gray-50/50 px-4 py-4 dark:border-dark-700 dark:bg-dark-900/30 sm:px-8 sm:py-5">
             <div class="flex items-center justify-end">
               <button
                 @click="handleDismiss"
@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -109,16 +109,6 @@ const renderedContent = computed(() => {
 function handleDismiss() {
   announcementStore.dismissPopup()
 }
-
-// Manage body overflow — only set, never unset (bell component handles restore)
-watch(
-  () => announcementStore.currentPopup,
-  (popup) => {
-    if (popup) {
-      document.body.style.overflow = 'hidden'
-    }
-  }
-)
 </script>
 
 <style scoped>

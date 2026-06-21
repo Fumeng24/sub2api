@@ -66,10 +66,10 @@
           </div>
         </section>
 
-        <div class="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <div class="grid gap-5 2xl:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]">
           <section class="card min-w-0 p-5 sm:p-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
+              <div class="min-w-0">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-300">
                   {{ t('affiliate.sharePanel.kicker') }}
                 </p>
@@ -86,12 +86,27 @@
               </button>
             </div>
 
+            <div class="mt-5 grid gap-3 sm:grid-cols-3">
+              <dl
+                v-for="item in shareSummaryStats"
+                :key="item.label"
+                class="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+              >
+                <dt class="truncate text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                  {{ item.label }}
+                </dt>
+                <dd class="mt-1 truncate text-base font-black text-gray-950 dark:text-white">
+                  {{ item.value }}
+                </dd>
+              </dl>
+            </div>
+
             <div class="mt-5 space-y-4">
               <div class="min-w-0 space-y-2">
                 <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('affiliate.yourCode') }}</p>
-                <div class="flex min-w-0 flex-col gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-dark-700 dark:bg-dark-900 sm:flex-row sm:items-center">
-                  <code class="block min-w-0 flex-1 break-all text-sm font-bold tracking-wide text-gray-950 dark:text-white sm:truncate sm:break-normal" v-text="detail.aff_code"></code>
-                  <button class="btn btn-secondary btn-sm w-full sm:w-auto sm:shrink-0" @click="copyCode">
+                <div class="flex min-w-0 flex-col gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-dark-700 dark:bg-dark-900 md:flex-row md:items-center">
+                  <code class="block min-w-0 flex-1 select-all break-all font-mono text-sm font-bold tracking-wide text-gray-950 dark:text-white md:truncate md:break-normal" :title="detail.aff_code" v-text="detail.aff_code"></code>
+                  <button class="btn btn-secondary btn-sm w-full md:w-auto md:shrink-0" @click="copyCode">
                     <Icon name="copy" size="sm" />
                     <span>{{ t('affiliate.copyCode') }}</span>
                   </button>
@@ -100,9 +115,9 @@
 
               <div class="min-w-0 space-y-2">
                 <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('affiliate.inviteLink') }}</p>
-                <div class="flex min-w-0 flex-col gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-dark-700 dark:bg-dark-900 sm:flex-row sm:items-center">
-                  <code class="block min-w-0 flex-1 break-all text-sm text-gray-700 dark:text-gray-300 sm:truncate sm:break-normal" v-text="inviteLink"></code>
-                  <button class="btn btn-secondary btn-sm w-full sm:w-auto sm:shrink-0" @click="copyInviteLink">
+                <div class="flex min-w-0 flex-col gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-dark-700 dark:bg-dark-900 md:flex-row md:items-center">
+                  <code class="block min-w-0 flex-1 select-all break-all font-mono text-sm text-gray-700 dark:text-gray-300 md:truncate md:break-normal" :title="inviteLink" v-text="inviteLink"></code>
+                  <button class="btn btn-secondary btn-sm w-full md:w-auto md:shrink-0" @click="copyInviteLink">
                     <Icon name="copy" size="sm" />
                     <span>{{ t('affiliate.copyLink') }}</span>
                   </button>
@@ -115,14 +130,14 @@
             class="mt-5 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-900/50 dark:bg-amber-950/20"
           >
             <form
-              class="flex flex-col gap-4 lg:flex-row lg:items-end"
+              class="grid gap-4 xl:grid-cols-[minmax(280px,1fr)_minmax(320px,420px)] xl:items-end"
               @submit.prevent="bindInviter"
             >
-              <div class="min-w-0 flex-1">
+              <div class="min-w-0">
                 <h4 class="text-sm font-semibold text-amber-900 dark:text-amber-100">
                   {{ t('affiliate.bind.title') }}
                 </h4>
-                <p class="mt-1 text-sm text-amber-800/80 dark:text-amber-200/80">
+                <p class="mt-1 text-sm leading-6 text-amber-800/80 dark:text-amber-200/80">
                   {{ t('affiliate.bind.description') }}
                 </p>
                 <p
@@ -132,7 +147,7 @@
                   {{ t('affiliate.bind.bonusHint', { amount: formatCurrency(bindBonusAmount) }) }}
                 </p>
               </div>
-              <div class="flex min-w-0 flex-col gap-2 sm:flex-row lg:w-[420px]">
+              <div class="flex min-w-0 flex-col gap-2 sm:flex-row xl:w-full">
                 <input
                   v-model="bindCode"
                   type="text"
@@ -143,7 +158,7 @@
                 />
                 <button
                   type="submit"
-                  class="btn btn-primary shrink-0"
+                  class="btn btn-primary w-full sm:w-auto sm:shrink-0"
                   :disabled="binding || !bindCode.trim()"
                 >
                   <Icon v-if="binding" name="refresh" size="sm" class="animate-spin" />
@@ -405,6 +420,8 @@ const affiliateStats = computed(() => [
     hint: t('affiliate.stats.totalQuotaHint'),
   },
 ])
+
+const shareSummaryStats = computed(() => affiliateStats.value.slice(0, 3))
 
 const proofCards = computed<Array<{ icon: AffiliateIconName; title: string; description: string }>>(() => [
   {

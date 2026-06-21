@@ -5,7 +5,7 @@
       <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
         {{ t('payment.quickAmounts') }}
       </label>
-      <div class="grid grid-cols-3 gap-2">
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(92px,1fr))] gap-2 sm:grid-cols-3">
         <button
           v-for="amt in displayAmounts"
           :key="amt"
@@ -13,7 +13,7 @@
           :disabled="isAmountDisabled(amt)"
           :title="isAmountDisabled(amt) ? disabledReasonText(amt) : undefined"
           :class="[
-            'min-h-[68px] rounded-lg border-2 px-3 py-2.5 text-center font-medium transition-colors',
+            'flex h-[72px] min-w-0 flex-col items-center justify-center overflow-hidden rounded-lg border-2 px-1.5 py-2 text-center font-medium transition-colors sm:px-3',
             isAmountDisabled(amt)
               ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300 dark:border-dark-700 dark:bg-dark-800/50 dark:text-dark-500'
               : modelValue === amt
@@ -22,10 +22,10 @@
           ]"
           @click="selectAmount(amt)"
         >
-          <span class="block text-sm leading-5">{{ amountLabel ? amountLabel(amt) : amt }}</span>
+          <span class="block max-w-full whitespace-nowrap text-[13px] leading-5 sm:text-sm">{{ amountLabel ? amountLabel(amt) : amt }}</span>
           <span
             v-if="amountDescription || isAmountDisabled(amt)"
-            class="mt-0.5 block text-[11px] leading-4"
+            class="mt-0.5 block max-w-full whitespace-nowrap text-[11px] leading-4"
             :class="isAmountDisabled(amt) ? 'text-gray-300 dark:text-dark-500' : 'text-gray-500 dark:text-gray-400'"
           >
             {{ isAmountDisabled(amt) ? disabledReasonText(amt) : amountDescriptionText(amt) }}

@@ -137,11 +137,12 @@
               <button
                 :ref="(el) => setGroupButtonRef(row.id, el)"
                 @click="openGroupSelector(row)"
-                class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700"
+                class="-mx-2 -my-1 flex max-w-full min-w-0 cursor-pointer flex-wrap items-center justify-end gap-x-2 gap-y-1 rounded-lg px-2 py-1 text-right transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700 md:flex-nowrap md:justify-start md:text-left"
                 :title="t('keys.clickToChangeGroup')"
               >
                 <GroupBadge
                   v-if="row.group"
+                  class="min-w-0 max-w-full shrink"
                   :name="row.group.name"
                   :platform="row.group.platform"
                   :subscription-type="row.group.subscription_type"
@@ -159,12 +160,12 @@
                   :discount-daily-end-time="row.group.group_rate_discount_daily_end_time"
                   :discount-timezone="row.group.group_rate_discount_timezone"
                 />
-                <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{
+                <span v-else class="shrink-0 whitespace-nowrap text-sm text-gray-400 dark:text-dark-500">{{
                   t('keys.noGroup')
                 }}</span>
-                <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
+                <span class="shrink-0 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
                 <svg
-                  class="h-3.5 w-3.5 text-gray-400 opacity-60 transition-opacity group-hover/dropdown:opacity-100"
+                  class="h-3.5 w-3.5 shrink-0 text-gray-400 opacity-60 transition-opacity group-hover/dropdown:opacity-100"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
