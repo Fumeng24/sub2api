@@ -64,29 +64,32 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="allEndpoints.length > 0" class="flex flex-wrap gap-2">
+  <div v-if="allEndpoints.length > 0" class="flex min-w-0 flex-wrap gap-2">
     <div
       v-for="(item, index) in allEndpoints"
       :key="index"
-      class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs transition-colors hover:border-primary-200 dark:border-dark-600 dark:bg-dark-800 dark:hover:border-primary-700"
+      class="flex max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs transition-colors hover:border-primary-200 dark:border-dark-600 dark:bg-dark-800 dark:hover:border-primary-700"
     >
-      <span class="font-medium text-gray-600 dark:text-gray-300">{{ item.name }}</span>
+      <span class="min-w-0 max-w-[8rem] truncate font-medium text-gray-600 dark:text-gray-300">{{ item.name }}</span>
       <span
         v-if="item.isDefault"
-        class="rounded bg-primary-50 px-1 py-px text-[10px] font-medium leading-tight text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
+        class="flex-shrink-0 rounded bg-primary-50 px-1 py-px text-[10px] font-medium leading-tight text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
       >{{ t('keys.endpoints.default') }}</span>
 
-      <span class="text-gray-300 dark:text-dark-500">|</span>
+      <span class="flex-shrink-0 text-gray-300 dark:text-dark-500">|</span>
 
-      <div class="group/endpoint relative flex items-center gap-1.5">
+      <div class="group/endpoint relative flex min-w-0 items-center gap-1.5">
         <div
-          class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[24rem] -translate-x-1/2 translate-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left opacity-0 shadow-[0_14px_36px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/80 transition-all duration-150 group-hover/endpoint:translate-y-0 group-hover/endpoint:opacity-100 group-focus-within/endpoint:translate-y-0 group-focus-within/endpoint:opacity-100 dark:border-slate-700 dark:bg-slate-900 dark:ring-slate-700/70"
+          class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[min(24rem,calc(100vw-1rem))] -translate-x-1/2 translate-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left opacity-0 shadow-[0_14px_36px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/80 transition-all duration-150 group-hover/endpoint:translate-y-0 group-hover/endpoint:opacity-100 group-focus-within/endpoint:translate-y-0 group-focus-within/endpoint:opacity-100 dark:border-slate-700 dark:bg-slate-900 dark:ring-slate-700/70"
         >
           <p
             v-if="item.description"
             class="max-w-[24rem] break-words text-xs leading-5 text-slate-600 dark:text-slate-200"
           >
             {{ item.description }}
+          </p>
+          <p class="mt-1.5 max-w-full break-all font-mono text-[11px] leading-4 text-slate-500 dark:text-slate-300">
+            {{ item.endpoint }}
           </p>
           <p
             class="flex items-center gap-1.5 text-[11px] leading-4 text-primary-600 dark:text-primary-300"
@@ -99,7 +102,7 @@ onBeforeUnmount(() => {
         </div>
 
         <code
-          class="cursor-pointer font-mono text-gray-500 decoration-gray-400 decoration-dashed underline-offset-2 hover:text-primary-600 hover:underline focus:text-primary-600 focus:underline focus:outline-none dark:text-gray-400 dark:decoration-gray-500 dark:hover:text-primary-400 dark:focus:text-primary-400"
+          class="min-w-0 max-w-[min(28rem,55vw)] cursor-pointer truncate font-mono text-gray-500 decoration-gray-400 decoration-dashed underline-offset-2 hover:text-primary-600 hover:underline focus:text-primary-600 focus:underline focus:outline-none dark:text-gray-400 dark:decoration-gray-500 dark:hover:text-primary-400 dark:focus:text-primary-400 sm:max-w-[28rem]"
           role="button"
           tabindex="0"
           @click="copy(item.endpoint)"
@@ -109,7 +112,7 @@ onBeforeUnmount(() => {
 
         <button
           type="button"
-          class="rounded p-0.5 transition-colors"
+          class="flex-shrink-0 rounded p-0.5 transition-colors"
           :class="copiedEndpoint === item.endpoint
             ? 'text-emerald-500 dark:text-emerald-400'
             : 'text-gray-400 hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400'"
@@ -128,7 +131,7 @@ onBeforeUnmount(() => {
           :href="speedTestUrl(item.endpoint)"
           target="_blank"
           rel="noopener noreferrer"
-          class="rounded p-0.5 text-gray-400 transition-colors hover:text-amber-500 dark:text-gray-500 dark:hover:text-amber-400"
+          class="flex-shrink-0 rounded p-0.5 text-gray-400 transition-colors hover:text-amber-500 dark:text-gray-500 dark:hover:text-amber-400"
           :title="t('keys.endpoints.speedTest')"
         >
           <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

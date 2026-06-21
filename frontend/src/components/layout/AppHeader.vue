@@ -1,8 +1,8 @@
 <template>
   <header class="glass sticky top-0 z-30 border-b border-gray-200/50 dark:border-dark-700/50">
-    <div class="flex h-16 items-center justify-between px-4 md:px-6">
+    <div class="flex h-16 items-center justify-between px-3 sm:px-4 md:px-6">
       <!-- Left: Mobile Menu Toggle + Page Title -->
-      <div class="flex items-center gap-4">
+      <div class="flex min-w-0 items-center gap-2 sm:gap-4">
         <button
           @click="toggleMobileSidebar"
           class="btn-ghost btn-icon lg:hidden"
@@ -22,7 +22,7 @@
       </div>
 
       <!-- Right: Announcements + Docs + Language + Subscriptions + Balance + User Dropdown -->
-      <div class="flex items-center gap-3">
+      <div class="flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3">
         <!-- Announcement Bell -->
         <AnnouncementBell v-if="user" />
 
@@ -48,18 +48,22 @@
           :href="docsLink.href"
           :target="docsLink.external ? '_blank' : undefined"
           :rel="docsLink.external ? 'noopener noreferrer' : undefined"
-          class="flex items-center gap-1.5 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-700 shadow-sm ring-1 ring-primary-100 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-900/40 dark:hover:bg-primary-900/50"
+          class="hidden items-center gap-1.5 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-700 shadow-sm ring-1 ring-primary-100 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-900/40 dark:hover:bg-primary-900/50 sm:flex"
           @click="handleDocsLinkClick"
         >
           <Icon name="book" size="sm" />
-          <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
+          <span>{{ t('nav.docs') }}</span>
         </a>
 
         <!-- Language Switcher -->
-        <LocaleSwitcher />
+        <div class="hidden sm:block">
+          <LocaleSwitcher />
+        </div>
 
         <!-- Subscription Progress (for users with active subscriptions) -->
-        <SubscriptionProgressMini v-if="user" />
+        <div class="hidden md:block">
+          <SubscriptionProgressMini v-if="user" />
+        </div>
 
         <!-- Balance Display -->
         <div
@@ -118,7 +122,7 @@
 
           <!-- Dropdown Menu -->
           <transition name="dropdown">
-            <div v-if="dropdownOpen" class="dropdown right-0 mt-2 w-56">
+            <div v-if="dropdownOpen" class="dropdown right-0 mt-2 w-56 max-w-[calc(100vw-1rem)]">
               <!-- User Info -->
               <div class="border-b border-gray-100 px-4 py-3 dark:border-dark-700">
                 <div class="text-sm font-medium text-gray-900 dark:text-white">
@@ -163,6 +167,23 @@
               </div>
 
               <div class="py-1">
+                <a
+                  v-if="docsLink"
+                  :href="docsLink.href"
+                  :target="docsLink.external ? '_blank' : undefined"
+                  :rel="docsLink.external ? 'noopener noreferrer' : undefined"
+                  @click="handleDocsDropdownClick"
+                  class="dropdown-item sm:hidden"
+                >
+                  <Icon name="book" size="sm" />
+                  {{ t('nav.docs') }}
+                </a>
+
+                <router-link to="/subscriptions" @click="closeDropdown" class="dropdown-item md:hidden">
+                  <Icon name="creditCard" size="sm" />
+                  {{ t('nav.mySubscriptions') }}
+                </router-link>
+
                 <router-link to="/profile" @click="closeDropdown" class="dropdown-item">
                   <Icon name="user" size="sm" />
                   {{ t('nav.profile') }}
@@ -191,6 +212,29 @@
                   {{ t('nav.github') }}
                 </a>
 
+              </div>
+
+              <div class="border-t border-gray-100 px-4 py-2.5 dark:border-dark-700 sm:hidden">
+                <div class="mb-2 text-xs text-gray-500 dark:text-dark-400">
+                  {{ t('common.language') }}
+                </div>
+                <div class="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
+                  <button
+                    v-for="option in availableLocales"
+                    :key="option.code"
+                    type="button"
+                    :disabled="localeSwitching"
+                    class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
+                    :class="
+                      currentLocaleCode === option.code
+                        ? 'bg-white text-primary-600 shadow-sm dark:bg-dark-800 dark:text-primary-300'
+                        : 'text-gray-500 hover:text-gray-800 dark:text-dark-300 dark:hover:text-white'
+                    "
+                    @click.stop="setHeaderLocale(option.code)"
+                  >
+                    {{ option.name }}
+                  </button>
+                </div>
               </div>
 
               <!-- Contact Support (only show if configured) -->
@@ -271,10 +315,11 @@ import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatSettlementCurrencyAmount, setSettlementCnyPerCredit, useSettlementCurrency } from '@/composables/useSettlementCurrency'
 import { resolveDocsLink, shouldUseClientDocsNavigation } from '@/utils/docsLink'
+import { availableLocales, setLocale } from '@/i18n'
 
 const router = useRouter()
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const adminSettingsStore = useAdminSettingsStore()
@@ -291,6 +336,7 @@ const {
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+const localeSwitching = ref(false)
 const contactInfo = computed(() => appStore.contactInfo)
 const docsCustomMenuItems = computed(() => [
   ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
@@ -301,6 +347,7 @@ const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 const ticketLink = computed(() => (authStore.canAccessTicketAdmin ? '/admin/tickets' : '/tickets'))
 const ticketUnreadCount = computed(() => (authStore.canAccessTicketAdmin ? ticketStore.adminUnreadCount : ticketStore.userUnreadCount))
 const showTicketShortcut = computed(() => !appStore.backendModeEnabled || authStore.canAccessTicketAdmin)
+const currentLocaleCode = computed(() => locale.value)
 const balanceCredits = computed(() => {
   const value = user.value?.balance ?? 0
   return Number.isFinite(value) ? value : 0
@@ -385,6 +432,22 @@ function handleDocsLinkClick(event: MouseEvent) {
   if (!shouldUseClientDocsNavigation(event, link)) return
   event.preventDefault()
   router.push(link?.route || link?.href || '/')
+}
+
+function handleDocsDropdownClick(event: MouseEvent) {
+  handleDocsLinkClick(event)
+  closeDropdown()
+}
+
+async function setHeaderLocale(code: string) {
+  if (localeSwitching.value) return
+  localeSwitching.value = true
+  try {
+    await setLocale(code)
+    closeDropdown()
+  } finally {
+    localeSwitching.value = false
+  }
 }
 
 async function handleLogout() {

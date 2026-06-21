@@ -21,7 +21,12 @@
     </button>
 
     <Transition name="date-picker-dropdown">
-      <div v-if="isOpen" class="date-picker-dropdown">
+      <div
+        v-if="isOpen"
+        ref="dropdownRef"
+        class="date-picker-dropdown"
+        :style="dropdownStyle"
+      >
         <!-- Quick presets -->
         <div class="date-picker-presets">
           <button
@@ -76,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 
@@ -104,9 +109,39 @@ const { t, locale } = useI18n()
 
 const isOpen = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
+const dropdownRef = ref<HTMLElement | null>(null)
 const localStartDate = ref(props.startDate)
 const localEndDate = ref(props.endDate)
 const activePreset = ref<string | null>('last24Hours')
+const dropdownPosition = ref<'bottom' | 'top'>('bottom')
+const triggerRect = ref<DOMRect | null>(null)
+const viewportPadding = 8
+
+const dropdownStyle = computed(() => {
+  if (!triggerRect.value) return {}
+
+  const rect = triggerRect.value
+  const viewportWidth = window.innerWidth
+  const maxWidth = Math.max(0, viewportWidth - viewportPadding * 2)
+  const width = Math.min(320, maxWidth)
+  const maxLeft = Math.max(viewportPadding, viewportWidth - width - viewportPadding)
+  const left = Math.min(Math.max(rect.left, viewportPadding), maxLeft)
+  const style: Record<string, string> = {
+    position: 'fixed',
+    left: `${left}px`,
+    width: `${width}px`,
+    maxWidth: `${maxWidth}px`,
+    zIndex: '100000010'
+  }
+
+  if (dropdownPosition.value === 'top') {
+    style.bottom = `${window.innerHeight - rect.top + 8}px`
+  } else {
+    style.top = `${rect.bottom + 8}px`
+  }
+
+  return style
+})
 
 const today = computed(() => {
   // Use local timezone to avoid UTC timezone issues
@@ -267,6 +302,24 @@ const toggle = () => {
   isOpen.value = !isOpen.value
 }
 
+const updateTriggerRect = () => {
+  if (containerRef.value) {
+    triggerRect.value = containerRef.value.getBoundingClientRect()
+  }
+}
+
+const calculateDropdownPosition = () => {
+  updateTriggerRect()
+
+  nextTick(() => {
+    if (!dropdownRef.value || !triggerRect.value) return
+    const dropdownHeight = dropdownRef.value.offsetHeight || 240
+    const spaceBelow = window.innerHeight - triggerRect.value.bottom
+    const spaceAbove = triggerRect.value.top
+    dropdownPosition.value = spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? 'top' : 'bottom'
+  })
+}
+
 const apply = () => {
   emit('update:startDate', localStartDate.value)
   emit('update:endDate', localEndDate.value)
@@ -307,6 +360,17 @@ watch(
   }
 )
 
+watch(isOpen, (open) => {
+  if (open) {
+    calculateDropdownPosition()
+    window.addEventListener('scroll', updateTriggerRect, { capture: true, passive: true })
+    window.addEventListener('resize', calculateDropdownPosition)
+  } else {
+    window.removeEventListener('scroll', updateTriggerRect, { capture: true })
+    window.removeEventListener('resize', calculateDropdownPosition)
+  }
+})
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleEscape)
@@ -317,6 +381,8 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
   document.removeEventListener('keydown', handleEscape)
+  window.removeEventListener('scroll', updateTriggerRect, { capture: true })
+  window.removeEventListener('resize', calculateDropdownPosition)
 })
 </script>
 
@@ -350,13 +416,12 @@ onUnmounted(() => {
 }
 
 .date-picker-dropdown {
-  @apply absolute left-0 z-[100] mt-2;
+  @apply z-[100];
   @apply bg-white dark:bg-dark-800;
   @apply rounded-xl;
   @apply border border-gray-200 dark:border-dark-700;
   @apply shadow-lg shadow-black/10 dark:shadow-black/30;
   @apply overflow-hidden;
-  @apply min-w-[320px];
 }
 
 .date-picker-presets {
@@ -421,6 +486,16 @@ onUnmounted(() => {
   @apply bg-primary-600 text-white;
   @apply hover:bg-primary-700;
   @apply transition-colors duration-150;
+}
+
+@media (max-width: 420px) {
+  .date-picker-custom {
+    @apply flex-col items-stretch;
+  }
+
+  .date-picker-separator {
+    @apply hidden;
+  }
 }
 
 /* Dropdown animation */

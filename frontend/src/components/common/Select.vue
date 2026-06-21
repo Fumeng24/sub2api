@@ -198,6 +198,7 @@ const optionsListRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<'bottom' | 'top'>('bottom')
 const triggerRect = ref<DOMRect | null>(null)
 const activeGroupKey = ref<string | number | boolean | null>(null)
+const viewportPadding = 8
 
 // i18n placeholders
 const placeholderText = computed(() => props.placeholder ?? t('common.selectOption'))
@@ -214,10 +215,17 @@ const dropdownStyle = computed(() => {
   if (!triggerRect.value) return {}
 
   const rect = triggerRect.value
+  const viewportWidth = window.innerWidth
+  const maxDropdownWidth = Math.max(0, viewportWidth - viewportPadding * 2)
+  const desiredWidth = Math.min(Math.max(rect.width, 200), maxDropdownWidth)
+  const maxLeft = Math.max(viewportPadding, viewportWidth - desiredWidth - viewportPadding)
+  const clampedLeft = Math.min(Math.max(rect.left, viewportPadding), maxLeft)
   const style: Record<string, string> = {
     position: 'fixed',
-    left: `${rect.left}px`,
-    minWidth: `${rect.width}px`,
+    left: `${clampedLeft}px`,
+    minWidth: `${desiredWidth}px`,
+    maxWidth: `${maxDropdownWidth}px`,
+    width: `${desiredWidth}px`,
     zIndex: '100000020'
   }
 
@@ -590,7 +598,7 @@ onUnmounted(() => {
 
 <style>
 .select-dropdown-portal {
-  @apply w-max min-w-[200px];
+  @apply min-w-[200px];
   @apply bg-white dark:bg-dark-800;
   @apply rounded-xl;
   @apply border border-gray-200 dark:border-dark-700;
@@ -612,14 +620,24 @@ onUnmounted(() => {
 }
 
 .select-dropdown-portal .select-group-tabs {
-  @apply grid grid-cols-3 gap-2.5 border-b border-gray-100 bg-gradient-to-r from-gray-50 via-white to-gray-50 p-2.5 dark:border-dark-700 dark:from-dark-900 dark:via-dark-800 dark:to-dark-900;
+  @apply grid grid-cols-3 gap-2.5 overflow-x-auto border-b border-gray-100 bg-gradient-to-r from-gray-50 via-white to-gray-50 p-2.5 dark:border-dark-700 dark:from-dark-900 dark:via-dark-800 dark:to-dark-900;
 }
 
 .select-dropdown-portal .select-group-tab {
-  @apply relative inline-flex min-h-11 items-center justify-center rounded-xl border-2 px-3 py-2 text-center text-sm font-bold;
+  @apply relative inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl border-2 px-3 py-2 text-center text-sm font-bold;
   @apply shadow-sm;
   @apply transition-all duration-150;
   @apply hover:-translate-y-0.5 hover:shadow-md;
+}
+
+@media (max-width: 480px) {
+  .select-dropdown-portal .select-group-tabs {
+    @apply flex;
+  }
+
+  .select-dropdown-portal .select-group-tab {
+    @apply min-w-[7rem] flex-shrink-0;
+  }
 }
 
 .select-dropdown-portal .select-group-tab-active {

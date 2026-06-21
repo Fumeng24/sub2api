@@ -458,6 +458,7 @@ export default {
     verifying: 'Verifying...',
     processing: 'Processing...',
     contactSupport: 'Contact Support',
+    language: 'Language',
     add: 'Add',
     invalidEmail: 'Please enter a valid email address',
     optional: 'optional',
