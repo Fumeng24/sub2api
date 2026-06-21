@@ -8,6 +8,8 @@ import { resolveDocumentTitle } from '@/router/title'
 import AnnouncementPopup from '@/components/common/AnnouncementPopup.vue'
 import { useAppStore, useAuthStore, useSubscriptionStore, useAnnouncementStore, useAdminComplianceStore } from '@/stores'
 import { getSetupStatus } from '@/api/setup'
+import { LOCALE_CHANGED_EVENT } from '@/i18n'
+import { applyRouteSeo } from '@/utils/seo'
 
 const router = useRouter()
 const route = useRoute()
@@ -55,6 +57,13 @@ function onVisibilityChange() {
 function onAdminComplianceRequired(event: Event) {
   const detail = (event as CustomEvent<Record<string, string>>).detail || {}
   adminComplianceStore.requireAcknowledgement(detail)
+}
+
+function refreshCurrentRouteSeo() {
+  applyRouteSeo(route, {
+    siteName: appStore.siteName,
+    title: resolveDocumentTitle(route.meta.title, appStore.siteName, route.meta.titleKey as string)
+  })
 }
 
 watch(
@@ -105,10 +114,12 @@ router.afterEach(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('admin-compliance-required', onAdminComplianceRequired)
+  window.removeEventListener(LOCALE_CHANGED_EVENT, refreshCurrentRouteSeo)
 })
 
 onMounted(async () => {
   window.addEventListener('admin-compliance-required', onAdminComplianceRequired)
+  window.addEventListener(LOCALE_CHANGED_EVENT, refreshCurrentRouteSeo)
 
   // Check if setup is needed
   try {
@@ -124,8 +135,8 @@ onMounted(async () => {
   // Load public settings into appStore (will be cached for other components)
   await appStore.fetchPublicSettings()
 
-  // Re-resolve document title now that siteName is available
-  document.title = resolveDocumentTitle(route.meta.title, appStore.siteName, route.meta.titleKey as string)
+  // Re-resolve document title and SEO tags now that siteName is available.
+  refreshCurrentRouteSeo()
 })
 </script>
 
