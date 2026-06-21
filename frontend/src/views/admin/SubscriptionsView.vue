@@ -3,12 +3,12 @@
     <TablePageLayout>
       <template #filters>
         <!-- Top Toolbar: Left (search + filters) / Right (actions) -->
-        <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <!-- Left: Fuzzy user search + filters (wrap to multiple lines) -->
-          <div class="flex flex-1 flex-wrap items-center gap-3">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
             <!-- User Search -->
             <div
-              class="relative w-full sm:w-64"
+              class="relative w-full min-w-0 sm:w-64"
               data-filter-user-search
             >
               <Icon
@@ -65,7 +65,7 @@
             </div>
 
             <!-- Filters -->
-            <div class="w-full sm:w-40">
+            <div class="w-full min-w-0 sm:w-40">
               <Select
                 v-model="filters.status"
                 :options="statusOptions"
@@ -73,7 +73,7 @@
                 @change="applyFilters"
               />
             </div>
-            <div class="w-full sm:w-48">
+            <div class="w-full min-w-0 sm:w-48">
               <Select
                 v-model="filters.group_id"
                 :options="groupOptions"
@@ -81,7 +81,7 @@
                 @change="applyFilters"
               />
             </div>
-            <div class="w-full sm:w-40">
+            <div class="w-full min-w-0 sm:w-40">
               <Select
                 v-model="filters.platform"
                 :options="platformFilterOptions"
@@ -92,11 +92,11 @@
           </div>
 
           <!-- Right: Actions -->
-          <div class="ml-auto flex flex-wrap items-center justify-end gap-3">
+          <div class="flex w-full flex-wrap items-center justify-end gap-2 xl:w-auto">
             <button
               @click="loadSubscriptions"
               :disabled="loading"
-              class="btn btn-secondary"
+              class="btn btn-secondary px-2 md:px-3"
               :title="t('common.refresh')"
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
@@ -154,12 +154,12 @@
             </div>
             <button
               @click="showGuideModal = true"
-              class="btn btn-secondary"
+              class="btn btn-secondary px-2 md:px-3"
               :title="t('admin.subscriptions.guide.showGuide')"
             >
               <Icon name="questionCircle" size="md" />
             </button>
-            <button @click="showAssignModal = true" class="btn btn-primary">
+            <button @click="showAssignModal = true" class="btn btn-primary min-w-0 flex-1 sm:flex-none">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.subscriptions.assignSubscription') }}
             </button>

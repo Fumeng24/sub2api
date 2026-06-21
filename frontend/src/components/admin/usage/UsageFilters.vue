@@ -1,11 +1,11 @@
 <template>
-  <div class="card p-6">
+  <div class="card p-4 sm:p-5">
     <!-- Toolbar: left filters (multi-line) + right actions -->
-    <div class="flex flex-wrap items-end justify-between gap-4">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <!-- Left: filters (allowed to wrap to multiple rows) -->
-      <div class="flex flex-1 flex-wrap items-end gap-4">
+      <div class="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
         <!-- User Search -->
-        <div ref="userSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]">
+        <div ref="userSearchRef" class="usage-filter-dropdown relative min-w-0">
           <label class="input-label">{{ t('admin.usage.userFilter') }}</label>
           <input
             v-model="userKeyword"
@@ -42,7 +42,7 @@
         </div>
 
         <!-- API Key Search -->
-        <div ref="apiKeySearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]">
+        <div ref="apiKeySearchRef" class="usage-filter-dropdown relative min-w-0">
           <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
           <input
             v-model="apiKeyKeyword"
@@ -79,13 +79,13 @@
         </div>
 
         <!-- Model Filter -->
-        <div class="w-full sm:w-auto sm:min-w-[220px]">
+        <div class="min-w-0">
           <label class="input-label">{{ t('usage.model') }}</label>
           <Select v-model="filters.model" :options="modelOptions" searchable @change="emitChange" />
         </div>
 
         <!-- Account Filter -->
-        <div ref="accountSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[220px]">
+        <div ref="accountSearchRef" class="usage-filter-dropdown relative min-w-0">
           <label class="input-label">{{ t('admin.usage.account') }}</label>
           <input
             v-model="accountKeyword"
@@ -122,25 +122,25 @@
         </div>
 
         <!-- Request Type Filter -->
-        <div class="w-full sm:w-auto sm:min-w-[180px]">
+        <div class="min-w-0">
           <label class="input-label">{{ t('usage.type') }}</label>
           <Select v-model="filters.request_type" :options="requestTypeOptions" @change="emitChange" />
         </div>
 
         <!-- Billing Type Filter -->
-        <div class="w-full sm:w-auto sm:min-w-[200px]">
+        <div class="min-w-0">
           <label class="input-label">{{ t('admin.usage.billingType') }}</label>
           <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="emitChange" />
         </div>
 
         <!-- Billing Mode Filter -->
-        <div class="w-full sm:w-auto sm:min-w-[200px]">
+        <div class="min-w-0">
           <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
           <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="emitChange" />
         </div>
 
         <!-- Group Filter -->
-        <div class="w-full sm:w-auto sm:min-w-[200px]">
+        <div class="min-w-0">
           <label class="input-label">{{ t('admin.usage.group') }}</label>
           <Select v-model="filters.group_id" :options="groupOptions" searchable @change="emitChange" />
         </div>
@@ -148,18 +148,18 @@
       </div>
 
       <!-- Right: actions -->
-      <div v-if="showActions" class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
-        <button type="button" @click="$emit('refresh')" class="btn btn-secondary">
+      <div v-if="showActions" class="flex w-full flex-wrap items-center justify-end gap-2 xl:w-auto xl:max-w-[34rem]">
+        <button type="button" @click="$emit('refresh')" class="btn btn-secondary min-w-0 flex-1 sm:flex-none">
           {{ t('common.refresh') }}
         </button>
-        <button type="button" @click="$emit('reset')" class="btn btn-secondary">
+        <button type="button" @click="$emit('reset')" class="btn btn-secondary min-w-0 flex-1 sm:flex-none">
           {{ t('common.reset') }}
         </button>
         <slot name="after-reset" />
-        <button type="button" @click="$emit('cleanup')" class="btn btn-danger">
+        <button type="button" @click="$emit('cleanup')" class="btn btn-danger min-w-0 flex-1 sm:flex-none">
           {{ t('admin.usage.cleanup.button') }}
         </button>
-        <button type="button" @click="$emit('export')" :disabled="exporting" class="btn btn-primary">
+        <button type="button" @click="$emit('export')" :disabled="exporting" class="btn btn-primary min-w-0 flex-1 sm:flex-none">
           {{ t('usage.exportExcel') }}
         </button>
       </div>

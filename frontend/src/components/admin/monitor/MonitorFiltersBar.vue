@@ -1,8 +1,8 @@
 <template>
-  <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+  <div class="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-start">
     <!-- Left: Search + Filters -->
-    <div class="flex flex-1 flex-wrap items-center gap-3">
-      <div class="relative w-full sm:w-64">
+    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+      <div class="relative w-full min-w-0 sm:w-64">
         <Icon
           name="search"
           size="md"
@@ -21,7 +21,7 @@
         v-model="provider"
         :options="providerFilterOptions"
         :placeholder="t('admin.channelMonitor.allProviders')"
-        class="w-44"
+        class="w-full min-w-0 sm:w-44"
         @change="$emit('reload')"
       />
 
@@ -29,24 +29,24 @@
         v-model="enabled"
         :options="enabledFilterOptions"
         :placeholder="t('admin.channelMonitor.enabledFilter')"
-        class="w-40"
+        class="w-full min-w-0 sm:w-40"
         @change="$emit('reload')"
       />
     </div>
 
     <!-- Right: Actions -->
-    <div class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-3 lg:w-auto">
+    <div class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
       <button
         @click="$emit('reload')"
         :disabled="loading"
-        class="btn btn-secondary"
+        class="btn btn-secondary px-2 md:px-3"
         :title="t('common.refresh')"
       >
         <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
       </button>
       <button
         @click="$emit('manage-sort')"
-        class="btn btn-secondary"
+        class="btn btn-secondary min-w-0 flex-1 sm:flex-none"
         :title="t('admin.channelMonitor.sortOrder')"
       >
         <Icon name="arrowsUpDown" size="md" class="mr-2" />
@@ -54,13 +54,13 @@
       </button>
       <button
         @click="$emit('manage-templates')"
-        class="btn btn-secondary"
+        class="btn btn-secondary min-w-0 flex-1 sm:flex-none"
         :title="t('admin.channelMonitor.template.manageButton')"
       >
         <Icon name="cog" size="md" class="mr-2" />
         {{ t('admin.channelMonitor.template.manageButton') }}
       </button>
-      <button @click="$emit('create')" class="btn btn-primary">
+      <button @click="$emit('create')" class="btn btn-primary min-w-0 flex-1 sm:flex-none">
         <Icon name="plus" size="md" class="mr-2" />
         {{ t('admin.channelMonitor.createButton') }}
       </button>

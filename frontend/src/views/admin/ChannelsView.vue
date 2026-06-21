@@ -2,10 +2,10 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+        <div class="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <!-- Left: Search + Filters -->
-          <div class="flex flex-1 flex-wrap items-center gap-3">
-            <div class="relative w-full sm:w-64">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <div class="relative w-full min-w-0 sm:w-64">
               <Icon
                 name="search"
                 size="md"
@@ -24,22 +24,22 @@
               v-model="filters.status"
               :options="statusFilterOptions"
               :placeholder="t('admin.channels.allStatus', 'All Status')"
-              class="w-40"
+              class="w-full min-w-0 sm:w-40"
               @change="loadChannels"
             />
           </div>
 
           <!-- Right: Actions -->
-          <div class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-3 lg:w-auto">
+          <div class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
             <button
               @click="loadChannels"
               :disabled="loading"
-              class="btn btn-secondary"
+              class="btn btn-secondary px-2 md:px-3"
               :title="t('common.refresh', 'Refresh')"
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
             </button>
-            <button @click="openCreateDialog" class="btn btn-primary">
+            <button @click="openCreateDialog" class="btn btn-primary min-w-0 flex-1 sm:flex-none">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.channels.createChannel', 'Create Channel') }}
             </button>

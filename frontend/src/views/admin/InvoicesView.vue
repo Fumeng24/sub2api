@@ -1,16 +1,16 @@
 <template>
   <AppLayout>
     <div class="space-y-4">
-      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-900">
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div class="flex-1">
+      <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-900">
+        <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div class="min-w-0 flex-1">
             <h1 class="text-xl font-bold text-gray-950 dark:text-white">发票管理</h1>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">审核用户开票申请，完成开票时会从用户余额扣除 2% 税点并锁定已开票金额。</p>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <input v-model.trim="filters.search" class="input w-full sm:w-64" placeholder="搜索用户、抬头、税号、发票号" @input="debounceLoad" />
-            <Select v-model="filters.status" :options="statusOptions" class="w-full sm:w-36" @change="load" />
-            <button class="btn btn-secondary" :disabled="loading" @click="load">
+          <div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 lg:w-auto">
+            <input v-model.trim="filters.search" class="input w-full min-w-0 sm:w-64" placeholder="搜索用户、抬头、税号、发票号" @input="debounceLoad" />
+            <Select v-model="filters.status" :options="statusOptions" class="w-full min-w-0 sm:w-36" @change="load" />
+            <button class="btn btn-secondary min-w-0 flex-1 sm:flex-none" :disabled="loading" @click="load">
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
               刷新
             </button>
@@ -18,7 +18,7 @@
         </div>
       </div>
 
-      <div class="card overflow-hidden">
+      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900">
         <div v-if="loading" class="flex justify-center py-20">
           <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
         </div>
@@ -104,11 +104,11 @@
           <InfoItem label="发票号" :value="selected.invoice_no || '-'" />
           <InfoItem label="创建时间" :value="formatDateTime(selected.created_at)" />
         </div>
-        <div v-if="selected.note" class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-dark-800 dark:text-gray-300">
+        <div v-if="selected.note" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-dark-800 dark:text-gray-300">
           <p class="mb-1 font-medium text-gray-900 dark:text-white">用户备注</p>
           <p class="whitespace-pre-wrap">{{ selected.note }}</p>
         </div>
-        <div v-if="selected.admin_note" class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-dark-800 dark:text-gray-300">
+        <div v-if="selected.admin_note" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-dark-800 dark:text-gray-300">
           <p class="mb-1 font-medium text-gray-900 dark:text-white">后台备注</p>
           <p class="whitespace-pre-wrap">{{ selected.admin_note }}</p>
         </div>
@@ -117,7 +117,7 @@
 
     <BaseDialog :show="actionDialog.show" :title="actionDialogTitle" @close="closeAction">
       <form class="space-y-4" @submit.prevent="submitAction">
-        <div v-if="selected" class="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-dark-800 dark:text-gray-300">
+        <div v-if="selected" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-dark-800 dark:text-gray-300">
           <p>申请 #{{ selected.id }} · {{ selected.user_email }}</p>
           <p class="mt-1">开票金额 {{ formatMoney(selected.amount) }}，税点 {{ formatMoney(selected.amount * selected.tax_rate) }}</p>
         </div>
@@ -160,7 +160,7 @@ const InfoItem = defineComponent({
     value: { type: String, required: true },
   },
   setup(props) {
-    return () => h('div', { class: 'rounded-xl border border-gray-100 p-3 dark:border-dark-700' }, [
+    return () => h('div', { class: 'rounded-lg border border-gray-100 p-3 dark:border-dark-700' }, [
       h('p', { class: 'text-xs text-gray-500 dark:text-gray-400' }, props.label),
       h('p', { class: 'mt-1 break-words text-sm font-medium text-gray-900 dark:text-white' }, props.value),
     ])

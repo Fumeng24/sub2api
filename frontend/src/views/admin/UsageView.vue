@@ -5,8 +5,8 @@
       <!-- Charts Section -->
       <div class="space-y-4">
         <div class="card p-4">
-          <div class="flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-2">
+          <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
+            <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.timeRange') }}:</span>
               <DateRangePicker
                 v-model:start-date="startDate"
@@ -14,9 +14,9 @@
                 @change="onDateRangeChange"
               />
             </div>
-            <div class="ml-auto flex items-center gap-2">
+            <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center lg:ml-auto">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.granularity') }}:</span>
-              <div class="w-28">
+              <div class="w-full sm:w-28">
                 <Select v-model="granularity" :options="granularityOptions" @change="loadChartData" />
               </div>
             </div>
@@ -100,7 +100,7 @@
           </div>
         </template>
       </UsageFilters>
-      <div class="mb-4 flex gap-2 border-b border-gray-200 dark:border-dark-700">
+      <div class="mb-4 flex min-w-0 gap-2 overflow-x-auto border-b border-gray-200 dark:border-dark-700">
         <button class="tab" :class="{ 'tab-active': activeTab === 'usage' }" @click="activeTab = 'usage'">
           {{ t('usage.tabs.usage') }}
         </button>

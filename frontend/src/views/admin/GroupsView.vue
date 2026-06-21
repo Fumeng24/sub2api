@@ -3,11 +3,11 @@
     <TablePageLayout>
       <template #filters>
         <div
-          class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start"
+          class="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-start"
         >
           <!-- Left: fuzzy search + filters (can wrap to multiple lines) -->
-          <div class="flex flex-1 flex-wrap items-center gap-3">
-            <div class="relative w-full sm:w-64">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <div class="relative w-full min-w-0 sm:w-64">
               <Icon
                 name="search"
                 size="md"
@@ -25,33 +25,33 @@
               v-model="filters.platform"
               :options="platformFilterOptions"
               :placeholder="t('admin.groups.allPlatforms')"
-              class="w-44"
+              class="w-full min-w-0 sm:w-44"
               @change="loadGroups"
             />
             <Select
               v-model="filters.status"
               :options="statusOptions"
               :placeholder="t('admin.groups.allStatus')"
-              class="w-40"
+              class="w-full min-w-0 sm:w-40"
               @change="loadGroups"
             />
             <Select
               v-model="filters.is_exclusive"
               :options="exclusiveOptions"
               :placeholder="t('admin.groups.allGroups')"
-              class="w-44"
+              class="w-full min-w-0 sm:w-44"
               @change="loadGroups"
             />
           </div>
 
           <!-- Right: actions -->
           <div
-            class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-3 lg:w-auto"
+            class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-2 lg:w-auto"
           >
             <button
               @click="loadGroups"
               :disabled="loading"
-              class="btn btn-secondary"
+              class="btn btn-secondary px-2 md:px-3"
               :title="t('common.refresh')"
             >
               <Icon
@@ -62,7 +62,7 @@
             </button>
             <button
               @click="openSortModal"
-              class="btn btn-secondary"
+              class="btn btn-secondary min-w-0 flex-1 sm:flex-none"
               :title="t('admin.groups.sortOrder')"
             >
               <Icon name="arrowsUpDown" size="md" class="mr-2" />
@@ -70,7 +70,7 @@
             </button>
             <button
               @click="openCreateModal"
-              class="btn btn-primary"
+              class="btn btn-primary min-w-0 flex-1 sm:flex-none"
               data-tour="groups-create-btn"
             >
               <Icon name="plus" size="md" class="mr-2" />

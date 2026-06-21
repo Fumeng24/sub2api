@@ -2,46 +2,48 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <!-- Left: Search + Filters -->
-          <div class="relative w-full sm:w-64">
-            <Icon
-              name="search"
-              size="md"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-            />
-            <input
-              v-model="searchQuery"
-              type="text"
-              :placeholder="t('admin.proxies.searchProxies')"
-              class="input pl-10"
-              @input="handleSearch"
-            />
-          </div>
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <div class="relative w-full min-w-0 sm:w-64">
+              <Icon
+                name="search"
+                size="md"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              />
+              <input
+                v-model="searchQuery"
+                type="text"
+                :placeholder="t('admin.proxies.searchProxies')"
+                class="input pl-10"
+                @input="handleSearch"
+              />
+            </div>
 
-          <div class="w-full sm:w-40">
-            <Select
-              v-model="filters.protocol"
-              :options="protocolOptions"
-              :placeholder="t('admin.proxies.allProtocols')"
-              @change="loadProxies"
-            />
-          </div>
-          <div class="w-full sm:w-36">
-            <Select
-              v-model="filters.status"
-              :options="statusOptions"
-              :placeholder="t('admin.proxies.allStatus')"
-              @change="loadProxies"
-            />
+            <div class="w-full min-w-0 sm:w-40">
+              <Select
+                v-model="filters.protocol"
+                :options="protocolOptions"
+                :placeholder="t('admin.proxies.allProtocols')"
+                @change="loadProxies"
+              />
+            </div>
+            <div class="w-full min-w-0 sm:w-36">
+              <Select
+                v-model="filters.status"
+                :options="statusOptions"
+                :placeholder="t('admin.proxies.allStatus')"
+                @change="loadProxies"
+              />
+            </div>
           </div>
 
           <!-- Right: All action buttons -->
-          <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
+          <div class="flex w-full flex-wrap items-center justify-end gap-2 xl:w-auto xl:max-w-[46rem]">
             <button
               @click="loadProxies"
               :disabled="loading"
-              class="btn btn-secondary"
+              class="btn btn-secondary px-2 md:px-3"
               :title="t('common.refresh')"
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
@@ -49,7 +51,7 @@
             <button
               @click="handleBatchTest"
               :disabled="batchTesting || loading"
-              class="btn btn-secondary"
+              class="btn btn-secondary min-w-0 flex-1 sm:flex-none"
               :title="t('admin.proxies.testConnection')"
             >
               <Icon name="play" size="md" class="mr-2" />
@@ -58,7 +60,7 @@
             <button
               @click="handleBatchQualityCheck"
               :disabled="batchQualityChecking || loading"
-              class="btn btn-secondary"
+              class="btn btn-secondary min-w-0 flex-1 sm:flex-none"
               :title="t('admin.proxies.batchQualityCheck')"
             >
               <Icon name="shield" size="md" class="mr-2" :class="batchQualityChecking ? 'animate-pulse' : ''" />
@@ -67,19 +69,19 @@
             <button
               @click="openBatchDelete"
               :disabled="selectedCount === 0"
-              class="btn btn-danger"
+              class="btn btn-danger min-w-0 flex-1 sm:flex-none"
               :title="t('admin.proxies.batchDeleteAction')"
             >
               <Icon name="trash" size="md" class="mr-2" />
               {{ t('admin.proxies.batchDeleteAction') }}
             </button>
-            <button @click="showImportData = true" class="btn btn-secondary">
+            <button @click="showImportData = true" class="btn btn-secondary min-w-0 flex-1 sm:flex-none">
               {{ t('admin.proxies.dataImport') }}
             </button>
-            <button @click="showExportDataDialog = true" class="btn btn-secondary">
+            <button @click="showExportDataDialog = true" class="btn btn-secondary min-w-0 flex-1 sm:flex-none">
               {{ selectedCount > 0 ? t('admin.proxies.dataExportSelected') : t('admin.proxies.dataExport') }}
             </button>
-            <button @click="showCreateModal = true" class="btn btn-primary">
+            <button @click="showCreateModal = true" class="btn btn-primary min-w-0 flex-1 sm:flex-none">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.proxies.createProxy') }}
             </button>

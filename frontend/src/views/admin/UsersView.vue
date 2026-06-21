@@ -3,11 +3,11 @@
     <TablePageLayout>
       <!-- Single Row: Search, Filters, and Actions -->
       <template #filters>
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <!-- Left: Search + Active Filters -->
-          <div class="flex flex-1 flex-wrap items-center gap-3">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
             <!-- Search Box -->
-            <div class="relative w-full md:w-64">
+            <div class="relative w-full min-w-0 sm:w-64">
               <Icon
                 name="search"
                 size="md"
@@ -23,7 +23,7 @@
             </div>
 
             <!-- Role Filter (visible when enabled) -->
-            <div v-if="visibleFilters.has('role')" class="w-full sm:w-32">
+            <div v-if="visibleFilters.has('role')" class="w-full min-w-0 sm:w-32">
               <Select
                 v-model="filters.role"
                 :options="[
@@ -37,7 +37,7 @@
             </div>
 
             <!-- Status Filter (visible when enabled) -->
-            <div v-if="visibleFilters.has('status')" class="w-full sm:w-32">
+            <div v-if="visibleFilters.has('status')" class="w-full min-w-0 sm:w-32">
               <Select
                 v-model="filters.status"
                 :options="[
@@ -50,7 +50,7 @@
             </div>
 
             <!-- Group Filter (visible when enabled) -->
-            <div v-if="visibleFilters.has('group')" class="w-full sm:w-44">
+            <div v-if="visibleFilters.has('group')" class="w-full min-w-0 sm:w-44">
               <Select
                 v-model="filters.group"
                 :options="groupFilterOptions"
@@ -63,7 +63,7 @@
             </div>
 
             <!-- API Key Group Filter (visible when enabled) -->
-            <div v-if="visibleFilters.has('apiKeyGroup')" class="w-full sm:w-44">
+            <div v-if="visibleFilters.has('apiKeyGroup')" class="w-full min-w-0 sm:w-44">
               <Select
                 v-model="filters.apiKeyGroup"
                 :options="apiKeyGroupFilterOptions"
@@ -77,7 +77,7 @@
             <template v-for="(value, attrId) in activeAttributeFilters" :key="attrId">
               <div
                 v-if="visibleFilters.has(`attr_${attrId}`)"
-                class="relative w-full sm:w-36"
+                class="relative w-full min-w-0 sm:w-36"
               >
                 <!-- Text/Email/URL/Textarea/Date type: styled input -->
                 <input
@@ -125,9 +125,9 @@
           </div>
 
           <!-- Right: Actions and Settings -->
-          <div class="flex flex-wrap items-center justify-end gap-2">
+          <div class="flex w-full flex-wrap items-center justify-end gap-2 xl:w-auto">
             <!-- Mobile: Secondary buttons (icon only) -->
-            <div class="flex items-center gap-2 md:contents">
+            <div class="flex flex-wrap items-center gap-2 md:contents">
               <!-- Refresh Button -->
               <button
                 @click="loadUsers"
@@ -244,7 +244,7 @@
             </div>
 
             <!-- Create User Button (full width on mobile, auto width on desktop) -->
-            <button @click="showCreateModal = true" class="btn btn-primary flex-1 md:flex-initial">
+            <button @click="showCreateModal = true" class="btn btn-primary min-w-0 flex-1 sm:flex-none">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.users.createUser') }}
             </button>
