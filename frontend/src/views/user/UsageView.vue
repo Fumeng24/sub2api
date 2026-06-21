@@ -2,18 +2,29 @@
   <AppLayout>
     <TablePageLayout>
       <template #actions>
-        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div class="space-y-4">
+          <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-dark-700 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+              <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+                {{ t('usage.title') }}
+              </h1>
+              <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+                {{ t('usage.description') }}
+              </p>
+            </div>
+          </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <!-- Total Requests -->
-          <div class="card p-4">
+          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
           <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+            <div class="rounded-lg bg-blue-50 p-2 ring-1 ring-blue-100 dark:bg-blue-900/20 dark:ring-blue-900/40">
               <Icon name="document" size="md" class="text-blue-600 dark:text-blue-400" />
             </div>
             <div>
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {{ t('usage.totalRequests') }}
               </p>
-              <p class="text-xl font-bold text-gray-900 dark:text-white">
+              <p class="text-xl font-semibold text-gray-950 dark:text-white">
                 {{ usageStats?.total_requests?.toLocaleString() || '0' }}
               </p>
               <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -24,16 +35,16 @@
         </div>
 
         <!-- Total Tokens -->
-        <div class="card p-4">
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
           <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
+            <div class="rounded-lg bg-amber-50 p-2 ring-1 ring-amber-100 dark:bg-amber-900/20 dark:ring-amber-900/40">
               <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" />
             </div>
             <div class="min-w-0 flex-1">
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {{ t('usage.totalTokens') }}
               </p>
-              <p class="text-xl font-bold text-gray-900 dark:text-white">
+              <p class="text-xl font-semibold text-gray-950 dark:text-white">
                 {{ formatTokens(usageStats?.total_tokens || 0) }}
               </p>
               <div class="space-y-1 text-xs">
@@ -64,16 +75,16 @@
         </div>
 
         <!-- Total Cost -->
-        <div class="card p-4">
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
           <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
+            <div class="rounded-lg bg-emerald-50 p-2 ring-1 ring-emerald-100 dark:bg-emerald-900/20 dark:ring-emerald-900/40">
               <Icon name="dollar" size="md" class="text-green-600 dark:text-green-400" />
             </div>
             <div class="min-w-0 flex-1">
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {{ t('usage.totalCost') }}
               </p>
-              <p class="text-xl font-bold text-green-600 dark:text-green-400">
+              <p class="text-xl font-semibold text-emerald-600 dark:text-emerald-400">
                 {{ formatSettlementAmount(usageStats?.total_actual_cost || 0, 4) }}
               </p>
               <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -86,16 +97,16 @@
         </div>
 
         <!-- Average Duration -->
-        <div class="card p-4">
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
           <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
-              <Icon name="clock" size="md" class="text-purple-600 dark:text-purple-400" />
+            <div class="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-100 dark:bg-slate-900/30 dark:ring-slate-700">
+              <Icon name="clock" size="md" class="text-slate-600 dark:text-slate-300" />
             </div>
             <div>
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {{ t('usage.avgDuration') }}
               </p>
-              <p class="text-xl font-bold text-gray-900 dark:text-white">
+              <p class="text-xl font-semibold text-gray-950 dark:text-white">
                 {{ formatDuration(usageStats?.average_duration_ms || 0) }}
               </p>
               <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.perRequest') }}</p>
@@ -103,11 +114,11 @@
           </div>
         </div>
         </div>
+        </div>
       </template>
 
       <template #filters>
-        <div class="card">
-          <div class="px-6 py-4">
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
           <div class="grid gap-4 lg:grid-cols-[minmax(180px,240px)_auto_1fr] lg:items-end">
             <!-- API Key Filter -->
             <div class="min-w-0">
@@ -174,7 +185,6 @@
               </button>
             </div>
           </div>
-        </div>
         </div>
       </template>
 

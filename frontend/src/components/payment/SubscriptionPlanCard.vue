@@ -1,8 +1,8 @@
 <template>
   <div
     :class="[
-      'group relative flex flex-col overflow-hidden rounded-2xl border transition-all',
-      'hover:shadow-xl hover:-translate-y-0.5',
+      'group relative flex flex-col overflow-hidden rounded-lg border shadow-sm transition-colors',
+      'hover:border-blue-200 hover:bg-gray-50 dark:hover:border-blue-900/50',
       borderClass,
       'bg-white dark:bg-dark-800',
     ]"
@@ -15,8 +15,8 @@
       <div class="mb-3 flex items-start justify-between gap-2">
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
-            <h3 class="truncate text-base font-bold text-gray-900 dark:text-white">{{ plan.name }}</h3>
-            <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium', badgeLightClass]">
+            <h3 class="truncate text-base font-semibold text-gray-900 dark:text-white">{{ plan.name }}</h3>
+            <span :class="['shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium', badgeLightClass]">
               {{ pLabel }}
             </span>
           </div>
@@ -26,7 +26,7 @@
         </div>
         <div class="shrink-0 text-right">
           <div class="flex items-baseline gap-1">
-            <span :class="['text-2xl font-extrabold tracking-tight', textClass]">{{ formatPaymentAmount(plan.price, priceCurrency) }}</span>
+            <span :class="['text-2xl font-semibold tracking-normal', textClass]">{{ formatPaymentAmount(plan.price, priceCurrency) }}</span>
           </div>
           <span class="text-[11px] text-gray-400 dark:text-dark-500">/ {{ validitySuffix }}</span>
           <div v-if="plan.original_price" class="mt-0.5 flex items-center justify-end gap-1.5">
@@ -84,7 +84,7 @@
       <!-- Subscribe Button -->
       <button
         type="button"
-        :class="['w-full rounded-xl py-2.5 text-sm font-semibold transition-all active:scale-[0.98]', btnClass]"
+        :class="['w-full rounded-lg py-2.5 text-sm font-semibold transition-all active:scale-[0.98]', btnClass]"
         @click="emit('select', plan)"
       >
         {{ isRenewal ? t('payment.renewNow') : t('payment.subscribeNow') }}

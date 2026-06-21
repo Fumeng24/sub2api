@@ -1,10 +1,10 @@
 <template>
-  <div class="card">
-    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('dashboard.recentUsage') }}</h2>
-      <span class="badge badge-gray">{{ t('dashboard.last7Days') }}</span>
+  <div class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-800">
+    <div class="flex flex-col gap-2 border-b border-gray-100 px-5 py-4 dark:border-dark-700 sm:flex-row sm:items-center sm:justify-between">
+      <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('dashboard.recentUsage') }}</h2>
+      <span class="badge badge-gray w-fit">{{ t('dashboard.last7Days') }}</span>
     </div>
-    <div class="p-6">
+    <div class="p-4 sm:p-5">
       <div v-if="loading" class="flex items-center justify-center py-12">
         <LoadingSpinner size="lg" />
       </div>
@@ -12,17 +12,17 @@
         <EmptyState :title="t('dashboard.noUsageRecords')" :description="t('dashboard.startUsingApi')" />
       </div>
       <div v-else class="space-y-3">
-        <div v-for="log in data" :key="log.id" class="flex items-center justify-between rounded-xl bg-gray-50 p-4 transition-colors hover:bg-gray-100 dark:bg-dark-800/50 dark:hover:bg-dark-800">
-          <div class="flex items-center gap-4">
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/30">
+        <div v-for="log in data" :key="log.id" class="flex flex-col gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4 transition-colors hover:bg-gray-100 dark:border-dark-700 dark:bg-dark-900/45 dark:hover:bg-dark-900 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex min-w-0 items-center gap-3">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900/30">
               <Icon name="beaker" size="md" class="text-primary-600 dark:text-primary-400" />
             </div>
-            <div>
-              <p class="text-sm font-medium text-gray-900 dark:text-white">{{ log.model }}</p>
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ log.model }}</p>
               <p class="text-xs text-gray-500 dark:text-dark-400">{{ formatDateTime(log.created_at) }}</p>
             </div>
           </div>
-          <div class="text-right">
+          <div class="shrink-0 text-left sm:text-right">
             <p class="text-sm font-semibold">
               <span class="text-green-600 dark:text-green-400" :title="t('dashboard.actual')">{{ formatSettlementAmount(log.actual_cost, 4) }}</span>
               <span class="font-normal text-gray-400 dark:text-gray-500" :title="t('dashboard.standard')"> / {{ formatSettlementAmount(log.total_cost, 4) }}</span>

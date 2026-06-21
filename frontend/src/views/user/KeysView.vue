@@ -2,55 +2,62 @@
     <AppLayout>
       <TablePageLayout>
         <template #filters>
-          <div class="flex flex-col gap-3">
-          <div class="flex flex-wrap items-center gap-3">
+          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
+          <div class="grid gap-3 md:grid-cols-[minmax(220px,1fr)_10rem_10rem] md:items-center">
             <SearchInput
               v-model="filterSearch"
               :placeholder="t('keys.searchPlaceholder')"
-              class="w-full sm:w-64"
+              class="w-full"
               @search="onFilterChange"
             />
             <Select
               :model-value="filterGroupId"
-              class="w-40"
+              class="w-full"
               :options="groupFilterOptions"
               @update:model-value="onGroupFilterChange"
             />
             <Select
               :model-value="filterStatus"
-              class="w-40"
+              class="w-full"
               :options="statusFilterOptions"
               @update:model-value="onStatusFilterChange"
             />
           </div>
-          <EndpointPopover
-            v-if="publicSettings?.api_base_url || (publicSettings?.custom_endpoints?.length ?? 0) > 0"
-            :api-base-url="publicSettings?.api_base_url || ''"
-            :custom-endpoints="publicSettings?.custom_endpoints || []"
-          />
+            <div
+              v-if="publicSettings?.api_base_url || (publicSettings?.custom_endpoints?.length ?? 0) > 0"
+              class="mt-3"
+            >
+              <EndpointPopover
+                :api-base-url="publicSettings?.api_base_url || ''"
+                :custom-endpoints="publicSettings?.custom_endpoints || []"
+              />
+            </div>
           </div>
         </template>
 
         <template #actions>
-        <div class="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-dark-700 dark:bg-dark-900">
-          <div class="flex min-w-0 items-start gap-3">
-            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-900/25 dark:text-primary-300">
-              <Icon name="chart" size="sm" />
-            </div>
+        <div class="flex min-w-0 flex-col gap-4 border-b border-gray-200 pb-4 dark:border-dark-700 lg:flex-row lg:items-end lg:justify-between">
+          <div class="min-w-0">
+            <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+              {{ t('keys.title') }}
+            </h1>
+            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-dark-300">
+              {{ t('keys.description') }}
+            </p>
             <div class="min-w-0">
-              <p class="text-sm font-semibold text-gray-900 dark:text-white">
+              <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">
                 {{ t('keys.serviceStatusTip.title') }}
               </p>
-              <p class="mt-1 text-sm leading-5 text-gray-500 dark:text-dark-300">
+              <p class="mt-1 max-w-2xl text-sm leading-5 text-gray-500 dark:text-dark-300">
                 {{ t('keys.serviceStatusTip.description') }}
               </p>
             </div>
           </div>
 
-          <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:justify-end">
             <button
               type="button"
-              class="btn btn-secondary min-w-0 flex-1 justify-center sm:flex-none"
+              class="btn btn-secondary justify-center"
               @click="router.push('/monitor')"
             >
               {{ t('keys.serviceStatusTip.action') }}
@@ -59,14 +66,14 @@
             <button
               @click="loadApiKeys"
               :disabled="loading"
-              class="btn btn-secondary shrink-0"
+              class="btn btn-secondary justify-center"
               :title="t('common.refresh')"
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
             </button>
             <button
               @click="showCreateModal = true"
-              class="btn btn-primary min-w-0 flex-1 justify-center sm:flex-none"
+              class="btn btn-primary justify-center"
               data-tour="keys-create-btn"
             >
               <Icon name="plus" size="md" class="mr-2" />

@@ -1,15 +1,23 @@
 <template>
   <AppLayout>
-    <div class="space-y-4">
+    <div class="mx-auto max-w-7xl space-y-5">
+      <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-dark-700 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0">
+          <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+            {{ t('nav.myOrders') }}
+          </h1>
+        </div>
+        <button class="btn btn-primary w-full justify-center sm:w-auto" @click="router.push('/purchase')">{{ t('payment.result.backToRecharge') }}</button>
+      </div>
+
       <!-- Filters -->
-      <div class="card p-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <Select v-model="currentFilter" :options="statusFilters" class="w-36" @change="fetchOrders" />
-          <div class="flex flex-1 items-center justify-end gap-2">
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Select v-model="currentFilter" :options="statusFilters" class="w-full sm:w-40" @change="fetchOrders" />
+          <div class="flex items-center justify-end gap-2">
             <button @click="fetchOrders" :disabled="loading" class="btn btn-secondary" :title="t('common.refresh')">
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
             </button>
-            <button class="btn btn-primary" @click="router.push('/purchase')">{{ t('payment.result.backToRecharge') }}</button>
           </div>
         </div>
       </div>
@@ -59,7 +67,7 @@
     <!-- Refund Dialog -->
     <BaseDialog :show="!!refundTarget" :title="t('payment.orders.requestRefund')" @close="refundTarget = null">
       <div v-if="refundTarget" class="space-y-4">
-        <div class="rounded-xl bg-gray-50 p-4 dark:bg-dark-800">
+        <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-800">
           <div class="flex justify-between text-sm">
             <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.orderId') }}</span>
             <span class="font-mono text-gray-900 dark:text-white">#{{ refundTarget.id }}</span>

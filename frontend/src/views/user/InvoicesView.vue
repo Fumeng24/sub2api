@@ -1,12 +1,11 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-6xl space-y-6">
-      <div class="overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-6 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-dark-900 dark:to-sky-950/20">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div class="mx-auto max-w-6xl space-y-5">
+      <div class="space-y-4">
+        <div class="flex flex-col gap-4 border-b border-gray-200 pb-4 dark:border-dark-700 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Invoice</p>
-            <h1 class="mt-2 text-2xl font-bold text-gray-950 dark:text-white">开票申请</h1>
-            <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
+            <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">开票申请</h1>
+            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
               可开票金额按已完成余额充值统计，已完成和处理中申请都会占用额度。500 元起开，完成开票时从账户余额扣除 2% 税点。
             </p>
           </div>
@@ -16,30 +15,30 @@
           </button>
         </div>
 
-        <div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-4">
-          <div class="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800/70">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
             <p class="text-xs text-gray-500 dark:text-gray-400">累计可开票充值</p>
-            <p class="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{{ formatMoney(summary?.recharge_amount) }}</p>
+            <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{{ formatMoney(summary?.recharge_amount) }}</p>
           </div>
-          <div class="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800/70">
+          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
             <p class="text-xs text-gray-500 dark:text-gray-400">已开票金额</p>
-            <p class="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{{ formatMoney(summary?.invoiced_amount) }}</p>
+            <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{{ formatMoney(summary?.invoiced_amount) }}</p>
           </div>
-          <div class="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800/70">
+          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
             <p class="text-xs text-gray-500 dark:text-gray-400">处理中占用</p>
-            <p class="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-300">{{ formatMoney(lockedInProgress) }}</p>
+            <p class="mt-2 text-2xl font-semibold text-amber-600 dark:text-amber-300">{{ formatMoney(lockedInProgress) }}</p>
           </div>
-          <div class="rounded-2xl border border-emerald-200 bg-emerald-600 p-4 text-white shadow-sm dark:border-emerald-500/40">
-            <p class="text-xs text-emerald-100">当前可申请</p>
-            <p class="mt-2 text-3xl font-black">{{ formatMoney(summary?.available_amount) }}</p>
+          <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10">
+            <p class="text-xs text-blue-700 dark:text-blue-200">当前可申请</p>
+            <p class="mt-2 text-2xl font-semibold text-blue-700 dark:text-blue-200">{{ formatMoney(summary?.available_amount) }}</p>
           </div>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-[0.95fr_1.35fr]">
-        <div class="card p-5">
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-[0.95fr_1.35fr]">
+        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800">
           <div class="mb-4">
-            <h2 class="text-lg font-bold text-gray-950 dark:text-white">提交开票信息</h2>
+            <h2 class="text-base font-semibold text-gray-950 dark:text-white">提交开票信息</h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">请确认开票金额不超过可申请额度。专票信息请填写完整，避免反复确认。</p>
           </div>
 
@@ -67,7 +66,7 @@
             <div>
               <label class="input-label">开票金额</label>
               <input v-model.number="form.amount" class="input" type="number" min="0" step="0.01" required placeholder="500.00" />
-              <div class="mt-2 rounded-xl bg-gray-50 p-3 text-xs leading-5 text-gray-600 dark:bg-dark-800 dark:text-gray-300">
+              <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs leading-5 text-gray-600 dark:bg-dark-900 dark:text-gray-300">
                 <p>最低开票 {{ formatMoney(summary?.min_amount || 500) }}，当前可开 {{ formatMoney(summary?.available_amount) }}。</p>
                 <p>完成开票时扣除税点：{{ formatMoney(taxFeePreview) }}（{{ summary?.tax_rate_percent || 2 }}%），当前余额 {{ formatMoney(summary?.current_balance) }}。</p>
               </div>
@@ -94,10 +93,10 @@
           </form>
         </div>
 
-        <div class="card overflow-hidden">
+        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-800">
           <div class="flex items-center justify-between border-b border-gray-100 p-5 dark:border-dark-700">
             <div>
-              <h2 class="text-lg font-bold text-gray-950 dark:text-white">申请记录</h2>
+              <h2 class="text-base font-semibold text-gray-950 dark:text-white">申请记录</h2>
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">后台确认后会进入开票处理，完成后锁定该金额。</p>
             </div>
           </div>
@@ -130,7 +129,7 @@
                 </div>
               </div>
 
-              <div v-if="item.admin_note || item.invoice_no" class="mt-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-dark-800 dark:text-gray-300">
+              <div v-if="item.admin_note || item.invoice_no" class="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-dark-900 dark:text-gray-300">
                 <p v-if="item.invoice_no">发票号：{{ item.invoice_no }}</p>
                 <p v-if="item.admin_note">后台备注：{{ item.admin_note }}</p>
               </div>

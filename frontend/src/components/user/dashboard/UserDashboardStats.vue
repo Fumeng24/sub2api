@@ -6,41 +6,38 @@
     <!-- Balance -->
     <div
       v-if="!isSimple"
-      class="relative overflow-hidden rounded-[1.75rem] border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-5 shadow-card dark:border-amber-900/40 dark:from-amber-950/40 dark:via-dark-800/70 dark:to-orange-950/30"
+      class="overflow-hidden rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800"
     >
-      <div class="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-500/10" />
-      <div class="pointer-events-none absolute -bottom-20 left-6 h-36 w-36 rounded-full bg-orange-300/20 blur-3xl dark:bg-orange-500/10" />
-
-      <div class="relative flex items-start justify-between gap-4">
+      <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
-          <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm ring-1 ring-amber-100 dark:bg-dark-900/70 dark:text-amber-300 dark:ring-amber-900/50">
+          <div class="mb-3 inline-flex items-center gap-2 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/50">
             <span class="h-1.5 w-1.5 rounded-full bg-amber-500" />
             {{ t('dashboard.balance') }}
           </div>
-          <p class="truncate text-3xl font-black tracking-tight text-amber-700 dark:text-amber-300 sm:text-4xl">
+          <p class="truncate text-3xl font-semibold tracking-normal text-gray-950 dark:text-white">
             {{ formatSettlementAmount(balance, 2) }}
           </p>
-          <p class="mt-2 text-sm font-semibold text-amber-700/80 dark:text-amber-300/80">
+          <p class="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400">
             {{ balanceSubtitle }}
           </p>
         </div>
-        <div class="rounded-2xl bg-amber-600/10 p-3 text-amber-700 ring-1 ring-amber-500/10 dark:bg-amber-400/10 dark:text-amber-300">
+        <div class="rounded-lg bg-amber-50 p-3 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/50">
           <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
           </svg>
         </div>
       </div>
 
-      <div class="relative mt-5 grid grid-cols-2 gap-2">
-        <div class="rounded-2xl bg-white/75 px-3 py-2 ring-1 ring-amber-100 dark:bg-dark-900/50 dark:ring-amber-900/40">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-700/70 dark:text-amber-300/70">
+      <div class="mt-5 grid grid-cols-2 gap-2">
+        <div class="rounded-lg bg-gray-50 px-3 py-2 ring-1 ring-gray-100 dark:bg-dark-900/50 dark:ring-dark-700">
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {{ t('common.status') }}
           </p>
           <p class="mt-1 text-sm font-bold text-gray-900 dark:text-white">{{ t('common.available') }}</p>
         </div>
         <button
           type="button"
-          class="group flex items-center justify-between gap-2 rounded-2xl bg-amber-600 px-3 py-2 text-left text-xs font-bold text-white shadow-lg shadow-amber-600/20 transition hover:-translate-y-0.5 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400"
+          class="group flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
           @click="balanceEquivalentExpanded = !balanceEquivalentExpanded"
         >
           <span class="min-w-0">
@@ -58,10 +55,10 @@
 
       <div
         v-if="balanceEquivalentExpanded"
-        class="relative mt-4 rounded-2xl border border-amber-100 bg-white/80 p-3 backdrop-blur dark:border-amber-900/40 dark:bg-dark-900/60"
+        class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900/60"
       >
         <div class="mb-3 flex items-start gap-2">
-          <div class="rounded-xl bg-amber-100 p-1.5 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+          <div class="rounded-md bg-amber-100 p-1.5 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
             <Icon name="sparkles" size="xs" :stroke-width="2" />
           </div>
           <div class="min-w-0">
@@ -77,7 +74,7 @@
           <div
             v-for="item in balanceEquivalentItems"
             :key="item.group.id"
-            class="rounded-xl bg-amber-50/80 px-3 py-2 text-xs ring-1 ring-amber-100/70 dark:bg-amber-950/20 dark:ring-amber-900/30"
+            class="rounded-lg bg-white px-3 py-2 text-xs ring-1 ring-gray-200 dark:bg-dark-800 dark:ring-dark-700"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -89,112 +86,112 @@
                 </p>
               </div>
               <div class="shrink-0 text-right">
-                <p class="font-mono text-sm font-black text-amber-700 dark:text-amber-300">
+                <p class="font-mono text-sm font-semibold text-amber-700 dark:text-amber-300">
                   {{ item.quotaLabel }}
                 </p>
                 <p class="text-[10px] text-gray-400">{{ item.quotaUnitLabel }}</p>
               </div>
             </div>
-            <p class="mt-1.5 rounded-lg bg-white/60 px-2 py-1 text-[10px] leading-4 text-amber-800/80 dark:bg-dark-900/40 dark:text-amber-200/80">
+            <p class="mt-1.5 rounded-md bg-gray-50 px-2 py-1 text-[10px] leading-4 text-gray-500 dark:bg-dark-900/40 dark:text-gray-400">
               {{ item.formulaLabel }}
             </p>
           </div>
         </div>
-        <p v-else class="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:bg-dark-800 dark:text-gray-400">
+        <p v-else class="rounded-lg bg-white px-3 py-2 text-xs text-gray-500 dark:bg-dark-800 dark:text-gray-400">
           {{ t('dashboard.balanceEquivalent.empty') }}
         </p>
       </div>
     </div>
 
     <!-- KPI Matrix -->
-    <div class="rounded-[1.75rem] border border-gray-100 bg-white/85 p-3 shadow-card dark:border-dark-700/60 dark:bg-dark-800/60">
-      <div class="mb-2 flex items-center justify-between px-1">
+    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
+      <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p class="text-sm font-bold text-gray-900 dark:text-white">{{ t('dashboard.todayOverview') }}</p>
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('dashboard.todayOverview') }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('dashboard.accountSnapshot') }}</p>
         </div>
-        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-500 dark:bg-dark-700 dark:text-gray-300">
+        <span class="w-fit rounded-md bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500 dark:bg-dark-700 dark:text-gray-300">
           {{ t('dashboard.last7Days') }}
         </span>
       </div>
 
       <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-        <div class="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/45">
           <div class="mb-3 flex items-center justify-between">
-            <p class="text-xs font-semibold text-blue-700 dark:text-blue-300">{{ t('dashboard.apiKeys') }}</p>
-            <div class="rounded-xl bg-white/80 p-2 text-blue-600 dark:bg-dark-900/60 dark:text-blue-300">
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('dashboard.apiKeys') }}</p>
+            <div class="rounded-md bg-white p-2 text-blue-600 ring-1 ring-gray-200 dark:bg-dark-800 dark:text-blue-300 dark:ring-dark-700">
               <Icon name="key" size="sm" :stroke-width="2" />
             </div>
           </div>
-          <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats?.total_api_keys || 0 }}</p>
+          <p class="text-2xl font-semibold text-gray-950 dark:text-white">{{ stats?.total_api_keys || 0 }}</p>
           <p class="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">{{ stats?.active_api_keys || 0 }} {{ t('common.active') }}</p>
         </div>
 
-        <div class="rounded-2xl border border-green-100 bg-green-50/60 p-4 dark:border-green-900/40 dark:bg-green-950/20">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/45">
           <div class="mb-3 flex items-center justify-between">
-            <p class="text-xs font-semibold text-green-700 dark:text-green-300">{{ t('dashboard.todayRequests') }}</p>
-            <div class="rounded-xl bg-white/80 p-2 text-green-600 dark:bg-dark-900/60 dark:text-green-300">
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('dashboard.todayRequests') }}</p>
+            <div class="rounded-md bg-white p-2 text-emerald-600 ring-1 ring-gray-200 dark:bg-dark-800 dark:text-emerald-300 dark:ring-dark-700">
               <Icon name="chart" size="sm" :stroke-width="2" />
             </div>
           </div>
-          <p class="text-2xl font-black text-gray-900 dark:text-white">{{ stats?.today_requests || 0 }}</p>
+          <p class="text-2xl font-semibold text-gray-950 dark:text-white">{{ stats?.today_requests || 0 }}</p>
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('common.total') }}: {{ formatNumber(stats?.total_requests || 0) }}</p>
         </div>
 
-        <div class="rounded-2xl border border-fuchsia-100 bg-fuchsia-50/60 p-4 dark:border-fuchsia-900/40 dark:bg-fuchsia-950/20">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/45">
           <div class="mb-3 flex items-center justify-between">
-            <p class="text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">{{ t('dashboard.todayCost') }}</p>
-            <div class="rounded-xl bg-white/80 p-2 text-fuchsia-600 dark:bg-dark-900/60 dark:text-fuchsia-300">
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('dashboard.todayCost') }}</p>
+            <div class="rounded-md bg-white p-2 text-blue-600 ring-1 ring-gray-200 dark:bg-dark-800 dark:text-blue-300 dark:ring-dark-700">
               <Icon name="dollar" size="sm" :stroke-width="2" />
             </div>
           </div>
-          <p class="text-2xl font-black text-gray-900 dark:text-white">
-            <span class="text-fuchsia-700 dark:text-fuchsia-300" :title="t('dashboard.actual')">{{ formatSettlementAmount(stats?.today_actual_cost || 0, 4) }}</span>
+          <p class="text-2xl font-semibold text-gray-950 dark:text-white">
+            <span class="text-blue-700 dark:text-blue-300" :title="t('dashboard.actual')">{{ formatSettlementAmount(stats?.today_actual_cost || 0, 4) }}</span>
             <span class="text-sm font-semibold text-gray-400 dark:text-gray-500" :title="t('dashboard.standard')"> / {{ formatSettlementAmount(stats?.today_cost || 0, 4) }}</span>
           </p>
           <p class="mt-1 truncate text-xs">
             <span class="text-gray-500 dark:text-gray-400">{{ t('common.total') }}: </span>
-            <span class="font-medium text-fuchsia-700 dark:text-fuchsia-300" :title="t('dashboard.actual')">{{ formatSettlementAmount(stats?.total_actual_cost || 0, 4) }}</span>
+            <span class="font-medium text-blue-700 dark:text-blue-300" :title="t('dashboard.actual')">{{ formatSettlementAmount(stats?.total_actual_cost || 0, 4) }}</span>
             <span class="text-gray-400 dark:text-gray-500" :title="t('dashboard.standard')"> / {{ formatSettlementAmount(stats?.total_cost || 0, 4) }}</span>
           </p>
         </div>
 
-        <div class="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/45">
           <div class="mb-3 flex items-center justify-between">
-            <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">{{ t('dashboard.todayTokens') }}</p>
-            <div class="rounded-xl bg-white/80 p-2 text-amber-600 dark:bg-dark-900/60 dark:text-amber-300">
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('dashboard.todayTokens') }}</p>
+            <div class="rounded-md bg-white p-2 text-amber-600 ring-1 ring-gray-200 dark:bg-dark-800 dark:text-amber-300 dark:ring-dark-700">
               <Icon name="cube" size="sm" :stroke-width="2" />
             </div>
           </div>
-          <p class="text-2xl font-black text-gray-900 dark:text-white">{{ formatTokens(stats?.today_tokens || 0) }}</p>
+          <p class="text-2xl font-semibold text-gray-950 dark:text-white">{{ formatTokens(stats?.today_tokens || 0) }}</p>
           <p class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
             <span>{{ t('dashboard.input') }}: {{ formatTokens(stats?.today_input_tokens || 0) }}</span>
             <span>{{ t('dashboard.output') }}: {{ formatTokens(stats?.today_output_tokens || 0) }}</span>
           </p>
         </div>
 
-        <div class="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/45">
           <div class="mb-3 flex items-center justify-between">
-            <p class="text-xs font-semibold text-indigo-700 dark:text-indigo-300">{{ t('dashboard.totalTokens') }}</p>
-            <div class="rounded-xl bg-white/80 p-2 text-indigo-600 dark:bg-dark-900/60 dark:text-indigo-300">
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('dashboard.totalTokens') }}</p>
+            <div class="rounded-md bg-white p-2 text-slate-600 ring-1 ring-gray-200 dark:bg-dark-800 dark:text-slate-300 dark:ring-dark-700">
               <Icon name="database" size="sm" :stroke-width="2" />
             </div>
           </div>
-          <p class="text-2xl font-black text-gray-900 dark:text-white">{{ formatTokens(stats?.total_tokens || 0) }}</p>
+          <p class="text-2xl font-semibold text-gray-950 dark:text-white">{{ formatTokens(stats?.total_tokens || 0) }}</p>
           <p class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
             <span>{{ t('dashboard.input') }}: {{ formatTokens(stats?.total_input_tokens || 0) }}</span>
             <span>{{ t('dashboard.output') }}: {{ formatTokens(stats?.total_output_tokens || 0) }}</span>
           </p>
         </div>
 
-        <div class="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 dark:border-sky-900/40 dark:bg-sky-950/20">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/45">
           <div class="mb-3 flex items-center justify-between">
-            <p class="text-xs font-semibold text-sky-700 dark:text-sky-300">{{ t('dashboard.cacheToday') }}</p>
-            <div class="rounded-xl bg-white/80 p-2 text-sky-600 dark:bg-dark-900/60 dark:text-sky-300">
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('dashboard.cacheToday') }}</p>
+            <div class="rounded-md bg-white p-2 text-sky-600 ring-1 ring-gray-200 dark:bg-dark-800 dark:text-sky-300 dark:ring-dark-700">
               <Icon name="database" size="sm" :stroke-width="2" />
             </div>
           </div>
-          <p class="text-2xl font-black text-sky-700 dark:text-sky-300">{{ formatTokens(stats?.today_cache_read_tokens || 0) }}</p>
+          <p class="text-2xl font-semibold text-sky-700 dark:text-sky-300">{{ formatTokens(stats?.today_cache_read_tokens || 0) }}</p>
           <div class="mt-1 space-y-0.5 text-xs">
             <p class="font-semibold text-sky-700 dark:text-sky-300">{{ t('usage.cacheHit') }}</p>
             <p class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
@@ -210,25 +207,25 @@
           </div>
         </div>
 
-        <div class="rounded-2xl border border-violet-100 bg-violet-50/60 p-4 dark:border-violet-900/40 dark:bg-violet-950/20 sm:col-span-2 2xl:col-span-1">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/45 sm:col-span-2 2xl:col-span-1">
           <div class="mb-3 flex items-center justify-between">
-            <p class="text-xs font-semibold text-violet-700 dark:text-violet-300">{{ t('dashboard.performance') }}</p>
-            <div class="rounded-xl bg-white/80 p-2 text-violet-600 dark:bg-dark-900/60 dark:text-violet-300">
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('dashboard.performance') }}</p>
+            <div class="rounded-md bg-white p-2 text-indigo-600 ring-1 ring-gray-200 dark:bg-dark-800 dark:text-indigo-300 dark:ring-dark-700">
               <Icon name="bolt" size="sm" :stroke-width="2" />
             </div>
           </div>
           <div class="grid grid-cols-3 gap-2">
-            <div class="rounded-xl bg-white/70 px-2.5 py-2 dark:bg-dark-900/40">
+            <div class="rounded-md bg-white px-2.5 py-2 ring-1 ring-gray-100 dark:bg-dark-800 dark:ring-dark-700">
               <p class="text-[10px] font-bold text-gray-400">RPM</p>
-              <p class="mt-1 font-mono text-lg font-black text-gray-900 dark:text-white">{{ formatTokens(stats?.rpm || 0) }}</p>
+              <p class="mt-1 font-mono text-lg font-semibold text-gray-900 dark:text-white">{{ formatTokens(stats?.rpm || 0) }}</p>
             </div>
-            <div class="rounded-xl bg-white/70 px-2.5 py-2 dark:bg-dark-900/40">
+            <div class="rounded-md bg-white px-2.5 py-2 ring-1 ring-gray-100 dark:bg-dark-800 dark:ring-dark-700">
               <p class="text-[10px] font-bold text-gray-400">TPM</p>
-              <p class="mt-1 font-mono text-lg font-black text-violet-700 dark:text-violet-300">{{ formatTokens(stats?.tpm || 0) }}</p>
+              <p class="mt-1 font-mono text-lg font-semibold text-indigo-700 dark:text-indigo-300">{{ formatTokens(stats?.tpm || 0) }}</p>
             </div>
-            <div class="rounded-xl bg-white/70 px-2.5 py-2 dark:bg-dark-900/40">
+            <div class="rounded-md bg-white px-2.5 py-2 ring-1 ring-gray-100 dark:bg-dark-800 dark:ring-dark-700">
               <p class="text-[10px] font-bold text-gray-400">{{ t('dashboard.avgResponse') }}</p>
-              <p class="mt-1 font-mono text-lg font-black text-rose-600 dark:text-rose-300">{{ formatDuration(stats?.average_duration_ms || 0) }}</p>
+              <p class="mt-1 font-mono text-lg font-semibold text-rose-600 dark:text-rose-300">{{ formatDuration(stats?.average_duration_ms || 0) }}</p>
             </div>
           </div>
         </div>
@@ -237,7 +234,7 @@
   </section>
 
   <!-- Row 3: Per-platform breakdown -->
-  <div v-if="!isSimple && platformCards.length > 0" class="card p-4">
+  <div v-if="!isSimple && platformCards.length > 0" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
     <div class="mb-3 flex items-center justify-between">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('dashboard.platformBreakdown') }}</h3>
       <span class="text-xs text-gray-500 dark:text-gray-400">

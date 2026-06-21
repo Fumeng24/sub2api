@@ -1,23 +1,35 @@
 <template>
   <AppLayout>
-    <MonitorHero
-      :overall-status="overallStatus"
-      :interval-seconds="DEFAULT_INTERVAL_SECONDS"
-      :window="currentWindow"
-      :loading="loading"
-      :auto-refresh="autoRefresh"
-      @update:window="handleWindowChange"
-      @refresh="manualReload"
-    />
+    <div class="mx-auto max-w-7xl space-y-5">
+      <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-dark-700 lg:flex-row lg:items-end lg:justify-between">
+        <div class="min-w-0">
+          <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+            {{ t('channelStatus.title') }}
+          </h1>
+          <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+            {{ t('channelStatus.description') }}
+          </p>
+        </div>
+        <MonitorHero
+          :overall-status="overallStatus"
+          :interval-seconds="DEFAULT_INTERVAL_SECONDS"
+          :window="currentWindow"
+          :loading="loading"
+          :auto-refresh="autoRefresh"
+          @update:window="handleWindowChange"
+          @refresh="manualReload"
+        />
+      </div>
 
-    <MonitorCardGrid
-      :items="items"
-      :window="currentWindow"
-      :countdown-seconds="countdown"
-      :loading="loading"
-      :detail-cache="detailCache"
-      @card-click="openDetail"
-    />
+      <MonitorCardGrid
+        :items="items"
+        :window="currentWindow"
+        :countdown-seconds="countdown"
+        :loading="loading"
+        :detail-cache="detailCache"
+        @card-click="openDetail"
+      />
+    </div>
 
     <MonitorDetailDialog
       :show="showDetail"

@@ -1,16 +1,16 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="mx-auto max-w-7xl space-y-5">
       <div v-if="loading" class="flex items-center justify-center py-12">
         <LoadingSpinner />
       </div>
 
       <div
         v-else-if="loadError"
-        class="rounded-[1.75rem] border border-red-100 bg-white/90 p-8 text-center shadow-card dark:border-red-900/40 dark:bg-dark-800/70"
+        class="rounded-lg border border-red-100 bg-white p-8 text-center shadow-sm dark:border-red-900/40 dark:bg-dark-800"
       >
         <div
-          class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300"
+          class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300"
         >
           <Icon name="exclamationTriangle" size="lg" :stroke-width="2" />
         </div>
@@ -27,6 +27,24 @@
       </div>
 
       <template v-else-if="stats">
+        <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-dark-700 sm:flex-row sm:items-end sm:justify-between">
+          <div class="min-w-0">
+            <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+              {{ t('dashboard.title') }}
+            </h1>
+            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+              {{ t('dashboard.welcomeMessage') }}
+            </p>
+          </div>
+          <button type="button" class="btn btn-secondary shrink-0" :disabled="loading || loadingCharts || loadingUsage" @click="refreshAll">
+            <Icon
+              name="refresh"
+              size="sm"
+              :class="loading || loadingCharts || loadingUsage ? 'animate-spin' : ''"
+            />
+            {{ t('common.refresh') }}
+          </button>
+        </div>
         <UserDashboardStats
           :stats="stats"
           :balance="user?.balance || 0"
@@ -47,11 +65,11 @@
           @granularityChange="loadCharts"
           @refresh="refreshAll"
         />
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div class="lg:col-span-2">
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.8fr)]">
+          <div>
             <UserDashboardRecentUsage :data="recentUsage" :loading="loadingUsage" />
           </div>
-          <div class="lg:col-span-1">
+          <div>
             <UserDashboardQuickActions />
           </div>
         </div>

@@ -2,8 +2,17 @@
   <AppLayout>
     <div
       data-testid="profile-shell"
-      class="mx-auto max-w-[950px] space-y-6"
+      class="mx-auto max-w-[950px] space-y-5"
     >
+      <div class="border-b border-gray-200 pb-4 dark:border-dark-700">
+        <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+          {{ t('profile.title') }}
+        </h1>
+        <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+          {{ t('profile.description') }}
+        </p>
+      </div>
+
       <ProfileInfoCard
         :user="user"
         :linuxdo-enabled="linuxdoOAuthEnabled"
@@ -17,17 +26,17 @@
 
       <div
         v-if="contactInfo"
-        class="card border-primary-200 bg-primary-50 p-6 dark:bg-primary-900/20"
+        class="rounded-lg border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10"
       >
         <div class="flex items-center gap-4">
-          <div class="rounded-xl bg-primary-100 p-3 text-primary-600">
+          <div class="rounded-lg bg-blue-100 p-3 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
             <Icon name="chat" size="lg" />
           </div>
           <div>
-            <h3 class="font-semibold text-primary-800 dark:text-primary-200">
+            <h3 class="font-semibold text-blue-900 dark:text-blue-100">
               {{ t('common.contactSupport') }}
             </h3>
-            <p class="text-sm font-medium">{{ contactInfo }}</p>
+            <p class="text-sm font-medium text-blue-800 dark:text-blue-200">{{ contactInfo }}</p>
           </div>
         </div>
       </div>
