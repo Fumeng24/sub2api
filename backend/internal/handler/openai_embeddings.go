@@ -137,6 +137,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 			if err != nil {
 				reqLog.Warn("openai_embeddings.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 				if len(failedAccountIDs) == 0 {
+					setOpenAISelectionRetryAfterHeader(c, err)
 					status, errType, message := openAISelectionEmptyErrorResponse(scheduleDecision)
 					if errType == "api_error" {
 						markOpsRoutingCapacityLimitedIfNoAvailable(c, err)

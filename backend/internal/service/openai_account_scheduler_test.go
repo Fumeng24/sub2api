@@ -3220,6 +3220,171 @@ func TestOpenAISelectionDiagnostics_RecordsStageAccountIDs(t *testing.T) {
 	require.Equal(t, 1, diag.FilterReasonCounts["concurrency_full"])
 }
 
+func TestOpenAISelectionDiagnostics_AllCooldownIncludesEarliestRetry(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(12012)
+	model := "gpt-5.9"
+	endpoint := "/v1/responses"
+	now := time.Now().UTC().Truncate(time.Second)
+	rateLimitReset := now.Add(30 * time.Second)
+	overloadUntil := now.Add(2 * time.Minute)
+	tempUntil := now.Add(90 * time.Second)
+	modelReset := now.Add(75 * time.Second)
+	accounts := []Account{
+		{
+			ID:               40101,
+			Platform:         PlatformOpenAI,
+			Type:             AccountTypeAPIKey,
+			Status:           StatusActive,
+			Schedulable:      true,
+			Concurrency:      1,
+			GroupIDs:         []int64{groupID},
+			RateLimitResetAt: &rateLimitReset,
+		},
+		{
+			ID:            40102,
+			Platform:      PlatformOpenAI,
+			Type:          AccountTypeAPIKey,
+			Status:        StatusActive,
+			Schedulable:   true,
+			Concurrency:   1,
+			GroupIDs:      []int64{groupID},
+			OverloadUntil: &overloadUntil,
+		},
+		{
+			ID:                     40103,
+			Platform:               PlatformOpenAI,
+			Type:                   AccountTypeAPIKey,
+			Status:                 StatusActive,
+			Schedulable:            true,
+			Concurrency:            1,
+			GroupIDs:               []int64{groupID},
+			TempUnschedulableUntil: &tempUntil,
+		},
+		{
+			ID:          40104,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+			Extra: map[string]any{
+				modelRateLimitsKey: map[string]any{
+					model: map[string]any{"rate_limit_reset_at": modelReset.Format(time.RFC3339)},
+				},
+			},
+		},
+		{
+			ID:          40105,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			GroupIDs:    []int64{groupID},
+		},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+	svc.schedulerHealth.reportFailure(40105, model, endpoint, "transient", 45*time.Second)
+	scheduler := &defaultOpenAIAccountScheduler{service: svc}
+	req := OpenAIAccountScheduleRequest{
+		GroupID:            &groupID,
+		RequestedModel:     model,
+		SchedulerEndpoint:  endpoint,
+		RequiredTransport:  OpenAIUpstreamTransportAny,
+		RequiredCapability: OpenAIEndpointCapabilityChatCompletions,
+	}
+
+	diag := scheduler.buildOpenAISelectionDiagnostics(ctx, req, nil)
+
+	require.True(t, diag.Collected)
+	require.Equal(t, 5, diag.GroupBindingAccountCount)
+	require.Equal(t, 0, diag.FinalCandidateCount)
+	require.Equal(t, 4, diag.StateFilteredCount)
+	require.Equal(t, 1, diag.CircuitFilteredCount)
+	require.Equal(t, 1, diag.FilterReasonCounts["rate_limited"])
+	require.Equal(t, 1, diag.FilterReasonCounts["overloaded"])
+	require.Equal(t, 1, diag.FilterReasonCounts["temp_unschedulable"])
+	require.Equal(t, 1, diag.FilterReasonCounts["model_rate_limited"])
+	require.Equal(t, 1, diag.FilterReasonCounts["scheduler_circuit_open"])
+	require.Equal(t, int64(40101), diag.EarliestRetryAccountID)
+	require.Equal(t, "rate_limited", diag.EarliestRetryReason)
+	require.WithinDuration(t, rateLimitReset, diag.EarliestRetryAt, time.Second)
+	require.Greater(t, diag.RetryAfterSeconds, 0)
+	require.LessOrEqual(t, diag.RetryAfterSeconds, 31)
+
+	selection, decision, err := svc.SelectAccountWithScheduler(ctx, &groupID, "", "", model, nil, OpenAIUpstreamTransportAny, false)
+	require.Error(t, err)
+	require.Nil(t, selection)
+	require.True(t, decision.Diagnostics.Collected)
+	var noAvailable *OpenAINoAvailableAccountsError
+	require.ErrorAs(t, err, &noAvailable)
+	require.ErrorIs(t, err, ErrNoAvailableAccounts)
+	require.Equal(t, int64(40101), noAvailable.Diagnostics.EarliestRetryAccountID)
+	require.Equal(t, "rate_limited", noAvailable.Diagnostics.EarliestRetryReason)
+	require.Greater(t, noAvailable.RetryAfterSeconds, 0)
+	require.Contains(t, err.Error(), "filter_reasons=")
+	require.Contains(t, err.Error(), "scheduler_circuit_open")
+	require.Contains(t, err.Error(), "rate_limited")
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_CooldownPrimaryUsesHealthyBackup(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(12013)
+	rateLimitReset := time.Now().Add(10 * time.Minute)
+	cooling := Account{
+		ID:               40201,
+		Platform:         PlatformOpenAI,
+		Type:             AccountTypeAPIKey,
+		Status:           StatusActive,
+		Schedulable:      true,
+		Concurrency:      1,
+		Priority:         0,
+		GroupIDs:         []int64{groupID},
+		RateLimitResetAt: &rateLimitReset,
+	}
+	healthy := Account{
+		ID:          40202,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    10,
+		GroupIDs:    []int64{groupID},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: []Account{cooling, healthy}},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(ctx, &groupID, "", "", "gpt-5.9", nil, OpenAIUpstreamTransportAny, false)
+
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, int64(40202), selection.Account.ID)
+	require.True(t, selection.Acquired)
+	require.False(t, selection.WeakFallback)
+	require.Nil(t, selection.WaitPlan)
+	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
 func intPtrForTest(v int) *int {
 	return &v
 }

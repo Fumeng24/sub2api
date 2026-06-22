@@ -2,10 +2,13 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"go.uber.org/zap"
+
+	"github.com/gin-gonic/gin"
 )
 
 func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDecision) []zap.Field {
@@ -48,6 +51,16 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 		zap.Int("selection_diag_model_rate_limit_filtered_count", diag.ModelRateLimitFilteredCount),
 		zap.Int("selection_diag_channel_pricing_restriction_filtered_count", diag.ChannelRestrictionFilteredCount),
 		zap.Int("selection_diag_group_scope_filtered_count", diag.GroupScopeFilteredCount),
+	}
+	if diag.RetryAfterSeconds > 0 {
+		fields = append(fields, zap.Int("selection_diag_retry_after_seconds", diag.RetryAfterSeconds))
+	}
+	if !diag.EarliestRetryAt.IsZero() {
+		fields = append(fields,
+			zap.Time("selection_diag_earliest_retry_at", diag.EarliestRetryAt),
+			zap.String("selection_diag_earliest_retry_reason", diag.EarliestRetryReason),
+			zap.Int64("selection_diag_earliest_retry_account_id", diag.EarliestRetryAccountID),
+		)
 	}
 	if len(diag.ExcludedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_excluded_account_ids", diag.ExcludedAccountIDs))
@@ -137,6 +150,16 @@ func openAIAccountSelectFailedFields(err error, excludedAccountCount int, decisi
 			zap.Int("concurrency_slot_allowed_count", diag.ConcurrencySlotAllowedCount),
 			zap.Int("final_candidate_count", diag.FinalCandidateCount),
 		)
+		if diag.RetryAfterSeconds > 0 {
+			fields = append(fields, zap.Int("retry_after_seconds", diag.RetryAfterSeconds))
+		}
+		if !diag.EarliestRetryAt.IsZero() {
+			fields = append(fields,
+				zap.Time("earliest_retry_at", diag.EarliestRetryAt),
+				zap.String("earliest_retry_reason", diag.EarliestRetryReason),
+				zap.Int64("earliest_retry_account_id", diag.EarliestRetryAccountID),
+			)
+		}
 		if len(diag.ExcludedAccountIDs) > 0 {
 			fields = append(fields, zap.Int64s("tried_accounts", diag.ExcludedAccountIDs))
 		}
@@ -158,6 +181,12 @@ func openAIAccountSelectFailedFields(err error, excludedAccountCount int, decisi
 	}
 	fields = append(fields, openAISelectionDiagnosticZapFields(decision)...)
 	return fields
+}
+
+func setOpenAISelectionRetryAfterHeader(c *gin.Context, err error) {
+	if retryAfter := service.OpenAIRetryAfterSecondsFromError(err); retryAfter > 0 {
+		c.Header("Retry-After", strconv.Itoa(retryAfter))
+	}
 }
 
 func openAISelectionSkippedAccounts(diag service.OpenAIAccountSelectionDiagnostics) map[string][]int64 {
