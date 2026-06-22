@@ -47,6 +47,21 @@ type InvoiceRequest struct {
 	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
+type InvoiceTemplate struct {
+	ID            int64     `json:"id"`
+	UserID        int64     `json:"user_id"`
+	Name          string    `json:"name"`
+	InvoiceType   string    `json:"invoice_type"`
+	Title         string    `json:"title"`
+	TaxID         string    `json:"tax_id"`
+	ItemName      string    `json:"item_name"`
+	ReceiverEmail string    `json:"receiver_email"`
+	Note          string    `json:"note"`
+	IsDefault     bool      `json:"is_default"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 type InvoiceSummary struct {
 	RechargeAmount   float64 `json:"recharge_amount"`
 	InvoicedAmount   float64 `json:"invoiced_amount"`
@@ -69,6 +84,18 @@ type CreateInvoiceRequestInput struct {
 	Amount        float64
 	ReceiverEmail string
 	Note          string
+}
+
+type SaveInvoiceTemplateInput struct {
+	UserID        int64
+	Name          string
+	InvoiceType   string
+	Title         string
+	TaxID         string
+	ItemName      string
+	ReceiverEmail string
+	Note          string
+	IsDefault     bool
 }
 
 type InvoiceListFilters struct {
@@ -104,4 +131,9 @@ type InvoiceRepository interface {
 	Reject(ctx context.Context, id int64, input RejectInvoiceInput) (*InvoiceRequest, error)
 	Cancel(ctx context.Context, id, userID int64) (*InvoiceRequest, error)
 	Complete(ctx context.Context, id int64, input CompleteInvoiceInput) (*InvoiceRequest, error)
+	ListTemplates(ctx context.Context, userID int64) ([]InvoiceTemplate, error)
+	CreateTemplate(ctx context.Context, input SaveInvoiceTemplateInput) (*InvoiceTemplate, error)
+	UpdateTemplate(ctx context.Context, id, userID int64, input SaveInvoiceTemplateInput) (*InvoiceTemplate, error)
+	DeleteTemplate(ctx context.Context, id, userID int64) error
+	SetDefaultTemplate(ctx context.Context, id, userID int64) (*InvoiceTemplate, error)
 }

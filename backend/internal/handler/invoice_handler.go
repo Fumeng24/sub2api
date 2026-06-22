@@ -30,6 +30,17 @@ type CreateInvoiceHTTPRequest struct {
 	Note          string  `json:"note"`
 }
 
+type SaveInvoiceTemplateHTTPRequest struct {
+	Name          string `json:"name"`
+	InvoiceType   string `json:"invoice_type"`
+	Title         string `json:"title" binding:"required"`
+	TaxID         string `json:"tax_id"`
+	ItemName      string `json:"item_name" binding:"required"`
+	ReceiverEmail string `json:"receiver_email" binding:"required"`
+	Note          string `json:"note"`
+	IsDefault     bool   `json:"is_default"`
+}
+
 func (h *InvoiceHandler) Summary(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
@@ -128,10 +139,130 @@ func (h *InvoiceHandler) Cancel(c *gin.Context) {
 	response.Success(c, inv)
 }
 
+func (h *InvoiceHandler) ListTemplates(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+	items, err := h.invoiceService.ListTemplates(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, items)
+}
+
+func (h *InvoiceHandler) CreateTemplate(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+	var req SaveInvoiceTemplateHTTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	tmpl, err := h.invoiceService.CreateTemplate(c.Request.Context(), service.SaveInvoiceTemplateInput{
+		UserID:        subject.UserID,
+		Name:          req.Name,
+		InvoiceType:   req.InvoiceType,
+		Title:         req.Title,
+		TaxID:         req.TaxID,
+		ItemName:      req.ItemName,
+		ReceiverEmail: req.ReceiverEmail,
+		Note:          req.Note,
+		IsDefault:     req.IsDefault,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, tmpl)
+}
+
+func (h *InvoiceHandler) UpdateTemplate(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+	id, ok := parseInvoiceTemplateIDParam(c)
+	if !ok {
+		return
+	}
+	var req SaveInvoiceTemplateHTTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	tmpl, err := h.invoiceService.UpdateTemplate(c.Request.Context(), id, subject.UserID, service.SaveInvoiceTemplateInput{
+		UserID:        subject.UserID,
+		Name:          req.Name,
+		InvoiceType:   req.InvoiceType,
+		Title:         req.Title,
+		TaxID:         req.TaxID,
+		ItemName:      req.ItemName,
+		ReceiverEmail: req.ReceiverEmail,
+		Note:          req.Note,
+		IsDefault:     req.IsDefault,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, tmpl)
+}
+
+func (h *InvoiceHandler) DeleteTemplate(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+	id, ok := parseInvoiceTemplateIDParam(c)
+	if !ok {
+		return
+	}
+	if err := h.invoiceService.DeleteTemplate(c.Request.Context(), id, subject.UserID); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"deleted": true})
+}
+
+func (h *InvoiceHandler) SetDefaultTemplate(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+	id, ok := parseInvoiceTemplateIDParam(c)
+	if !ok {
+		return
+	}
+	tmpl, err := h.invoiceService.SetDefaultTemplate(c.Request.Context(), id, subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, tmpl)
+}
+
 func parseInvoiceIDParam(c *gin.Context) (int64, bool) {
 	id, err := strconv.ParseInt(strings.TrimSpace(c.Param("id")), 10, 64)
 	if err != nil || id <= 0 {
 		response.BadRequest(c, "Invalid invoice request ID")
+		return 0, false
+	}
+	return id, true
+}
+
+func parseInvoiceTemplateIDParam(c *gin.Context) (int64, bool) {
+	id, err := strconv.ParseInt(strings.TrimSpace(c.Param("template_id")), 10, 64)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "Invalid invoice template ID")
 		return 0, false
 	}
 	return id, true

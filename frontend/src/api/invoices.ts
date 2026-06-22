@@ -29,6 +29,21 @@ export interface InvoiceRequest {
   updated_at: string
 }
 
+export interface InvoiceTemplate {
+  id: number
+  user_id: number
+  name: string
+  invoice_type: InvoiceType
+  title: string
+  tax_id: string
+  item_name: string
+  receiver_email: string
+  note: string
+  is_default: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface InvoiceSummary {
   recharge_amount: number
   invoiced_amount: number
@@ -52,6 +67,17 @@ export interface CreateInvoiceRequestPayload {
   note?: string
 }
 
+export interface SaveInvoiceTemplatePayload {
+  name: string
+  invoice_type: InvoiceType
+  title: string
+  tax_id?: string
+  item_name: string
+  receiver_email: string
+  note?: string
+  is_default?: boolean
+}
+
 export const invoicesAPI = {
   getSummary() {
     return apiClient.get<InvoiceSummary>('/invoices/summary')
@@ -71,6 +97,26 @@ export const invoicesAPI = {
 
   cancel(id: number) {
     return apiClient.post<InvoiceRequest>(`/invoices/${id}/cancel`)
+  },
+
+  listTemplates() {
+    return apiClient.get<InvoiceTemplate[]>('/invoices/templates')
+  },
+
+  createTemplate(data: SaveInvoiceTemplatePayload) {
+    return apiClient.post<InvoiceTemplate>('/invoices/templates', data)
+  },
+
+  updateTemplate(id: number, data: SaveInvoiceTemplatePayload) {
+    return apiClient.put<InvoiceTemplate>(`/invoices/templates/${id}`, data)
+  },
+
+  deleteTemplate(id: number) {
+    return apiClient.delete<{ deleted: boolean }>(`/invoices/templates/${id}`)
+  },
+
+  setDefaultTemplate(id: number) {
+    return apiClient.post<InvoiceTemplate>(`/invoices/templates/${id}/default`)
   },
 }
 

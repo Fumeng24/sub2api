@@ -17,6 +17,8 @@ var (
 	ErrInvoiceAmountTooSmall      = infraerrors.BadRequest("INVOICE_AMOUNT_TOO_SMALL", "invoice amount must be at least 500")
 	ErrInvoiceAmountUnavailable   = infraerrors.BadRequest("INVOICE_AMOUNT_UNAVAILABLE", "invoice amount exceeds available invoice amount")
 	ErrInvoiceBalanceInsufficient = infraerrors.BadRequest("INVOICE_BALANCE_INSUFFICIENT", "user balance is insufficient for invoice tax fee")
+	ErrInvoiceTemplateNotFound    = infraerrors.NotFound("INVOICE_TEMPLATE_NOT_FOUND", "invoice template not found")
+	ErrInvoiceTemplateNameTaken   = infraerrors.Conflict("INVOICE_TEMPLATE_NAME_TAKEN", "invoice template name already exists")
 )
 
 type InvoiceService struct {
@@ -83,6 +85,35 @@ func (s *InvoiceService) Complete(ctx context.Context, id int64, input CompleteI
 	return s.repo.Complete(ctx, id, input)
 }
 
+func (s *InvoiceService) ListTemplates(ctx context.Context, userID int64) ([]InvoiceTemplate, error) {
+	return s.repo.ListTemplates(ctx, userID)
+}
+
+func (s *InvoiceService) CreateTemplate(ctx context.Context, input SaveInvoiceTemplateInput) (*InvoiceTemplate, error) {
+	normalized, err := normalizeSaveInvoiceTemplateInput(input)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateTemplate(ctx, normalized)
+}
+
+func (s *InvoiceService) UpdateTemplate(ctx context.Context, id, userID int64, input SaveInvoiceTemplateInput) (*InvoiceTemplate, error) {
+	normalized, err := normalizeSaveInvoiceTemplateInput(input)
+	if err != nil {
+		return nil, err
+	}
+	normalized.UserID = userID
+	return s.repo.UpdateTemplate(ctx, id, userID, normalized)
+}
+
+func (s *InvoiceService) DeleteTemplate(ctx context.Context, id, userID int64) error {
+	return s.repo.DeleteTemplate(ctx, id, userID)
+}
+
+func (s *InvoiceService) SetDefaultTemplate(ctx context.Context, id, userID int64) (*InvoiceTemplate, error) {
+	return s.repo.SetDefaultTemplate(ctx, id, userID)
+}
+
 func normalizeCreateInvoiceInput(input CreateInvoiceRequestInput) (CreateInvoiceRequestInput, error) {
 	input.InvoiceType = strings.TrimSpace(input.InvoiceType)
 	if input.InvoiceType == "" {
@@ -117,6 +148,52 @@ func normalizeCreateInvoiceInput(input CreateInvoiceRequestInput) (CreateInvoice
 		return input, ErrInvoiceAmountTooSmall.WithMetadata(map[string]string{"min_amount": fmt.Sprintf("%.2f", InvoiceMinAmount)})
 	}
 	return input, nil
+}
+
+func normalizeSaveInvoiceTemplateInput(input SaveInvoiceTemplateInput) (SaveInvoiceTemplateInput, error) {
+	input.Name = trimInvoiceText(input.Name, 80)
+	input.InvoiceType = strings.TrimSpace(input.InvoiceType)
+	if input.InvoiceType == "" {
+		input.InvoiceType = InvoiceTypeCompanyVATGeneral
+	}
+	if !isValidInvoiceType(input.InvoiceType) {
+		return input, infraerrors.BadRequest("INVOICE_TYPE_INVALID", "invoice type is invalid")
+	}
+	input.Title = trimInvoiceText(input.Title, 255)
+	input.TaxID = strings.ToUpper(trimInvoiceText(input.TaxID, 100))
+	input.ItemName = trimInvoiceText(input.ItemName, 100)
+	input.ReceiverEmail = trimInvoiceText(input.ReceiverEmail, 255)
+	input.Note = trimInvoiceText(input.Note, 2000)
+
+	if input.Name == "" {
+		input.Name = defaultInvoiceTemplateName(input)
+	}
+	if input.Title == "" {
+		return input, infraerrors.BadRequest("INVOICE_TITLE_REQUIRED", "invoice title is required")
+	}
+	if input.ItemName == "" {
+		return input, infraerrors.BadRequest("INVOICE_ITEM_REQUIRED", "invoice item is required")
+	}
+	if input.ReceiverEmail == "" {
+		return input, infraerrors.BadRequest("INVOICE_RECEIVER_EMAIL_REQUIRED", "receiver email is required")
+	}
+	if _, err := mail.ParseAddress(input.ReceiverEmail); err != nil {
+		return input, infraerrors.BadRequest("INVOICE_RECEIVER_EMAIL_INVALID", "receiver email is invalid")
+	}
+	if input.InvoiceType != InvoiceTypePersonal && input.TaxID == "" {
+		return input, infraerrors.BadRequest("INVOICE_TAX_ID_REQUIRED", "tax ID is required for company invoices")
+	}
+	return input, nil
+}
+
+func defaultInvoiceTemplateName(input SaveInvoiceTemplateInput) string {
+	if input.InvoiceType == InvoiceTypePersonal {
+		return "个人发票"
+	}
+	if input.Title != "" {
+		return trimInvoiceText(input.Title, 80)
+	}
+	return "默认模板"
 }
 
 func normalizeInvoicePagination(params pagination.PaginationParams, defaultSortBy, defaultSortOrder string) pagination.PaginationParams {

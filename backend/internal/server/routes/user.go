@@ -120,6 +120,14 @@ func RegisterUserRoutes(
 		invoices := authenticated.Group("/invoices")
 		{
 			invoices.GET("/summary", h.Invoice.Summary)
+			templates := invoices.Group("/templates")
+			{
+				templates.GET("", h.Invoice.ListTemplates)
+				templates.POST("", h.Invoice.CreateTemplate)
+				templates.PUT("/:template_id", h.Invoice.UpdateTemplate)
+				templates.DELETE("/:template_id", h.Invoice.DeleteTemplate)
+				templates.POST("/:template_id/default", h.Invoice.SetDefaultTemplate)
+			}
 			invoices.GET("", h.Invoice.List)
 			invoices.POST("", h.Invoice.Create)
 			invoices.GET("/:id", h.Invoice.GetByID)

@@ -9,8 +9,9 @@ import (
 )
 
 type invoiceRepoStub struct {
-	createInput CreateInvoiceRequestInput
-	createErr   error
+	createInput   CreateInvoiceRequestInput
+	createErr     error
+	templateInput SaveInvoiceTemplateInput
 }
 
 func (s *invoiceRepoStub) GetSummary(context.Context, int64) (*InvoiceSummary, error) {
@@ -54,6 +55,28 @@ func (s *invoiceRepoStub) Cancel(context.Context, int64, int64) (*InvoiceRequest
 }
 
 func (s *invoiceRepoStub) Complete(context.Context, int64, CompleteInvoiceInput) (*InvoiceRequest, error) {
+	return nil, nil
+}
+
+func (s *invoiceRepoStub) ListTemplates(context.Context, int64) ([]InvoiceTemplate, error) {
+	return nil, nil
+}
+
+func (s *invoiceRepoStub) CreateTemplate(_ context.Context, input SaveInvoiceTemplateInput) (*InvoiceTemplate, error) {
+	s.templateInput = input
+	return &InvoiceTemplate{ID: 1, Name: input.Name, InvoiceType: input.InvoiceType}, nil
+}
+
+func (s *invoiceRepoStub) UpdateTemplate(_ context.Context, _ int64, _ int64, input SaveInvoiceTemplateInput) (*InvoiceTemplate, error) {
+	s.templateInput = input
+	return &InvoiceTemplate{ID: 1, Name: input.Name, InvoiceType: input.InvoiceType}, nil
+}
+
+func (s *invoiceRepoStub) DeleteTemplate(context.Context, int64, int64) error {
+	return nil
+}
+
+func (s *invoiceRepoStub) SetDefaultTemplate(context.Context, int64, int64) (*InvoiceTemplate, error) {
 	return nil, nil
 }
 
@@ -179,4 +202,34 @@ func TestInvoiceServiceRejectRequiresReason(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "INVOICE_REJECT_REASON_REQUIRED")
+}
+
+func TestInvoiceServiceCreateTemplateNormalizesInput(t *testing.T) {
+	t.Parallel()
+
+	repo := &invoiceRepoStub{}
+	svc := NewInvoiceService(repo)
+
+	got, err := svc.CreateTemplate(context.Background(), SaveInvoiceTemplateInput{
+		UserID:        42,
+		Name:          "  默认模板  ",
+		InvoiceType:   "",
+		Title:         "  Wegoo AI  ",
+		TaxID:         "  abcd1234  ",
+		ItemName:      "  信息技术服务费  ",
+		ReceiverEmail: " billing@example.com ",
+		Note:          "  remark  ",
+		IsDefault:     true,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, int64(1), got.ID)
+	require.Equal(t, "默认模板", repo.templateInput.Name)
+	require.Equal(t, InvoiceTypeCompanyVATGeneral, repo.templateInput.InvoiceType)
+	require.Equal(t, "Wegoo AI", repo.templateInput.Title)
+	require.Equal(t, "ABCD1234", repo.templateInput.TaxID)
+	require.Equal(t, "信息技术服务费", repo.templateInput.ItemName)
+	require.Equal(t, "billing@example.com", repo.templateInput.ReceiverEmail)
+	require.Equal(t, "remark", repo.templateInput.Note)
+	require.True(t, repo.templateInput.IsDefault)
 }

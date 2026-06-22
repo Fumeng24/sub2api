@@ -13,6 +13,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/lib/pq"
 )
 
 type invoiceRepository struct {
@@ -298,6 +299,236 @@ func (r *invoiceRepository) Complete(ctx context.Context, id int64, input servic
 	return completed, nil
 }
 
+func (r *invoiceRepository) ListTemplates(ctx context.Context, userID int64) ([]service.InvoiceTemplate, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("invoice repository db is nil")
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, user_id, name, invoice_type, title, tax_id, item_name,
+			receiver_email, note, is_default, created_at, updated_at
+		FROM invoice_templates
+		WHERE user_id = $1
+		ORDER BY is_default DESC, updated_at DESC, id DESC
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list invoice templates: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make([]service.InvoiceTemplate, 0)
+	for rows.Next() {
+		var tmpl service.InvoiceTemplate
+		if err := rows.Scan(invoiceTemplateScanDest(&tmpl)...); err != nil {
+			return nil, err
+		}
+		out = append(out, tmpl)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *invoiceRepository) CreateTemplate(ctx context.Context, input service.SaveInvoiceTemplateInput) (*service.InvoiceTemplate, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("invoice repository db is nil")
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var count int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM invoice_templates
+		WHERE user_id = $1
+	`, input.UserID).Scan(&count); err != nil {
+		return nil, fmt.Errorf("count invoice templates: %w", err)
+	}
+	isDefault := input.IsDefault || count == 0
+	if isDefault {
+		if _, err := tx.ExecContext(ctx, `UPDATE invoice_templates SET is_default = FALSE, updated_at = NOW() WHERE user_id = $1`, input.UserID); err != nil {
+			return nil, fmt.Errorf("unset invoice template default: %w", err)
+		}
+	}
+
+	tmpl := &service.InvoiceTemplate{}
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO invoice_templates (
+			user_id, name, invoice_type, title, tax_id, item_name, receiver_email, note,
+			is_default, created_at, updated_at
+		)
+		SELECT u.id, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+		FROM users u
+		WHERE u.id = $1 AND u.deleted_at IS NULL
+		RETURNING id, user_id, name, invoice_type, title, tax_id, item_name,
+			receiver_email, note, is_default, created_at, updated_at
+	`, input.UserID, input.Name, input.InvoiceType, input.Title, input.TaxID, input.ItemName,
+		input.ReceiverEmail, input.Note, isDefault).Scan(invoiceTemplateScanDest(tmpl)...)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrUserNotFound
+	}
+	if err != nil {
+		if isInvoiceTemplateNameConflict(err) {
+			return nil, service.ErrInvoiceTemplateNameTaken
+		}
+		return nil, fmt.Errorf("create invoice template: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return tmpl, nil
+}
+
+func (r *invoiceRepository) UpdateTemplate(ctx context.Context, id, userID int64, input service.SaveInvoiceTemplateInput) (*service.InvoiceTemplate, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("invoice repository db is nil")
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var existingID int64
+	err = tx.QueryRowContext(ctx, `
+		SELECT id
+		FROM invoice_templates
+		WHERE id = $1 AND user_id = $2
+		FOR UPDATE
+	`, id, userID).Scan(&existingID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrInvoiceTemplateNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("lock invoice template: %w", err)
+	}
+	if input.IsDefault {
+		if _, err := tx.ExecContext(ctx, `UPDATE invoice_templates SET is_default = FALSE, updated_at = NOW() WHERE user_id = $1`, userID); err != nil {
+			return nil, fmt.Errorf("unset invoice template default: %w", err)
+		}
+	}
+
+	tmpl := &service.InvoiceTemplate{}
+	err = tx.QueryRowContext(ctx, `
+		UPDATE invoice_templates
+		SET name = $3,
+			invoice_type = $4,
+			title = $5,
+			tax_id = $6,
+			item_name = $7,
+			receiver_email = $8,
+			note = $9,
+			is_default = $10,
+			updated_at = NOW()
+		WHERE id = $1 AND user_id = $2
+		RETURNING id, user_id, name, invoice_type, title, tax_id, item_name,
+			receiver_email, note, is_default, created_at, updated_at
+	`, id, userID, input.Name, input.InvoiceType, input.Title, input.TaxID, input.ItemName,
+		input.ReceiverEmail, input.Note, input.IsDefault).Scan(invoiceTemplateScanDest(tmpl)...)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrInvoiceTemplateNotFound
+	}
+	if err != nil {
+		if isInvoiceTemplateNameConflict(err) {
+			return nil, service.ErrInvoiceTemplateNameTaken
+		}
+		return nil, fmt.Errorf("update invoice template: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return tmpl, nil
+}
+
+func (r *invoiceRepository) DeleteTemplate(ctx context.Context, id, userID int64) error {
+	if r == nil || r.db == nil {
+		return errors.New("invoice repository db is nil")
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var wasDefault bool
+	err = tx.QueryRowContext(ctx, `
+		DELETE FROM invoice_templates
+		WHERE id = $1 AND user_id = $2
+		RETURNING is_default
+	`, id, userID).Scan(&wasDefault)
+	if errors.Is(err, sql.ErrNoRows) {
+		return service.ErrInvoiceTemplateNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("delete invoice template: %w", err)
+	}
+	if wasDefault {
+		if _, err := tx.ExecContext(ctx, `
+			WITH next_template AS (
+				SELECT id
+				FROM invoice_templates
+				WHERE user_id = $1
+				ORDER BY updated_at DESC, id DESC
+				LIMIT 1
+			)
+			UPDATE invoice_templates
+			SET is_default = TRUE, updated_at = NOW()
+			WHERE id IN (SELECT id FROM next_template)
+		`, userID); err != nil {
+			return fmt.Errorf("promote next invoice template: %w", err)
+		}
+	}
+	return tx.Commit()
+}
+
+func (r *invoiceRepository) SetDefaultTemplate(ctx context.Context, id, userID int64) (*service.InvoiceTemplate, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("invoice repository db is nil")
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var existingID int64
+	err = tx.QueryRowContext(ctx, `
+		SELECT id
+		FROM invoice_templates
+		WHERE id = $1 AND user_id = $2
+		FOR UPDATE
+	`, id, userID).Scan(&existingID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrInvoiceTemplateNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("lock invoice template: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE invoice_templates SET is_default = FALSE, updated_at = NOW() WHERE user_id = $1`, userID); err != nil {
+		return nil, fmt.Errorf("unset invoice template default: %w", err)
+	}
+
+	tmpl := &service.InvoiceTemplate{}
+	err = tx.QueryRowContext(ctx, `
+		UPDATE invoice_templates
+		SET is_default = TRUE,
+			updated_at = NOW()
+		WHERE id = $1 AND user_id = $2
+		RETURNING id, user_id, name, invoice_type, title, tax_id, item_name,
+			receiver_email, note, is_default, created_at, updated_at
+	`, id, userID).Scan(invoiceTemplateScanDest(tmpl)...)
+	if err != nil {
+		return nil, fmt.Errorf("set invoice template default: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return tmpl, nil
+}
+
 type InvoiceQueryFilters struct {
 	UserID int64
 	Status string
@@ -520,6 +751,31 @@ func invoiceScanDest(inv *service.InvoiceRequest) []any {
 		&inv.CreatedAt,
 		&inv.UpdatedAt,
 	}
+}
+
+func invoiceTemplateScanDest(tmpl *service.InvoiceTemplate) []any {
+	return []any{
+		&tmpl.ID,
+		&tmpl.UserID,
+		&tmpl.Name,
+		&tmpl.InvoiceType,
+		&tmpl.Title,
+		&tmpl.TaxID,
+		&tmpl.ItemName,
+		&tmpl.ReceiverEmail,
+		&tmpl.Note,
+		&tmpl.IsDefault,
+		&tmpl.CreatedAt,
+		&tmpl.UpdatedAt,
+	}
+}
+
+func isInvoiceTemplateNameConflict(err error) bool {
+	var pqErr *pq.Error
+	if !errors.As(err, &pqErr) {
+		return false
+	}
+	return string(pqErr.Code) == "23505" && pqErr.Constraint == "idx_invoice_templates_user_name"
 }
 
 func nullableAdminID(id int64) any {
