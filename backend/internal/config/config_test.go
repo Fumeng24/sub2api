@@ -309,6 +309,63 @@ func TestDeployComposePassesOpenAIProbeAndWeakFallbackConfig(t *testing.T) {
 	}
 }
 
+func TestDeployComposePassesRuntimeTuningConfig(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	composeFiles := []string{
+		"deploy/docker-compose.yml",
+		"deploy/docker-compose.local.yml",
+		"deploy/docker-compose.standalone.yml",
+		"deploy/docker-compose.dev.yml",
+	}
+	required := []string{
+		"SERVER_MAX_REQUEST_BODY_SIZE=${SERVER_MAX_REQUEST_BODY_SIZE:-268435456}",
+		"SERVER_H2C_ENABLED=${SERVER_H2C_ENABLED:-true}",
+		"GATEWAY_FORCE_CODEX_CLI=${GATEWAY_FORCE_CODEX_CLI:-false}",
+		"GATEWAY_MAX_BODY_SIZE=${GATEWAY_MAX_BODY_SIZE:-268435456}",
+		"GATEWAY_MAX_CONNS_PER_HOST=${GATEWAY_MAX_CONNS_PER_HOST:-2048}",
+		"GATEWAY_MAX_IDLE_CONNS=${GATEWAY_MAX_IDLE_CONNS:-8192}",
+		"GATEWAY_MAX_IDLE_CONNS_PER_HOST=${GATEWAY_MAX_IDLE_CONNS_PER_HOST:-4096}",
+		"GATEWAY_SCHEDULING_STICKY_SESSION_MAX_WAITING=${GATEWAY_SCHEDULING_STICKY_SESSION_MAX_WAITING:-3}",
+		"GATEWAY_SCHEDULING_STICKY_SESSION_WAIT_TIMEOUT=${GATEWAY_SCHEDULING_STICKY_SESSION_WAIT_TIMEOUT:-120s}",
+		"GATEWAY_SCHEDULING_FALLBACK_WAIT_TIMEOUT=${GATEWAY_SCHEDULING_FALLBACK_WAIT_TIMEOUT:-30s}",
+		"GATEWAY_SCHEDULING_FALLBACK_MAX_WAITING=${GATEWAY_SCHEDULING_FALLBACK_MAX_WAITING:-100}",
+		"GATEWAY_SCHEDULING_LOAD_BATCH_ENABLED=${GATEWAY_SCHEDULING_LOAD_BATCH_ENABLED:-true}",
+		"GATEWAY_SCHEDULING_DB_FALLBACK_ENABLED=${GATEWAY_SCHEDULING_DB_FALLBACK_ENABLED:-true}",
+		"GATEWAY_SCHEDULING_OUTBOX_POLL_INTERVAL_SECONDS=${GATEWAY_SCHEDULING_OUTBOX_POLL_INTERVAL_SECONDS:-1}",
+		"GATEWAY_SCHEDULING_FULL_REBUILD_INTERVAL_SECONDS=${GATEWAY_SCHEDULING_FULL_REBUILD_INTERVAL_SECONDS:-300}",
+		"RATE_LIMIT_OVERLOAD_COOLDOWN_MINUTES=${RATE_LIMIT_OVERLOAD_COOLDOWN_MINUTES:-10}",
+		"DASHBOARD_AGGREGATION_ENABLED=${DASHBOARD_AGGREGATION_ENABLED:-true}",
+		"DASHBOARD_AGGREGATION_RETENTION_DAILY_DAYS=${DASHBOARD_AGGREGATION_RETENTION_DAILY_DAYS:-730}",
+	}
+	for _, rel := range composeFiles {
+		rel := rel
+		t.Run(rel, func(t *testing.T) {
+			body, err := os.ReadFile(filepath.Join(root, rel))
+			require.NoError(t, err)
+			content := string(body)
+			for _, want := range required {
+				require.Contains(t, content, want)
+			}
+		})
+	}
+}
+
+func TestDeployComposeRedisServiceUsesConfiguredMaxClients(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	for _, rel := range []string{
+		"deploy/docker-compose.yml",
+		"deploy/docker-compose.local.yml",
+		"deploy/docker-compose.dev.yml",
+	} {
+		rel := rel
+		t.Run(rel, func(t *testing.T) {
+			body, err := os.ReadFile(filepath.Join(root, rel))
+			require.NoError(t, err)
+			require.Contains(t, string(body), "--maxclients ${REDIS_MAXCLIENTS:-50000}")
+		})
+	}
+}
+
 func TestDeployExampleKeepsGatewayResponseHeaderTimeoutBelowCloudflare(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", "..", ".."))
 	body, err := os.ReadFile(filepath.Join(root, "deploy/config.example.yaml"))
