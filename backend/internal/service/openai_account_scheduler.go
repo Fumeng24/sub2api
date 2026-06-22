@@ -1058,8 +1058,11 @@ func openAIAccountStatusFilterReason(ctx context.Context, account *Account, req 
 }
 
 func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterReason(account *Account, req OpenAIAccountScheduleRequest, endpoint string) string {
-	reason, _ := s.openAIAccountCircuitFilterState(account, req, endpoint)
-	return reason
+	view := s.openAIAccountCircuitHealthState(account, req, endpoint, time.Now())
+	if view.Allowed {
+		return ""
+	}
+	return view.Reason
 }
 
 func (d *OpenAIAccountSelectionDiagnostics) addReason(reason string) {
@@ -1144,16 +1147,13 @@ func openAIAccountModelRateLimitRetryAt(ctx context.Context, account *Account, r
 	return retryAt
 }
 
-func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterState(account *Account, req OpenAIAccountScheduleRequest, endpoint string) (string, time.Time) {
+func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitHealthState(account *Account, req OpenAIAccountScheduleRequest, endpoint string, now time.Time) healthStateView {
 	if s == nil || s.service == nil || account == nil {
-		return "", time.Time{}
+		return closedHealthStateView()
 	}
-	now := time.Now()
-	if until, ok := s.service.openAIAccountRuntimeBlockUntil(account.ID); ok && until.After(now) {
-		return "runtime_circuit_open", until
-	}
-	if s.service.isOpenAIAccountCircuitHalfOpenInFlight(account.ID, now) {
-		return "runtime_half_open_in_flight", time.Time{}
+	runtimeView := openAIAccountRuntimeHealthStateView(s.service, account.ID, now)
+	if !runtimeView.Allowed {
+		return runtimeView
 	}
 	if s.service.schedulerHealth != nil {
 		allowHalfOpen := openAIRequestRequiresImageGenerationBridge(req)
@@ -1161,12 +1161,20 @@ func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterState(account 
 		// Responses image_generation uses real user requests as the half-open
 		// probe because a text-only probe does not validate that tool chain.
 		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, allowHalfOpen)
-		state := schedulerHealthFilterStateFromSnapshot(snap, now, allowHalfOpen, "scheduler_probe_pending")
-		if !state.Allowed {
-			return state.Reason, state.RetryAt
+		view := schedulerHealthStateViewFromSnapshot(snap, now, allowHalfOpen, healthReasonSchedulerProbePending)
+		if !view.Allowed {
+			return view
 		}
 	}
-	return "", time.Time{}
+	return closedHealthStateView()
+}
+
+func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterState(account *Account, req OpenAIAccountScheduleRequest, endpoint string) (string, time.Time) {
+	view := s.openAIAccountCircuitHealthState(account, req, endpoint, time.Now())
+	if view.Allowed {
+		return "", time.Time{}
+	}
+	return view.Reason, view.RetryAt
 }
 
 const (

@@ -259,27 +259,22 @@ func (item *OpsOpenAISchedulerAccountStatus) applyOpenAISchedulerCircuitStatus(g
 	if item == nil || gateway == nil || accountID <= 0 {
 		return
 	}
-	if until, ok := gateway.openAIAccountRuntimeBlockUntil(accountID); ok && until.After(now) {
-		item.CircuitState = "runtime_open"
-		item.CircuitReason = "runtime_circuit_open"
-		item.CircuitScope = "account"
-		t := until.UTC()
-		item.RuntimeCircuitUntil = &t
-		remaining := int64(until.Sub(now).Seconds())
-		if remaining > 0 {
-			item.RuntimeCircuitRemainingSec = &remaining
+	runtimeView := openAIAccountRuntimeHealthStateView(gateway, accountID, now)
+	if !runtimeView.Allowed {
+		item.CircuitState = runtimeView.LegacyCircuitState
+		item.CircuitReason = runtimeView.Reason
+		item.CircuitScope = runtimeView.Scope
+		if retryAt, remaining := runtimeView.retryAtPtr(now); retryAt != nil {
+			item.RuntimeCircuitUntil = retryAt
+			item.RuntimeCircuitRemainingSec = remaining
 		}
-	}
-	if gateway.isOpenAIAccountCircuitHalfOpenInFlight(accountID, now) {
-		item.CircuitState = "runtime_half_open"
-		item.CircuitReason = "runtime_half_open_in_flight"
-		item.CircuitScope = "account"
 	}
 	if gateway.schedulerHealth == nil {
 		return
 	}
 	schedulerEndpoint := schedulerEndpointFromOpenAIRequest(req)
 	snap := gateway.schedulerHealth.snapshot(accountID, req.RequestedModel, schedulerEndpoint, false)
+	schedulerView := schedulerHealthStateViewFromSnapshot(snap, now, false, healthReasonSchedulerProbePending)
 	item.SchedulerHealthScore = snap.HealthScore
 	item.SchedulerErrorRate = snap.ErrorRate
 	if snap.HasTTFT {
@@ -290,27 +285,21 @@ func (item *OpsOpenAISchedulerAccountStatus) applyOpenAISchedulerCircuitStatus(g
 	if item.CircuitState != schedulerCircuitClosed {
 		return
 	}
-	switch snap.CircuitState {
-	case schedulerCircuitOpen:
-		item.CircuitState = schedulerCircuitOpen
-		item.CircuitReason = "scheduler_circuit_open"
-		item.CircuitScope = "account_model_endpoint"
-		item.CircuitModel = snap.Key.Model
-		item.CircuitEndpoint = snap.Key.Endpoint
-		if !snap.CooldownUntil.IsZero() {
-			t := snap.CooldownUntil.UTC()
-			item.RuntimeCircuitUntil = &t
-			remaining := int64(snap.CooldownUntil.Sub(now).Seconds())
-			if remaining > 0 {
-				item.RuntimeCircuitRemainingSec = &remaining
-			}
-		}
-	case schedulerCircuitHalfOpen:
-		item.CircuitState = schedulerCircuitHalfOpen
-		item.CircuitReason = "scheduler_half_open"
-		item.CircuitScope = "account_model_endpoint"
-		item.CircuitModel = snap.Key.Model
-		item.CircuitEndpoint = snap.Key.Endpoint
+	if schedulerView.Allowed || schedulerView.LegacyCircuitState == schedulerCircuitClosed {
+		return
+	}
+	item.CircuitState = schedulerView.LegacyCircuitState
+	if schedulerView.LegacyCircuitState == schedulerCircuitHalfOpen {
+		item.CircuitReason = healthReasonSchedulerHalfOpen
+	} else {
+		item.CircuitReason = schedulerView.Reason
+	}
+	item.CircuitScope = schedulerView.Scope
+	item.CircuitModel = schedulerView.Model
+	item.CircuitEndpoint = schedulerView.Endpoint
+	if retryAt, remaining := schedulerView.retryAtPtr(now); retryAt != nil {
+		item.RuntimeCircuitUntil = retryAt
+		item.RuntimeCircuitRemainingSec = remaining
 	}
 }
 

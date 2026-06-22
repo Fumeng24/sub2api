@@ -2986,22 +2986,31 @@ func (s *GatewayService) isGatewayAccountSchedulerHealthAllowed(accountID int64,
 	return s.gatewayAccountSchedulerHealthFilterState(accountID, model, endpoint, false).Allowed
 }
 
-func (s *GatewayService) gatewayAccountSchedulerHealthFilterState(accountID int64, model, endpoint string, allowHalfOpen bool) schedulerHealthFilterState {
+func (s *GatewayService) gatewayAccountSchedulerHealthState(accountID int64, model, endpoint string, allowHalfOpen bool, now time.Time) healthStateView {
 	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
-		return schedulerHealthFilterState{
-			Snapshot: schedulerHealthSnapshot{
-				Key:           makeAccountSchedulerHealthKey(accountID, model, endpoint),
-				HealthScore:   1,
-				ModelScore:    1,
-				LatencyScore:  1,
-				CircuitState:  schedulerCircuitClosed,
-				HalfOpenProbe: false,
-			},
-			Allowed: true,
+		view := closedHealthStateView()
+		view.Snapshot = schedulerHealthSnapshot{
+			Key:           makeAccountSchedulerHealthKey(accountID, model, endpoint),
+			HealthScore:   1,
+			ModelScore:    1,
+			LatencyScore:  1,
+			CircuitState:  schedulerCircuitClosed,
+			HalfOpenProbe: false,
 		}
+		return view
 	}
 	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, allowHalfOpen)
-	return schedulerHealthFilterStateFromSnapshot(snap, time.Now(), allowHalfOpen, "scheduler_half_open_in_flight")
+	return schedulerHealthStateViewFromSnapshot(snap, now, allowHalfOpen, healthReasonSchedulerHalfOpenInFlight)
+}
+
+func (s *GatewayService) gatewayAccountSchedulerHealthFilterState(accountID int64, model, endpoint string, allowHalfOpen bool) schedulerHealthFilterState {
+	view := s.gatewayAccountSchedulerHealthState(accountID, model, endpoint, allowHalfOpen, time.Now())
+	return schedulerHealthFilterState{
+		Snapshot: view.Snapshot,
+		Allowed:  view.Allowed,
+		Reason:   view.Reason,
+		RetryAt:  view.RetryAt,
+	}
 }
 
 func (s *GatewayService) isGatewayAccountSchedulerHealthCandidateAllowed(accountID int64, model, endpoint string) bool {
@@ -3992,6 +4001,32 @@ func (d *GatewaySelectionDiagnostics) addSkipped(account *Account, reason string
 	d.SkippedAccounts = appendGatewaySelectionSkippedAccount(d.SkippedAccounts, skipped)
 }
 
+func (d *GatewaySelectionDiagnostics) addSkippedHealthView(account *Account, view healthStateView, loadInfo *AccountLoadInfo) {
+	if account == nil {
+		d.addReason(view.Reason)
+		return
+	}
+	d.addReason(view.Reason)
+	skipped := GatewaySelectionSkippedAccount{
+		AccountID:       account.ID,
+		Reason:          strings.TrimSpace(view.Reason),
+		CircuitState:    view.LegacyCircuitState,
+		CircuitReason:   view.LastFailureReason,
+		CircuitModel:    view.Model,
+		CircuitEndpoint: view.Endpoint,
+		MaxConcurrency:  account.Concurrency,
+	}
+	if retryAt, remaining := view.retryAtPtr(time.Now()); retryAt != nil {
+		skipped.CircuitRetryAt = retryAt
+		skipped.CircuitRetryRemainingSec = remaining
+	}
+	if loadInfo != nil {
+		skipped.LoadRate = loadInfo.LoadRate
+		skipped.CurrentConcurrency = loadInfo.CurrentConcurrency
+	}
+	d.SkippedAccounts = appendGatewaySelectionSkippedAccount(d.SkippedAccounts, skipped)
+}
+
 func appendGatewaySelectionID(ids []int64, account *Account) []int64 {
 	if account == nil {
 		return ids
@@ -4102,10 +4137,10 @@ func (s *GatewayService) buildGatewaySelectionDiagnostics(
 		diag.StateAllowedCount++
 		diag.StateAllowedAccountIDs = appendGatewaySelectionID(diag.StateAllowedAccountIDs, account)
 
-		healthState := s.gatewayAccountSchedulerHealthFilterState(account.ID, requestedModel, endpoint, true)
+		healthState := s.gatewayAccountSchedulerHealthState(account.ID, requestedModel, endpoint, true, time.Now())
 		if !healthState.Allowed {
 			diag.CircuitFilteredAccountIDs = appendGatewaySelectionID(diag.CircuitFilteredAccountIDs, account)
-			diag.addSkipped(account, healthState.Reason, healthState.Snapshot, gatewaySelectionLoadInfo(loadMap, account))
+			diag.addSkippedHealthView(account, healthState, gatewaySelectionLoadInfo(loadMap, account))
 			continue
 		}
 		diag.CircuitAllowedCount++
