@@ -339,39 +339,12 @@ func (s *schedulerHealthSnapshot) applyDefaultTTFTFallback(fallback schedulerHea
 }
 
 func schedulerHealthFilterStateFromSnapshot(snap schedulerHealthSnapshot, now time.Time, allowHalfOpen bool, halfOpenBlockedReason string) schedulerHealthFilterState {
+	view := schedulerHealthStateViewFromSnapshot(snap, now, allowHalfOpen, halfOpenBlockedReason)
 	state := schedulerHealthFilterState{
 		Snapshot: snap,
-		Allowed:  true,
-	}
-	if now.IsZero() {
-		now = time.Now()
-	}
-	switch snap.CircuitState {
-	case "", schedulerCircuitClosed:
-		return state
-	case schedulerCircuitOpen:
-		if snap.CooldownUntil.IsZero() || snap.CooldownUntil.After(now) {
-			state.Allowed = false
-			state.Reason = "scheduler_circuit_open"
-			state.RetryAt = snap.CooldownUntil
-			return state
-		}
-	case schedulerCircuitHalfOpen:
-		if allowHalfOpen && snap.HalfOpenProbe {
-			return state
-		}
-		state.Allowed = false
-		if halfOpenBlockedReason == "" {
-			halfOpenBlockedReason = "scheduler_probe_pending"
-		}
-		state.Reason = halfOpenBlockedReason
-		state.RetryAt = snap.CooldownUntil
-		return state
-	default:
-		state.Allowed = false
-		state.Reason = "scheduler_circuit_open"
-		state.RetryAt = snap.CooldownUntil
-		return state
+		Allowed:  view.Allowed,
+		Reason:   view.Reason,
+		RetryAt:  view.RetryAt,
 	}
 	return state
 }
