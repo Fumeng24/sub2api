@@ -3978,7 +3978,7 @@ func (d *GatewaySelectionDiagnostics) addSkipped(account *Account, reason string
 		CircuitEndpoint: snap.Key.Endpoint,
 		MaxConcurrency:  account.Concurrency,
 	}
-	if !snap.CooldownUntil.IsZero() {
+	if !snap.CooldownUntil.IsZero() && snap.CooldownUntil.After(time.Now()) {
 		retryAt := snap.CooldownUntil.UTC()
 		skipped.CircuitRetryAt = &retryAt
 		if remaining := int64(time.Until(snap.CooldownUntil).Seconds()); remaining > 0 {

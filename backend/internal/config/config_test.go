@@ -1801,6 +1801,13 @@ func TestValidateConfig_OpenAIWSRules(t *testing.T) {
 			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds = 0 },
 			wantErr: "gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds",
 		},
+		{
+			name: "runtime cooldown 秒数不能超过 duration 上限",
+			mutate: func(c *Config) {
+				c.Gateway.OpenAIScheduler.RuntimeCooldowns.RequestErrorCooldownSeconds = int(maxDurationSeconds) + 1
+			},
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.request_error_cooldown_seconds",
+		},
 	}
 
 	for _, tc := range cases {

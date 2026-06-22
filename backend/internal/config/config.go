@@ -20,6 +20,8 @@ const (
 	RunModeSimple   = "simple"
 )
 
+const maxDurationSeconds = int64(time.Duration(1<<63-1) / time.Second)
+
 // 使用量记录队列溢出策略
 const (
 	UsageRecordOverflowPolicyDrop   = "drop"
@@ -2714,20 +2716,21 @@ func (c *Config) Validate() error {
 	if c.Gateway.OpenAIScheduler.StickyEscapeErrorRate < 0 || c.Gateway.OpenAIScheduler.StickyEscapeErrorRate > 1 {
 		return fmt.Errorf("gateway.openai_scheduler.sticky_escape_error_rate must be between 0 and 1")
 	}
-	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.OAuth429FallbackCooldownSeconds <= 0 {
-		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.oauth_429_fallback_cooldown_seconds must be positive")
+	runtimeCooldowns := c.Gateway.OpenAIScheduler.RuntimeCooldowns
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.oauth_429_fallback_cooldown_seconds", runtimeCooldowns.OAuth429FallbackCooldownSeconds); err != nil {
+		return err
 	}
-	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.RequestErrorCooldownSeconds <= 0 {
-		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.request_error_cooldown_seconds must be positive")
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.request_error_cooldown_seconds", runtimeCooldowns.RequestErrorCooldownSeconds); err != nil {
+		return err
 	}
-	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.TransientCooldownPersistMinIntervalSeconds <= 0 {
-		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.transient_cooldown_persist_min_interval_seconds must be positive")
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.transient_cooldown_persist_min_interval_seconds", runtimeCooldowns.TransientCooldownPersistMinIntervalSeconds); err != nil {
+		return err
 	}
-	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.StopSchedulingBridgeCooldownSeconds <= 0 {
-		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.stop_scheduling_bridge_cooldown_seconds must be positive")
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.stop_scheduling_bridge_cooldown_seconds", runtimeCooldowns.StopSchedulingBridgeCooldownSeconds); err != nil {
+		return err
 	}
-	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds <= 0 {
-		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds must be positive")
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds", runtimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds); err != nil {
+		return err
 	}
 	if c.Gateway.MaxLineSize < 0 {
 		return fmt.Errorf("gateway.max_line_size must be non-negative")
@@ -2881,6 +2884,16 @@ func (c *Config) Validate() error {
 	}
 	if err := ValidateDingTalkConfig(c.DingTalk); err != nil {
 		return fmt.Errorf("dingtalk_connect: %w", err)
+	}
+	return nil
+}
+
+func validatePositiveDurationSeconds(path string, seconds int) error {
+	if seconds <= 0 {
+		return fmt.Errorf("%s must be positive", path)
+	}
+	if int64(seconds) > maxDurationSeconds {
+		return fmt.Errorf("%s must be <= %d", path, maxDurationSeconds)
 	}
 	return nil
 }

@@ -25,27 +25,28 @@ func defaultOpenAIRuntimeCooldowns() openAIRuntimeCooldowns {
 	}
 }
 
+func openAIRuntimeCooldownSeconds(seconds int, fallback time.Duration) time.Duration {
+	if seconds <= 0 {
+		return fallback
+	}
+	maxSeconds := int64(time.Duration(1<<63-1) / time.Second)
+	if int64(seconds) > maxSeconds {
+		return fallback
+	}
+	return time.Duration(seconds) * time.Second
+}
+
 func openAIRuntimeCooldownsFromConfig(cfg *config.Config) openAIRuntimeCooldowns {
 	cooldowns := defaultOpenAIRuntimeCooldowns()
 	if cfg == nil {
 		return cooldowns
 	}
 	runtime := cfg.Gateway.OpenAIScheduler.RuntimeCooldowns
-	if runtime.OAuth429FallbackCooldownSeconds > 0 {
-		cooldowns.oAuth429Fallback = time.Duration(runtime.OAuth429FallbackCooldownSeconds) * time.Second
-	}
-	if runtime.RequestErrorCooldownSeconds > 0 {
-		cooldowns.requestError = time.Duration(runtime.RequestErrorCooldownSeconds) * time.Second
-	}
-	if runtime.TransientCooldownPersistMinIntervalSeconds > 0 {
-		cooldowns.transientPersistMinInterval = time.Duration(runtime.TransientCooldownPersistMinIntervalSeconds) * time.Second
-	}
-	if runtime.StopSchedulingBridgeCooldownSeconds > 0 {
-		cooldowns.stopSchedulingBridge = time.Duration(runtime.StopSchedulingBridgeCooldownSeconds) * time.Second
-	}
-	if runtime.AccountCircuitHalfOpenProbeTTLSeconds > 0 {
-		cooldowns.accountCircuitHalfOpenProbeTTL = time.Duration(runtime.AccountCircuitHalfOpenProbeTTLSeconds) * time.Second
-	}
+	cooldowns.oAuth429Fallback = openAIRuntimeCooldownSeconds(runtime.OAuth429FallbackCooldownSeconds, cooldowns.oAuth429Fallback)
+	cooldowns.requestError = openAIRuntimeCooldownSeconds(runtime.RequestErrorCooldownSeconds, cooldowns.requestError)
+	cooldowns.transientPersistMinInterval = openAIRuntimeCooldownSeconds(runtime.TransientCooldownPersistMinIntervalSeconds, cooldowns.transientPersistMinInterval)
+	cooldowns.stopSchedulingBridge = openAIRuntimeCooldownSeconds(runtime.StopSchedulingBridgeCooldownSeconds, cooldowns.stopSchedulingBridge)
+	cooldowns.accountCircuitHalfOpenProbeTTL = openAIRuntimeCooldownSeconds(runtime.AccountCircuitHalfOpenProbeTTLSeconds, cooldowns.accountCircuitHalfOpenProbeTTL)
 	return cooldowns
 }
 

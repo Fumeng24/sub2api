@@ -588,6 +588,22 @@ func TestOpenAITransientTransportScheduleFailureUsesConfiguredCooldown(t *testin
 	require.LessOrEqual(t, remaining, 2500*time.Millisecond)
 }
 
+func TestOpenAIRuntimeCooldownsFromConfigRejectsOverflow(t *testing.T) {
+	cfg := &config.Config{
+		Gateway: config.GatewayConfig{
+			OpenAIScheduler: config.GatewayOpenAISchedulerConfig{
+				RuntimeCooldowns: config.GatewayOpenAIRuntimeCooldownsConfig{
+					RequestErrorCooldownSeconds: int(time.Duration(1<<63-1)/time.Second) + 1,
+				},
+			},
+		},
+	}
+
+	cooldowns := openAIRuntimeCooldownsFromConfig(cfg)
+
+	require.Equal(t, openAIRequestErrorCooldown, cooldowns.requestError)
+}
+
 func TestOpenAI403ScheduleFailureOverrideUsesTransientProbeCircuit(t *testing.T) {
 	svc := &OpenAIGatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
 	accountID := int64(117)
