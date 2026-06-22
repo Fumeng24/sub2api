@@ -980,6 +980,9 @@ type GatewayOpenAIRuntimeCooldownsConfig struct {
 	TransientCooldownPersistMinIntervalSeconds int `mapstructure:"transient_cooldown_persist_min_interval_seconds"`
 	StopSchedulingBridgeCooldownSeconds        int `mapstructure:"stop_scheduling_bridge_cooldown_seconds"`
 	AccountCircuitHalfOpenProbeTTLSeconds      int `mapstructure:"account_circuit_half_open_probe_ttl_seconds"`
+	ProbeTimeoutSeconds                        int `mapstructure:"probe_timeout_seconds"`
+	ProbeRetryDelaySeconds                     int `mapstructure:"probe_retry_delay_seconds"`
+	ProbeMaxConcurrency                        int `mapstructure:"probe_max_concurrency"`
 }
 
 // GatewayUsageRecordConfig 使用量记录异步队列配置
@@ -1919,6 +1922,9 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.transient_cooldown_persist_min_interval_seconds", 15)
 	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.stop_scheduling_bridge_cooldown_seconds", 120)
 	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds", 30)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.probe_timeout_seconds", 30)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.probe_retry_delay_seconds", 5)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.probe_max_concurrency", 10000)
 	// OpenAI HTTP upstream protocol strategy
 	viper.SetDefault("gateway.openai_http2.enabled", true)
 	viper.SetDefault("gateway.openai_http2.allow_proxy_fallback_to_http1", true)
@@ -2731,6 +2737,18 @@ func (c *Config) Validate() error {
 	}
 	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds", runtimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds); err != nil {
 		return err
+	}
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.probe_timeout_seconds", runtimeCooldowns.ProbeTimeoutSeconds); err != nil {
+		return err
+	}
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.probe_retry_delay_seconds", runtimeCooldowns.ProbeRetryDelaySeconds); err != nil {
+		return err
+	}
+	if runtimeCooldowns.ProbeMaxConcurrency <= 0 {
+		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.probe_max_concurrency must be positive")
+	}
+	if runtimeCooldowns.ProbeMaxConcurrency > 10000 {
+		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.probe_max_concurrency must be <= 10000")
 	}
 	if c.Gateway.MaxLineSize < 0 {
 		return fmt.Errorf("gateway.max_line_size must be non-negative")
