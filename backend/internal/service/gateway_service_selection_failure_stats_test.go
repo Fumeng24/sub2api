@@ -264,6 +264,16 @@ func TestGatewaySelectionDiagnostics_CircuitOpen(t *testing.T) {
 	if len(diag.SkippedAccounts) != 1 || diag.SkippedAccounts[0].CircuitState != schedulerCircuitOpen || diag.SkippedAccounts[0].CircuitEndpoint != endpoint {
 		t.Fatalf("expected scoped circuit details in skipped account, got %+v", diag.SkippedAccounts)
 	}
+	skipped := diag.SkippedAccounts[0]
+	if skipped.Reason != "scheduler_circuit_open" || skipped.CircuitReason != "transient_transport" || skipped.CircuitModel != model {
+		t.Fatalf("expected scheduler circuit reason details in skipped account, got %+v", skipped)
+	}
+	if skipped.CircuitRetryAt == nil {
+		t.Fatalf("expected circuit retry time in skipped account, got %+v", skipped)
+	}
+	if skipped.CircuitRetryRemainingSec == nil || *skipped.CircuitRetryRemainingSec <= 0 {
+		t.Fatalf("expected positive circuit retry remaining seconds, got %+v", skipped)
+	}
 }
 
 func TestGatewayServiceReportAccountScheduleSuccessForRequestClearsContextEndpoint(t *testing.T) {

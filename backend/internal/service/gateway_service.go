@@ -2983,15 +2983,25 @@ func (s *GatewayService) isAccountSchedulableForModelSelection(ctx context.Conte
 }
 
 func (s *GatewayService) isGatewayAccountSchedulerHealthAllowed(accountID int64, model, endpoint string) bool {
-	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
-		return true
-	}
-	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, false)
-	return snap.CircuitState == schedulerCircuitClosed
+	return s.gatewayAccountSchedulerHealthFilterState(accountID, model, endpoint, false).Allowed
 }
 
-func (s *GatewayService) isGatewayAccountWeakFallbackHealthEligible(accountID int64, model, endpoint string) bool {
-	return s.isGatewayAccountSchedulerHealthAllowed(accountID, model, endpoint)
+func (s *GatewayService) gatewayAccountSchedulerHealthFilterState(accountID int64, model, endpoint string, allowHalfOpen bool) schedulerHealthFilterState {
+	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
+		return schedulerHealthFilterState{
+			Snapshot: schedulerHealthSnapshot{
+				Key:           makeAccountSchedulerHealthKey(accountID, model, endpoint),
+				HealthScore:   1,
+				ModelScore:    1,
+				LatencyScore:  1,
+				CircuitState:  schedulerCircuitClosed,
+				HalfOpenProbe: false,
+			},
+			Allowed: true,
+		}
+	}
+	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, allowHalfOpen)
+	return schedulerHealthFilterStateFromSnapshot(snap, time.Now(), allowHalfOpen, "scheduler_half_open_in_flight")
 }
 
 func (s *GatewayService) isGatewayAccountSchedulerHealthCandidateAllowed(accountID int64, model, endpoint string) bool {
@@ -3000,6 +3010,10 @@ func (s *GatewayService) isGatewayAccountSchedulerHealthCandidateAllowed(account
 	}
 	snap := s.schedulerHealth.snapshot(accountID, model, endpoint, false)
 	return snap.CircuitState != schedulerCircuitOpen
+}
+
+func (s *GatewayService) isGatewayAccountWeakFallbackHealthEligible(accountID int64, model, endpoint string) bool {
+	return s.gatewayAccountSchedulerHealthFilterState(accountID, model, endpoint, false).Allowed
 }
 
 func (s *GatewayService) isGatewayAccountStaticEligibleForSelection(
@@ -3870,15 +3884,17 @@ type selectionFailureStats struct {
 }
 
 type GatewaySelectionSkippedAccount struct {
-	AccountID          int64  `json:"account_id"`
-	Reason             string `json:"reason"`
-	CircuitState       string `json:"circuit_state,omitempty"`
-	CircuitReason      string `json:"circuit_reason,omitempty"`
-	CircuitModel       string `json:"circuit_model,omitempty"`
-	CircuitEndpoint    string `json:"circuit_endpoint,omitempty"`
-	LoadRate           int    `json:"load_rate,omitempty"`
-	CurrentConcurrency int    `json:"current_concurrency,omitempty"`
-	MaxConcurrency     int    `json:"max_concurrency,omitempty"`
+	AccountID                int64      `json:"account_id"`
+	Reason                   string     `json:"reason"`
+	CircuitState             string     `json:"circuit_state,omitempty"`
+	CircuitReason            string     `json:"circuit_reason,omitempty"`
+	CircuitModel             string     `json:"circuit_model,omitempty"`
+	CircuitEndpoint          string     `json:"circuit_endpoint,omitempty"`
+	CircuitRetryAt           *time.Time `json:"circuit_retry_at,omitempty"`
+	CircuitRetryRemainingSec *int64     `json:"circuit_retry_remaining_sec,omitempty"`
+	LoadRate                 int        `json:"load_rate,omitempty"`
+	CurrentConcurrency       int        `json:"current_concurrency,omitempty"`
+	MaxConcurrency           int        `json:"max_concurrency,omitempty"`
 }
 
 type GatewaySelectionDiagnostics struct {
@@ -3961,6 +3977,13 @@ func (d *GatewaySelectionDiagnostics) addSkipped(account *Account, reason string
 		CircuitModel:    snap.Key.Model,
 		CircuitEndpoint: snap.Key.Endpoint,
 		MaxConcurrency:  account.Concurrency,
+	}
+	if !snap.CooldownUntil.IsZero() {
+		retryAt := snap.CooldownUntil.UTC()
+		skipped.CircuitRetryAt = &retryAt
+		if remaining := int64(time.Until(snap.CooldownUntil).Seconds()); remaining > 0 {
+			skipped.CircuitRetryRemainingSec = &remaining
+		}
 	}
 	if loadInfo != nil {
 		skipped.LoadRate = loadInfo.LoadRate
@@ -4079,21 +4102,10 @@ func (s *GatewayService) buildGatewaySelectionDiagnostics(
 		diag.StateAllowedCount++
 		diag.StateAllowedAccountIDs = appendGatewaySelectionID(diag.StateAllowedAccountIDs, account)
 
-		snap := schedulerHealthSnapshot{CircuitState: schedulerCircuitClosed}
-		if s != nil && s.schedulerHealth != nil {
-			snap = s.schedulerHealth.snapshot(account.ID, requestedModel, endpoint, true)
-		}
-		switch snap.CircuitState {
-		case schedulerCircuitClosed:
-		case schedulerCircuitHalfOpen:
-			if !snap.HalfOpenProbe {
-				diag.CircuitFilteredAccountIDs = appendGatewaySelectionID(diag.CircuitFilteredAccountIDs, account)
-				diag.addSkipped(account, "scheduler_half_open_in_flight", snap, gatewaySelectionLoadInfo(loadMap, account))
-				continue
-			}
-		default:
+		healthState := s.gatewayAccountSchedulerHealthFilterState(account.ID, requestedModel, endpoint, true)
+		if !healthState.Allowed {
 			diag.CircuitFilteredAccountIDs = appendGatewaySelectionID(diag.CircuitFilteredAccountIDs, account)
-			diag.addSkipped(account, "scheduler_circuit_open", snap, gatewaySelectionLoadInfo(loadMap, account))
+			diag.addSkipped(account, healthState.Reason, healthState.Snapshot, gatewaySelectionLoadInfo(loadMap, account))
 			continue
 		}
 		diag.CircuitAllowedCount++
