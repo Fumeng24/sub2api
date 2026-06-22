@@ -261,6 +261,62 @@ func TestLoadOpenAIResponseHeaderTimeoutFromEnv(t *testing.T) {
 	require.Equal(t, 1800, cfg.Gateway.OpenAIResponseHeaderTimeout)
 }
 
+func TestDeployExamplesKeepOpenAIResponseHeaderTimeoutEnabled(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	files := map[string]string{
+		"deploy/.env.example":                  "GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=15",
+		"deploy/config.example.yaml":           "openai_response_header_timeout: 15",
+		"deploy/docker-compose.yml":            "GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=${GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT:-15}",
+		"deploy/docker-compose.local.yml":      "GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=${GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT:-15}",
+		"deploy/docker-compose.standalone.yml": "GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=${GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT:-15}",
+		"deploy/docker-compose.dev.yml":        "GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=${GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT:-15}",
+	}
+	for rel, want := range files {
+		rel := rel
+		want := want
+		t.Run(rel, func(t *testing.T) {
+			body, err := os.ReadFile(filepath.Join(root, rel))
+			require.NoError(t, err)
+			require.Contains(t, string(body), want)
+		})
+	}
+}
+
+func TestDeployComposePassesOpenAIProbeAndWeakFallbackConfig(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	composeFiles := []string{
+		"deploy/docker-compose.yml",
+		"deploy/docker-compose.local.yml",
+		"deploy/docker-compose.standalone.yml",
+		"deploy/docker-compose.dev.yml",
+	}
+	required := []string{
+		"GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_TIMEOUT_SECONDS=${GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_TIMEOUT_SECONDS:-30}",
+		"GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_RETRY_DELAY_SECONDS=${GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_RETRY_DELAY_SECONDS:-5}",
+		"GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_MAX_CONCURRENCY=${GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_MAX_CONCURRENCY:-10000}",
+		"GATEWAY_SCHEDULING_WEAK_FALLBACK_ENABLED=${GATEWAY_SCHEDULING_WEAK_FALLBACK_ENABLED:-false}",
+	}
+	for _, rel := range composeFiles {
+		rel := rel
+		t.Run(rel, func(t *testing.T) {
+			body, err := os.ReadFile(filepath.Join(root, rel))
+			require.NoError(t, err)
+			content := string(body)
+			for _, want := range required {
+				require.Contains(t, content, want)
+			}
+		})
+	}
+}
+
+func TestDeployExampleKeepsGatewayResponseHeaderTimeoutBelowCloudflare(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	body, err := os.ReadFile(filepath.Join(root, "deploy/config.example.yaml"))
+	require.NoError(t, err)
+	require.Contains(t, string(body), "response_header_timeout: 100")
+	require.NotContains(t, string(body), "response_header_timeout: 600")
+}
+
 func TestLoadOpenAIWSStickyTTLCompatibility(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("GATEWAY_OPENAI_WS_STICKY_RESPONSE_ID_TTL_SECONDS", "0")
