@@ -1943,11 +1943,16 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			if err != nil {
 				return nil, err
 			}
-			weakFallback := !s.isGatewayAccountSchedulerHealthAllowed(account.ID, requestedModel, schedulerEndpointFromContext(ctx, account.Platform))
+
+			endpoint := schedulerEndpointFromContext(ctx, account.Platform)
+			if !s.isGatewayAccountSchedulerHealthAllowed(account.ID, requestedModel, endpoint) {
+				localExcluded[account.ID] = struct{}{}
+				continue
+			}
 
 			result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
 			if err == nil && result.Acquired {
-				if !weakFallback && !s.tryBeginGatewayHalfOpenProbeForAccount(account, requestedModel, schedulerEndpointFromContext(ctx, account.Platform)) {
+				if !s.tryBeginGatewayHalfOpenProbeForAccount(account, requestedModel, endpoint) {
 					result.ReleaseFunc()
 					localExcluded[account.ID] = struct{}{}
 					continue
@@ -1958,12 +1963,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					localExcluded[account.ID] = struct{}{} // 排除此账号
 					continue                               // 重新选择
 				}
-				selection, selectErr := s.newSelectionResult(ctx, account, true, result.ReleaseFunc, nil)
-				if selection != nil && weakFallback {
-					selection.WeakFallback = true
-					selection.WeakFallbackReason = gatewayAccountWeakFallbackReason
-				}
-				return selection, selectErr
+				return s.newSelectionResult(ctx, account, true, result.ReleaseFunc, nil)
 			}
 
 			// 对于等待计划的情况，也需要先检查会话限制
@@ -1981,10 +1981,6 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 						Timeout:        cfg.StickySessionWaitTimeout,
 						MaxWaiting:     cfg.StickySessionMaxWaiting,
 					})
-					if selection != nil && weakFallback {
-						selection.WeakFallback = true
-						selection.WeakFallbackReason = gatewayAccountWeakFallbackReason
-					}
 					return selection, selectErr
 				}
 			}
@@ -1994,10 +1990,6 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 				Timeout:        cfg.FallbackWaitTimeout,
 				MaxWaiting:     cfg.FallbackMaxWaiting,
 			})
-			if selection != nil && weakFallback {
-				selection.WeakFallback = true
-				selection.WeakFallbackReason = gatewayAccountWeakFallbackReason
-			}
 			return selection, selectErr
 		}
 	}
@@ -2556,7 +2548,7 @@ func (s *GatewayService) selectGatewayCooldownFallbackResult(
 	if len(candidates) == 0 {
 		return nil, false, nil
 	}
-	scores := buildSchedulerAccountCooldownFallbackScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth)
+	scores := buildSchedulerAccountWaitScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth)
 	order := buildRoleAwareSchedulerOrder(scores, preferOAuth, schedulerSessionSeedParts(groupID, requestedModel, schedulerEndpoint, sessionHash, "weak_fallback")...)
 	if len(order) == 0 {
 		return nil, false, nil
@@ -2568,6 +2560,9 @@ func (s *GatewayService) selectGatewayCooldownFallbackResult(
 		}
 		acc = s.recheckGatewayCooldownFallbackAccount(ctx, acc, groupID, requestedModel, platform, useMixed, schedGroup, needsUpstreamCheck, schedulerEndpoint)
 		if acc == nil {
+			continue
+		}
+		if !s.isGatewayAccountWeakFallbackHealthEligible(acc.ID, requestedModel, schedulerEndpoint) {
 			continue
 		}
 		result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
@@ -2609,6 +2604,9 @@ func (s *GatewayService) selectGatewayCooldownFallbackResult(
 		}
 		acc = s.recheckGatewayCooldownFallbackAccount(ctx, acc, groupID, requestedModel, platform, useMixed, schedGroup, needsUpstreamCheck, schedulerEndpoint)
 		if acc == nil {
+			continue
+		}
+		if !s.isGatewayAccountWeakFallbackHealthEligible(acc.ID, requestedModel, schedulerEndpoint) {
 			continue
 		}
 		if !s.checkAndRegisterSession(ctx, acc, sessionHash) {
@@ -2992,6 +2990,10 @@ func (s *GatewayService) isGatewayAccountSchedulerHealthAllowed(accountID int64,
 	return snap.CircuitState == schedulerCircuitClosed
 }
 
+func (s *GatewayService) isGatewayAccountWeakFallbackHealthEligible(accountID int64, model, endpoint string) bool {
+	return s.isGatewayAccountSchedulerHealthAllowed(accountID, model, endpoint)
+}
+
 func (s *GatewayService) isGatewayAccountSchedulerHealthCandidateAllowed(accountID int64, model, endpoint string) bool {
 	if s == nil || s.schedulerHealth == nil || accountID <= 0 {
 		return true
@@ -3101,7 +3103,7 @@ func (s *GatewayService) selectFirstGatewayCooldownFallbackAccount(
 	preferOAuth bool,
 	seedParts ...string,
 ) *Account {
-	scores := buildSchedulerAccountCooldownFallbackScores(accounts, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth)
+	scores := buildSchedulerAccountWaitScores(accounts, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth)
 	sessionHash := ""
 	suffixParts := seedParts
 	if len(seedParts) > 0 {
@@ -3115,6 +3117,9 @@ func (s *GatewayService) selectFirstGatewayCooldownFallbackAccount(
 		}
 		account := s.recheckGatewayCooldownFallbackAccount(ctx, item.Account, groupID, requestedModel, platform, useMixed, schedGroup, needsUpstreamCheck, schedulerEndpoint)
 		if account == nil {
+			continue
+		}
+		if !s.isGatewayAccountWeakFallbackHealthEligible(account.ID, requestedModel, schedulerEndpoint) {
 			continue
 		}
 		s.logGatewayCooldownFallbackSelected(groupID, requestedModel, schedulerEndpoint, account.ID, len(accounts), len(order), false)

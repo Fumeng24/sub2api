@@ -1876,7 +1876,7 @@ func TestGatewayService_selectAccountWithMixedScheduling(t *testing.T) {
 		require.Contains(t, err.Error(), "supporting model")
 	})
 
-	t.Run("混合调度-Claude单账号熔断使用同组弱回退", func(t *testing.T) {
+	t.Run("混合调度-Claude单账号熔断不使用同组弱回退", func(t *testing.T) {
 		groupID := int64(11)
 		accountID := int64(38800)
 		model := "claude-opus-4-7"
@@ -1926,9 +1926,9 @@ func TestGatewayService_selectAccountWithMixedScheduling(t *testing.T) {
 		svc.schedulerHealth.reportFailure(accountID, model, endpoint, "transient_transport", time.Minute)
 
 		acc, err := svc.selectAccountWithMixedScheduling(testCtx, &groupID, "", model, nil, PlatformAnthropic)
-		require.NoError(t, err)
-		require.NotNil(t, acc)
-		require.Equal(t, accountID, acc.ID)
+		require.Error(t, err)
+		require.Nil(t, acc)
+		require.ErrorIs(t, err, ErrNoAvailableAccounts)
 
 		snap := svc.schedulerHealth.snapshot(accountID, model, endpoint, false)
 		require.Equal(t, schedulerCircuitOpen, snap.CircuitState)
