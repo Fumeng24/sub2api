@@ -44,6 +44,44 @@ if (typeof window !== 'undefined' && typeof window.localStorage.getItem !== 'fun
   })
 }
 
+function createMediaQueryList(query: string, matches = false): MediaQueryList {
+  const listeners = new Set<(event: MediaQueryListEvent) => void>()
+  const mediaQueryList = {
+    media: query,
+    matches,
+    onchange: null,
+    addEventListener: vi.fn((_type: string, listener: EventListenerOrEventListenerObject) => {
+      if (typeof listener === 'function') {
+        listeners.add(listener as (event: MediaQueryListEvent) => void)
+      }
+    }),
+    removeEventListener: vi.fn((_type: string, listener: EventListenerOrEventListenerObject) => {
+      if (typeof listener === 'function') {
+        listeners.delete(listener as (event: MediaQueryListEvent) => void)
+      }
+    }),
+    addListener: vi.fn((listener: (event: MediaQueryListEvent) => void) => {
+      listeners.add(listener)
+    }),
+    removeListener: vi.fn((listener: (event: MediaQueryListEvent) => void) => {
+      listeners.delete(listener)
+    }),
+    dispatchEvent: vi.fn((event: Event) => {
+      listeners.forEach(listener => listener(event as MediaQueryListEvent))
+      return true
+    })
+  }
+  return mediaQueryList as unknown as MediaQueryList
+}
+
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn((query: string) => createMediaQueryList(query))
+  })
+}
+
 // Mock requestIdleCallback (Safari < 15 不支持)
 if (typeof globalThis.requestIdleCallback === 'undefined') {
   globalThis.requestIdleCallback = ((callback: IdleRequestCallback) => {

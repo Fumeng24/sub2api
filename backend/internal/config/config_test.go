@@ -289,6 +289,15 @@ func TestLoadOpenAIProbeRunnerConfigFromEnv(t *testing.T) {
 	require.Equal(t, 3, cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeMaxConcurrency)
 }
 
+func TestLoadGatewaySchedulingWeakFallbackFromEnv(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("GATEWAY_SCHEDULING_WEAK_FALLBACK_ENABLED", "true")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.True(t, cfg.Gateway.Scheduling.WeakFallbackEnabled)
+}
+
 func TestLoadDefaultIdempotencyConfig(t *testing.T) {
 	resetViperWithJWTSecret(t)
 

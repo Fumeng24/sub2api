@@ -433,6 +433,9 @@ gateway:
     # Fallback max waiting queue size
     # 兜底最大排队长度
     fallback_max_waiting: 100
+    # Whether generic Gateway may relax soft filters as weak fallback.
+    # 通用 Gateway 是否允许放宽软过滤弱兜底；默认关闭，避免借用冷却/不健康账号。
+    weak_fallback_enabled: false
     # Enable batch load calculation for scheduling
     # 启用调度批量负载计算
     load_batch_enabled: true

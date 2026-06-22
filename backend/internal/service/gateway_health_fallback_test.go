@@ -215,3 +215,59 @@ func TestGatewayServiceSchedulerCircuitOpenAllCandidatesNoWeakFallback(t *testin
 		t.Fatalf("second circuit-open account acquire calls=%d want=0", got)
 	}
 }
+
+func TestGatewayServiceWeakFallbackRequiresExplicitEnable(t *testing.T) {
+	ctx := context.Background()
+	model := "claude-3-5-sonnet-20241022"
+	endpoint := "/v1/messages"
+
+	accountID := int64(53001)
+	account := &Account{
+		ID:          accountID,
+		Platform:    PlatformAnthropic,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+	}
+	concurrencyCache := &gatewayHealthFallbackConcurrencyCache{}
+	svc := &GatewayService{
+		accountRepo:        stubOpenAIAccountRepo{accounts: []Account{*account}},
+		cache:              &stubGatewayCache{},
+		cfg:                &config.Config{RunMode: config.RunModeStandard},
+		concurrencyService: NewConcurrencyService(concurrencyCache),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+
+	result, attempted, err := svc.selectGatewayCooldownFallbackResult(ctx, []*Account{account}, nil, "", model, endpoint, PlatformAnthropic, false, nil, false, false, nil, false)
+	if err != nil {
+		t.Fatalf("selectGatewayCooldownFallbackResult() error = %v", err)
+	}
+	if result != nil || attempted {
+		t.Fatalf("default weak fallback must be disabled, got result=%#v attempted=%t", result, attempted)
+	}
+	if got := concurrencyCache.acquireCalls[accountID]; got != 0 {
+		t.Fatalf("disabled weak fallback acquire calls=%d want=0", got)
+	}
+
+	svc.cfg.Gateway.Scheduling.WeakFallbackEnabled = true
+	result, attempted, err = svc.selectGatewayCooldownFallbackResult(ctx, []*Account{account}, nil, "", model, endpoint, PlatformAnthropic, false, nil, false, false, nil, false)
+	if err != nil {
+		t.Fatalf("selectGatewayCooldownFallbackResult() enabled error = %v", err)
+	}
+	if result == nil || result.Account == nil || result.Account.ID != accountID {
+		t.Fatalf("expected weak fallback account %d, got %#v", accountID, result)
+	}
+	if !attempted {
+		t.Fatalf("expected weak fallback attempt")
+	}
+	if !result.WeakFallback {
+		t.Fatalf("expected explicit weak fallback selection")
+	}
+	if got := concurrencyCache.acquireCalls[accountID]; got != 1 {
+		t.Fatalf("weak fallback account acquire calls=%d want=1", got)
+	}
+	if result.ReleaseFunc != nil {
+		result.ReleaseFunc()
+	}
+}
