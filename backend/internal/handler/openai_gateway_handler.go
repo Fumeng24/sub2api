@@ -1045,8 +1045,13 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 				reqLog.Warn("openai_messages.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 				if len(failedAccountIDs) == 0 {
 					setOpenAISelectionRetryAfterHeader(c, err)
-					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-					h.anthropicStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "Service temporarily unavailable", streamStarted)
+					status, errType, message := openAISelectionEmptyErrorResponse(scheduleDecision)
+					if errType == "api_error" {
+						markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					} else {
+						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
+					}
+					h.anthropicStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, openAISelectionEmptyErrorMetadata(scheduleDecision))
 					return
 				} else {
 					if lastFailoverErr != nil {
@@ -1229,19 +1234,31 @@ func resolveOpenAIMessagesMetadataSession(sessionHash, promptCacheKey, reqModel 
 
 // anthropicErrorResponse writes an error in Anthropic Messages API format.
 func (h *OpenAIGatewayHandler) anthropicErrorResponse(c *gin.Context, status int, errType, message string) {
+	h.anthropicErrorResponseWithMetadata(c, status, errType, message, nil)
+}
+
+func (h *OpenAIGatewayHandler) anthropicErrorResponseWithMetadata(c *gin.Context, status int, errType, message string, metadata map[string]any) {
 	message = service.ClientFacingErrorMessage(status, errType, message)
+	errBody := gin.H{
+		"type":    errType,
+		"message": message,
+	}
+	if len(metadata) > 0 {
+		errBody["metadata"] = metadata
+	}
 	c.JSON(status, gin.H{
-		"type": "error",
-		"error": gin.H{
-			"type":    errType,
-			"message": message,
-		},
+		"type":  "error",
+		"error": errBody,
 	})
 }
 
 // anthropicStreamingAwareError handles errors that may occur during streaming,
 // using Anthropic SSE error format.
 func (h *OpenAIGatewayHandler) anthropicStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
+	h.anthropicStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, nil)
+}
+
+func (h *OpenAIGatewayHandler) anthropicStreamingAwareErrorWithMetadata(c *gin.Context, status int, errType, message string, streamStarted bool, metadata map[string]any) {
 	message = service.ClientFacingErrorMessage(status, errType, message)
 	if streamStarted {
 		flusher, ok := c.Writer.(http.Flusher)
@@ -1258,7 +1275,7 @@ func (h *OpenAIGatewayHandler) anthropicStreamingAwareError(c *gin.Context, stat
 		}
 		return
 	}
-	h.anthropicErrorResponse(c, status, errType, message)
+	h.anthropicErrorResponseWithMetadata(c, status, errType, message, metadata)
 }
 
 // handleAnthropicFailoverExhausted maps upstream failover errors to Anthropic format.

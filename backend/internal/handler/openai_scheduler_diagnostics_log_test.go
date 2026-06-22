@@ -96,8 +96,8 @@ func TestOpenAISelectionEmptyErrorMetadata_ModelMismatchRedactsAccountSummary(t 
 	diag, ok := metadata["openai_selection_diagnostics"].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, "gpt-5.3-codex", diag["requested_model"])
-	require.Equal(t, []string{"gpt-5.3-codex-spark"}, diag["group_visible_models"])
-	require.Equal(t, []string{"gpt-5.3-codex-spark"}, diag["group_available_models"])
+	require.NotContains(t, diag, "group_visible_models")
+	require.NotContains(t, diag, "group_available_models")
 	require.Equal(t, 2, diag["account_model_support_summary_count"])
 	require.NotContains(t, diag, "account_model_support_summary")
 }
