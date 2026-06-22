@@ -159,9 +159,9 @@ func (s *OpenAIGatewayService) markOpenAITransient5xxCoolingDown(ctx context.Con
 	_ = ctx
 
 	category := schedulerFailureCategory(statusCode, responseBody)
-	cooldown := schedulerCooldownForCategory(category, headers)
+	cooldown := s.openAISchedulerCooldownForCategory(category, headers)
 	if cooldown <= 0 {
-		cooldown = schedulerCooldownForCategory("transient", nil)
+		cooldown = s.openAISchedulerCooldownForCategory("transient", nil)
 	}
 	until := time.Now().Add(cooldown)
 	s.closeOpenAIAccountIdleConnectionsForCircuit(account.ID, statusCode, "openai_transient_5xx", responseBody)
@@ -197,7 +197,7 @@ func (s *OpenAIGatewayService) markOpenAIOAuth429RateLimited(ctx context.Context
 	s.recordOpenAIOAuth429()
 	_ = ctx
 
-	cooldownUntil := time.Now().Add(openAIOAuth429FallbackCooldown)
+	cooldownUntil := time.Now().Add(s.openAIRuntimeCooldowns().oAuth429Fallback)
 	if s.rateLimitService != nil {
 		if resetAt := s.rateLimitService.calculateOpenAI429ResetTime(headers); resetAt != nil && resetAt.After(time.Now()) {
 			cooldownUntil = *resetAt
@@ -226,7 +226,7 @@ func (s *OpenAIGatewayService) BlockAccountScheduling(account *Account, until ti
 	now := time.Now()
 	blockUntil := until
 	if blockUntil.IsZero() || !blockUntil.After(now) {
-		blockUntil = now.Add(openAIStopSchedulingBridgeCooldown)
+		blockUntil = now.Add(s.openAIRuntimeCooldowns().stopSchedulingBridge)
 	}
 
 	s.openaiAccountCircuitHalfOpen.Delete(account.ID)
@@ -351,7 +351,7 @@ func (s *OpenAIGatewayService) isOpenAIAccountCircuitHalfOpenInFlight(accountID 
 		return false
 	}
 	startedAt, ok := value.(time.Time)
-	if !ok || startedAt.IsZero() || now.Sub(startedAt) > openAIAccountCircuitHalfOpenProbeTTL {
+	if !ok || startedAt.IsZero() || now.Sub(startedAt) > s.openAIRuntimeCooldowns().accountCircuitHalfOpenProbeTTL {
 		s.openaiAccountCircuitHalfOpen.Delete(accountID)
 		return false
 	}

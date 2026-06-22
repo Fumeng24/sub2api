@@ -6,8 +6,9 @@ import (
 )
 
 type schedulerResultReporter struct {
-	health *accountSchedulerHealthStats
-	source string
+	health              *accountSchedulerHealthStats
+	source              string
+	cooldownForCategory func(category string, headers http.Header) time.Duration
 }
 
 type schedulerResultReport struct {
@@ -41,6 +42,9 @@ func (r schedulerResultReporter) report(input schedulerResultReport) schedulerRe
 	statusCode, body, headers := schedulerFailureInputs(input.FailoverErr)
 	category := schedulerClassifyFailure(r.source, input.FailoverErr, statusCode, body)
 	cooldown := schedulerCooldownForCategory(category, headers)
+	if r.cooldownForCategory != nil {
+		cooldown = r.cooldownForCategory(category, headers)
+	}
 	r.health.reportFailure(input.AccountID, input.Model, input.Endpoint, category, cooldown)
 	outcome.FailureCategory = category
 	outcome.Cooldown = cooldown
