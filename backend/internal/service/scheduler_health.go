@@ -667,6 +667,10 @@ func containsAnySchedulerText(text string, markers ...string) bool {
 }
 
 func schedulerCooldownForCategory(category string, headers http.Header) time.Duration {
+	return schedulerCooldownForCategoryWithOpenAIRequestError(category, headers, openAIRequestErrorCooldown)
+}
+
+func schedulerCooldownForCategoryWithOpenAIRequestError(category string, headers http.Header, requestErrorCooldown time.Duration) time.Duration {
 	switch category {
 	case "auth":
 		return time.Hour
@@ -689,6 +693,9 @@ func schedulerCooldownForCategory(category string, headers http.Header) time.Dur
 	case "transient", "unknown":
 		return 90 * time.Second
 	case "transient_transport", "transient_timeout":
+		if requestErrorCooldown > 0 {
+			return requestErrorCooldown
+		}
 		return openAIRequestErrorCooldown
 	case "compact_bad_output", "empty_output":
 		return 30 * time.Second

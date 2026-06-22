@@ -132,6 +132,21 @@ func TestLoadDefaultOpenAIWSConfig(t *testing.T) {
 	if cfg.Gateway.OpenAIScheduler.StickyEscapeErrorRate != 0.5 {
 		t.Fatalf("Gateway.OpenAIScheduler.StickyEscapeErrorRate = %v, want 0.5", cfg.Gateway.OpenAIScheduler.StickyEscapeErrorRate)
 	}
+	if cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.OAuth429FallbackCooldownSeconds != 5 {
+		t.Fatalf("Gateway.OpenAIScheduler.RuntimeCooldowns.OAuth429FallbackCooldownSeconds = %d, want 5", cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.OAuth429FallbackCooldownSeconds)
+	}
+	if cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.RequestErrorCooldownSeconds != 30 {
+		t.Fatalf("Gateway.OpenAIScheduler.RuntimeCooldowns.RequestErrorCooldownSeconds = %d, want 30", cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.RequestErrorCooldownSeconds)
+	}
+	if cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.TransientCooldownPersistMinIntervalSeconds != 15 {
+		t.Fatalf("Gateway.OpenAIScheduler.RuntimeCooldowns.TransientCooldownPersistMinIntervalSeconds = %d, want 15", cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.TransientCooldownPersistMinIntervalSeconds)
+	}
+	if cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.StopSchedulingBridgeCooldownSeconds != 120 {
+		t.Fatalf("Gateway.OpenAIScheduler.RuntimeCooldowns.StopSchedulingBridgeCooldownSeconds = %d, want 120", cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.StopSchedulingBridgeCooldownSeconds)
+	}
+	if cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds != 30 {
+		t.Fatalf("Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds = %d, want 30", cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds)
+	}
 	if !cfg.Gateway.OpenAIWS.SessionHashReadOldFallback {
 		t.Fatalf("Gateway.OpenAIWS.SessionHashReadOldFallback = false, want true")
 	}
@@ -1758,6 +1773,33 @@ func TestValidateConfig_OpenAIWSRules(t *testing.T) {
 			name:    "sticky_escape_error_rate 不能大于 1",
 			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.StickyEscapeErrorRate = 1.1 },
 			wantErr: "gateway.openai_scheduler.sticky_escape_error_rate",
+		},
+		{
+			name:    "oauth 429 fallback cooldown 必须为正数",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.RuntimeCooldowns.OAuth429FallbackCooldownSeconds = 0 },
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.oauth_429_fallback_cooldown_seconds",
+		},
+		{
+			name:    "request error cooldown 必须为正数",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.RuntimeCooldowns.RequestErrorCooldownSeconds = 0 },
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.request_error_cooldown_seconds",
+		},
+		{
+			name: "transient cooldown persist interval 必须为正数",
+			mutate: func(c *Config) {
+				c.Gateway.OpenAIScheduler.RuntimeCooldowns.TransientCooldownPersistMinIntervalSeconds = 0
+			},
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.transient_cooldown_persist_min_interval_seconds",
+		},
+		{
+			name:    "stop scheduling bridge cooldown 必须为正数",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.RuntimeCooldowns.StopSchedulingBridgeCooldownSeconds = 0 },
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.stop_scheduling_bridge_cooldown_seconds",
+		},
+		{
+			name:    "half open probe ttl 必须为正数",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds = 0 },
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds",
 		},
 	}
 

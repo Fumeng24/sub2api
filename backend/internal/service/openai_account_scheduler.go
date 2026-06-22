@@ -2863,7 +2863,7 @@ func (s *OpenAIGatewayService) openAISchedulerReporter() schedulerResultReporter
 	if s == nil {
 		return schedulerResultReporter{source: PlatformOpenAI}
 	}
-	return schedulerResultReporter{health: s.schedulerHealth, source: PlatformOpenAI}
+	return schedulerResultReporter{health: s.schedulerHealth, source: PlatformOpenAI, cooldownForCategory: s.openAISchedulerCooldownForCategory}
 }
 
 func (s *OpenAIGatewayService) RecordOpenAIAccountSwitch() {

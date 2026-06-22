@@ -967,6 +967,17 @@ type GatewayOpenAISchedulerConfig struct {
 	StickyEscapeTTFTMs int `mapstructure:"sticky_escape_ttft_ms"`
 	// StickyEscapeErrorRate: 错误率 EWMA 超过该阈值时跳过 sticky
 	StickyEscapeErrorRate float64 `mapstructure:"sticky_escape_error_rate"`
+	// RuntimeCooldowns: OpenAI 运行时账号冷却/探测窗口配置
+	RuntimeCooldowns GatewayOpenAIRuntimeCooldownsConfig `mapstructure:"runtime_cooldowns"`
+}
+
+// GatewayOpenAIRuntimeCooldownsConfig OpenAI 运行时账号冷却配置。
+type GatewayOpenAIRuntimeCooldownsConfig struct {
+	OAuth429FallbackCooldownSeconds            int `mapstructure:"oauth_429_fallback_cooldown_seconds"`
+	RequestErrorCooldownSeconds                int `mapstructure:"request_error_cooldown_seconds"`
+	TransientCooldownPersistMinIntervalSeconds int `mapstructure:"transient_cooldown_persist_min_interval_seconds"`
+	StopSchedulingBridgeCooldownSeconds        int `mapstructure:"stop_scheduling_bridge_cooldown_seconds"`
+	AccountCircuitHalfOpenProbeTTLSeconds      int `mapstructure:"account_circuit_half_open_probe_ttl_seconds"`
 }
 
 // GatewayUsageRecordConfig 使用量记录异步队列配置
@@ -1898,6 +1909,14 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.queue", 0.7)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.error_rate", 0.8)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.ttft", 0.5)
+	viper.SetDefault("gateway.openai_scheduler.sticky_escape_enabled", true)
+	viper.SetDefault("gateway.openai_scheduler.sticky_escape_ttft_ms", 15000)
+	viper.SetDefault("gateway.openai_scheduler.sticky_escape_error_rate", 0.5)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.oauth_429_fallback_cooldown_seconds", 5)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.request_error_cooldown_seconds", 30)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.transient_cooldown_persist_min_interval_seconds", 15)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.stop_scheduling_bridge_cooldown_seconds", 120)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds", 30)
 	// OpenAI HTTP upstream protocol strategy
 	viper.SetDefault("gateway.openai_http2.enabled", true)
 	viper.SetDefault("gateway.openai_http2.allow_proxy_fallback_to_http1", true)
@@ -2694,6 +2713,21 @@ func (c *Config) Validate() error {
 	}
 	if c.Gateway.OpenAIScheduler.StickyEscapeErrorRate < 0 || c.Gateway.OpenAIScheduler.StickyEscapeErrorRate > 1 {
 		return fmt.Errorf("gateway.openai_scheduler.sticky_escape_error_rate must be between 0 and 1")
+	}
+	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.OAuth429FallbackCooldownSeconds <= 0 {
+		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.oauth_429_fallback_cooldown_seconds must be positive")
+	}
+	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.RequestErrorCooldownSeconds <= 0 {
+		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.request_error_cooldown_seconds must be positive")
+	}
+	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.TransientCooldownPersistMinIntervalSeconds <= 0 {
+		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.transient_cooldown_persist_min_interval_seconds must be positive")
+	}
+	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.StopSchedulingBridgeCooldownSeconds <= 0 {
+		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.stop_scheduling_bridge_cooldown_seconds must be positive")
+	}
+	if c.Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds <= 0 {
+		return fmt.Errorf("gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds must be positive")
 	}
 	if c.Gateway.MaxLineSize < 0 {
 		return fmt.Errorf("gateway.max_line_size must be non-negative")
