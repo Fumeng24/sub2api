@@ -178,8 +178,13 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				reqLog.Warn("openai.images.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 				if len(failedAccountIDs) == 0 {
 					setOpenAISelectionRetryAfterHeader(c, err)
-					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available compatible accounts", streamStarted)
+					status, errType, message := openAISelectionEmptyErrorResponse(scheduleDecision)
+					if errType == "api_error" {
+						markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					} else {
+						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
+					}
+					h.handleStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, openAISelectionEmptyErrorMetadata(scheduleDecision))
 					return
 				}
 				if lastFailoverErr != nil {

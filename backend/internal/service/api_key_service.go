@@ -851,6 +851,17 @@ func resolveAvailableGroupModelsListConfig(
 	return GroupModelsListConfig{Enabled: true, Models: models}
 }
 
+func groupVisibleModelsListForDiagnostics(group *Group, accounts []Account) (GroupModelsListConfig, bool) {
+	if group == nil {
+		return GroupModelsListConfig{}, false
+	}
+	return resolveAvailableGroupModelsListConfig(*group, accounts), true
+}
+
+func groupAvailableModelsForDiagnostics(platform string, accounts []Account) ([]string, bool) {
+	return modelsFromGroupAccounts(platform, accounts)
+}
+
 func modelsFromGroupAccounts(platform string, accounts []Account) ([]string, bool) {
 	normalizedPlatform := strings.ToLower(strings.TrimSpace(platform))
 	seen := make(map[string]struct{})

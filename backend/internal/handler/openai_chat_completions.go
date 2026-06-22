@@ -177,7 +177,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 					} else {
 						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 					}
-					h.handleStreamingAwareError(c, status, errType, message, streamStarted)
+					h.handleStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, openAISelectionEmptyErrorMetadata(scheduleDecision))
 					return
 				} else {
 					if lastFailoverErr != nil {
