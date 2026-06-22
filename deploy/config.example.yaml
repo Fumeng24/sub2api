@@ -328,6 +328,18 @@ gateway:
     sticky_escape_ttft_ms: 15000
     # 错误率 EWMA 超过该阈值时跳过 sticky，默认 0.5，仅在明显降级时触发
     sticky_escape_error_rate: 0.5
+    runtime_cooldowns:
+      oauth_429_fallback_cooldown_seconds: 5
+      request_error_cooldown_seconds: 30
+      transient_cooldown_persist_min_interval_seconds: 15
+      stop_scheduling_bridge_cooldown_seconds: 120
+      account_circuit_half_open_probe_ttl_seconds: 30
+      # OpenAI/Gateway 账号熔断恢复探针单次超时
+      probe_timeout_seconds: 30
+      # 探针失败后的重试间隔（cadence）
+      probe_retry_delay_seconds: 5
+      # 10000 表示默认不对探针增加额外进程内并发门控；调低后按进程限流
+      probe_max_concurrency: 10000
   # OpenAI HTTP upstream protocol strategy.
   # OpenAI HTTP 上游协议策略（默认 HTTP/2；代理明确不兼容时可临时回退 HTTP/1.1）。
   openai_http2:

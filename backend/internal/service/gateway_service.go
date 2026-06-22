@@ -885,6 +885,8 @@ type GatewayService struct {
 	userPlatformQuotaRepo       UserPlatformQuotaRepository
 	schedulerHealth             *accountSchedulerHealthStats
 	gatewayAccountCircuitProbes sync.Map // key: accountSchedulerHealthKey, value: *gatewayAccountCircuitProbe
+
+	gatewayAccountCircuitProbeLimiter schedulerProbeLimiterHolder
 }
 
 // NewGatewayService creates a new GatewayService

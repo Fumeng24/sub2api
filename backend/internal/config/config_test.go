@@ -147,6 +147,15 @@ func TestLoadDefaultOpenAIWSConfig(t *testing.T) {
 	if cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds != 30 {
 		t.Fatalf("Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds = %d, want 30", cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds)
 	}
+	if cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeTimeoutSeconds != 30 {
+		t.Fatalf("Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeTimeoutSeconds = %d, want 30", cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeTimeoutSeconds)
+	}
+	if cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeRetryDelaySeconds != 5 {
+		t.Fatalf("Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeRetryDelaySeconds = %d, want 5", cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeRetryDelaySeconds)
+	}
+	if cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeMaxConcurrency != 10000 {
+		t.Fatalf("Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeMaxConcurrency = %d, want 10000", cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeMaxConcurrency)
+	}
 	if !cfg.Gateway.OpenAIWS.SessionHashReadOldFallback {
 		t.Fatalf("Gateway.OpenAIWS.SessionHashReadOldFallback = false, want true")
 	}
@@ -265,6 +274,19 @@ func TestLoadOpenAIWSStickyTTLCompatibility(t *testing.T) {
 	if cfg.Gateway.OpenAIWS.StickyResponseIDTTLSeconds != 7200 {
 		t.Fatalf("StickyResponseIDTTLSeconds = %d, want 7200", cfg.Gateway.OpenAIWS.StickyResponseIDTTLSeconds)
 	}
+}
+
+func TestLoadOpenAIProbeRunnerConfigFromEnv(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_TIMEOUT_SECONDS", "7")
+	t.Setenv("GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_RETRY_DELAY_SECONDS", "2")
+	t.Setenv("GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_MAX_CONCURRENCY", "3")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, 7, cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeTimeoutSeconds)
+	require.Equal(t, 2, cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeRetryDelaySeconds)
+	require.Equal(t, 3, cfg.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeMaxConcurrency)
 }
 
 func TestLoadDefaultIdempotencyConfig(t *testing.T) {
@@ -1807,6 +1829,33 @@ func TestValidateConfig_OpenAIWSRules(t *testing.T) {
 				c.Gateway.OpenAIScheduler.RuntimeCooldowns.RequestErrorCooldownSeconds = int(maxDurationSeconds) + 1
 			},
 			wantErr: "gateway.openai_scheduler.runtime_cooldowns.request_error_cooldown_seconds",
+		},
+		{
+			name:    "probe timeout 必须为正数",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeTimeoutSeconds = 0 },
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.probe_timeout_seconds",
+		},
+		{
+			name:    "probe retry delay 必须为正数",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeRetryDelaySeconds = -1 },
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.probe_retry_delay_seconds",
+		},
+		{
+			name: "probe timeout 秒数不能超过 duration 上限",
+			mutate: func(c *Config) {
+				c.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeTimeoutSeconds = int(maxDurationSeconds) + 1
+			},
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.probe_timeout_seconds",
+		},
+		{
+			name:    "probe 并发必须为正数",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeMaxConcurrency = 0 },
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.probe_max_concurrency",
+		},
+		{
+			name:    "probe 并发不能超过上限",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.RuntimeCooldowns.ProbeMaxConcurrency = 10001 },
+			wantErr: "gateway.openai_scheduler.runtime_cooldowns.probe_max_concurrency",
 		},
 	}
 

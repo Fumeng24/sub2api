@@ -45,12 +45,14 @@ func (s *OpenAIGatewayService) maybeStartOpenAIAccountCircuitProbe(accountID int
 		cancel()
 		return
 	}
+	runnerCfg := s.openAIAccountCircuitProbeRunnerConfig()
 	slog.Info("account_circuit_probe_started",
 		"account_id", accountID,
 		"model", key.Model,
 		"endpoint", key.Endpoint,
-		"timeout", openAIAccountCircuitProbeTimeout.String(),
-		"retry_delay", openAIAccountCircuitProbeRetryDelay.String(),
+		"timeout", runnerCfg.timeout.String(),
+		"retry_delay", runnerCfg.retryDelay.String(),
+		"max_concurrency", runnerCfg.maxConcurrency,
 		"healthy_ttft", schedulerHealthyTTFTThreshold.String(),
 		"category", category,
 	)
@@ -85,14 +87,23 @@ func (s *OpenAIGatewayService) stopOpenAIAccountCircuitProbe(accountID int64, mo
 
 func (s *OpenAIGatewayService) runOpenAIAccountCircuitProbe(ctx context.Context, key accountSchedulerHealthKey, initialCategory string) {
 	defer s.openaiAccountCircuitProbes.Delete(key)
+	runnerCfg := s.openAIAccountCircuitProbeRunnerConfig()
 	runner := schedulerProbeRunner{
 		health:     s.schedulerHealth,
 		classifier: schedulerClassifierForPlatform(PlatformOpenAI),
 		adapter:    openAIAccountCircuitProbeAdapter{service: s},
-		timeout:    openAIAccountCircuitProbeTimeout,
-		retryDelay: openAIAccountCircuitProbeRetryDelay,
+		timeout:    runnerCfg.timeout,
+		retryDelay: runnerCfg.retryDelay,
+		limiter:    s.openaiAccountCircuitProbeLimiter.get(runnerCfg.maxConcurrency),
 	}
 	runner.run(ctx, key, initialCategory)
+}
+
+func (s *OpenAIGatewayService) openAIAccountCircuitProbeRunnerConfig() schedulerProbeRunnerConfig {
+	if s == nil {
+		return schedulerProbeRunnerConfigFromConfig(nil, openAIAccountCircuitProbeTimeout, openAIAccountCircuitProbeRetryDelay)
+	}
+	return schedulerProbeRunnerConfigFromConfig(s.cfg, openAIAccountCircuitProbeTimeout, openAIAccountCircuitProbeRetryDelay)
 }
 
 func (a openAIAccountCircuitProbeAdapter) Probe(ctx context.Context, key schedulerProbeKey) (int, []byte, int, error) {
@@ -130,7 +141,7 @@ func (s *OpenAIGatewayService) probeOpenAIAccountCircuit(ctx context.Context, ke
 	if s == nil || s.accountRepo == nil || s.httpUpstream == nil {
 		return 0, nil, 0, fmt.Errorf("openai circuit probe dependencies unavailable")
 	}
-	probeCtx, cancel := context.WithTimeout(ctx, openAIAccountCircuitProbeTimeout)
+	probeCtx, cancel := context.WithTimeout(ctx, s.openAIAccountCircuitProbeRunnerConfig().timeout)
 	defer cancel()
 
 	account, err := s.accountRepo.GetByID(probeCtx, key.AccountID)

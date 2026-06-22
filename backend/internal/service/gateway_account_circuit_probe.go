@@ -53,12 +53,14 @@ func (s *GatewayService) maybeStartGatewayAccountCircuitProbe(accountID int64, m
 		cancel()
 		return
 	}
+	runnerCfg := s.gatewayAccountCircuitProbeRunnerConfig()
 	slog.Info("gateway_account_circuit_probe_started",
 		"account_id", accountID,
 		"model", key.Model,
 		"endpoint", key.Endpoint,
-		"timeout", gatewayAccountCircuitProbeTimeout.String(),
-		"retry_delay", gatewayAccountCircuitProbeRetryDelay.String(),
+		"timeout", runnerCfg.timeout.String(),
+		"retry_delay", runnerCfg.retryDelay.String(),
+		"max_concurrency", runnerCfg.maxConcurrency,
 		"healthy_ttft", schedulerHealthyTTFTThreshold.String(),
 		"category", category,
 	)
@@ -92,14 +94,23 @@ func (s *GatewayService) stopGatewayAccountCircuitProbe(accountID int64, model, 
 
 func (s *GatewayService) runGatewayAccountCircuitProbe(ctx context.Context, key accountSchedulerHealthKey, initialCategory string) {
 	defer s.gatewayAccountCircuitProbes.Delete(key)
+	runnerCfg := s.gatewayAccountCircuitProbeRunnerConfig()
 	runner := schedulerProbeRunner{
 		health:     s.schedulerHealth,
 		classifier: defaultSchedulerErrorClassifier{},
 		adapter:    gatewayAccountCircuitProbeAdapter{service: s},
-		timeout:    gatewayAccountCircuitProbeTimeout,
-		retryDelay: gatewayAccountCircuitProbeRetryDelay,
+		timeout:    runnerCfg.timeout,
+		retryDelay: runnerCfg.retryDelay,
+		limiter:    s.gatewayAccountCircuitProbeLimiter.get(runnerCfg.maxConcurrency),
 	}
 	runner.run(ctx, key, initialCategory)
+}
+
+func (s *GatewayService) gatewayAccountCircuitProbeRunnerConfig() schedulerProbeRunnerConfig {
+	if s == nil {
+		return schedulerProbeRunnerConfigFromConfig(nil, gatewayAccountCircuitProbeTimeout, gatewayAccountCircuitProbeRetryDelay)
+	}
+	return schedulerProbeRunnerConfigFromConfig(s.cfg, gatewayAccountCircuitProbeTimeout, gatewayAccountCircuitProbeRetryDelay)
 }
 
 func (a gatewayAccountCircuitProbeAdapter) Probe(ctx context.Context, key schedulerProbeKey) (int, []byte, int, error) {

@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -101,4 +103,159 @@ func TestSchedulerProbeRunner_EmptySuccessStreamClassifiedAsTimeout(t *testing.T
 	snap := health.snapshot(key.AccountID, key.Model, key.Endpoint, false)
 	require.Equal(t, schedulerCircuitOpen, snap.CircuitState)
 	require.Equal(t, schedulerSlowTTFTCategory, snap.LastFailureReason)
+}
+
+func TestSchedulerProbeRunnerConfigFromConfig(t *testing.T) {
+	cfg := &config.Config{
+		Gateway: config.GatewayConfig{
+			OpenAIScheduler: config.GatewayOpenAISchedulerConfig{
+				RuntimeCooldowns: config.GatewayOpenAIRuntimeCooldownsConfig{
+					ProbeTimeoutSeconds:    7,
+					ProbeRetryDelaySeconds: 2,
+					ProbeMaxConcurrency:    3,
+				},
+			},
+		},
+	}
+
+	got := schedulerProbeRunnerConfigFromConfig(cfg, 30*time.Second, 5*time.Second)
+
+	require.Equal(t, 7*time.Second, got.timeout)
+	require.Equal(t, 2*time.Second, got.retryDelay)
+	require.Equal(t, 3, got.maxConcurrency)
+}
+
+func TestSchedulerProbeRunner_ProbeTimeoutCancelsAttempt(t *testing.T) {
+	health := newAccountSchedulerHealthStats()
+	key := makeAccountSchedulerHealthKey(4, "model", "endpoint")
+	adapter := &schedulerProbeTimeoutAdapter{}
+	before := GetSchedulerProbeRunnerMetricsSnapshot()
+
+	started := time.Now()
+	schedulerProbeRunner{
+		health:     health,
+		adapter:    adapter,
+		timeout:    20 * time.Millisecond,
+		retryDelay: time.Hour,
+	}.run(context.Background(), key, "transient_timeout")
+
+	require.GreaterOrEqual(t, time.Since(started), 20*time.Millisecond)
+	require.Less(t, time.Since(started), 200*time.Millisecond)
+	require.Equal(t, 1, adapter.continueCount)
+	after := GetSchedulerProbeRunnerMetricsSnapshot()
+	require.Equal(t, before.Timeouts+1, after.Timeouts)
+	snap := health.snapshot(key.AccountID, key.Model, key.Endpoint, false)
+	require.Equal(t, schedulerCircuitOpen, snap.CircuitState)
+}
+
+func TestSchedulerProbeRunner_ConcurrencyLimitWaitsForSlot(t *testing.T) {
+	key := makeAccountSchedulerHealthKey(5, "model", "endpoint")
+	limiter := newSchedulerProbeLimiter(1)
+	first := &schedulerProbeBlockingAdapter{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	second := &schedulerProbeCountingAdapter{}
+	before := GetSchedulerProbeRunnerMetricsSnapshot()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		schedulerProbeRunner{
+			adapter: first,
+			timeout: time.Second,
+			limiter: limiter,
+		}.run(context.Background(), key, "transient_timeout")
+	}()
+
+	select {
+	case <-first.started:
+	case <-time.After(time.Second):
+		t.Fatal("first probe did not acquire slot")
+	}
+
+	schedulerProbeRunner{
+		adapter: second,
+		timeout: 20 * time.Millisecond,
+		limiter: limiter,
+	}.run(context.Background(), key, "transient_timeout")
+
+	require.Equal(t, 0, second.calls)
+	after := GetSchedulerProbeRunnerMetricsSnapshot()
+	require.Equal(t, before.ConcurrencyWaitTimeout+1, after.ConcurrencyWaitTimeout)
+
+	close(first.release)
+	wg.Wait()
+}
+
+type schedulerProbeTimeoutAdapter struct {
+	continueCount int
+}
+
+func (a *schedulerProbeTimeoutAdapter) Probe(ctx context.Context, key schedulerProbeKey) (int, []byte, int, error) {
+	<-ctx.Done()
+	return 0, nil, 0, ctx.Err()
+}
+
+func (a *schedulerProbeTimeoutAdapter) OnRecovered(key schedulerProbeKey) {}
+
+func (a *schedulerProbeTimeoutAdapter) OnUnschedulable(key schedulerProbeKey) {}
+
+func (a *schedulerProbeTimeoutAdapter) ShouldContinue(key schedulerProbeKey, category string) bool {
+	a.continueCount++
+	return false
+}
+
+func (a *schedulerProbeTimeoutAdapter) LogAttrs(key schedulerProbeKey) []any {
+	return []any{"account_id", key.AccountID, "model", key.Model, "endpoint", key.Endpoint}
+}
+
+type schedulerProbeBlockingAdapter struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (a *schedulerProbeBlockingAdapter) Probe(ctx context.Context, key schedulerProbeKey) (int, []byte, int, error) {
+	a.once.Do(func() { close(a.started) })
+	select {
+	case <-ctx.Done():
+		return 0, nil, 0, ctx.Err()
+	case <-a.release:
+		return 200, nil, 1, nil
+	}
+}
+
+func (a *schedulerProbeBlockingAdapter) OnRecovered(key schedulerProbeKey) {}
+
+func (a *schedulerProbeBlockingAdapter) OnUnschedulable(key schedulerProbeKey) {}
+
+func (a *schedulerProbeBlockingAdapter) ShouldContinue(key schedulerProbeKey, category string) bool {
+	return false
+}
+
+func (a *schedulerProbeBlockingAdapter) LogAttrs(key schedulerProbeKey) []any {
+	return []any{"account_id", key.AccountID, "model", key.Model, "endpoint", key.Endpoint}
+}
+
+type schedulerProbeCountingAdapter struct {
+	calls int
+}
+
+func (a *schedulerProbeCountingAdapter) Probe(ctx context.Context, key schedulerProbeKey) (int, []byte, int, error) {
+	a.calls++
+	return 200, nil, 1, nil
+}
+
+func (a *schedulerProbeCountingAdapter) OnRecovered(key schedulerProbeKey) {}
+
+func (a *schedulerProbeCountingAdapter) OnUnschedulable(key schedulerProbeKey) {}
+
+func (a *schedulerProbeCountingAdapter) ShouldContinue(key schedulerProbeKey, category string) bool {
+	return false
+}
+
+func (a *schedulerProbeCountingAdapter) LogAttrs(key schedulerProbeKey) []any {
+	return []any{"account_id", key.AccountID, "model", key.Model, "endpoint", key.Endpoint}
 }
