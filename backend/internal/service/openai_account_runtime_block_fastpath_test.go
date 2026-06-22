@@ -559,6 +559,51 @@ func TestOpenAITransientScheduleFailureUsesScopedSchedulerCooldown(t *testing.T)
 	require.Equal(t, schedulerCircuitClosed, otherModel.CircuitState)
 }
 
+func TestOpenAITransientTransportScheduleFailureUsesConfiguredCooldown(t *testing.T) {
+	svc := &OpenAIGatewayService{
+		cfg: &config.Config{
+			Gateway: config.GatewayConfig{
+				OpenAIScheduler: config.GatewayOpenAISchedulerConfig{
+					RuntimeCooldowns: config.GatewayOpenAIRuntimeCooldownsConfig{
+						RequestErrorCooldownSeconds: 2,
+					},
+				},
+			},
+		},
+		schedulerHealth: newAccountSchedulerHealthStats(),
+	}
+	accountID := int64(119)
+	model := "gpt-5.5"
+	endpoint := "/v1/responses"
+	failoverErr := &UpstreamFailoverError{SchedulerCategory: "transient_transport"}
+
+	before := time.Now()
+	svc.ReportOpenAIAccountScheduleFailure(accountID, model, endpoint, failoverErr)
+
+	snap := svc.schedulerHealth.snapshot(accountID, model, endpoint, false)
+	require.Equal(t, schedulerCircuitOpen, snap.CircuitState)
+	require.Equal(t, "transient_transport", snap.LastFailureReason)
+	remaining := snap.CooldownUntil.Sub(before)
+	require.GreaterOrEqual(t, remaining, 1500*time.Millisecond)
+	require.LessOrEqual(t, remaining, 2500*time.Millisecond)
+}
+
+func TestOpenAIRuntimeCooldownsFromConfigRejectsOverflow(t *testing.T) {
+	cfg := &config.Config{
+		Gateway: config.GatewayConfig{
+			OpenAIScheduler: config.GatewayOpenAISchedulerConfig{
+				RuntimeCooldowns: config.GatewayOpenAIRuntimeCooldownsConfig{
+					RequestErrorCooldownSeconds: int(time.Duration(1<<63-1)/time.Second) + 1,
+				},
+			},
+		},
+	}
+
+	cooldowns := openAIRuntimeCooldownsFromConfig(cfg)
+
+	require.Equal(t, openAIRequestErrorCooldown, cooldowns.requestError)
+}
+
 func TestOpenAI403ScheduleFailureOverrideUsesTransientProbeCircuit(t *testing.T) {
 	svc := &OpenAIGatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
 	accountID := int64(117)

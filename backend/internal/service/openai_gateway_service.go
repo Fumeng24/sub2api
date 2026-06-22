@@ -461,7 +461,7 @@ func NewOpenAIGatewayService(
 		userPlatformQuotaRepo:           userPlatformQuotaRepo,
 		responseHeaderFilter:            compileResponseHeaderFilter(cfg),
 		codexSnapshotThrottle:           newAccountWriteThrottle(openAICodexSnapshotPersistMinInterval),
-		openaiTransientCooldownThrottle: newAccountWriteThrottle(openAITransientCooldownPersistMinInterval),
+		openaiTransientCooldownThrottle: newAccountWriteThrottle(openAIRuntimeCooldownsFromConfig(cfg).transientPersistMinInterval),
 		schedulerHealth:                 newAccountSchedulerHealthStats(),
 	}
 	if rateLimitService != nil {

@@ -264,6 +264,74 @@ func TestGatewaySelectionDiagnostics_CircuitOpen(t *testing.T) {
 	if len(diag.SkippedAccounts) != 1 || diag.SkippedAccounts[0].CircuitState != schedulerCircuitOpen || diag.SkippedAccounts[0].CircuitEndpoint != endpoint {
 		t.Fatalf("expected scoped circuit details in skipped account, got %+v", diag.SkippedAccounts)
 	}
+	skipped := diag.SkippedAccounts[0]
+	if skipped.Reason != "scheduler_circuit_open" || skipped.CircuitReason != "transient_transport" || skipped.CircuitModel != model {
+		t.Fatalf("expected scheduler circuit reason details in skipped account, got %+v", skipped)
+	}
+	if skipped.CircuitRetryAt == nil {
+		t.Fatalf("expected circuit retry time in skipped account, got %+v", skipped)
+	}
+	if skipped.CircuitRetryRemainingSec == nil || *skipped.CircuitRetryRemainingSec <= 0 {
+		t.Fatalf("expected positive circuit retry remaining seconds, got %+v", skipped)
+	}
+}
+
+func TestGatewaySelectionDiagnostics_HalfOpenPendingOmitsPastRetryAt(t *testing.T) {
+	groupID := int64(42)
+	model := "claude-opus-4-7"
+	endpoint := "/v1/messages"
+	account := &Account{
+		ID:            38823,
+		Platform:      PlatformAnthropic,
+		Type:          AccountTypeOAuth,
+		Status:        StatusActive,
+		Schedulable:   true,
+		AccountGroups: []AccountGroup{{GroupID: groupID}},
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{model: model},
+		},
+	}
+	svc := &GatewayService{schedulerHealth: newAccountSchedulerHealthStats()}
+	svc.schedulerHealth.reportFailure(account.ID, model, endpoint, "transient_transport", time.Millisecond)
+	key := makeAccountSchedulerHealthKey(account.ID, model, endpoint)
+	entry, ok := svc.schedulerHealth.get(key)
+	if !ok {
+		t.Fatal("expected scheduler health entry")
+	}
+	entry.mu.Lock()
+	entry.cooldownUntil = time.Now().Add(-time.Second)
+	entry.circuitState = schedulerCircuitHalfOpen
+	entry.halfOpenInFlight = true
+	entry.mu.Unlock()
+
+	err := svc.newGatewayNoAvailableError(
+		context.Background(),
+		&groupID,
+		model,
+		PlatformAnthropic,
+		endpoint,
+		[]*Account{account},
+		nil,
+		false,
+		&Group{ID: groupID, Platform: PlatformAnthropic, Status: StatusActive},
+		false,
+		nil,
+	)
+
+	var noAvailable *GatewayNoAvailableAccountsError
+	if !errors.As(err, &noAvailable) {
+		t.Fatalf("expected GatewayNoAvailableAccountsError, got %T", err)
+	}
+	if len(noAvailable.Diagnostics.SkippedAccounts) != 1 {
+		t.Fatalf("expected one skipped account, got %+v", noAvailable.Diagnostics.SkippedAccounts)
+	}
+	skipped := noAvailable.Diagnostics.SkippedAccounts[0]
+	if skipped.Reason != "scheduler_half_open_in_flight" {
+		t.Fatalf("expected half-open in-flight reason, got %+v", skipped)
+	}
+	if skipped.CircuitRetryAt != nil || skipped.CircuitRetryRemainingSec != nil {
+		t.Fatalf("expected no stale retry time for half-open in-flight account, got %+v", skipped)
+	}
 }
 
 func TestGatewayServiceReportAccountScheduleSuccessForRequestClearsContextEndpoint(t *testing.T) {

@@ -67,6 +67,13 @@ type schedulerHealthSnapshot struct {
 	LastFailureReason string
 }
 
+type schedulerHealthFilterState struct {
+	Snapshot schedulerHealthSnapshot
+	Allowed  bool
+	Reason   string
+	RetryAt  time.Time
+}
+
 type schedulerAccountScore struct {
 	Account    *Account
 	Config     AccountGroup
@@ -329,6 +336,44 @@ func (s *schedulerHealthSnapshot) applyDefaultTTFTFallback(fallback schedulerHea
 	s.TTFTEWMA = fallback.TTFTEWMA
 	s.HasTTFT = true
 	s.LatencyScore = latencyScoreFromTTFT(fallback.TTFTEWMA, true)
+}
+
+func schedulerHealthFilterStateFromSnapshot(snap schedulerHealthSnapshot, now time.Time, allowHalfOpen bool, halfOpenBlockedReason string) schedulerHealthFilterState {
+	state := schedulerHealthFilterState{
+		Snapshot: snap,
+		Allowed:  true,
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	switch snap.CircuitState {
+	case "", schedulerCircuitClosed:
+		return state
+	case schedulerCircuitOpen:
+		if snap.CooldownUntil.IsZero() || snap.CooldownUntil.After(now) {
+			state.Allowed = false
+			state.Reason = "scheduler_circuit_open"
+			state.RetryAt = snap.CooldownUntil
+			return state
+		}
+	case schedulerCircuitHalfOpen:
+		if allowHalfOpen && snap.HalfOpenProbe {
+			return state
+		}
+		state.Allowed = false
+		if halfOpenBlockedReason == "" {
+			halfOpenBlockedReason = "scheduler_probe_pending"
+		}
+		state.Reason = halfOpenBlockedReason
+		state.RetryAt = snap.CooldownUntil
+		return state
+	default:
+		state.Allowed = false
+		state.Reason = "scheduler_circuit_open"
+		state.RetryAt = snap.CooldownUntil
+		return state
+	}
+	return state
 }
 
 func (s *accountSchedulerHealthStats) clear(accountID int64, model, endpoint string) {
@@ -667,6 +712,10 @@ func containsAnySchedulerText(text string, markers ...string) bool {
 }
 
 func schedulerCooldownForCategory(category string, headers http.Header) time.Duration {
+	return schedulerCooldownForCategoryWithOpenAIRequestError(category, headers, openAIRequestErrorCooldown)
+}
+
+func schedulerCooldownForCategoryWithOpenAIRequestError(category string, headers http.Header, requestErrorCooldown time.Duration) time.Duration {
 	switch category {
 	case "auth":
 		return time.Hour
@@ -689,6 +738,9 @@ func schedulerCooldownForCategory(category string, headers http.Header) time.Dur
 	case "transient", "unknown":
 		return 90 * time.Second
 	case "transient_transport", "transient_timeout":
+		if requestErrorCooldown > 0 {
+			return requestErrorCooldown
+		}
 		return openAIRequestErrorCooldown
 	case "compact_bad_output", "empty_output":
 		return 30 * time.Second

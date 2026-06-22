@@ -20,6 +20,8 @@ const (
 	RunModeSimple   = "simple"
 )
 
+const maxDurationSeconds = int64(time.Duration(1<<63-1) / time.Second)
+
 // 使用量记录队列溢出策略
 const (
 	UsageRecordOverflowPolicyDrop   = "drop"
@@ -967,6 +969,17 @@ type GatewayOpenAISchedulerConfig struct {
 	StickyEscapeTTFTMs int `mapstructure:"sticky_escape_ttft_ms"`
 	// StickyEscapeErrorRate: 错误率 EWMA 超过该阈值时跳过 sticky
 	StickyEscapeErrorRate float64 `mapstructure:"sticky_escape_error_rate"`
+	// RuntimeCooldowns: OpenAI 运行时账号冷却/探测窗口配置
+	RuntimeCooldowns GatewayOpenAIRuntimeCooldownsConfig `mapstructure:"runtime_cooldowns"`
+}
+
+// GatewayOpenAIRuntimeCooldownsConfig OpenAI 运行时账号冷却配置。
+type GatewayOpenAIRuntimeCooldownsConfig struct {
+	OAuth429FallbackCooldownSeconds            int `mapstructure:"oauth_429_fallback_cooldown_seconds"`
+	RequestErrorCooldownSeconds                int `mapstructure:"request_error_cooldown_seconds"`
+	TransientCooldownPersistMinIntervalSeconds int `mapstructure:"transient_cooldown_persist_min_interval_seconds"`
+	StopSchedulingBridgeCooldownSeconds        int `mapstructure:"stop_scheduling_bridge_cooldown_seconds"`
+	AccountCircuitHalfOpenProbeTTLSeconds      int `mapstructure:"account_circuit_half_open_probe_ttl_seconds"`
 }
 
 // GatewayUsageRecordConfig 使用量记录异步队列配置
@@ -1898,6 +1911,14 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.queue", 0.7)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.error_rate", 0.8)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.ttft", 0.5)
+	viper.SetDefault("gateway.openai_scheduler.sticky_escape_enabled", true)
+	viper.SetDefault("gateway.openai_scheduler.sticky_escape_ttft_ms", 15000)
+	viper.SetDefault("gateway.openai_scheduler.sticky_escape_error_rate", 0.5)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.oauth_429_fallback_cooldown_seconds", 5)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.request_error_cooldown_seconds", 30)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.transient_cooldown_persist_min_interval_seconds", 15)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.stop_scheduling_bridge_cooldown_seconds", 120)
+	viper.SetDefault("gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds", 30)
 	// OpenAI HTTP upstream protocol strategy
 	viper.SetDefault("gateway.openai_http2.enabled", true)
 	viper.SetDefault("gateway.openai_http2.allow_proxy_fallback_to_http1", true)
@@ -2695,6 +2716,22 @@ func (c *Config) Validate() error {
 	if c.Gateway.OpenAIScheduler.StickyEscapeErrorRate < 0 || c.Gateway.OpenAIScheduler.StickyEscapeErrorRate > 1 {
 		return fmt.Errorf("gateway.openai_scheduler.sticky_escape_error_rate must be between 0 and 1")
 	}
+	runtimeCooldowns := c.Gateway.OpenAIScheduler.RuntimeCooldowns
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.oauth_429_fallback_cooldown_seconds", runtimeCooldowns.OAuth429FallbackCooldownSeconds); err != nil {
+		return err
+	}
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.request_error_cooldown_seconds", runtimeCooldowns.RequestErrorCooldownSeconds); err != nil {
+		return err
+	}
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.transient_cooldown_persist_min_interval_seconds", runtimeCooldowns.TransientCooldownPersistMinIntervalSeconds); err != nil {
+		return err
+	}
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.stop_scheduling_bridge_cooldown_seconds", runtimeCooldowns.StopSchedulingBridgeCooldownSeconds); err != nil {
+		return err
+	}
+	if err := validatePositiveDurationSeconds("gateway.openai_scheduler.runtime_cooldowns.account_circuit_half_open_probe_ttl_seconds", runtimeCooldowns.AccountCircuitHalfOpenProbeTTLSeconds); err != nil {
+		return err
+	}
 	if c.Gateway.MaxLineSize < 0 {
 		return fmt.Errorf("gateway.max_line_size must be non-negative")
 	}
@@ -2847,6 +2884,16 @@ func (c *Config) Validate() error {
 	}
 	if err := ValidateDingTalkConfig(c.DingTalk); err != nil {
 		return fmt.Errorf("dingtalk_connect: %w", err)
+	}
+	return nil
+}
+
+func validatePositiveDurationSeconds(path string, seconds int) error {
+	if seconds <= 0 {
+		return fmt.Errorf("%s must be positive", path)
+	}
+	if int64(seconds) > maxDurationSeconds {
+		return fmt.Errorf("%s must be <= %d", path, maxDurationSeconds)
 	}
 	return nil
 }
