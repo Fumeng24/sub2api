@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="group flex min-h-[260px] w-full flex-col rounded-lg border border-gray-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-blue-200 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:hover:border-blue-900/50 dark:hover:bg-dark-800/80"
+    class="group flex min-h-[260px] min-w-0 w-full flex-col rounded-lg border border-gray-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-blue-200 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:hover:border-blue-900/50 dark:hover:bg-dark-800/80"
     @click="emit('click')"
   >
     <!-- Header: icon + name/model + status chip -->
