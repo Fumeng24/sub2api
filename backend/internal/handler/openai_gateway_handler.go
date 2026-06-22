@@ -563,6 +563,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			if err != nil {
 				reqLog.Warn("openai.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 				if len(failedAccountIDs) == 0 {
+					setOpenAISelectionRetryAfterHeader(c, err)
 					if errors.Is(err, service.ErrNoAvailableCompactAccounts) {
 						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 						h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "compact_not_supported", "No available OpenAI accounts support /responses/compact", streamStarted)
@@ -1043,6 +1044,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			if err != nil {
 				reqLog.Warn("openai_messages.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 				if len(failedAccountIDs) == 0 {
+					setOpenAISelectionRetryAfterHeader(c, err)
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 					h.anthropicStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "Service temporarily unavailable", streamStarted)
 					return

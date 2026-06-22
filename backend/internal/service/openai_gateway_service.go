@@ -1335,9 +1335,94 @@ func (s *OpenAIGatewayService) SelectAccountForModelWithExclusions(ctx context.C
 	return s.selectAccountForModelWithExclusions(s.withOpenAIQuotaAutoPauseContext(ctx), groupID, sessionHash, requestedModel, excludedIDs, false, 0, "", OpenAIAccountScheduleOptions{})
 }
 
-// noAvailableOpenAISelectionError builds the standard "no account available" error
-// while preserving the compact-specific error when applicable.
-func noAvailableOpenAISelectionError(requestedModel string, compactBlocked bool) error {
+type OpenAINoAvailableAccountsError struct {
+	Cause             error
+	RequestedModel    string
+	CompactBlocked    bool
+	Diagnostics       OpenAIAccountSelectionDiagnostics
+	RetryAfterSeconds int
+}
+
+func (e *OpenAINoAvailableAccountsError) Error() string {
+	if e == nil {
+		return ErrNoAvailableAccounts.Error()
+	}
+	cause := e.Cause
+	if cause == nil {
+		cause = baseNoAvailableOpenAISelectionError(e.RequestedModel, e.CompactBlocked)
+	}
+	message := cause.Error()
+	diagParts := make([]string, 0, 4)
+	if e.RetryAfterSeconds > 0 {
+		diagParts = append(diagParts, fmt.Sprintf("retry_after=%ds", e.RetryAfterSeconds))
+	}
+	if !e.Diagnostics.EarliestRetryAt.IsZero() {
+		diagParts = append(diagParts, "earliest_retry_at="+e.Diagnostics.EarliestRetryAt.UTC().Format(time.RFC3339))
+	}
+	if e.Diagnostics.EarliestRetryReason != "" {
+		diagParts = append(diagParts, "earliest_retry_reason="+e.Diagnostics.EarliestRetryReason)
+	}
+	if len(e.Diagnostics.FilterReasonCounts) > 0 {
+		diagParts = append(diagParts, "filter_reasons="+formatOpenAISelectionFilterReasons(e.Diagnostics.FilterReasonCounts))
+	}
+	if len(diagParts) == 0 {
+		return message
+	}
+	return message + "; " + strings.Join(diagParts, "; ")
+}
+
+func (e *OpenAINoAvailableAccountsError) Unwrap() error {
+	if e == nil || e.Cause == nil {
+		return ErrNoAvailableAccounts
+	}
+	return e.Cause
+}
+
+func (e *OpenAINoAvailableAccountsError) Is(target error) bool {
+	if target == nil {
+		return false
+	}
+	if target == ErrNoAvailableAccounts {
+		return true
+	}
+	if target == ErrNoAvailableCompactAccounts {
+		return e != nil && e.CompactBlocked
+	}
+	return false
+}
+
+func (e *OpenAINoAvailableAccountsError) RetryAfterSecondsValue() int {
+	if e == nil {
+		return 0
+	}
+	return e.RetryAfterSeconds
+}
+
+func OpenAIRetryAfterSecondsFromError(err error) int {
+	var noAvailable *OpenAINoAvailableAccountsError
+	if !errors.As(err, &noAvailable) || noAvailable == nil {
+		return 0
+	}
+	return noAvailable.RetryAfterSecondsValue()
+}
+
+func formatOpenAISelectionFilterReasons(counts map[string]int) string {
+	if len(counts) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s:%d", key, counts[key]))
+	}
+	return strings.Join(parts, ",")
+}
+
+func baseNoAvailableOpenAISelectionError(requestedModel string, compactBlocked bool) error {
 	if compactBlocked {
 		return ErrNoAvailableCompactAccounts
 	}
@@ -1345,6 +1430,94 @@ func noAvailableOpenAISelectionError(requestedModel string, compactBlocked bool)
 		return fmt.Errorf("no available OpenAI accounts supporting model: %s", requestedModel)
 	}
 	return errors.New("no available OpenAI accounts")
+}
+
+// noAvailableOpenAISelectionError builds the standard "no account available" error
+// while preserving the compact-specific error when applicable.
+func noAvailableOpenAISelectionError(requestedModel string, compactBlocked bool, diagnostics ...OpenAIAccountSelectionDiagnostics) error {
+	cause := baseNoAvailableOpenAISelectionError(requestedModel, compactBlocked)
+	if len(diagnostics) == 0 || !diagnostics[0].Collected {
+		return cause
+	}
+	return newOpenAINoAvailableAccountsError(cause, requestedModel, compactBlocked, diagnostics[0])
+}
+
+func newOpenAINoAvailableAccountsError(cause error, requestedModel string, compactBlocked bool, diag OpenAIAccountSelectionDiagnostics) error {
+	if cause == nil {
+		cause = baseNoAvailableOpenAISelectionError(requestedModel, compactBlocked)
+	}
+	retryAfter := diag.RetryAfterSeconds
+	if retryAfter <= 0 && !diag.EarliestRetryAt.IsZero() {
+		retryAfter = retryAfterSecondsUntil(diag.EarliestRetryAt, time.Now())
+	}
+	return &OpenAINoAvailableAccountsError{
+		Cause:             cause,
+		RequestedModel:    requestedModel,
+		CompactBlocked:    compactBlocked,
+		Diagnostics:       diag,
+		RetryAfterSeconds: retryAfter,
+	}
+}
+
+func attachOpenAINoAvailableDiagnostics(err error, requestedModel string, diag OpenAIAccountSelectionDiagnostics) error {
+	if err == nil || !diag.Collected {
+		return err
+	}
+	if !errors.Is(err, ErrNoAvailableAccounts) && !errors.Is(err, ErrNoAvailableCompactAccounts) {
+		return err
+	}
+	var existing *OpenAINoAvailableAccountsError
+	if errors.As(err, &existing) && existing != nil {
+		if existing.RetryAfterSeconds > 0 && diag.RetryAfterSeconds <= 0 {
+			diag.RetryAfterSeconds = existing.RetryAfterSeconds
+		}
+		if existing.Diagnostics.EarliestRetryAt.IsZero() || !diag.EarliestRetryAt.IsZero() {
+			return newOpenAINoAvailableAccountsError(existing.Cause, requestedModel, existing.CompactBlocked, diag)
+		}
+		return err
+	}
+	return newOpenAINoAvailableAccountsError(err, requestedModel, errors.Is(err, ErrNoAvailableCompactAccounts), diag)
+}
+
+func (s *OpenAIGatewayService) newOpenAINoAvailableSelectionError(
+	ctx context.Context,
+	groupID *int64,
+	sessionHash string,
+	cacheAffinityHash string,
+	cacheAffinityGroup string,
+	requestedModel string,
+	excludedIDs map[int64]struct{},
+	requireCompact bool,
+	requiredCapability OpenAIEndpointCapability,
+	schedulerEndpoint string,
+	options OpenAIAccountScheduleOptions,
+	compactBlocked bool,
+) error {
+	req := OpenAIAccountScheduleRequest{
+		GroupID:                           groupID,
+		SessionHash:                       sessionHash,
+		CacheAffinityHash:                 cacheAffinityHash,
+		CacheAffinityGroup:                cacheAffinityGroup,
+		RequestedModel:                    requestedModel,
+		SchedulerEndpoint:                 schedulerEndpoint,
+		RequiredTransport:                 OpenAIUpstreamTransportAny,
+		RequiredCapability:                requiredCapability,
+		RequireCompact:                    requireCompact,
+		RequireCodexImageGenerationBridge: options.RequireCodexImageGenerationBridge,
+		ExcludedIDs:                       excludedIDs,
+	}
+	if strings.TrimSpace(req.SchedulerEndpoint) == "" {
+		req.SchedulerEndpoint = schedulerEndpointFromOpenAIRequest(req)
+	}
+	diagCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), openAIAdvancedSchedulerSettingDBTimeout)
+	defer cancel()
+	diagnosticScheduler := &defaultOpenAIAccountScheduler{service: s}
+	diag := diagnosticScheduler.buildOpenAISelectionDiagnostics(
+		diagCtx,
+		req,
+		s.openAISchedulerGroupForFallback(diagCtx, groupID),
+	)
+	return noAvailableOpenAISelectionError(requestedModel, compactBlocked, diag)
 }
 
 // openAICompactSupportTier classifies an OpenAI account by compact capability
@@ -2117,6 +2290,22 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			_ = s.setStickySessionAccountID(ctx, groupID, cacheAffinityHash, accountID, openaiStickySessionTTL)
 		}
 	}
+	newNoAvailableErr := func(compactBlocked bool) error {
+		return s.newOpenAINoAvailableSelectionError(
+			ctx,
+			groupID,
+			sessionHash,
+			cacheAffinityHash,
+			cacheAffinityGroup,
+			requestedModel,
+			excludedIDs,
+			requireCompact,
+			requiredCapability,
+			schedulerEndpoint,
+			options,
+			requireCompact && compactBlocked,
+		)
+	}
 	if s.concurrencyService == nil || !cfg.LoadBatchEnabled {
 		effectiveSessionHash := sessionHash
 		effectiveStickyAccountID := stickyAccountID
@@ -2204,9 +2393,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		} else if fallback != nil {
 			return fallback, nil
 		} else if requireCompact && compactBlocked {
-			return nil, ErrNoAvailableCompactAccounts
+			return nil, newNoAvailableErr(true)
 		}
-		return nil, ErrNoAvailableAccounts
+		return nil, newNoAvailableErr(false)
 	}
 
 	isExcluded := func(accountID int64) bool {
@@ -2373,9 +2562,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		} else if fallback != nil {
 			return fallback, nil
 		} else if requireCompact && compactBlocked {
-			return nil, ErrNoAvailableCompactAccounts
+			return nil, newNoAvailableErr(true)
 		}
-		return nil, ErrNoAvailableAccounts
+		return nil, newNoAvailableErr(false)
 	}
 
 	accountLoadsFor := func(pool []*Account) []AccountWithConcurrency {
@@ -2556,13 +2745,13 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	} else if fallback != nil {
 		return fallback, nil
 	} else if requireCompact && compactBlocked {
-		return nil, ErrNoAvailableCompactAccounts
+		return nil, newNoAvailableErr(true)
 	}
 
 	if requireCompact && baseCandidateCount > 0 {
-		return nil, ErrNoAvailableCompactAccounts
+		return nil, newNoAvailableErr(true)
 	}
-	return nil, ErrNoAvailableAccounts
+	return nil, newNoAvailableErr(false)
 }
 
 func (s *OpenAIGatewayService) listSchedulableAccounts(ctx context.Context, groupID *int64) ([]*Account, error) {
