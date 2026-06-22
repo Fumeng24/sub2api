@@ -134,6 +134,44 @@ type OpenAIAccountSelectionDiagnostics struct {
 	CompactSupportedAccountIDs                 []int64
 	StateAllowedAccountIDs                     []int64
 	CircuitAllowedAccountIDs                   []int64
+	EarliestRetryAt                            time.Time
+	EarliestRetryReason                        string
+	EarliestRetryAccountID                     int64
+	RetryAfterSeconds                          int
+	GroupVisibleModelsKnown                    bool
+	GroupVisibleModelsEnabled                  bool
+	GroupVisibleModelsConfigured               bool
+	GroupVisibleModels                         []string
+	GroupVisibleModelsCount                    int
+	GroupVisibleModelsTruncated                bool
+	GroupAvailableModelsKnown                  bool
+	GroupAvailableModels                       []string
+	GroupAvailableModelsCount                  int
+	GroupAvailableModelsTruncated              bool
+	AccountModelSupportSummary                 []OpenAIAccountModelSupportDiagnostic
+	AccountModelSupportSummaryCount            int
+	AccountModelSupportSummaryTruncated        bool
+}
+
+type OpenAIAccountModelSupportDiagnostic struct {
+	AccountID                    int64    `json:"account_id"`
+	Platform                     string   `json:"platform,omitempty"`
+	Type                         string   `json:"type,omitempty"`
+	Status                       string   `json:"status,omitempty"`
+	Schedulable                  bool     `json:"schedulable"`
+	ActiveSchedulable            bool     `json:"active_schedulable"`
+	SupportsRequestedModel       bool     `json:"supports_requested_model"`
+	HasModelMapping              bool     `json:"has_model_mapping"`
+	ModelMappingCount            int      `json:"model_mapping_count"`
+	ModelMappingModels           []string `json:"model_mapping_models,omitempty"`
+	ModelMappingModelsTruncated  bool     `json:"model_mapping_models_truncated,omitempty"`
+	ModelMappingMatched          bool     `json:"model_mapping_matched"`
+	ModelMappingMatchedLookup    string   `json:"model_mapping_matched_lookup,omitempty"`
+	ModelMappingMatchedKey       string   `json:"model_mapping_matched_key,omitempty"`
+	CompactModelMappingCount     int      `json:"compact_model_mapping_count,omitempty"`
+	CompactModelMappingModels    []string `json:"compact_model_mapping_models,omitempty"`
+	CompactModelMappingTruncated bool     `json:"compact_model_mapping_truncated,omitempty"`
+	SupportsViaCompactMapping    bool     `json:"supports_via_compact_mapping,omitempty"`
 }
 
 type OpenAIAccountSchedulerMetricsSnapshot struct {
@@ -391,7 +429,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 		)
 		if err != nil {
 			attachDiagnostics()
-			return nil, decision, err
+			return nil, decision, attachOpenAINoAvailableDiagnostics(err, req.RequestedModel, decision.Diagnostics)
 		}
 		if selection != nil && selection.Account != nil {
 			if !s.isAccountTransportCompatible(selection.Account, req.RequiredTransport) {
@@ -418,7 +456,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 	selection, escapedStickyID, err := s.selectBySessionHash(ctx, sessionReq)
 	if err != nil {
 		attachDiagnostics()
-		return nil, decision, err
+		return nil, decision, attachOpenAINoAvailableDiagnostics(err, req.RequestedModel, decision.Diagnostics)
 	}
 	if selection != nil && selection.Account != nil {
 		decision.Layer = openAIAccountScheduleLayerSessionSticky
@@ -436,7 +474,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 	selection, escapedAffinityID, err := s.selectByCacheAffinity(ctx, req)
 	if err != nil {
 		attachDiagnostics()
-		return nil, decision, err
+		return nil, decision, attachOpenAINoAvailableDiagnostics(err, req.RequestedModel, decision.Diagnostics)
 	}
 	if selection != nil && selection.Account != nil {
 		decision.Layer = openAIAccountScheduleLayerCacheAffinity
@@ -457,6 +495,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 	decision.LoadSkew = loadSkew
 	if err != nil {
 		attachDiagnostics()
+		err = attachOpenAINoAvailableDiagnostics(err, req.RequestedModel, decision.Diagnostics)
 		s.service.emitOpenAISelectionEmptyAlert(ctx, req, decision, err)
 		return nil, decision, err
 	}
@@ -1019,35 +1058,8 @@ func openAIAccountStatusFilterReason(ctx context.Context, account *Account, req 
 }
 
 func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterReason(account *Account, req OpenAIAccountScheduleRequest, endpoint string) string {
-	if s == nil || s.service == nil || account == nil {
-		return ""
-	}
-	now := time.Now()
-	if until, ok := s.service.openAIAccountRuntimeBlockUntil(account.ID); ok && until.After(now) {
-		return "runtime_circuit_open"
-	}
-	if s.service.isOpenAIAccountCircuitHalfOpenInFlight(account.ID, now) {
-		return "runtime_half_open_in_flight"
-	}
-	if s.service.schedulerHealth != nil {
-		allowHalfOpen := openAIRequestRequiresImageGenerationBridge(req)
-		// Most OpenAI dimensions recover through the background probe runner.
-		// Responses image_generation uses real user requests as the half-open
-		// probe because a text-only probe does not validate that tool chain.
-		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, allowHalfOpen)
-		switch snap.CircuitState {
-		case schedulerCircuitOpen:
-			if snap.CooldownUntil.IsZero() || snap.CooldownUntil.After(now) {
-				return "scheduler_circuit_open"
-			}
-		case schedulerCircuitHalfOpen:
-			if allowHalfOpen && snap.HalfOpenProbe {
-				return ""
-			}
-			return "scheduler_probe_pending"
-		}
-	}
-	return ""
+	reason, _ := s.openAIAccountCircuitFilterState(account, req, endpoint)
+	return reason
 }
 
 func (d *OpenAIAccountSelectionDiagnostics) addReason(reason string) {
@@ -1059,6 +1071,222 @@ func (d *OpenAIAccountSelectionDiagnostics) addReason(reason string) {
 		d.FilterReasonCounts = make(map[string]int)
 	}
 	d.FilterReasonCounts[reason]++
+}
+
+func (d *OpenAIAccountSelectionDiagnostics) considerRetryAt(account *Account, reason string, retryAt time.Time) {
+	if d == nil || account == nil || retryAt.IsZero() {
+		return
+	}
+	now := time.Now()
+	if !retryAt.After(now) {
+		return
+	}
+	if d.EarliestRetryAt.IsZero() || retryAt.Before(d.EarliestRetryAt) {
+		d.EarliestRetryAt = retryAt
+		d.EarliestRetryReason = strings.TrimSpace(reason)
+		d.EarliestRetryAccountID = account.ID
+		d.RetryAfterSeconds = retryAfterSecondsUntil(retryAt, now)
+	}
+}
+
+func retryAfterSecondsUntil(retryAt time.Time, now time.Time) int {
+	if retryAt.IsZero() || !retryAt.After(now) {
+		return 0
+	}
+	seconds := int(math.Ceil(retryAt.Sub(now).Seconds()))
+	if seconds < 1 {
+		return 1
+	}
+	return seconds
+}
+
+func openAIAccountStatusRetryAt(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest, reason string) time.Time {
+	if account == nil {
+		return time.Time{}
+	}
+	switch reason {
+	case "overloaded":
+		if account.OverloadUntil != nil {
+			return *account.OverloadUntil
+		}
+	case "rate_limited":
+		if account.RateLimitResetAt != nil {
+			return *account.RateLimitResetAt
+		}
+	case "temp_unschedulable":
+		if account.TempUnschedulableUntil != nil {
+			return *account.TempUnschedulableUntil
+		}
+	case "model_rate_limited":
+		return openAIAccountModelRateLimitRetryAt(ctx, account, req)
+	}
+	return time.Time{}
+}
+
+func openAIAccountModelRateLimitRetryAt(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest) time.Time {
+	if account == nil {
+		return time.Time{}
+	}
+	now := time.Now()
+	var retryAt time.Time
+	for _, key := range account.modelRateLimitKeysForRequest(ctx, req.RequestedModel) {
+		resetAt := account.modelRateLimitResetAt(key)
+		if resetAt == nil || !resetAt.After(now) {
+			continue
+		}
+		retryAt = earliestNonZeroTime(retryAt, *resetAt)
+	}
+	if retryAt.IsZero() {
+		if remaining := account.GetRateLimitRemainingTimeWithContext(ctx, req.RequestedModel); remaining > 0 {
+			retryAt = now.Add(remaining)
+		}
+	}
+	return retryAt
+}
+
+func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterState(account *Account, req OpenAIAccountScheduleRequest, endpoint string) (string, time.Time) {
+	if s == nil || s.service == nil || account == nil {
+		return "", time.Time{}
+	}
+	now := time.Now()
+	if until, ok := s.service.openAIAccountRuntimeBlockUntil(account.ID); ok && until.After(now) {
+		return "runtime_circuit_open", until
+	}
+	if s.service.isOpenAIAccountCircuitHalfOpenInFlight(account.ID, now) {
+		return "runtime_half_open_in_flight", time.Time{}
+	}
+	if s.service.schedulerHealth != nil {
+		allowHalfOpen := openAIRequestRequiresImageGenerationBridge(req)
+		// Most OpenAI dimensions recover through the background probe runner.
+		// Responses image_generation uses real user requests as the half-open
+		// probe because a text-only probe does not validate that tool chain.
+		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, allowHalfOpen)
+		switch snap.CircuitState {
+		case schedulerCircuitOpen:
+			if snap.CooldownUntil.IsZero() || snap.CooldownUntil.After(now) {
+				return "scheduler_circuit_open", snap.CooldownUntil
+			}
+		case schedulerCircuitHalfOpen:
+			if allowHalfOpen && snap.HalfOpenProbe {
+				return "", time.Time{}
+			}
+			return "scheduler_probe_pending", snap.CooldownUntil
+		}
+	}
+	return "", time.Time{}
+}
+
+const (
+	openAISelectionDiagnosticModelListLimit      = 50
+	openAISelectionDiagnosticAccountSummaryLimit = 20
+	openAISelectionDiagnosticMappingListLimit    = 30
+)
+
+func truncateOpenAIDiagnosticStrings(values []string, limit int) ([]string, int, bool) {
+	count := len(values)
+	if count == 0 {
+		return nil, 0, false
+	}
+	if limit <= 0 || count <= limit {
+		return append([]string(nil), values...), count, false
+	}
+	return append([]string(nil), values[:limit]...), count, true
+}
+
+func truncateOpenAIDiagnosticAccounts(values []OpenAIAccountModelSupportDiagnostic, limit int) ([]OpenAIAccountModelSupportDiagnostic, int, bool) {
+	count := len(values)
+	if count == 0 {
+		return nil, 0, false
+	}
+	if limit <= 0 || count <= limit {
+		return append([]OpenAIAccountModelSupportDiagnostic(nil), values...), count, false
+	}
+	return append([]OpenAIAccountModelSupportDiagnostic(nil), values[:limit]...), count, true
+}
+
+func openAIAccountsForModelDiagnostics(accounts []*Account) []Account {
+	if len(accounts) == 0 {
+		return nil
+	}
+	out := make([]Account, 0, len(accounts))
+	for _, account := range accounts {
+		if account == nil {
+			continue
+		}
+		out = append(out, *account)
+	}
+	return out
+}
+
+func applyOpenAIGroupModelDiagnostics(diag *OpenAIAccountSelectionDiagnostics, group *Group, accounts []*Account) {
+	if diag == nil {
+		return
+	}
+	accountValues := openAIAccountsForModelDiagnostics(accounts)
+	if cfg, ok := groupVisibleModelsListForDiagnostics(group, accountValues); ok {
+		diag.GroupVisibleModelsKnown = true
+		diag.GroupVisibleModelsEnabled = cfg.Enabled
+		if group != nil {
+			normalized := normalizeGroupModelsListConfig(group.ModelsListConfig)
+			diag.GroupVisibleModelsConfigured = normalized.Enabled && len(normalized.Models) > 0
+		}
+		diag.GroupVisibleModels, diag.GroupVisibleModelsCount, diag.GroupVisibleModelsTruncated = truncateOpenAIDiagnosticStrings(cfg.Models, openAISelectionDiagnosticModelListLimit)
+	}
+
+	models, enumerable := groupAvailableModelsForDiagnostics(PlatformOpenAI, accountValues)
+	diag.GroupAvailableModelsKnown = enumerable
+	if enumerable {
+		diag.GroupAvailableModels, diag.GroupAvailableModelsCount, diag.GroupAvailableModelsTruncated = truncateOpenAIDiagnosticStrings(models, openAISelectionDiagnosticModelListLimit)
+	}
+}
+
+func buildOpenAIAccountModelSupportDiagnostics(
+	accounts []*Account,
+	requestedModel string,
+	requireCompact bool,
+	options OpenAIAccountScheduleOptions,
+) ([]OpenAIAccountModelSupportDiagnostic, int, bool) {
+	if len(accounts) == 0 {
+		return nil, 0, false
+	}
+	items := make([]OpenAIAccountModelSupportDiagnostic, 0, len(accounts))
+	for _, account := range accounts {
+		if account == nil {
+			continue
+		}
+		mappingKeys := account.modelMappingKeysForDiagnostics()
+		mappingModels, _, mappingTruncated := truncateOpenAIDiagnosticStrings(mappingKeys, openAISelectionDiagnosticMappingListLimit)
+		compactKeys := sortedModelMappingKeys(account.GetCompactModelMapping())
+		compactModels, _, compactTruncated := truncateOpenAIDiagnosticStrings(compactKeys, openAISelectionDiagnosticMappingListLimit)
+		mappingMatched, mappingLookup, mappingKey := account.modelMappingMatchForDiagnostics(requestedModel)
+		supportsRequestedModel := openAIAccountSupportsModelForSchedule(account, requestedModel, requireCompact, options)
+		supportsViaCompactMapping := strings.TrimSpace(requestedModel) != "" &&
+			(requireCompact || options.AllowCompactModelMapping) &&
+			!account.IsModelSupported(requestedModel) &&
+			openAICompactMappingMatchesRequest(account, requestedModel)
+
+		items = append(items, OpenAIAccountModelSupportDiagnostic{
+			AccountID:                    account.ID,
+			Platform:                     account.Platform,
+			Type:                         account.Type,
+			Status:                       account.Status,
+			Schedulable:                  account.Schedulable,
+			ActiveSchedulable:            account.IsOpenAI() && account.Status == StatusActive && account.Schedulable,
+			SupportsRequestedModel:       supportsRequestedModel,
+			HasModelMapping:              len(mappingKeys) > 0,
+			ModelMappingCount:            len(mappingKeys),
+			ModelMappingModels:           mappingModels,
+			ModelMappingModelsTruncated:  mappingTruncated,
+			ModelMappingMatched:          mappingMatched,
+			ModelMappingMatchedLookup:    mappingLookup,
+			ModelMappingMatchedKey:       mappingKey,
+			CompactModelMappingCount:     len(compactKeys),
+			CompactModelMappingModels:    compactModels,
+			CompactModelMappingTruncated: compactTruncated,
+			SupportsViaCompactMapping:    supportsViaCompactMapping,
+		})
+	}
+	return truncateOpenAIDiagnosticAccounts(items, openAISelectionDiagnosticAccountSummaryLimit)
 }
 
 func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlan(
@@ -1111,6 +1339,13 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlanFromAccounts(
 
 	plan.accounts = accounts
 	diag.GroupBindingAccountCount = len(accounts)
+	applyOpenAIGroupModelDiagnostics(&diag, schedGroup, accounts)
+	diag.AccountModelSupportSummary, diag.AccountModelSupportSummaryCount, diag.AccountModelSupportSummaryTruncated = buildOpenAIAccountModelSupportDiagnostics(
+		accounts,
+		req.RequestedModel,
+		req.RequireCompact,
+		openAIAccountScheduleOptionsFromRequest(req),
+	)
 	circuitAllowed := make([]*Account, 0, len(accounts))
 	for _, account := range accounts {
 		if account == nil {
@@ -1198,12 +1433,13 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlanFromAccounts(
 				diag.GroupScopeFilteredCount++
 			}
 			diag.addReason(reason)
+			diag.considerRetryAt(account, reason, openAIAccountStatusRetryAt(ctx, account, req, reason))
 			continue
 		}
 		diag.StateAllowedCount++
 		diag.StateAllowedAccountIDs = appendOpenAIAccountID(diag.StateAllowedAccountIDs, account)
 
-		if reason := s.openAIAccountCircuitFilterReason(account, req, diag.Endpoint); reason != "" {
+		if reason, retryAt := s.openAIAccountCircuitFilterState(account, req, diag.Endpoint); reason != "" {
 			diag.CircuitFilteredCount++
 			diag.CircuitFilteredAccountIDs = appendOpenAIAccountID(diag.CircuitFilteredAccountIDs, account)
 			if strings.Contains(reason, "half_open") {
@@ -1211,6 +1447,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlanFromAccounts(
 				diag.HalfOpenFilteredAccountIDs = appendOpenAIAccountID(diag.HalfOpenFilteredAccountIDs, account)
 			}
 			diag.addReason(reason)
+			diag.considerRetryAt(account, reason, retryAt)
 			continue
 		}
 		diag.CircuitAllowedCount++
@@ -1509,6 +1746,38 @@ func (s *defaultOpenAIAccountScheduler) isOpenAIWeakFallbackHardCompatible(ctx c
 	return true
 }
 
+func (s *defaultOpenAIAccountScheduler) isOpenAIWeakFallbackHealthEligible(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest, health schedulerHealthSnapshot, loadInfo *AccountLoadInfo) bool {
+	if account == nil {
+		return false
+	}
+	if s != nil && s.service != nil {
+		if s.service.isOpenAIAccountRuntimeBlocked(account) {
+			return false
+		}
+		if !s.service.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req), false) {
+			return false
+		}
+	}
+	if health.CircuitState != "" && health.CircuitState != schedulerCircuitClosed {
+		return false
+	}
+	now := time.Now()
+	if account.OverloadUntil != nil && now.Before(*account.OverloadUntil) {
+		return false
+	}
+	if account.RateLimitResetAt != nil && now.Before(*account.RateLimitResetAt) {
+		return false
+	}
+	if account.TempUnschedulableUntil != nil && now.Before(*account.TempUnschedulableUntil) {
+		return false
+	}
+	if account.GetRateLimitRemainingTimeWithContext(ctx, req.RequestedModel) > 0 {
+		return false
+	}
+	_ = loadInfo
+	return true
+}
+
 func (s *defaultOpenAIAccountScheduler) buildOpenAIWeakFallbackOrder(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
@@ -1552,6 +1821,9 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIWeakFallbackOrder(
 		loadInfo := loadMap[account.ID]
 		if loadInfo == nil {
 			loadInfo = &AccountLoadInfo{AccountID: account.ID}
+		}
+		if !s.isOpenAIWeakFallbackHealthEligible(ctx, account, req, health, loadInfo) {
+			continue
 		}
 		cfg := accountGroupConfigFor(account, req.GroupID)
 		cooldown, cooldownAt, _ := openAIAccountSoftCooldownState(ctx, account, req, schedGroup, health, loadInfo)
@@ -1637,7 +1909,8 @@ func (s *defaultOpenAIAccountScheduler) trySelectOpenAICooldownFallback(
 			cfg := s.service.schedulingConfig()
 			for _, candidate := range order {
 				fresh := s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldownForSelection(ctx, candidate.account, req.RequestedModel, req.RequireCompact, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
-				if fresh == nil || !s.isOpenAIWeakFallbackHardCompatible(ctx, fresh, req, schedGroup) {
+				if fresh == nil || !s.isOpenAIWeakFallbackHardCompatible(ctx, fresh, req, schedGroup) ||
+					!s.isOpenAIWeakFallbackHealthEligible(ctx, fresh, req, schedulerHealthSnapshot{}, nil) {
 					continue
 				}
 				return &AccountSelectionResult{
@@ -1929,6 +2202,9 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 		if allowCooldownFallback {
 			compatible = s.isAccountRequestCompatibleIgnoringCooldown
 			fresh = s.service.resolveFreshOpenAIAccountIgnoringCooldownForSelection(ctx, candidate.account, req.RequestedModel, false, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
+			if fresh != nil && !s.isOpenAIWeakFallbackHealthEligible(ctx, fresh, req, schedulerHealthSnapshot{}, nil) {
+				fresh = nil
+			}
 		} else if bypassSnapshot {
 			fresh = s.service.recheckSelectedOpenAIAccountFromDBForSelection(ctx, candidate.account, req.RequestedModel, false, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
 		} else {
@@ -1939,6 +2215,9 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 		}
 		if allowCooldownFallback {
 			fresh = s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldownForSelection(ctx, fresh, req.RequestedModel, false, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
+			if fresh != nil && !s.isOpenAIWeakFallbackHealthEligible(ctx, fresh, req, schedulerHealthSnapshot{}, nil) {
+				fresh = nil
+			}
 		} else {
 			fresh = s.service.recheckSelectedOpenAIAccountFromDBForSelection(ctx, fresh, req.RequestedModel, false, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
 		}
@@ -1949,13 +2228,7 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 			compactBlocked = true
 			continue
 		}
-		var result *AcquireResult
-		var acquireErr error
-		if allowCooldownFallback {
-			result, acquireErr = s.service.tryAcquireAccountSlotIgnoringCircuit(ctx, fresh.ID, fresh.Concurrency)
-		} else {
-			result, acquireErr = s.service.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
-		}
+		result, acquireErr := s.service.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
 		if acquireErr != nil {
 			return nil, compactBlocked, acquireErr
 		}
@@ -2074,7 +2347,7 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 	if req.RequireCompact && compactBlocked {
 		return nil, candidateCount, topK, loadSkew, ErrNoAvailableCompactAccounts
 	}
-	return nil, candidateCount, topK, loadSkew, noAvailableOpenAISelectionError(req.RequestedModel, compactBlocked)
+	return nil, candidateCount, topK, loadSkew, noAvailableOpenAISelectionError(req.RequestedModel, compactBlocked, plan.diagnostics)
 }
 
 func (s *defaultOpenAIAccountScheduler) isAccountTransportCompatible(account *Account, requiredTransport OpenAIUpstreamTransport) bool {
@@ -2353,7 +2626,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 				selection, err := s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, effectiveExcludedIDs, requireCompact, requiredCapability, options)
 				if err != nil {
 					attachFallbackDiagnostics(effectiveExcludedIDs)
-					return nil, decision, err
+					return nil, decision, attachOpenAINoAvailableDiagnostics(err, requestedModel, decision.Diagnostics)
 				}
 				if selection == nil || selection.Account == nil {
 					return selection, decision, nil
@@ -2370,7 +2643,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 				}
 				if _, exists := effectiveExcludedIDs[selection.Account.ID]; exists {
 					attachFallbackDiagnostics(effectiveExcludedIDs)
-					return nil, decision, ErrNoAvailableAccounts
+					return nil, decision, attachOpenAINoAvailableDiagnostics(ErrNoAvailableAccounts, requestedModel, decision.Diagnostics)
 				}
 				effectiveExcludedIDs[selection.Account.ID] = struct{}{}
 			}
@@ -2381,7 +2654,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 			selection, err := s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, effectiveExcludedIDs, requireCompact, requiredCapability, options)
 			if err != nil {
 				attachFallbackDiagnostics(effectiveExcludedIDs)
-				return nil, decision, err
+				return nil, decision, attachOpenAINoAvailableDiagnostics(err, requestedModel, decision.Diagnostics)
 			}
 			if selection == nil || selection.Account == nil {
 				return selection, decision, nil
@@ -2399,7 +2672,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 			}
 			if _, exists := effectiveExcludedIDs[selection.Account.ID]; exists {
 				attachFallbackDiagnostics(effectiveExcludedIDs)
-				return nil, decision, ErrNoAvailableAccounts
+				return nil, decision, attachOpenAINoAvailableDiagnostics(ErrNoAvailableAccounts, requestedModel, decision.Diagnostics)
 			}
 			effectiveExcludedIDs[selection.Account.ID] = struct{}{}
 		}

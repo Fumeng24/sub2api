@@ -563,6 +563,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			if err != nil {
 				reqLog.Warn("openai.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 				if len(failedAccountIDs) == 0 {
+					setOpenAISelectionRetryAfterHeader(c, err)
 					if errors.Is(err, service.ErrNoAvailableCompactAccounts) {
 						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 						h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "compact_not_supported", "No available OpenAI accounts support /responses/compact", streamStarted)
@@ -574,7 +575,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					} else {
 						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 					}
-					h.handleStreamingAwareError(c, status, errType, message, streamStarted)
+					h.handleStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, openAISelectionEmptyErrorMetadata(scheduleDecision))
 					return
 				}
 				if lastFailoverErr != nil {
@@ -1043,8 +1044,14 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			if err != nil {
 				reqLog.Warn("openai_messages.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 				if len(failedAccountIDs) == 0 {
-					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-					h.anthropicStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "Service temporarily unavailable", streamStarted)
+					setOpenAISelectionRetryAfterHeader(c, err)
+					status, errType, message := openAISelectionEmptyErrorResponse(scheduleDecision)
+					if errType == "api_error" {
+						markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					} else {
+						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
+					}
+					h.anthropicStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, openAISelectionEmptyErrorMetadata(scheduleDecision))
 					return
 				} else {
 					if lastFailoverErr != nil {
@@ -1227,19 +1234,31 @@ func resolveOpenAIMessagesMetadataSession(sessionHash, promptCacheKey, reqModel 
 
 // anthropicErrorResponse writes an error in Anthropic Messages API format.
 func (h *OpenAIGatewayHandler) anthropicErrorResponse(c *gin.Context, status int, errType, message string) {
+	h.anthropicErrorResponseWithMetadata(c, status, errType, message, nil)
+}
+
+func (h *OpenAIGatewayHandler) anthropicErrorResponseWithMetadata(c *gin.Context, status int, errType, message string, metadata map[string]any) {
 	message = service.ClientFacingErrorMessage(status, errType, message)
+	errBody := gin.H{
+		"type":    errType,
+		"message": message,
+	}
+	if len(metadata) > 0 {
+		errBody["metadata"] = metadata
+	}
 	c.JSON(status, gin.H{
-		"type": "error",
-		"error": gin.H{
-			"type":    errType,
-			"message": message,
-		},
+		"type":  "error",
+		"error": errBody,
 	})
 }
 
 // anthropicStreamingAwareError handles errors that may occur during streaming,
 // using Anthropic SSE error format.
 func (h *OpenAIGatewayHandler) anthropicStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
+	h.anthropicStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, nil)
+}
+
+func (h *OpenAIGatewayHandler) anthropicStreamingAwareErrorWithMetadata(c *gin.Context, status int, errType, message string, streamStarted bool, metadata map[string]any) {
 	message = service.ClientFacingErrorMessage(status, errType, message)
 	if streamStarted {
 		flusher, ok := c.Writer.(http.Flusher)
@@ -1256,7 +1275,7 @@ func (h *OpenAIGatewayHandler) anthropicStreamingAwareError(c *gin.Context, stat
 		}
 		return
 	}
-	h.anthropicErrorResponse(c, status, errType, message)
+	h.anthropicErrorResponseWithMetadata(c, status, errType, message, metadata)
 }
 
 // handleAnthropicFailoverExhausted maps upstream failover errors to Anthropic format.
@@ -2141,6 +2160,10 @@ func upstreamClientErrorForOpenAIFailoverStatus(statusCode int) UpstreamClientEr
 
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *OpenAIGatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
+	h.handleStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, nil)
+}
+
+func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithMetadata(c *gin.Context, status int, errType, message string, streamStarted bool, metadata map[string]any) {
 	message = service.ClientFacingErrorMessage(status, errType, message)
 	if streamStarted {
 		// /v1/responses 的严格 SDK（Codex CLI）要求终止事件必须属于
@@ -2166,7 +2189,7 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareError(c *gin.Context, status 
 	}
 
 	// Normal case: return JSON response with proper status code
-	h.errorResponse(c, status, errType, message)
+	h.errorResponseWithMetadata(c, status, errType, message, metadata)
 }
 
 // ensureForwardErrorResponse 在 Forward 返回错误但尚未写响应时补写统一错误响应。
@@ -2274,12 +2297,20 @@ func openAIForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForwa
 
 // errorResponse returns OpenAI API format error response
 func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
+	h.errorResponseWithMetadata(c, status, errType, message, nil)
+}
+
+func (h *OpenAIGatewayHandler) errorResponseWithMetadata(c *gin.Context, status int, errType, message string, metadata map[string]any) {
 	message = service.ClientFacingErrorMessage(status, errType, message)
+	errBody := gin.H{
+		"type":    errType,
+		"message": message,
+	}
+	if len(metadata) > 0 {
+		errBody["metadata"] = metadata
+	}
 	c.JSON(status, gin.H{
-		"error": gin.H{
-			"type":    errType,
-			"message": message,
-		},
+		"error": errBody,
 	})
 }
 

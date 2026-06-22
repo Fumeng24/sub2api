@@ -176,6 +176,30 @@ func TestGatewayHandleStreamingAwareError_MessagesStreamingKeepsLegacy(t *testin
 	assert.True(t, strings.HasPrefix(body, `data: {"type":"error"`), "got: %q", body)
 }
 
+func TestOpenAIGatewayAnthropicStreamingAwareError_NonStreamingIncludesMetadata(t *testing.T) {
+	c, w := newGinContextForEndpoint(t, EndpointMessages)
+	h := &OpenAIGatewayHandler{}
+
+	metadata := map[string]any{
+		"openai_selection_diagnostics": map[string]any{
+			"model_supported_count": 0,
+		},
+	}
+	h.anthropicStreamingAwareErrorWithMetadata(c, http.StatusBadRequest, "model_not_supported", "Requested model is not available", false, metadata)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.Equal(t, "error", body["type"])
+	errObj, ok := body["error"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "model_not_supported", errObj["type"])
+	metadataObj, ok := errObj["metadata"].(map[string]any)
+	require.True(t, ok)
+	diag, ok := metadataObj["openai_selection_diagnostics"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(0), diag["model_supported_count"])
+}
+
 // 项目里 /responses 注册在多组路由：/v1/responses（gateway）、裸 /responses（top-level）、
 // /backend-api/codex/responses（codex direct）。我们 fix 必须覆盖全部，
 // 否则一些客户端走的路径就不会发 response.failed，照样报 stream closed。

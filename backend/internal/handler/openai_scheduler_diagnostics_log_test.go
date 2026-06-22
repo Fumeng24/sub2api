@@ -69,6 +69,39 @@ func TestOpenAISelectionEmptyErrorResponse_ModelUnsupported(t *testing.T) {
 	require.Contains(t, message, "gpt-5.2")
 }
 
+func TestOpenAISelectionEmptyErrorMetadata_ModelMismatchRedactsAccountSummary(t *testing.T) {
+	metadata := openAISelectionEmptyErrorMetadata(service.OpenAIAccountScheduleDecision{
+		Diagnostics: service.OpenAIAccountSelectionDiagnostics{
+			Collected:                           true,
+			GroupID:                             12,
+			Model:                               "gpt-5.3-codex",
+			Endpoint:                            "/v1/responses",
+			GroupBindingAccountCount:            2,
+			ModelSupportedCount:                 0,
+			FilterReasonCounts:                  map[string]int{"model_unsupported": 2},
+			GroupVisibleModelsKnown:             true,
+			GroupVisibleModelsEnabled:           true,
+			GroupVisibleModels:                  []string{"gpt-5.3-codex-spark"},
+			GroupVisibleModelsCount:             1,
+			GroupAvailableModelsKnown:           true,
+			GroupAvailableModels:                []string{"gpt-5.3-codex-spark"},
+			GroupAvailableModelsCount:           1,
+			AccountModelSupportSummaryCount:     2,
+			AccountModelSupportSummaryTruncated: false,
+			AccountModelSupportSummary:          []service.OpenAIAccountModelSupportDiagnostic{{AccountID: 38865, ModelMappingModels: []string{"gpt-5.3-codex-spark"}}},
+		},
+	})
+
+	require.NotNil(t, metadata)
+	diag, ok := metadata["openai_selection_diagnostics"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "gpt-5.3-codex", diag["requested_model"])
+	require.NotContains(t, diag, "group_visible_models")
+	require.NotContains(t, diag, "group_available_models")
+	require.Equal(t, 2, diag["account_model_support_summary_count"])
+	require.NotContains(t, diag, "account_model_support_summary")
+}
+
 func TestOpenAISelectionEmptyErrorResponse_ImageGenerationBridgeUnsupported(t *testing.T) {
 	status, errType, message := openAISelectionEmptyErrorResponse(service.OpenAIAccountScheduleDecision{
 		Diagnostics: service.OpenAIAccountSelectionDiagnostics{

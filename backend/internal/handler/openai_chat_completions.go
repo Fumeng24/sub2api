@@ -170,13 +170,14 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			if err != nil {
 				reqLog.Warn("openai_chat_completions.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
 				if len(failedAccountIDs) == 0 {
+					setOpenAISelectionRetryAfterHeader(c, err)
 					status, errType, message := openAISelectionEmptyErrorResponse(scheduleDecision)
 					if errType == "api_error" {
 						markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 					} else {
 						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 					}
-					h.handleStreamingAwareError(c, status, errType, message, streamStarted)
+					h.handleStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, openAISelectionEmptyErrorMetadata(scheduleDecision))
 					return
 				} else {
 					if lastFailoverErr != nil {
