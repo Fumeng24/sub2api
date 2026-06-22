@@ -134,6 +134,40 @@ type OpenAIAccountSelectionDiagnostics struct {
 	CompactSupportedAccountIDs                 []int64
 	StateAllowedAccountIDs                     []int64
 	CircuitAllowedAccountIDs                   []int64
+	GroupVisibleModelsKnown                    bool
+	GroupVisibleModelsEnabled                  bool
+	GroupVisibleModelsConfigured               bool
+	GroupVisibleModels                         []string
+	GroupVisibleModelsCount                    int
+	GroupVisibleModelsTruncated                bool
+	GroupAvailableModelsKnown                  bool
+	GroupAvailableModels                       []string
+	GroupAvailableModelsCount                  int
+	GroupAvailableModelsTruncated              bool
+	AccountModelSupportSummary                 []OpenAIAccountModelSupportDiagnostic
+	AccountModelSupportSummaryCount            int
+	AccountModelSupportSummaryTruncated        bool
+}
+
+type OpenAIAccountModelSupportDiagnostic struct {
+	AccountID                    int64    `json:"account_id"`
+	Platform                     string   `json:"platform,omitempty"`
+	Type                         string   `json:"type,omitempty"`
+	Status                       string   `json:"status,omitempty"`
+	Schedulable                  bool     `json:"schedulable"`
+	ActiveSchedulable            bool     `json:"active_schedulable"`
+	SupportsRequestedModel       bool     `json:"supports_requested_model"`
+	HasModelMapping              bool     `json:"has_model_mapping"`
+	ModelMappingCount            int      `json:"model_mapping_count"`
+	ModelMappingModels           []string `json:"model_mapping_models,omitempty"`
+	ModelMappingModelsTruncated  bool     `json:"model_mapping_models_truncated,omitempty"`
+	ModelMappingMatched          bool     `json:"model_mapping_matched"`
+	ModelMappingMatchedLookup    string   `json:"model_mapping_matched_lookup,omitempty"`
+	ModelMappingMatchedKey       string   `json:"model_mapping_matched_key,omitempty"`
+	CompactModelMappingCount     int      `json:"compact_model_mapping_count,omitempty"`
+	CompactModelMappingModels    []string `json:"compact_model_mapping_models,omitempty"`
+	CompactModelMappingTruncated bool     `json:"compact_model_mapping_truncated,omitempty"`
+	SupportsViaCompactMapping    bool     `json:"supports_via_compact_mapping,omitempty"`
 }
 
 type OpenAIAccountSchedulerMetricsSnapshot struct {
@@ -1061,6 +1095,119 @@ func (d *OpenAIAccountSelectionDiagnostics) addReason(reason string) {
 	d.FilterReasonCounts[reason]++
 }
 
+const (
+	openAISelectionDiagnosticModelListLimit      = 50
+	openAISelectionDiagnosticAccountSummaryLimit = 20
+	openAISelectionDiagnosticMappingListLimit    = 30
+)
+
+func truncateOpenAIDiagnosticStrings(values []string, limit int) ([]string, int, bool) {
+	count := len(values)
+	if count == 0 {
+		return nil, 0, false
+	}
+	if limit <= 0 || count <= limit {
+		return append([]string(nil), values...), count, false
+	}
+	return append([]string(nil), values[:limit]...), count, true
+}
+
+func truncateOpenAIDiagnosticAccounts(values []OpenAIAccountModelSupportDiagnostic, limit int) ([]OpenAIAccountModelSupportDiagnostic, int, bool) {
+	count := len(values)
+	if count == 0 {
+		return nil, 0, false
+	}
+	if limit <= 0 || count <= limit {
+		return append([]OpenAIAccountModelSupportDiagnostic(nil), values...), count, false
+	}
+	return append([]OpenAIAccountModelSupportDiagnostic(nil), values[:limit]...), count, true
+}
+
+func openAIAccountsForModelDiagnostics(accounts []*Account) []Account {
+	if len(accounts) == 0 {
+		return nil
+	}
+	out := make([]Account, 0, len(accounts))
+	for _, account := range accounts {
+		if account == nil {
+			continue
+		}
+		out = append(out, *account)
+	}
+	return out
+}
+
+func applyOpenAIGroupModelDiagnostics(diag *OpenAIAccountSelectionDiagnostics, group *Group, accounts []*Account) {
+	if diag == nil {
+		return
+	}
+	accountValues := openAIAccountsForModelDiagnostics(accounts)
+	if cfg, ok := groupVisibleModelsListForDiagnostics(group, accountValues); ok {
+		diag.GroupVisibleModelsKnown = true
+		diag.GroupVisibleModelsEnabled = cfg.Enabled
+		if group != nil {
+			normalized := normalizeGroupModelsListConfig(group.ModelsListConfig)
+			diag.GroupVisibleModelsConfigured = normalized.Enabled && len(normalized.Models) > 0
+		}
+		diag.GroupVisibleModels, diag.GroupVisibleModelsCount, diag.GroupVisibleModelsTruncated = truncateOpenAIDiagnosticStrings(cfg.Models, openAISelectionDiagnosticModelListLimit)
+	}
+
+	models, enumerable := groupAvailableModelsForDiagnostics(PlatformOpenAI, accountValues)
+	diag.GroupAvailableModelsKnown = enumerable
+	if enumerable {
+		diag.GroupAvailableModels, diag.GroupAvailableModelsCount, diag.GroupAvailableModelsTruncated = truncateOpenAIDiagnosticStrings(models, openAISelectionDiagnosticModelListLimit)
+	}
+}
+
+func buildOpenAIAccountModelSupportDiagnostics(
+	accounts []*Account,
+	requestedModel string,
+	requireCompact bool,
+	options OpenAIAccountScheduleOptions,
+) ([]OpenAIAccountModelSupportDiagnostic, int, bool) {
+	if len(accounts) == 0 {
+		return nil, 0, false
+	}
+	items := make([]OpenAIAccountModelSupportDiagnostic, 0, len(accounts))
+	for _, account := range accounts {
+		if account == nil {
+			continue
+		}
+		mappingKeys := account.modelMappingKeysForDiagnostics()
+		mappingModels, _, mappingTruncated := truncateOpenAIDiagnosticStrings(mappingKeys, openAISelectionDiagnosticMappingListLimit)
+		compactKeys := sortedModelMappingKeys(account.GetCompactModelMapping())
+		compactModels, _, compactTruncated := truncateOpenAIDiagnosticStrings(compactKeys, openAISelectionDiagnosticMappingListLimit)
+		mappingMatched, mappingLookup, mappingKey := account.modelMappingMatchForDiagnostics(requestedModel)
+		supportsRequestedModel := openAIAccountSupportsModelForSchedule(account, requestedModel, requireCompact, options)
+		supportsViaCompactMapping := strings.TrimSpace(requestedModel) != "" &&
+			(requireCompact || options.AllowCompactModelMapping) &&
+			!account.IsModelSupported(requestedModel) &&
+			openAICompactMappingMatchesRequest(account, requestedModel)
+
+		items = append(items, OpenAIAccountModelSupportDiagnostic{
+			AccountID:                    account.ID,
+			Platform:                     account.Platform,
+			Type:                         account.Type,
+			Status:                       account.Status,
+			Schedulable:                  account.Schedulable,
+			ActiveSchedulable:            account.IsOpenAI() && account.Status == StatusActive && account.Schedulable,
+			SupportsRequestedModel:       supportsRequestedModel,
+			HasModelMapping:              len(mappingKeys) > 0,
+			ModelMappingCount:            len(mappingKeys),
+			ModelMappingModels:           mappingModels,
+			ModelMappingModelsTruncated:  mappingTruncated,
+			ModelMappingMatched:          mappingMatched,
+			ModelMappingMatchedLookup:    mappingLookup,
+			ModelMappingMatchedKey:       mappingKey,
+			CompactModelMappingCount:     len(compactKeys),
+			CompactModelMappingModels:    compactModels,
+			CompactModelMappingTruncated: compactTruncated,
+			SupportsViaCompactMapping:    supportsViaCompactMapping,
+		})
+	}
+	return truncateOpenAIDiagnosticAccounts(items, openAISelectionDiagnosticAccountSummaryLimit)
+}
+
 func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlan(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
@@ -1111,6 +1258,13 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlanFromAccounts(
 
 	plan.accounts = accounts
 	diag.GroupBindingAccountCount = len(accounts)
+	applyOpenAIGroupModelDiagnostics(&diag, schedGroup, accounts)
+	diag.AccountModelSupportSummary, diag.AccountModelSupportSummaryCount, diag.AccountModelSupportSummaryTruncated = buildOpenAIAccountModelSupportDiagnostics(
+		accounts,
+		req.RequestedModel,
+		req.RequireCompact,
+		openAIAccountScheduleOptionsFromRequest(req),
+	)
 	circuitAllowed := make([]*Account, 0, len(accounts))
 	for _, account := range accounts {
 		if account == nil {

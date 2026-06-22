@@ -143,7 +143,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 					} else {
 						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 					}
-					h.errorResponse(c, status, errType, message)
+					h.errorResponseWithMetadata(c, status, errType, message, openAISelectionEmptyErrorMetadata(scheduleDecision))
 					return
 				} else {
 					if lastFailoverErr != nil {

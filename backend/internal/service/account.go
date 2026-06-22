@@ -660,6 +660,61 @@ func mappingSupportsRequestedModel(mapping map[string]string, requestedModel str
 	return false
 }
 
+func sortedModelMappingKeys(mapping map[string]string) []string {
+	if len(mapping) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(mapping))
+	for key := range mapping {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func mappingMatchKeyForDiagnostics(mapping map[string]string, requestedModel string) (string, bool) {
+	requestedModel = strings.TrimSpace(requestedModel)
+	if requestedModel == "" || len(mapping) == 0 {
+		return "", false
+	}
+	if _, exists := mapping[requestedModel]; exists {
+		return requestedModel, true
+	}
+	for _, pattern := range sortedModelMappingKeys(mapping) {
+		if matchWildcard(pattern, requestedModel) {
+			return pattern, true
+		}
+	}
+	return "", false
+}
+
+func (a *Account) modelMappingKeysForDiagnostics() []string {
+	if a == nil {
+		return nil
+	}
+	return sortedModelMappingKeys(a.GetModelMapping())
+}
+
+func (a *Account) modelMappingMatchForDiagnostics(requestedModel string) (matched bool, lookupModel string, mappingKey string) {
+	if a == nil {
+		return false, "", ""
+	}
+	mapping := a.GetModelMapping()
+	if len(mapping) == 0 {
+		return false, "", ""
+	}
+	for _, candidate := range requestedModelLookupCandidates(a.Platform, requestedModel) {
+		if key, ok := mappingMatchKeyForDiagnostics(mapping, candidate); ok {
+			return true, candidate, key
+		}
+	}
+	return false, "", ""
+}
+
 func resolveRequestedModelInMapping(mapping map[string]string, requestedModel string) (mappedModel string, matched bool) {
 	if requestedModel == "" {
 		return "", false

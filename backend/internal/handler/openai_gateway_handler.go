@@ -574,7 +574,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					} else {
 						service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 					}
-					h.handleStreamingAwareError(c, status, errType, message, streamStarted)
+					h.handleStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, openAISelectionEmptyErrorMetadata(scheduleDecision))
 					return
 				}
 				if lastFailoverErr != nil {
@@ -2141,6 +2141,10 @@ func upstreamClientErrorForOpenAIFailoverStatus(statusCode int) UpstreamClientEr
 
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *OpenAIGatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
+	h.handleStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, nil)
+}
+
+func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithMetadata(c *gin.Context, status int, errType, message string, streamStarted bool, metadata map[string]any) {
 	message = service.ClientFacingErrorMessage(status, errType, message)
 	if streamStarted {
 		// /v1/responses 的严格 SDK（Codex CLI）要求终止事件必须属于
@@ -2166,7 +2170,7 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareError(c *gin.Context, status 
 	}
 
 	// Normal case: return JSON response with proper status code
-	h.errorResponse(c, status, errType, message)
+	h.errorResponseWithMetadata(c, status, errType, message, metadata)
 }
 
 // ensureForwardErrorResponse 在 Forward 返回错误但尚未写响应时补写统一错误响应。
@@ -2274,12 +2278,20 @@ func openAIForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForwa
 
 // errorResponse returns OpenAI API format error response
 func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
+	h.errorResponseWithMetadata(c, status, errType, message, nil)
+}
+
+func (h *OpenAIGatewayHandler) errorResponseWithMetadata(c *gin.Context, status int, errType, message string, metadata map[string]any) {
 	message = service.ClientFacingErrorMessage(status, errType, message)
+	errBody := gin.H{
+		"type":    errType,
+		"message": message,
+	}
+	if len(metadata) > 0 {
+		errBody["metadata"] = metadata
+	}
 	c.JSON(status, gin.H{
-		"error": gin.H{
-			"type":    errType,
-			"message": message,
-		},
+		"error": errBody,
 	})
 }
 

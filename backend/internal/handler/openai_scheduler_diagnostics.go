@@ -48,6 +48,25 @@ func openAISelectionDiagnosticZapFields(decision service.OpenAIAccountScheduleDe
 		zap.Int("selection_diag_model_rate_limit_filtered_count", diag.ModelRateLimitFilteredCount),
 		zap.Int("selection_diag_channel_pricing_restriction_filtered_count", diag.ChannelRestrictionFilteredCount),
 		zap.Int("selection_diag_group_scope_filtered_count", diag.GroupScopeFilteredCount),
+		zap.Bool("selection_diag_group_visible_models_known", diag.GroupVisibleModelsKnown),
+		zap.Bool("selection_diag_group_visible_models_enabled", diag.GroupVisibleModelsEnabled),
+		zap.Bool("selection_diag_group_visible_models_configured", diag.GroupVisibleModelsConfigured),
+		zap.Int("selection_diag_group_visible_models_count", diag.GroupVisibleModelsCount),
+		zap.Bool("selection_diag_group_visible_models_truncated", diag.GroupVisibleModelsTruncated),
+		zap.Bool("selection_diag_group_available_models_known", diag.GroupAvailableModelsKnown),
+		zap.Int("selection_diag_group_available_models_count", diag.GroupAvailableModelsCount),
+		zap.Bool("selection_diag_group_available_models_truncated", diag.GroupAvailableModelsTruncated),
+		zap.Int("selection_diag_account_model_support_summary_count", diag.AccountModelSupportSummaryCount),
+		zap.Bool("selection_diag_account_model_support_summary_truncated", diag.AccountModelSupportSummaryTruncated),
+	}
+	if len(diag.GroupVisibleModels) > 0 {
+		fields = append(fields, zap.Strings("selection_diag_group_visible_models", diag.GroupVisibleModels))
+	}
+	if len(diag.GroupAvailableModels) > 0 {
+		fields = append(fields, zap.Strings("selection_diag_group_available_models", diag.GroupAvailableModels))
+	}
+	if len(diag.AccountModelSupportSummary) > 0 {
+		fields = append(fields, zap.Any("selection_diag_account_model_support_summary", diag.AccountModelSupportSummary))
 	}
 	if len(diag.ExcludedAccountIDs) > 0 {
 		fields = append(fields, zap.Int64s("selection_diag_excluded_account_ids", diag.ExcludedAccountIDs))
@@ -136,6 +155,11 @@ func openAIAccountSelectFailedFields(err error, excludedAccountCount int, decisi
 			zap.Int("circuit_allowed_count", diag.CircuitAllowedCount),
 			zap.Int("concurrency_slot_allowed_count", diag.ConcurrencySlotAllowedCount),
 			zap.Int("final_candidate_count", diag.FinalCandidateCount),
+			zap.Bool("group_visible_models_known", diag.GroupVisibleModelsKnown),
+			zap.Strings("group_visible_models", diag.GroupVisibleModels),
+			zap.Bool("group_available_models_known", diag.GroupAvailableModelsKnown),
+			zap.Strings("group_available_models", diag.GroupAvailableModels),
+			zap.Any("account_model_support_summary", diag.AccountModelSupportSummary),
 		)
 		if len(diag.ExcludedAccountIDs) > 0 {
 			fields = append(fields, zap.Int64s("tried_accounts", diag.ExcludedAccountIDs))
@@ -179,6 +203,45 @@ func openAISelectionSkippedAccounts(diag service.OpenAIAccountSelectionDiagnosti
 	add("concurrency_full", diag.ConcurrencySlotFilteredAccountIDs)
 	add("half_open_filtered", diag.HalfOpenFilteredAccountIDs)
 	return skipped
+}
+
+func openAISelectionEmptyErrorMetadata(decision service.OpenAIAccountScheduleDecision) map[string]any {
+	diag := decision.Diagnostics
+	if !diag.Collected {
+		return nil
+	}
+	return map[string]any{
+		"openai_selection_diagnostics": map[string]any{
+			"requested_model":                         strings.TrimSpace(diag.Model),
+			"group_id":                                diag.GroupID,
+			"endpoint":                                diag.Endpoint,
+			"require_compact":                         diag.RequireCompact,
+			"compact_strict_supported_only":           diag.CompactStrictSupportedOnly,
+			"required_transport":                      diag.RequiredTransport,
+			"required_capability":                     diag.RequiredCapability,
+			"required_image_capability":               diag.RequiredImageCapability,
+			"require_codex_image_generation_bridge":   diag.RequireCodexImageGenerationBridge,
+			"group_binding_account_count":             diag.GroupBindingAccountCount,
+			"active_schedulable_count":                diag.ActiveSchedulableCount,
+			"after_excluded_count":                    diag.AfterExcludedCount,
+			"model_supported_count":                   diag.ModelSupportedCount,
+			"endpoint_supported_count":                diag.EndpointSupportedCount,
+			"final_candidate_count":                   diag.FinalCandidateCount,
+			"filter_reason_counts":                    diag.FilterReasonCounts,
+			"group_visible_models_known":              diag.GroupVisibleModelsKnown,
+			"group_visible_models_enabled":            diag.GroupVisibleModelsEnabled,
+			"group_visible_models_configured":         diag.GroupVisibleModelsConfigured,
+			"group_visible_models":                    diag.GroupVisibleModels,
+			"group_visible_models_count":              diag.GroupVisibleModelsCount,
+			"group_visible_models_truncated":          diag.GroupVisibleModelsTruncated,
+			"group_available_models_known":            diag.GroupAvailableModelsKnown,
+			"group_available_models":                  diag.GroupAvailableModels,
+			"group_available_models_count":            diag.GroupAvailableModelsCount,
+			"group_available_models_truncated":        diag.GroupAvailableModelsTruncated,
+			"account_model_support_summary_count":     diag.AccountModelSupportSummaryCount,
+			"account_model_support_summary_truncated": diag.AccountModelSupportSummaryTruncated,
+		},
+	}
 }
 
 func openAISelectionEmptyErrorResponse(decision service.OpenAIAccountScheduleDecision) (int, string, string) {
