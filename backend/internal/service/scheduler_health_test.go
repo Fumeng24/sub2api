@@ -338,6 +338,54 @@ func TestSchedulerFailureDoesNotExtendAlreadyOpenCooldown(t *testing.T) {
 	}
 }
 
+func TestSchedulerHealthFilterStateReasonsAndRetry(t *testing.T) {
+	now := time.Now()
+	retryAt := now.Add(time.Minute)
+	snap := schedulerHealthSnapshot{
+		Key:               makeAccountSchedulerHealthKey(38848, "gpt-5.5", "/v1/responses"),
+		CircuitState:      schedulerCircuitOpen,
+		CooldownUntil:     retryAt,
+		LastFailureReason: "transient_transport",
+	}
+
+	open := schedulerHealthFilterStateFromSnapshot(snap, now, false, "")
+	if open.Allowed {
+		t.Fatal("expected open scheduler circuit to be blocked")
+	}
+	if open.Reason != "scheduler_circuit_open" {
+		t.Fatalf("reason=%q want scheduler_circuit_open", open.Reason)
+	}
+	if !open.RetryAt.Equal(retryAt) {
+		t.Fatalf("retry_at=%v want %v", open.RetryAt, retryAt)
+	}
+	if open.Snapshot.LastFailureReason != "transient_transport" {
+		t.Fatalf("last_failure_reason=%q", open.Snapshot.LastFailureReason)
+	}
+
+	halfOpen := schedulerHealthFilterStateFromSnapshot(schedulerHealthSnapshot{
+		Key:           snap.Key,
+		CircuitState:  schedulerCircuitHalfOpen,
+		CooldownUntil: retryAt,
+		HalfOpenProbe: false,
+	}, now, true, "scheduler_half_open_in_flight")
+	if halfOpen.Allowed {
+		t.Fatal("expected occupied half-open probe to be blocked")
+	}
+	if halfOpen.Reason != "scheduler_half_open_in_flight" {
+		t.Fatalf("reason=%q want scheduler_half_open_in_flight", halfOpen.Reason)
+	}
+
+	probe := schedulerHealthFilterStateFromSnapshot(schedulerHealthSnapshot{
+		Key:           snap.Key,
+		CircuitState:  schedulerCircuitHalfOpen,
+		CooldownUntil: retryAt,
+		HalfOpenProbe: true,
+	}, now, true, "scheduler_probe_pending")
+	if !probe.Allowed || probe.Reason != "" {
+		t.Fatalf("expected available half-open probe, got allowed=%v reason=%q", probe.Allowed, probe.Reason)
+	}
+}
+
 func TestSchedulerHealthStatsConcurrentAccess(t *testing.T) {
 	health := newAccountSchedulerHealthStats()
 	models := []string{"gpt-5.4", "gpt-5.5"}

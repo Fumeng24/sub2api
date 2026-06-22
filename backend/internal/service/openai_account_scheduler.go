@@ -1161,16 +1161,9 @@ func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterState(account 
 		// Responses image_generation uses real user requests as the half-open
 		// probe because a text-only probe does not validate that tool chain.
 		snap := s.service.schedulerHealth.snapshot(account.ID, req.RequestedModel, endpoint, allowHalfOpen)
-		switch snap.CircuitState {
-		case schedulerCircuitOpen:
-			if snap.CooldownUntil.IsZero() || snap.CooldownUntil.After(now) {
-				return "scheduler_circuit_open", snap.CooldownUntil
-			}
-		case schedulerCircuitHalfOpen:
-			if allowHalfOpen && snap.HalfOpenProbe {
-				return "", time.Time{}
-			}
-			return "scheduler_probe_pending", snap.CooldownUntil
+		state := schedulerHealthFilterStateFromSnapshot(snap, now, allowHalfOpen, "scheduler_probe_pending")
+		if !state.Allowed {
+			return state.Reason, state.RetryAt
 		}
 	}
 	return "", time.Time{}
