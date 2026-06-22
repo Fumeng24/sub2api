@@ -366,6 +366,89 @@ func TestDeployComposeRedisServiceUsesConfiguredMaxClients(t *testing.T) {
 	}
 }
 
+func TestDeployBareMetalSystemdReadsRuntimeEnvFile(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	files := map[string][]string{
+		"deploy/sub2api.service": {
+			"ReadWritePaths=/opt/sub2api /etc/sub2api",
+			"Environment=DATA_DIR=/etc/sub2api",
+			"Environment=LOG_OUTPUT_FILE_PATH=/opt/sub2api/data/logs/sub2api.log",
+			"EnvironmentFile=-/etc/sub2api/sub2api.env",
+		},
+		"deploy/install.sh": {
+			"ENV_FILE=\"$CONFIG_DIR/sub2api.env\"",
+			"RUNTIME_DROPIN_FILE=\"$SYSTEMD_DROPIN_DIR/runtime-env.conf\"",
+			"ReadWritePaths=/opt/sub2api /etc/sub2api",
+			"Environment=DATA_DIR=/etc/sub2api",
+			"Environment=LOG_OUTPUT_FILE_PATH=/opt/sub2api/data/logs/sub2api.log",
+			"EnvironmentFile=-/etc/sub2api/sub2api.env",
+			"EnvironmentFile=-$ENV_FILE",
+			"migrate_legacy_data_dir",
+			"install_runtime_systemd_dropin",
+		},
+	}
+
+	for rel, required := range files {
+		rel := rel
+		required := required
+		t.Run(rel, func(t *testing.T) {
+			body, err := os.ReadFile(filepath.Join(root, rel))
+			require.NoError(t, err)
+			content := string(body)
+			for _, want := range required {
+				require.Contains(t, content, want)
+			}
+		})
+	}
+}
+
+func TestDeployBareMetalRuntimeEnvExampleIncludesCriticalTuning(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	body, err := os.ReadFile(filepath.Join(root, "deploy/sub2api.env.example"))
+	require.NoError(t, err)
+	content := string(body)
+
+	required := []string{
+		"DATA_DIR=/etc/sub2api",
+		"LOG_OUTPUT_FILE_PATH=/opt/sub2api/data/logs/sub2api.log",
+		"SERVER_MAX_REQUEST_BODY_SIZE=268435456",
+		"GATEWAY_MAX_BODY_SIZE=268435456",
+		"GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=15",
+		"GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_RETRY_DELAY_SECONDS=5",
+		"GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_MAX_CONCURRENCY=10000",
+		"GATEWAY_MAX_CONNS_PER_HOST=2048",
+		"GATEWAY_MAX_IDLE_CONNS=8192",
+		"GATEWAY_MAX_IDLE_CONNS_PER_HOST=4096",
+		"GATEWAY_SCHEDULING_WEAK_FALLBACK_ENABLED=false",
+		"GATEWAY_SCHEDULING_DB_FALLBACK_ENABLED=true",
+		"RATE_LIMIT_OVERLOAD_COOLDOWN_MINUTES=10",
+	}
+	for _, want := range required {
+		require.Contains(t, content, want)
+	}
+}
+
+func TestDeployBareMetalDocsMentionRuntimeEnvFile(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", "..", ".."))
+	body, err := os.ReadFile(filepath.Join(root, "deploy/README.md"))
+	require.NoError(t, err)
+	content := string(body)
+
+	required := []string{
+		"`sub2api.env.example` | Bare-metal runtime tuning environment template",
+		"/etc/sub2api/sub2api.env",
+		"EnvironmentFile=-/etc/sub2api/sub2api.env",
+		"DATA_DIR=/etc/sub2api",
+		"GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=15",
+		"GATEWAY_SCHEDULING_WEAK_FALLBACK_ENABLED=false",
+		"GATEWAY_MAX_CONNS_PER_HOST=2048",
+		"sudo systemctl show sub2api --property=Environment",
+	}
+	for _, want := range required {
+		require.Contains(t, content, want)
+	}
+}
+
 func TestDeployExampleKeepsGatewayResponseHeaderTimeoutBelowCloudflare(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", "..", ".."))
 	body, err := os.ReadFile(filepath.Join(root, "deploy/config.example.yaml"))
