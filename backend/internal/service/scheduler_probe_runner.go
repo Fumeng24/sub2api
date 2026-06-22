@@ -64,7 +64,10 @@ func (r schedulerProbeRunner) run(ctx context.Context, key schedulerProbeKey, in
 						"max_concurrency", r.limiter.limit,
 					)...,
 				)
-				return
+				if !sleepSchedulerProbeRetry(ctx, r.retryDelay) {
+					return
+				}
+				continue
 			}
 		}
 		statusCode, body, ttftMs, err := r.adapter.Probe(probeCtx, key)

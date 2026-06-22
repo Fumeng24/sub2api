@@ -141,10 +141,8 @@ func (s *OpenAIGatewayService) probeOpenAIAccountCircuit(ctx context.Context, ke
 	if s == nil || s.accountRepo == nil || s.httpUpstream == nil {
 		return 0, nil, 0, fmt.Errorf("openai circuit probe dependencies unavailable")
 	}
-	probeCtx, cancel := context.WithTimeout(ctx, s.openAIAccountCircuitProbeRunnerConfig().timeout)
-	defer cancel()
 
-	account, err := s.accountRepo.GetByID(probeCtx, key.AccountID)
+	account, err := s.accountRepo.GetByID(ctx, key.AccountID)
 	if err != nil {
 		return 0, nil, 0, fmt.Errorf("load probe account: %w", err)
 	}
@@ -155,11 +153,11 @@ func (s *OpenAIGatewayService) probeOpenAIAccountCircuit(ctx context.Context, ke
 		return 0, nil, 0, fmt.Errorf("%w: status=%s schedulable=%t", errSchedulerProbeUnschedulable, account.Status, account.Schedulable)
 	}
 
-	token, _, err := s.GetAccessToken(probeCtx, account)
+	token, _, err := s.GetAccessToken(ctx, account)
 	if err != nil {
 		return 0, nil, 0, fmt.Errorf("get probe token: %w", err)
 	}
-	req, err := s.buildOpenAIAccountCircuitProbeRequest(probeCtx, account, key.Model, key.Endpoint, token)
+	req, err := s.buildOpenAIAccountCircuitProbeRequest(ctx, account, key.Model, key.Endpoint, token)
 	if err != nil {
 		return 0, nil, 0, err
 	}

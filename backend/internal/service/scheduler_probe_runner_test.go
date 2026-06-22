@@ -148,7 +148,7 @@ func TestSchedulerProbeRunner_ProbeTimeoutCancelsAttempt(t *testing.T) {
 	require.Equal(t, schedulerCircuitOpen, snap.CircuitState)
 }
 
-func TestSchedulerProbeRunner_ConcurrencyLimitWaitsForSlot(t *testing.T) {
+func TestSchedulerProbeRunner_ConcurrencyLimitRetriesUntilSlotAvailable(t *testing.T) {
 	key := makeAccountSchedulerHealthKey(5, "model", "endpoint")
 	limiter := newSchedulerProbeLimiter(1)
 	first := &schedulerProbeBlockingAdapter{
@@ -174,18 +174,18 @@ func TestSchedulerProbeRunner_ConcurrencyLimitWaitsForSlot(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("first probe did not acquire slot")
 	}
+	time.AfterFunc(30*time.Millisecond, func() { close(first.release) })
 
 	schedulerProbeRunner{
-		adapter: second,
-		timeout: 20 * time.Millisecond,
-		limiter: limiter,
+		adapter:    second,
+		timeout:    20 * time.Millisecond,
+		retryDelay: time.Millisecond,
+		limiter:    limiter,
 	}.run(context.Background(), key, "transient_timeout")
 
-	require.Equal(t, 0, second.calls)
+	require.Equal(t, 1, second.calls)
 	after := GetSchedulerProbeRunnerMetricsSnapshot()
-	require.Equal(t, before.ConcurrencyWaitTimeout+1, after.ConcurrencyWaitTimeout)
-
-	close(first.release)
+	require.GreaterOrEqual(t, after.ConcurrencyWaitTimeout, before.ConcurrencyWaitTimeout+1)
 	wg.Wait()
 }
 
