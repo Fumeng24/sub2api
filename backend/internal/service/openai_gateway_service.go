@@ -2128,13 +2128,17 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		if err != nil {
 			return nil, err
 		}
-		weakFallback := !isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability, options) ||
+		if !isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability, options) ||
 			s.isOpenAIAccountRuntimeBlocked(account) ||
-			!s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen)
-		result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
-		if weakFallback {
-			result, err = s.tryAcquireAccountSlotIgnoringCircuit(ctx, account.ID, account.Concurrency)
+			!s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+			retryExcluded := cloneExcludedAccountIDs(excludedIDs)
+			if retryExcluded == nil {
+				retryExcluded = make(map[int64]struct{}, 1)
+			}
+			retryExcluded[account.ID] = struct{}{}
+			return s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, retryExcluded, requireCompact, requiredCapability, options)
 		}
+		result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
 		if err == nil && result != nil && result.Acquired {
 			if !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
 				if result.ReleaseFunc != nil {
@@ -2148,11 +2152,6 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				return s.selectAccountWithLoadAwareness(ctx, groupID, sessionHash, requestedModel, retryExcluded, requireCompact, requiredCapability, options)
 			}
 			selection, selectErr := s.newAcquiredSelectionResult(ctx, account, result.ReleaseFunc)
-			if selection != nil && weakFallback {
-				selection.WeakFallback = true
-				selection.WeakFallbackReason = openAIAccountWeakFallbackReason
-				selection.BypassOpenAIHeaderTO = true
-			}
 			if selectErr == nil && selection != nil {
 				bindCacheAffinity(account.ID)
 			}
@@ -2183,11 +2182,6 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			Timeout:        cfg.FallbackWaitTimeout,
 			MaxWaiting:     cfg.FallbackMaxWaiting,
 		})
-		if selection != nil && weakFallback {
-			selection.WeakFallback = true
-			selection.WeakFallbackReason = openAIAccountWeakFallbackReason
-			selection.BypassOpenAIHeaderTO = true
-		}
 		if selectErr == nil && selection != nil {
 			bindCacheAffinity(account.ID)
 		}
@@ -2667,13 +2661,6 @@ func (s *OpenAIGatewayService) tryAcquireAccountSlot(ctx context.Context, accoun
 		return nil, nil
 	}
 	return result, nil
-}
-
-func (s *OpenAIGatewayService) tryAcquireAccountSlotIgnoringCircuit(ctx context.Context, accountID int64, maxConcurrency int) (*AcquireResult, error) {
-	if s.concurrencyService == nil {
-		return &AcquireResult{Acquired: true, ReleaseFunc: func() {}}, nil
-	}
-	return s.concurrencyService.AcquireAccountSlot(ctx, accountID, maxConcurrency)
 }
 
 func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccountForSelection(ctx context.Context, account *Account, requestedModel string, requireCompact bool, excludedIDs map[int64]struct{}, requiredCapability OpenAIEndpointCapability, options OpenAIAccountScheduleOptions) *Account {

@@ -1509,6 +1509,38 @@ func (s *defaultOpenAIAccountScheduler) isOpenAIWeakFallbackHardCompatible(ctx c
 	return true
 }
 
+func (s *defaultOpenAIAccountScheduler) isOpenAIWeakFallbackHealthEligible(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest, health schedulerHealthSnapshot, loadInfo *AccountLoadInfo) bool {
+	if account == nil {
+		return false
+	}
+	if s != nil && s.service != nil {
+		if s.service.isOpenAIAccountRuntimeBlocked(account) {
+			return false
+		}
+		if !s.service.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req), false) {
+			return false
+		}
+	}
+	if health.CircuitState != "" && health.CircuitState != schedulerCircuitClosed {
+		return false
+	}
+	now := time.Now()
+	if account.OverloadUntil != nil && now.Before(*account.OverloadUntil) {
+		return false
+	}
+	if account.RateLimitResetAt != nil && now.Before(*account.RateLimitResetAt) {
+		return false
+	}
+	if account.TempUnschedulableUntil != nil && now.Before(*account.TempUnschedulableUntil) {
+		return false
+	}
+	if account.GetRateLimitRemainingTimeWithContext(ctx, req.RequestedModel) > 0 {
+		return false
+	}
+	_ = loadInfo
+	return true
+}
+
 func (s *defaultOpenAIAccountScheduler) buildOpenAIWeakFallbackOrder(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
@@ -1552,6 +1584,9 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIWeakFallbackOrder(
 		loadInfo := loadMap[account.ID]
 		if loadInfo == nil {
 			loadInfo = &AccountLoadInfo{AccountID: account.ID}
+		}
+		if !s.isOpenAIWeakFallbackHealthEligible(ctx, account, req, health, loadInfo) {
+			continue
 		}
 		cfg := accountGroupConfigFor(account, req.GroupID)
 		cooldown, cooldownAt, _ := openAIAccountSoftCooldownState(ctx, account, req, schedGroup, health, loadInfo)
@@ -1637,7 +1672,8 @@ func (s *defaultOpenAIAccountScheduler) trySelectOpenAICooldownFallback(
 			cfg := s.service.schedulingConfig()
 			for _, candidate := range order {
 				fresh := s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldownForSelection(ctx, candidate.account, req.RequestedModel, req.RequireCompact, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
-				if fresh == nil || !s.isOpenAIWeakFallbackHardCompatible(ctx, fresh, req, schedGroup) {
+				if fresh == nil || !s.isOpenAIWeakFallbackHardCompatible(ctx, fresh, req, schedGroup) ||
+					!s.isOpenAIWeakFallbackHealthEligible(ctx, fresh, req, schedulerHealthSnapshot{}, nil) {
 					continue
 				}
 				return &AccountSelectionResult{
@@ -1929,6 +1965,9 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 		if allowCooldownFallback {
 			compatible = s.isAccountRequestCompatibleIgnoringCooldown
 			fresh = s.service.resolveFreshOpenAIAccountIgnoringCooldownForSelection(ctx, candidate.account, req.RequestedModel, false, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
+			if fresh != nil && !s.isOpenAIWeakFallbackHealthEligible(ctx, fresh, req, schedulerHealthSnapshot{}, nil) {
+				fresh = nil
+			}
 		} else if bypassSnapshot {
 			fresh = s.service.recheckSelectedOpenAIAccountFromDBForSelection(ctx, candidate.account, req.RequestedModel, false, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
 		} else {
@@ -1939,6 +1978,9 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 		}
 		if allowCooldownFallback {
 			fresh = s.service.recheckSelectedOpenAIAccountFromDBIgnoringCooldownForSelection(ctx, fresh, req.RequestedModel, false, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
+			if fresh != nil && !s.isOpenAIWeakFallbackHealthEligible(ctx, fresh, req, schedulerHealthSnapshot{}, nil) {
+				fresh = nil
+			}
 		} else {
 			fresh = s.service.recheckSelectedOpenAIAccountFromDBForSelection(ctx, fresh, req.RequestedModel, false, req.ExcludedIDs, req.RequiredCapability, openAIAccountScheduleOptionsFromRequest(req))
 		}
@@ -1949,13 +1991,7 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 			compactBlocked = true
 			continue
 		}
-		var result *AcquireResult
-		var acquireErr error
-		if allowCooldownFallback {
-			result, acquireErr = s.service.tryAcquireAccountSlotIgnoringCircuit(ctx, fresh.ID, fresh.Concurrency)
-		} else {
-			result, acquireErr = s.service.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
-		}
+		result, acquireErr := s.service.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
 		if acquireErr != nil {
 			return nil, compactBlocked, acquireErr
 		}

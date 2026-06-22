@@ -141,24 +141,18 @@ func TestOpenAIAccountCircuitProbe_RecoveryRequiresSuccessfulProbe(t *testing.T)
 	})
 
 	selection, _, err := svc.SelectAccountWithScheduler(context.Background(), nil, "", "", "gpt-5.1", nil, OpenAIUpstreamTransportAny, false)
-	require.NoError(t, err)
-	require.NotNil(t, selection)
-	require.True(t, selection.WeakFallback)
-	if selection.ReleaseFunc != nil {
-		selection.ReleaseFunc()
-	}
+	require.Error(t, err)
+	require.Nil(t, selection)
+	require.Contains(t, err.Error(), "no available OpenAI accounts")
 
 	require.Eventually(t, func() bool {
 		return upstream.callCount() >= 1
 	}, time.Second, time.Millisecond)
 
 	selection, _, err = svc.SelectAccountWithScheduler(context.Background(), nil, "", "", "gpt-5.1", nil, OpenAIUpstreamTransportAny, false)
-	require.NoError(t, err)
-	require.NotNil(t, selection)
-	require.True(t, selection.WeakFallback, "failed probe keeps normal scheduling closed, but same-group weak fallback may still try the account")
-	if selection.ReleaseFunc != nil {
-		selection.ReleaseFunc()
-	}
+	require.Error(t, err)
+	require.Nil(t, selection, "failed probe keeps normal scheduling closed; user traffic must not probe the account")
+	require.Contains(t, err.Error(), "no available OpenAI accounts")
 
 	close(upstream.allowSecond)
 	require.Eventually(t, func() bool {
