@@ -60,6 +60,11 @@ func TestExtractUpstreamModelIDs(t *testing.T) {
 			body: `[{"id":"z-model"},{"name":"models/a-model"}]`,
 			want: []string{"a-model", "z-model"},
 		},
+		{
+			name: "string arrays from compatible gateways",
+			body: `{"models":["gpt-5","models/gemini-2.5-flash","gpt-5",""]}`,
+			want: []string{"gemini-2.5-flash", "gpt-5"},
+		},
 	}
 
 	for _, tt := range tests {
