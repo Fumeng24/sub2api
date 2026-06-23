@@ -52,12 +52,14 @@ type OpenAIAccountScheduleRequest struct {
 	RequiredImageCapability           OpenAIImagesCapability
 	RequireCompact                    bool
 	RequireCodexImageGenerationBridge bool
+	IgnoreSchedulerHealth             bool
 	ExcludedIDs                       map[int64]struct{}
 }
 
 type OpenAIAccountScheduleOptions struct {
 	RequireCodexImageGenerationBridge bool
 	AllowCompactModelMapping          bool
+	IgnoreSchedulerHealth             bool
 }
 
 type OpenAIAccountScheduleDecision struct {
@@ -85,6 +87,7 @@ type OpenAIAccountSelectionDiagnostics struct {
 	RequiredCapability                         string
 	RequiredImageCapability                    string
 	RequireCodexImageGenerationBridge          bool
+	IgnoreSchedulerHealth                      bool
 	GroupBindingAccountCount                   int
 	ActiveSchedulableCount                     int
 	ExcludedAccountCount                       int
@@ -603,7 +606,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 	if !openAICompactStickyHitAllowed(req.RequireCompact, account, req.RequestedModel) {
 		return nil, 0, nil
 	}
-	if !s.service.isOpenAIAccountSchedulerHealthAllowed(account.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req)) {
+	if !req.IgnoreSchedulerHealth && !s.service.isOpenAIAccountSchedulerHealthAllowed(account.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req)) {
 		_ = s.service.deleteStickySessionAccountID(ctx, req.GroupID, sessionHash)
 		return nil, 0, nil
 	}
@@ -952,6 +955,7 @@ func openAICompactAccountAllowedForSelection(requireCompact bool, excludedIDs ma
 func openAIAccountScheduleOptionsFromRequest(req OpenAIAccountScheduleRequest) OpenAIAccountScheduleOptions {
 	return normalizeOpenAIAccountScheduleOptions(req.RequireCompact, OpenAIAccountScheduleOptions{
 		RequireCodexImageGenerationBridge: req.RequireCodexImageGenerationBridge,
+		IgnoreSchedulerHealth:             req.IgnoreSchedulerHealth,
 	})
 }
 
@@ -1155,7 +1159,7 @@ func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitHealthState(account 
 	if !runtimeView.Allowed {
 		return runtimeView
 	}
-	if s.service.schedulerHealth != nil {
+	if !req.IgnoreSchedulerHealth && s.service.schedulerHealth != nil {
 		allowHalfOpen := openAIRequestRequiresImageGenerationBridge(req)
 		// Most OpenAI dimensions recover through the background probe runner.
 		// Responses image_generation uses real user requests as the half-open
@@ -1328,6 +1332,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlanFromAccounts(
 		RequiredCapability:                string(req.RequiredCapability),
 		RequiredImageCapability:           string(req.RequiredImageCapability),
 		RequireCodexImageGenerationBridge: req.RequireCodexImageGenerationBridge,
+		IgnoreSchedulerHealth:             req.IgnoreSchedulerHealth,
 		ExcludedAccountCount:              len(req.ExcludedIDs),
 		ExcludedAccountIDs:                openAIAccountIDsFromMap(req.ExcludedIDs),
 		FilterReasonCounts:                make(map[string]int),
@@ -1440,16 +1445,18 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionPlanFromAccounts(
 		diag.StateAllowedCount++
 		diag.StateAllowedAccountIDs = appendOpenAIAccountID(diag.StateAllowedAccountIDs, account)
 
-		if reason, retryAt := s.openAIAccountCircuitFilterState(account, req, diag.Endpoint); reason != "" {
-			diag.CircuitFilteredCount++
-			diag.CircuitFilteredAccountIDs = appendOpenAIAccountID(diag.CircuitFilteredAccountIDs, account)
-			if strings.Contains(reason, "half_open") {
-				diag.HalfOpenFilteredCount++
-				diag.HalfOpenFilteredAccountIDs = appendOpenAIAccountID(diag.HalfOpenFilteredAccountIDs, account)
+		if !req.IgnoreSchedulerHealth {
+			if reason, retryAt := s.openAIAccountCircuitFilterState(account, req, diag.Endpoint); reason != "" {
+				diag.CircuitFilteredCount++
+				diag.CircuitFilteredAccountIDs = appendOpenAIAccountID(diag.CircuitFilteredAccountIDs, account)
+				if strings.Contains(reason, "half_open") {
+					diag.HalfOpenFilteredCount++
+					diag.HalfOpenFilteredAccountIDs = appendOpenAIAccountID(diag.HalfOpenFilteredAccountIDs, account)
+				}
+				diag.addReason(reason)
+				diag.considerRetryAt(account, reason, retryAt)
+				continue
 			}
-			diag.addReason(reason)
-			diag.considerRetryAt(account, reason, retryAt)
-			continue
 		}
 		diag.CircuitAllowedCount++
 		diag.CircuitAllowedAccountIDs = appendOpenAIAccountID(diag.CircuitAllowedAccountIDs, account)
@@ -1569,6 +1576,9 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	var health *accountSchedulerHealthStats
 	if s != nil && s.service != nil {
 		health = s.service.schedulerHealth
+	}
+	if req.IgnoreSchedulerHealth {
+		health = nil
 	}
 	allowHalfOpen := openAIRequestRequiresImageGenerationBridge(req)
 	allScores := buildSchedulerAccountScores(candidatePool, req.GroupID, req.RequestedModel, endpoint, loadMap, health, allowHalfOpen)
@@ -1802,11 +1812,11 @@ func (s *defaultOpenAIAccountScheduler) isOpenAIWeakFallbackHealthEligible(ctx c
 		if s.service.isOpenAIAccountRuntimeBlocked(account) {
 			return false
 		}
-		if !s.service.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req), false) {
+		if !req.IgnoreSchedulerHealth && !s.service.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req), false) {
 			return false
 		}
 	}
-	if health.CircuitState != "" && health.CircuitState != schedulerCircuitClosed {
+	if !req.IgnoreSchedulerHealth && health.CircuitState != "" && health.CircuitState != schedulerCircuitClosed {
 		return false
 	}
 	now := time.Now()
@@ -1840,6 +1850,9 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIWeakFallbackOrder(
 	var healthStats *accountSchedulerHealthStats
 	if s != nil && s.service != nil {
 		healthStats = s.service.schedulerHealth
+	}
+	if req.IgnoreSchedulerHealth {
+		healthStats = nil
 	}
 	candidates := make([]openAIAccountCandidateScore, 0, len(accounts))
 	compactBlocked := false
@@ -2281,7 +2294,7 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 			return nil, compactBlocked, acquireErr
 		}
 		if result != nil && result.Acquired {
-			if !allowCooldownFallback && candidate.halfOpen && s.service.schedulerHealth != nil &&
+			if !req.IgnoreSchedulerHealth && !allowCooldownFallback && candidate.halfOpen && s.service.schedulerHealth != nil &&
 				!s.service.schedulerHealth.tryBeginHalfOpenProbe(fresh.ID, req.RequestedModel, schedulerEndpointFromOpenAIRequest(req)) {
 				if result.ReleaseFunc != nil {
 					result.ReleaseFunc()
@@ -2612,13 +2625,14 @@ func (s *OpenAIGatewayService) SelectAccountWithSchedulerForImages(
 	excludedIDs map[int64]struct{},
 	requiredCapability OpenAIImagesCapability,
 ) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
-	selection, decision, err := s.selectAccountWithScheduler(ctx, groupID, "", sessionHash, requestedModel, excludedIDs, OpenAIUpstreamTransportHTTPSSE, "", requiredCapability, false, OpenAIAccountScheduleOptions{})
+	options := OpenAIAccountScheduleOptions{IgnoreSchedulerHealth: true}
+	selection, decision, err := s.selectAccountWithScheduler(ctx, groupID, "", sessionHash, requestedModel, excludedIDs, OpenAIUpstreamTransportHTTPSSE, "", requiredCapability, false, options)
 	if err == nil && selection != nil && selection.Account != nil {
 		return selection, decision, nil
 	}
 	// 如果要求 native 能力（如指定了模型）但没有可用的 APIKey 账号，回退到 basic（OAuth 账号）
 	if requiredCapability == OpenAIImagesCapabilityNative {
-		return s.selectAccountWithScheduler(ctx, groupID, "", sessionHash, requestedModel, excludedIDs, OpenAIUpstreamTransportHTTPSSE, "", OpenAIImagesCapabilityBasic, false, OpenAIAccountScheduleOptions{})
+		return s.selectAccountWithScheduler(ctx, groupID, "", sessionHash, requestedModel, excludedIDs, OpenAIUpstreamTransportHTTPSSE, "", OpenAIImagesCapabilityBasic, false, options)
 	}
 	return selection, decision, err
 }
@@ -2656,6 +2670,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 				RequiredImageCapability:           requiredImageCapability,
 				RequireCompact:                    requireCompact,
 				RequireCodexImageGenerationBridge: options.RequireCodexImageGenerationBridge,
+				IgnoreSchedulerHealth:             options.IgnoreSchedulerHealth,
 				ExcludedIDs:                       effectiveExcludedIDs,
 			}
 			diagReq.SchedulerEndpoint = schedulerEndpointFromContext(ctx, schedulerEndpointFromOpenAIRequest(diagReq))
@@ -2767,6 +2782,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 		RequiredImageCapability:           requiredImageCapability,
 		RequireCompact:                    requireCompact,
 		RequireCodexImageGenerationBridge: options.RequireCodexImageGenerationBridge,
+		IgnoreSchedulerHealth:             options.IgnoreSchedulerHealth,
 		ExcludedIDs:                       excludedIDs,
 	}
 	req.SchedulerEndpoint = schedulerEndpointFromContext(ctx, schedulerEndpointFromOpenAIRequest(req))
@@ -2852,6 +2868,10 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleTerminal(accountID int
 	if s.schedulerHealth != nil {
 		s.schedulerHealth.reportNeutral(accountID, model, endpoint)
 	}
+}
+
+func (s *OpenAIGatewayService) ReportOpenAIImagesScheduleFailure(accountID int64, model, endpoint string) {
+	s.ReportOpenAIAccountScheduleTerminal(accountID, model, endpoint)
 }
 
 func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleFailure(accountID int64, model, endpoint string, failoverErr *UpstreamFailoverError) {
