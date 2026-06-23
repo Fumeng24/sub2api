@@ -1630,6 +1630,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		loadRateSumSquares += loadRate * loadRate
 	}
 	plan.loadSkew = calcLoadSkewByMoments(loadRateSum, loadRateSumSquares, len(candidates))
+	s.applyOpenAIResetWeight(candidates)
 	plan.candidates = candidates
 
 	plan.topK = len(candidates)
@@ -1649,6 +1650,52 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	}
 	plan.waitOrder = s.buildOpenAISelectionOrder(req, waitPlan)
 	return plan
+}
+
+func (s *defaultOpenAIAccountScheduler) applyOpenAIResetWeight(candidates []openAIAccountCandidateScore) {
+	if len(candidates) == 0 || s == nil || s.service == nil {
+		return
+	}
+	weights := s.service.openAIWSSchedulerWeights()
+	if weights.Reset <= 0 {
+		return
+	}
+
+	now := time.Now()
+	minRemaining, maxRemaining := 0.0, 0.0
+	hasSample := false
+	for _, candidate := range candidates {
+		if candidate.account == nil || candidate.account.SessionWindowEnd == nil || !now.Before(*candidate.account.SessionWindowEnd) {
+			continue
+		}
+		remaining := candidate.account.SessionWindowEnd.Sub(now).Seconds()
+		if !hasSample {
+			minRemaining, maxRemaining = remaining, remaining
+			hasSample = true
+			continue
+		}
+		if remaining < minRemaining {
+			minRemaining = remaining
+		}
+		if remaining > maxRemaining {
+			maxRemaining = remaining
+		}
+	}
+	if !hasSample {
+		return
+	}
+
+	for i := range candidates {
+		account := candidates[i].account
+		if account == nil || account.SessionWindowEnd == nil || !now.Before(*account.SessionWindowEnd) {
+			continue
+		}
+		resetFactor := 1.0
+		if maxRemaining > minRemaining {
+			resetFactor = 1 - clamp01((account.SessionWindowEnd.Sub(now).Seconds()-minRemaining)/(maxRemaining-minRemaining))
+		}
+		candidates[i].score += weights.Reset * resetFactor
+	}
 }
 
 func openAIAccountSoftCooldownState(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest, schedGroup *Group, health schedulerHealthSnapshot, loadInfo *AccountLoadInfo) (cooldown bool, cooldownAt time.Time, reasons []string) {
