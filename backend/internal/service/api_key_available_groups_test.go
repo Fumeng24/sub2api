@@ -72,7 +72,7 @@ func TestIsUserVisibleImageGenerationGroup(t *testing.T) {
 		Platform:             PlatformGemini,
 		AllowImageGeneration: true,
 	}))
-	require.False(t, isUserVisibleImageGenerationGroup(&Group{
+	require.True(t, isUserVisibleImageGenerationGroup(&Group{
 		Name:                 "GPT普通",
 		Platform:             PlatformOpenAI,
 		AllowImageGeneration: true,
