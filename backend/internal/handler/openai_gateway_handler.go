@@ -82,9 +82,6 @@ func shouldFallbackOpenAICompactToModel(c *gin.Context, requestedModel string, f
 	if requestedModel == "" || strings.EqualFold(requestedModel, openAICompactFallbackModel) {
 		return false
 	}
-	if strings.EqualFold(requestedModel, "gpt-5.5") {
-		return false
-	}
 	return service.IsOpenAIContextWindowErrorForTest(string(failoverErr.ResponseBody))
 }
 
@@ -103,6 +100,29 @@ func openAIContextWindowClientMessage(model string, responseBody []byte, fallbac
 
 func openAIRequestModelFromContext(c *gin.Context) string {
 	return requestModelFromContext(c)
+}
+
+func shouldFallbackOpenAIWSSelectionToHTTPBridge(previousResponseID string, cfg *config.Config, decision service.OpenAIAccountScheduleDecision) bool {
+	if strings.TrimSpace(previousResponseID) != "" {
+		return false
+	}
+	if cfg == nil || !cfg.Gateway.OpenAIWS.HTTPBridgeEnabled {
+		return false
+	}
+	diag := decision.Diagnostics
+	if !diag.Collected {
+		return false
+	}
+	if strings.TrimSpace(diag.RequiredTransport) != string(service.OpenAIUpstreamTransportResponsesWebsocketV2) {
+		return false
+	}
+	if diag.ModelSupportedCount <= 0 || diag.EndpointSupportedCount > 0 {
+		return false
+	}
+	if diag.FilterReasonCounts != nil && diag.FilterReasonCounts["endpoint_unsupported"] > 0 {
+		return diag.FilterReasonCounts["endpoint_unsupported"] >= diag.ModelSupportedCount
+	}
+	return true
 }
 
 func replaceOpenAIRequestModel(body []byte, model string) ([]byte, error) {
@@ -562,6 +582,13 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			cancelSchedule()
 			if err != nil {
 				reqLog.Warn("openai.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
+				if openAISelectionUnavailableExhaustedByFailover(err, scheduleDecision, len(failedAccountIDs)) {
+					setOpenAISelectionRetryAfterHeader(c, err)
+					status, errType, message := openAISelectionFailoverExhaustedErrorResponse()
+					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					h.handleStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, openAISelectionEmptyErrorMetadata(scheduleDecision))
+					return
+				}
 				if len(failedAccountIDs) == 0 {
 					setOpenAISelectionRetryAfterHeader(c, err)
 					if errors.Is(err, service.ErrNoAvailableCompactAccounts) {
@@ -1043,6 +1070,13 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			cancelSchedule()
 			if err != nil {
 				reqLog.Warn("openai_messages.account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
+				if openAISelectionUnavailableExhaustedByFailover(err, scheduleDecision, len(failedAccountIDs)) {
+					setOpenAISelectionRetryAfterHeader(c, err)
+					status, errType, message := openAISelectionFailoverExhaustedErrorResponse()
+					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
+					h.anthropicStreamingAwareErrorWithMetadata(c, status, errType, message, streamStarted, openAISelectionEmptyErrorMetadata(scheduleDecision))
+					return
+				}
 				if len(failedAccountIDs) == 0 {
 					setOpenAISelectionRetryAfterHeader(c, err)
 					status, errType, message := openAISelectionEmptyErrorResponse(scheduleDecision)
@@ -1624,9 +1658,15 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	switchCount := 0
 	failedAccountIDs := make(map[int64]struct{})
 	var lastFailoverErr *service.UpstreamFailoverError
+	requiredTransport := service.OpenAIUpstreamTransportResponsesWebsocketV2
+	forceHTTPBridge := false
 
 	for {
-		reqLog.Debug("openai.websocket_account_selecting", zap.Int("excluded_account_count", len(failedAccountIDs)))
+		reqLog.Debug("openai.websocket_account_selecting",
+			zap.Int("excluded_account_count", len(failedAccountIDs)),
+			zap.String("required_transport", string(requiredTransport)),
+			zap.Bool("force_http_bridge", forceHTTPBridge),
+		)
 		scheduleCtx, cancelSchedule := openAIAccountSelectionContext(ctx, schedulerEndpoint, lastFailoverErr != nil || len(failedAccountIDs) > 0)
 		scheduleCtx = withOpenAIAccountCacheAffinity(scheduleCtx, apiKey, subject, reqModel, schedulerEndpoint, firstMessage)
 		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapabilityAndOptions(
@@ -1636,14 +1676,28 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			sessionHash,
 			reqModel,
 			failedAccountIDs,
-			service.OpenAIUpstreamTransportResponsesWebsocketV2,
+			requiredTransport,
 			service.OpenAIEndpointCapabilityChatCompletions,
 			false,
 			scheduleOptions,
 		)
 		cancelSchedule()
 		if err != nil {
+			if requiredTransport == service.OpenAIUpstreamTransportResponsesWebsocketV2 &&
+				shouldFallbackOpenAIWSSelectionToHTTPBridge(previousResponseID, h.cfg, scheduleDecision) {
+				requiredTransport = service.OpenAIUpstreamTransportHTTPSSE
+				schedulerEndpoint = service.OpenAIResponsesSchedulerEndpointForIntent("/v1/responses", wsImageIntent)
+				forceHTTPBridge = true
+				reqLog.Warn("openai.websocket_account_select_fallback_to_http_bridge",
+					openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...,
+				)
+				continue
+			}
 			reqLog.Warn("openai.websocket_account_select_failed", openAIAccountSelectFailedFields(err, len(failedAccountIDs), scheduleDecision)...)
+			if openAISelectionUnavailableExhaustedByFailover(err, scheduleDecision, len(failedAccountIDs)) {
+				closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "no available account")
+				return
+			}
 			if lastFailoverErr != nil {
 				closeOpenAIWSFailoverExhausted(wsConn, lastFailoverErr)
 			} else {
@@ -1846,7 +1900,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		// WebSocket 首包可能很大，hash 必须在 hooks 外算成字符串，避免 AfterTurn 闭包保活请求体。
 		requestPayloadHash = service.HashUsageRequestPayload(wsFirstMessage)
 
-		if err := h.gatewayService.ProxyResponsesWebSocketFromClient(ctx, c, wsConn, account, token, wsFirstMessage, hooks); err != nil {
+		proxyCtx := ctx
+		if forceHTTPBridge {
+			proxyCtx = service.WithOpenAIWSForceHTTPBridge(proxyCtx)
+		}
+		if err := h.gatewayService.ProxyResponsesWebSocketFromClient(proxyCtx, c, wsConn, account, token, wsFirstMessage, hooks); err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
 				h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, reqModel, schedulerEndpoint, failoverErr)

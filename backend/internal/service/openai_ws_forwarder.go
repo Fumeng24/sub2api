@@ -2471,11 +2471,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	}
 
 	wsDecision := s.getOpenAIWSProtocolResolver().Resolve(account)
+	forceHTTPBridge := openAIWSForceHTTPBridgeFromContext(ctx)
 	modeRouterV2Enabled := s != nil && s.cfg != nil && s.cfg.Gateway.OpenAIWS.ModeRouterV2Enabled
 	ingressMode := OpenAIWSIngressModeCtxPool
 	if modeRouterV2Enabled {
 		ingressMode = account.ResolveOpenAIResponsesWebSocketV2Mode(s.cfg.Gateway.OpenAIWS.IngressModeDefault)
-		if ingressMode == OpenAIWSIngressModeOff {
+		if ingressMode == OpenAIWSIngressModeOff && !forceHTTPBridge {
 			return NewOpenAIWSClientCloseError(
 				coderws.StatusPolicyViolation,
 				"websocket mode is disabled for this account",
@@ -2485,6 +2486,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		switch ingressMode {
 		case OpenAIWSIngressModePassthrough:
 			if wsDecision.Transport != OpenAIUpstreamTransportResponsesWebsocketV2 {
+				if forceHTTPBridge {
+					break
+				}
 				return fmt.Errorf("websocket ingress requires ws_v2 transport, got=%s", wsDecision.Transport)
 			}
 			return s.proxyResponsesWebSocketV2Passthrough(
@@ -2500,14 +2504,16 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		case OpenAIWSIngressModeCtxPool, OpenAIWSIngressModeShared, OpenAIWSIngressModeDedicated:
 			// continue
 		default:
-			return NewOpenAIWSClientCloseError(
-				coderws.StatusPolicyViolation,
-				"websocket mode only supports ctx_pool/passthrough",
-				nil,
-			)
+			if !forceHTTPBridge {
+				return NewOpenAIWSClientCloseError(
+					coderws.StatusPolicyViolation,
+					"websocket mode only supports ctx_pool/passthrough",
+					nil,
+				)
+			}
 		}
 	}
-	if wsDecision.Transport != OpenAIUpstreamTransportResponsesWebsocketV2 {
+	if wsDecision.Transport != OpenAIUpstreamTransportResponsesWebsocketV2 && !forceHTTPBridge {
 		return fmt.Errorf("websocket ingress requires ws_v2 transport, got=%s", wsDecision.Transport)
 	}
 	dedicatedMode := modeRouterV2Enabled && ingressMode == OpenAIWSIngressModeDedicated
@@ -2802,13 +2808,14 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	}
 	refreshIngressRouteState(firstPayload)
 
-	if s.shouldBridgeOpenAIWSHTTP(firstPayload.payloadBytes, firstPayload.previousResponseID) {
+	if s.shouldBridgeOpenAIWSHTTPWithContext(ctx, firstPayload.payloadBytes, firstPayload.previousResponseID) {
 		logOpenAIWSModeInfo(
-			"ingress_ws_http_bridge_start account_id=%d account_type=%s payload_bytes=%d threshold_bytes=%d has_session_hash=%v store_disabled=%v",
+			"ingress_ws_http_bridge_start account_id=%d account_type=%s payload_bytes=%d threshold_bytes=%d force=%v has_session_hash=%v store_disabled=%v",
 			account.ID,
 			account.Type,
 			firstPayload.payloadBytes,
 			s.openAIWSHTTPBridgeThresholdBytes(),
+			forceHTTPBridge,
 			sessionHash != "",
 			storeDisabled,
 		)

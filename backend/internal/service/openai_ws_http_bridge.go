@@ -22,6 +22,23 @@ const (
 	openAIWSHTTPBridgeErrorBodyLimitBytes         = 64 * 1024
 )
 
+type openAIWSForceHTTPBridgeContextKey struct{}
+
+func WithOpenAIWSForceHTTPBridge(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, openAIWSForceHTTPBridgeContextKey{}, true)
+}
+
+func openAIWSForceHTTPBridgeFromContext(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	force, _ := ctx.Value(openAIWSForceHTTPBridgeContextKey{}).(bool)
+	return force
+}
+
 func ResolveOpenAIWSClientReadLimitBytes(cfg *config.Config) int64 {
 	if cfg == nil || cfg.Gateway.OpenAIWS.ClientReadLimitBytes <= 0 {
 		return openAIWSClientReadLimitBytesDefault
@@ -41,11 +58,18 @@ func (s *OpenAIGatewayService) openAIWSHTTPBridgeThresholdBytes() int64 {
 }
 
 func (s *OpenAIGatewayService) shouldBridgeOpenAIWSHTTP(payloadBytes int, previousResponseID string) bool {
+	return s.shouldBridgeOpenAIWSHTTPWithContext(context.Background(), payloadBytes, previousResponseID)
+}
+
+func (s *OpenAIGatewayService) shouldBridgeOpenAIWSHTTPWithContext(ctx context.Context, payloadBytes int, previousResponseID string) bool {
 	if !s.openAIWSHTTPBridgeEnabled() {
 		return false
 	}
 	if strings.TrimSpace(previousResponseID) != "" {
 		return false
+	}
+	if openAIWSForceHTTPBridgeFromContext(ctx) {
+		return true
 	}
 	threshold := s.openAIWSHTTPBridgeThresholdBytes()
 	return threshold > 0 && int64(payloadBytes) >= threshold
@@ -142,6 +166,36 @@ func buildOpenAIWSHTTPBridgeErrorEvent(statusCode int, message string) []byte {
 	return body
 }
 
+func buildOpenAIWSHTTPBridgeUpstreamFailoverError(statusCode int, headers http.Header, body []byte) *UpstreamFailoverError {
+	if statusCode <= 0 {
+		statusCode = http.StatusBadGateway
+	}
+	return &UpstreamFailoverError{
+		StatusCode:      statusCode,
+		ResponseBody:    append([]byte(nil), body...),
+		ResponseHeaders: cloneHeader(headers),
+	}
+}
+
+func (s *OpenAIGatewayService) newOpenAIWSHTTPBridgeFailoverError(
+	ctx context.Context,
+	account *Account,
+	statusCode int,
+	headers http.Header,
+	body []byte,
+	updateRuntime bool,
+) *UpstreamFailoverError {
+	failoverErr := buildOpenAIWSHTTPBridgeUpstreamFailoverError(statusCode, headers, body)
+	if s != nil && account != nil {
+		if updateRuntime && statusCode > 0 && len(body) > 0 {
+			reqModel := strings.TrimSpace(gjson.GetBytes(body, "model").String())
+			_ = s.handleOpenAIAccountUpstreamError(ctx, account, statusCode, headers, body, reqModel)
+		}
+		failoverErr.SchedulerCategory = s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, failoverErr.StatusCode, failoverErr.ResponseBody)
+	}
+	return failoverErr
+}
+
 func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	ctx context.Context,
 	c *gin.Context,
@@ -194,8 +248,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	if err != nil {
 		safeErr := sanitizeUpstreamErrorMessage(err.Error())
-		_ = writeClientMessage(buildOpenAIWSHTTPBridgeErrorEvent(http.StatusBadGateway, "Upstream request failed"))
-		return nil, fmt.Errorf("upstream http bridge request failed: %s", safeErr)
+		return nil, s.newOpenAIWSHTTPBridgeFailoverError(ctx, account, http.StatusBadGateway, nil, []byte(safeErr), true)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -204,6 +257,9 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 		upstreamMsg := sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(respBody)))
 		if upstreamMsg == "" {
 			upstreamMsg = http.StatusText(resp.StatusCode)
+		}
+		if shouldFailoverOpenAIPassthroughResponse(resp.StatusCode, respBody) {
+			return nil, s.newOpenAIWSHTTPBridgeFailoverError(ctx, account, resp.StatusCode, resp.Header, respBody, true)
 		}
 		_ = writeClientMessage(buildOpenAIWSHTTPBridgeErrorEvent(resp.StatusCode, upstreamMsg))
 		return nil, fmt.Errorf("upstream http bridge error: status=%d message=%s", resp.StatusCode, upstreamMsg)
@@ -310,6 +366,13 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 			parseOpenAIWSResponseUsageFromCompletedEvent(upstreamMessage, &usage)
 		}
 		imageCounter.AddSSEData(upstreamMessage)
+		if eventType == "error" {
+			errCodeRaw, errTypeRaw, errMsgRaw := parseOpenAIWSErrorEventFields(upstreamMessage)
+			s.persistOpenAIWSRateLimitSignal(ctx, account, resp.Header, upstreamMessage, errCodeRaw, errTypeRaw, errMsgRaw)
+			if !wroteDownstream && isOpenAIWSRateLimitError(errCodeRaw, errTypeRaw, errMsgRaw) {
+				return resultWithUsage(), s.newOpenAIWSHTTPBridgeFailoverError(ctx, account, http.StatusTooManyRequests, resp.Header, upstreamMessage, false)
+			}
+		}
 
 		if needModelReplace && len(mappedModelBytes) > 0 && openAIWSEventMayContainModel(eventType) && strings.Contains(trimmedData, mappedModel) {
 			upstreamMessage = replaceOpenAIWSMessageModel(upstreamMessage, mappedModel, originalModel)
@@ -346,8 +409,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 		}
 
 		if eventType == "error" {
-			errCodeRaw, errTypeRaw, errMsgRaw := parseOpenAIWSErrorEventFields(upstreamMessage)
-			s.persistOpenAIWSRateLimitSignal(ctx, account, resp.Header, upstreamMessage, errCodeRaw, errTypeRaw, errMsgRaw)
+			_, _, errMsgRaw := parseOpenAIWSErrorEventFields(upstreamMessage)
 			errMessage := strings.TrimSpace(errMsgRaw)
 			if errMessage == "" {
 				errMessage = "upstream error event"
