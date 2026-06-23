@@ -12,7 +12,7 @@ import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
-import { resolveDocumentTitle } from './title'
+import { resolveRouteDocumentTitle } from './title'
 import { applyRouteSeo } from '@/utils/seo'
 import { recoverFromChunkLoadError } from '@/utils/chunkRecovery'
 
@@ -825,23 +825,12 @@ router.beforeEach(async (to, _from, next) => {
 
   // Set page title and route-level SEO tags.
   const appStore = useAppStore()
-  let documentTitle: string | undefined
-  // For custom pages, use menu item label as document title
-  if (to.name === 'CustomPage') {
-    const id = to.params.id as string
-    const publicItems = appStore.cachedPublicSettings?.custom_menu_items ?? []
-    const adminSettingsStore = useAdminSettingsStore()
-    const menuItem = publicItems.find((item) => item.id === id)
-      ?? (authStore.isAdmin ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
-    if (menuItem?.label) {
-      const siteName = appStore.siteName || 'Sub2API'
-      documentTitle = `${menuItem.label} - ${siteName}`
-    } else {
-      documentTitle = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)
-    }
-  } else {
-    documentTitle = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)
-  }
+  const adminSettingsStore = useAdminSettingsStore()
+  const customMenuItems = [
+    ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
+    ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
+  ]
+  const documentTitle = resolveRouteDocumentTitle(to, appStore.siteName, customMenuItems)
   applyRouteSeo(to, { siteName: appStore.siteName, title: documentTitle })
 
   // Check if route requires authentication

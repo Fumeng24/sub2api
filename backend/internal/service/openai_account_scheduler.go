@@ -2938,6 +2938,7 @@ func (s *OpenAIGatewayService) openAIWSSchedulerWeights() GatewayOpenAIWSSchedul
 			Queue:     s.cfg.Gateway.OpenAIWS.SchedulerScoreWeights.Queue,
 			ErrorRate: s.cfg.Gateway.OpenAIWS.SchedulerScoreWeights.ErrorRate,
 			TTFT:      s.cfg.Gateway.OpenAIWS.SchedulerScoreWeights.TTFT,
+			Reset:     s.cfg.Gateway.OpenAIWS.SchedulerScoreWeights.Reset,
 		}
 	}
 	return GatewayOpenAIWSSchedulerScoreWeightsView{
@@ -2946,6 +2947,7 @@ func (s *OpenAIGatewayService) openAIWSSchedulerWeights() GatewayOpenAIWSSchedul
 		Queue:     0.7,
 		ErrorRate: 0.8,
 		TTFT:      0.5,
+		Reset:     0.0,
 	}
 }
 
@@ -2955,6 +2957,8 @@ type GatewayOpenAIWSSchedulerScoreWeightsView struct {
 	Queue     float64
 	ErrorRate float64
 	TTFT      float64
+	// Reset 倾向「会话窗口最早重置」的账号；0 表示关闭（默认）。
+	Reset float64
 }
 
 func clamp01(value float64) float64 {

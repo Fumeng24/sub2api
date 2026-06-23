@@ -24,6 +24,10 @@ function decodeUsageScript(params: URLSearchParams): string {
 }
 
 describe('ccswitchImport utils', () => {
+  it('defaults OpenAI CC Switch imports to the current Codex model', () => {
+    expect(OPENAI_CC_SWITCH_CODEX_MODEL).toBe('gpt-5.5')
+  })
+
   const baseInput = {
     baseUrl: 'https://api.example.com',
     providerName: 'Sub2API',
