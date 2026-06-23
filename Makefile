@@ -1,4 +1,4 @@
-.PHONY: build build-backend build-frontend build-datamanagementd test test-backend test-frontend test-frontend-critical test-datamanagementd secret-scan
+.PHONY: build build-external build-backend build-backend-external build-frontend build-datamanagementd test test-backend test-frontend test-frontend-critical test-datamanagementd secret-scan
 
 FRONTEND_CRITICAL_VITEST := \
 	src/views/auth/__tests__/LinuxDoCallbackView.spec.ts \
@@ -8,12 +8,19 @@ FRONTEND_CRITICAL_VITEST := \
 	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \
 	src/views/admin/__tests__/SettingsView.spec.ts
 
-# 一键编译前后端
-build: build-backend build-frontend
+# 一键编译前后端。先构建前端，避免 embed 后端打入旧静态资源。
+build: build-frontend build-backend
+
+# 前端静态包 + 不内嵌静态资源的后端二进制。
+build-external: build-frontend build-backend-external
 
 # 编译后端（复用 backend/Makefile）
 build-backend:
 	@$(MAKE) -C backend build
+
+# 编译不内嵌前端资源的后端；生产部署时配合 SUB2API_FRONTEND_DIST 使用。
+build-backend-external:
+	@$(MAKE) -C backend build-external
 
 # 编译前端（需要已安装依赖）
 build-frontend:
