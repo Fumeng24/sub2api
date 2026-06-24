@@ -19,10 +19,10 @@ function group(overrides: Partial<Group>): Group {
 }
 
 describe('imageGenerationGroups', () => {
-  it('allows only enabled OpenAI or Gemini groups whose names include 生图', () => {
+  it('allows OpenAI or Gemini groups when image generation is enabled', () => {
     expect(isImageGenerationGroup(group({ platform: 'openai', name: 'GPT生图' }))).toBe(true)
-    expect(isImageGenerationGroup(group({ platform: 'gemini', name: 'Gemini生图' }))).toBe(true)
-    expect(isImageGenerationGroup(group({ platform: 'gemini', name: 'Gemini普通' }))).toBe(false)
+    expect(isImageGenerationGroup(group({ platform: 'openai', name: 'GPT普通' }))).toBe(true)
+    expect(isImageGenerationGroup(group({ platform: 'gemini', name: 'Gemini普通' }))).toBe(true)
     expect(isImageGenerationGroup(group({ platform: 'anthropic', name: 'Claude生图' }))).toBe(false)
     expect(isImageGenerationGroup(group({ allow_image_generation: false, name: 'GPT生图' }))).toBe(false)
   })
@@ -53,6 +53,13 @@ describe('imageGenerationGroups', () => {
     expect(resolveSupportedImageModels(group({ platform: 'openai', models_list_config: undefined })))
       .toEqual(DEFAULT_OPENAI_IMAGE_MODELS)
     expect(resolveSupportedImageModels(group({ platform: 'gemini', models_list_config: undefined })))
+      .toEqual(DEFAULT_GEMINI_IMAGE_MODELS)
+  })
+
+  it('falls back to platform image defaults when custom model list is disabled', () => {
+    expect(resolveSupportedImageModels(group({ platform: 'openai', models_list_config: { enabled: false, models: [] } })))
+      .toEqual(DEFAULT_OPENAI_IMAGE_MODELS)
+    expect(resolveSupportedImageModels(group({ platform: 'gemini', models_list_config: { enabled: false, models: ['gemini-2.5-pro'] } })))
       .toEqual(DEFAULT_GEMINI_IMAGE_MODELS)
   })
 })

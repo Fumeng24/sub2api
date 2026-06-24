@@ -39,16 +39,16 @@ export function defaultImageModelsForGroup(group: Pick<Group, 'platform'>) {
 }
 
 export function resolveSupportedImageModels(group: Pick<Group, 'platform' | 'models_list_config'>) {
-  if (group.models_list_config) {
+  if (group.models_list_config?.enabled) {
     const models = group.models_list_config.models
     if (!Array.isArray(models)) return []
     return uniqueImageModels(models).filter(isImageGenerationModelName)
   }
-  // Legacy fallback for older group payloads that do not expose supported models.
-  // Once models_list_config is present, the page must strictly follow that list.
+  // Fallback only applies when the current group does not enable a custom
+  // user-visible model list. Enabled lists remain strict to avoid cross-group leakage.
   return defaultImageModelsForGroup(group)
 }
 
-export function isImageGenerationGroup(group: Pick<Group, 'allow_image_generation' | 'name' | 'platform'>) {
-  return group.allow_image_generation && group.name.includes('生图') && isSupportedImagePlatform(group.platform)
+export function isImageGenerationGroup(group: Pick<Group, 'allow_image_generation' | 'platform'>) {
+  return group.allow_image_generation && isSupportedImagePlatform(group.platform)
 }
