@@ -51,6 +51,33 @@ func filterByMinLoadRate(accounts []accountWithLoad) []accountWithLoad {
 	return result
 }
 
+func filterBySoonestReset(accounts []accountWithLoad) []accountWithLoad {
+	if len(accounts) <= 1 {
+		return accounts
+	}
+	now := time.Now()
+	var soonest *time.Time
+	for _, acc := range accounts {
+		if acc.account == nil || acc.account.SessionWindowEnd == nil || !now.Before(*acc.account.SessionWindowEnd) {
+			continue
+		}
+		if soonest == nil || acc.account.SessionWindowEnd.Before(*soonest) {
+			t := *acc.account.SessionWindowEnd
+			soonest = &t
+		}
+	}
+	if soonest == nil {
+		return accounts
+	}
+	result := make([]accountWithLoad, 0, len(accounts))
+	for _, acc := range accounts {
+		if acc.account != nil && acc.account.SessionWindowEnd != nil && acc.account.SessionWindowEnd.Equal(*soonest) {
+			result = append(result, acc)
+		}
+	}
+	return result
+}
+
 func selectByLRU(accounts []accountWithLoad, preferOAuth bool) *accountWithLoad {
 	if len(accounts) == 0 {
 		return nil
