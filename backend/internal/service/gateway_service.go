@@ -473,7 +473,11 @@ var (
 // ErrNoAvailableAccounts 表示没有可用的账号
 var ErrNoAvailableAccounts = errors.New("no available accounts")
 
-const gatewayAccountWeakFallbackReason = "same_group_soft_filter_relaxed"
+const (
+	gatewayAccountWeakFallbackReason                  = "same_group_soft_filter_relaxed"
+	gatewaySingleCandidateCircuitFallbackReason       = "single_candidate_transient_circuit_relaxed"
+	gatewaySingleCandidateCircuitFallbackLogEventName = "gateway_single_candidate_circuit_fallback_selected"
+)
 
 type gatewayDeferredHalfOpenProbeContextKey struct{}
 
@@ -2486,6 +2490,18 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			MaxWaiting:     cfg.FallbackMaxWaiting,
 		})
 	}
+	if fallback, attempted, fallbackErr := s.selectSingleCandidateTransientCircuitFallbackResult(ctx, candidates, groupID, sessionHash, requestedModel, schedulerEndpoint, loadMap, true); fallbackErr != nil {
+		return nil, fallbackErr
+	} else if fallback != nil {
+		return fallback, nil
+	} else if attempted {
+		slog.Warn("gateway_single_candidate_circuit_fallback_exhausted",
+			"group_id", derefGroupID(groupID),
+			"model", requestedModel,
+			"endpoint", schedulerEndpoint,
+			"candidate_count", len(candidates),
+		)
+	}
 	if s.gatewayWeakFallbackEnabled() {
 		if fallback, attempted, fallbackErr := s.selectGatewayCooldownFallbackResult(ctx, candidates, groupID, sessionHash, requestedModel, schedulerEndpoint, platform, useMixed, group, needsUpstreamCheck, preferOAuth, loadMap, true); fallbackErr != nil {
 			return nil, fallbackErr
@@ -2636,6 +2652,99 @@ func (s *GatewayService) selectGatewayCooldownFallbackResult(
 	return nil, true, nil
 }
 
+func (s *GatewayService) selectSingleCandidateTransientCircuitFallbackResult(
+	ctx context.Context,
+	candidates []*Account,
+	groupID *int64,
+	sessionHash string,
+	requestedModel string,
+	schedulerEndpoint string,
+	loadMap map[int64]*AccountLoadInfo,
+	allowWaitPlan bool,
+) (*AccountSelectionResult, bool, error) {
+	if len(candidates) != 1 {
+		return nil, false, nil
+	}
+	account := candidates[0]
+	if account == nil || !s.isSingleCandidateTransientCircuitFallbackEligible(account, requestedModel, schedulerEndpoint, loadMap) {
+		return nil, false, nil
+	}
+
+	result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
+	if err != nil {
+		return nil, true, err
+	}
+	if result != nil && result.Acquired {
+		if !s.checkAndRegisterSession(ctx, account, sessionHash) {
+			if result.ReleaseFunc != nil {
+				result.ReleaseFunc()
+			}
+			return nil, true, nil
+		}
+		if sessionHash != "" && s.cache != nil {
+			_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, account.ID, stickySessionTTL)
+		}
+		selection, err := s.newSelectionResult(ctx, account, true, result.ReleaseFunc, nil)
+		if err != nil {
+			if result.ReleaseFunc != nil {
+				result.ReleaseFunc()
+			}
+			return nil, true, err
+		}
+		selection.WeakFallback = true
+		selection.WeakFallbackReason = gatewaySingleCandidateCircuitFallbackReason
+		s.logGatewaySingleCandidateCircuitFallbackSelected(groupID, requestedModel, schedulerEndpoint, account.ID, false)
+		return selection, true, nil
+	}
+
+	if !allowWaitPlan || s.concurrencyService == nil {
+		return nil, true, nil
+	}
+	if !s.checkAndRegisterSession(ctx, account, sessionHash) {
+		return nil, true, nil
+	}
+	cfg := s.schedulingConfig()
+	selection, err := s.newSelectionResult(ctx, account, false, nil, &AccountWaitPlan{
+		AccountID:      account.ID,
+		MaxConcurrency: account.Concurrency,
+		Timeout:        cfg.FallbackWaitTimeout,
+		MaxWaiting:     cfg.FallbackMaxWaiting,
+	})
+	if err != nil {
+		return nil, true, err
+	}
+	selection.WeakFallback = true
+	selection.WeakFallbackReason = gatewaySingleCandidateCircuitFallbackReason
+	s.logGatewaySingleCandidateCircuitFallbackSelected(groupID, requestedModel, schedulerEndpoint, account.ID, true)
+	return selection, true, nil
+}
+
+func (s *GatewayService) isSingleCandidateTransientCircuitFallbackEligible(account *Account, requestedModel, schedulerEndpoint string, loadMap map[int64]*AccountLoadInfo) bool {
+	if account == nil || s == nil || s.schedulerHealth == nil {
+		return false
+	}
+	if loadInfo := gatewaySelectionLoadInfo(loadMap, account); loadInfo != nil && loadInfo.LoadRate >= 100 {
+		return false
+	}
+	view := s.gatewayAccountSchedulerHealthState(account.ID, requestedModel, schedulerEndpoint, true, time.Now())
+	if view.Allowed {
+		return false
+	}
+	if view.Reason != healthReasonSchedulerCircuitOpen {
+		return false
+	}
+	return gatewaySingleCandidateCircuitFallbackReasonAllowed(view.LastFailureReason)
+}
+
+func gatewaySingleCandidateCircuitFallbackReasonAllowed(reason string) bool {
+	switch strings.TrimSpace(reason) {
+	case "transient", "transient_transport", "transient_timeout", "unknown":
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *GatewayService) recheckGatewayCooldownFallbackAccount(
 	ctx context.Context,
 	account *Account,
@@ -2698,6 +2807,17 @@ func (s *GatewayService) logGatewayCooldownFallbackSelected(groupID *int64, requ
 		"account_id", accountID,
 		"candidate_count", candidateCount,
 		"fallback_candidate_count", fallbackCandidateCount,
+		"wait_plan", waitPlan,
+	)
+}
+
+func (s *GatewayService) logGatewaySingleCandidateCircuitFallbackSelected(groupID *int64, requestedModel, schedulerEndpoint string, accountID int64, waitPlan bool) {
+	slog.Warn(gatewaySingleCandidateCircuitFallbackLogEventName,
+		"group_id", derefGroupID(groupID),
+		"model", requestedModel,
+		"endpoint", schedulerEndpoint,
+		"account_id", accountID,
+		"reason", gatewaySingleCandidateCircuitFallbackReason,
 		"wait_plan", waitPlan,
 	)
 }

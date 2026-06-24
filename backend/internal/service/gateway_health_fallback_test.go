@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
@@ -157,6 +158,68 @@ func TestGatewayServiceSchedulerCircuitOpenSkipsBadUpstreamAndSelectsHealthy(t *
 	}
 	if got := concurrencyCache.acquireCalls[healthyID]; got != 1 {
 		t.Fatalf("healthy account acquire calls=%d want=1", got)
+	}
+	if result.ReleaseFunc != nil {
+		result.ReleaseFunc()
+	}
+}
+
+func TestGatewayServiceSchedulerCircuitOpenSingleCandidateTransientFallback(t *testing.T) {
+	ctx := context.WithValue(context.Background(), ctxkey.ForcePlatform, PlatformAnthropic)
+	ctx = WithSchedulerEndpoint(ctx, "/v1/messages")
+	model := "claude-opus-4-8"
+
+	accountID := int64(51501)
+	repo := stubOpenAIAccountRepo{accounts: []Account{
+		{
+			ID:          accountID,
+			Platform:    PlatformAnthropic,
+			Type:        AccountTypeAPIKey,
+			Status:      StatusActive,
+			Schedulable: true,
+			Concurrency: 1,
+			Priority:    0,
+		},
+	}}
+	concurrencyCache := &gatewayHealthFallbackConcurrencyCache{}
+	svc := &GatewayService{
+		accountRepo: repo,
+		cache:       &stubGatewayCache{},
+		cfg: &config.Config{
+			RunMode: config.RunModeStandard,
+			Gateway: config.GatewayConfig{
+				Scheduling: config.GatewaySchedulingConfig{
+					LoadBatchEnabled:         true,
+					StickySessionMaxWaiting:  3,
+					StickySessionWaitTimeout: time.Second,
+					FallbackWaitTimeout:      time.Second,
+					FallbackMaxWaiting:       10,
+				},
+			},
+		},
+		concurrencyService: NewConcurrencyService(concurrencyCache),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+	svc.schedulerHealth.reportFailure(accountID, model, "/v1/messages", "transient_timeout", time.Minute)
+
+	result, err := svc.SelectAccountWithLoadAwareness(ctx, nil, "", model, nil, "", 0)
+	if err != nil {
+		t.Fatalf("SelectAccountWithLoadAwareness() error = %v", err)
+	}
+	if result == nil || result.Account == nil {
+		t.Fatalf("expected selected account, got %#v", result)
+	}
+	if result.Account.ID != accountID {
+		t.Fatalf("selected account=%d want=%d", result.Account.ID, accountID)
+	}
+	if !result.Acquired {
+		t.Fatalf("expected acquired single-candidate fallback")
+	}
+	if !result.WeakFallback || result.WeakFallbackReason != gatewaySingleCandidateCircuitFallbackReason {
+		t.Fatalf("fallback flags = weak:%t reason:%q", result.WeakFallback, result.WeakFallbackReason)
+	}
+	if got := concurrencyCache.acquireCalls[accountID]; got != 1 {
+		t.Fatalf("single circuit-open account acquire calls=%d want=1", got)
 	}
 	if result.ReleaseFunc != nil {
 		result.ReleaseFunc()
