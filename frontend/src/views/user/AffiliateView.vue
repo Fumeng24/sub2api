@@ -8,20 +8,17 @@
       </div>
 
       <template v-else-if="detail">
-        <section class="relative overflow-hidden rounded-3xl border border-emerald-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.20),_transparent_34%),linear-gradient(135deg,_#f8fafc_0%,_#ecfdf5_42%,_#fff7ed_100%)] p-5 shadow-sm dark:border-emerald-900/60 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.22),_transparent_34%),linear-gradient(135deg,_#08111f_0%,_#052e26_48%,_#1c1308_100%)] sm:p-7">
-          <div class="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-amber-300/30 blur-3xl dark:bg-amber-500/10"></div>
-          <div class="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-emerald-400/20 blur-3xl dark:bg-emerald-400/10"></div>
-
-          <div class="relative grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)] lg:items-stretch">
+        <section class="overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-5 shadow-sm sm:p-7">
+          <div class="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)] lg:items-stretch">
             <div class="min-w-0">
-              <div class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 shadow-sm backdrop-blur dark:border-emerald-800/70 dark:bg-white/10 dark:text-emerald-200">
+              <div class="inline-flex items-center gap-2 rounded-full border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--apple-muted)]">
                 <Icon name="sparkles" size="xs" :stroke-width="2" />
                 {{ t('affiliate.hero.kicker') }}
               </div>
-              <h1 class="mt-4 max-w-3xl text-3xl font-black tracking-tight text-gray-950 dark:text-white sm:text-4xl lg:text-5xl">
+              <h1 class="mt-4 max-w-3xl text-3xl font-semibold tracking-normal text-[var(--apple-text)] sm:text-4xl lg:text-5xl">
                 {{ t('affiliate.hero.title') }}
               </h1>
-              <p class="mt-4 max-w-2xl text-base leading-7 text-gray-700 dark:text-gray-300">
+              <p class="mt-4 max-w-2xl text-base leading-7 text-[var(--apple-muted)]">
                 {{ t('affiliate.hero.description') }}
               </p>
 
@@ -29,7 +26,7 @@
                 <div
                   v-for="item in heroPills"
                   :key="item"
-                  class="rounded-2xl border border-white/70 bg-white/75 px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-gray-100"
+                  class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--apple-text)]"
                 >
                   {{ item }}
                 </div>
@@ -40,12 +37,12 @@
                   <Icon name="copy" size="sm" />
                   <span>{{ t('affiliate.promo.copyButton') }}</span>
                 </button>
-                <button class="btn btn-secondary w-full border-white/70 bg-white/75 sm:w-auto dark:border-white/10 dark:bg-white/10" @click="copyInviteLink">
+                <button class="btn btn-secondary w-full sm:w-auto" @click="copyInviteLink">
                   <Icon name="link" size="sm" />
                   <span>{{ t('affiliate.copyLink') }}</span>
                 </button>
               </div>
-              <p class="mt-3 text-sm text-emerald-800/80 dark:text-emerald-200/80">
+              <p class="mt-3 text-sm text-[var(--apple-muted)]">
                 {{ t('affiliate.hero.shareHint') }}
               </p>
             </div>
@@ -54,13 +51,13 @@
               <div
                 v-for="item in affiliateStats"
                 :key="item.label"
-                class="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10"
+                class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-4"
               >
-                <p class="text-sm text-gray-500 dark:text-dark-300">{{ item.label }}</p>
-                <p class="mt-2 break-words text-2xl font-black text-gray-950 dark:text-white">
+                <p class="text-sm text-[var(--apple-muted)]">{{ item.label }}</p>
+                <p class="mt-2 break-words text-2xl font-semibold text-[var(--apple-text)]">
                   {{ item.value }}
                 </p>
-                <p v-if="item.hint" class="mt-1 text-xs leading-5 text-gray-500 dark:text-dark-300">{{ item.hint }}</p>
+                <p v-if="item.hint" class="mt-1 text-xs leading-5 text-[var(--apple-muted)]">{{ item.hint }}</p>
               </div>
             </div>
           </div>
@@ -70,13 +67,13 @@
           <section class="card min-w-0 p-5 sm:p-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-300">
+                <p class="text-xs font-semibold uppercase tracking-normal text-[var(--apple-muted)]">
                   {{ t('affiliate.sharePanel.kicker') }}
                 </p>
-                <h2 class="mt-2 text-xl font-black tracking-tight text-gray-950 dark:text-white">
+                <h2 class="mt-2 text-xl font-semibold tracking-normal text-[var(--apple-text)]">
                   {{ t('affiliate.sharePanel.title') }}
                 </h2>
-                <p class="mt-1 text-sm leading-6 text-gray-500 dark:text-dark-400">
+                <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">
                   {{ t('affiliate.sharePanel.description') }}
                 </p>
               </div>
@@ -90,12 +87,12 @@
               <dl
                 v-for="item in shareSummaryStats"
                 :key="item.label"
-                class="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+                class="min-w-0 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-3"
               >
-                <dt class="truncate text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                <dt class="truncate text-xs font-medium text-[var(--apple-muted)]">
                   {{ item.label }}
                 </dt>
-                <dd class="mt-1 truncate text-base font-black text-gray-950 dark:text-white">
+                <dd class="mt-1 truncate text-base font-semibold text-[var(--apple-text)]">
                   {{ item.value }}
                 </dd>
               </dl>
@@ -103,9 +100,9 @@
 
             <div class="mt-5 space-y-4">
               <div class="min-w-0 space-y-2">
-                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('affiliate.yourCode') }}</p>
-                <div class="flex min-w-0 flex-col gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-dark-700 dark:bg-dark-900 md:flex-row md:items-center">
-                  <code class="block min-w-0 flex-1 select-all break-all font-mono text-sm font-bold tracking-wide text-gray-950 dark:text-white md:truncate md:break-normal" :title="detail.aff_code" v-text="detail.aff_code"></code>
+                <p class="text-sm font-semibold text-[var(--apple-text)]">{{ t('affiliate.yourCode') }}</p>
+                <div class="flex min-w-0 flex-col gap-2 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] px-3 py-3 md:flex-row md:items-center">
+                  <code class="block min-w-0 flex-1 select-all break-all font-mono text-sm font-semibold tracking-normal text-[var(--apple-text)] md:truncate md:break-normal" :title="detail.aff_code" v-text="detail.aff_code"></code>
                   <button class="btn btn-secondary btn-sm w-full md:w-auto md:shrink-0" @click="copyCode">
                     <Icon name="copy" size="sm" />
                     <span>{{ t('affiliate.copyCode') }}</span>
@@ -114,9 +111,9 @@
               </div>
 
               <div class="min-w-0 space-y-2">
-                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('affiliate.inviteLink') }}</p>
-                <div class="flex min-w-0 flex-col gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-dark-700 dark:bg-dark-900 md:flex-row md:items-center">
-                  <code class="block min-w-0 flex-1 select-all break-all font-mono text-sm text-gray-700 dark:text-gray-300 md:truncate md:break-normal" :title="inviteLink" v-text="inviteLink"></code>
+                <p class="text-sm font-semibold text-[var(--apple-text)]">{{ t('affiliate.inviteLink') }}</p>
+                <div class="flex min-w-0 flex-col gap-2 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] px-3 py-3 md:flex-row md:items-center">
+                  <code class="block min-w-0 flex-1 select-all break-all font-mono text-sm text-[var(--apple-muted)] md:truncate md:break-normal" :title="inviteLink" v-text="inviteLink"></code>
                   <button class="btn btn-secondary btn-sm w-full md:w-auto md:shrink-0" @click="copyInviteLink">
                     <Icon name="copy" size="sm" />
                     <span>{{ t('affiliate.copyLink') }}</span>
@@ -127,22 +124,22 @@
 
           <div
             v-if="detail.inviter_id == null && detail.can_bind_inviter"
-            class="mt-5 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-900/50 dark:bg-amber-950/20"
+            class="mt-5 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-4"
           >
             <form
               class="grid gap-4 xl:grid-cols-[minmax(280px,1fr)_minmax(320px,420px)] xl:items-end"
               @submit.prevent="bindInviter"
             >
               <div class="min-w-0">
-                <h4 class="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                <h4 class="text-sm font-semibold text-[var(--apple-text)]">
                   {{ t('affiliate.bind.title') }}
                 </h4>
-                <p class="mt-1 text-sm leading-6 text-amber-800/80 dark:text-amber-200/80">
+                <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">
                   {{ t('affiliate.bind.description') }}
                 </p>
                 <p
                   v-if="bindBonusAmount > 0"
-                  class="mt-2 inline-flex rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm dark:bg-white/10 dark:text-amber-200"
+                  class="mt-2 inline-flex rounded-full border border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-3 py-1 text-xs font-semibold text-[var(--apple-blue)]"
                 >
                   {{ t('affiliate.bind.bonusHint', { amount: formatCurrency(bindBonusAmount) }) }}
                 </p>
@@ -151,7 +148,7 @@
                 <input
                   v-model="bindCode"
                   type="text"
-                  class="input min-w-0 flex-1 bg-white/90 uppercase dark:bg-dark-950/70"
+                  class="input min-w-0 flex-1 uppercase"
                   :placeholder="t('affiliate.bind.codePlaceholder')"
                   :disabled="binding"
                   autocomplete="off"
@@ -171,14 +168,14 @@
 
           <div
             v-if="detail.can_claim_bind_bonus && bindBonusAmount > 0"
-            class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/85 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+            class="mt-5 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-4"
           >
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
-                <h4 class="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                <h4 class="text-sm font-semibold text-[var(--apple-text)]">
                   {{ t('affiliate.bind.claimTitle') }}
                 </h4>
-                <p class="mt-1 text-sm leading-6 text-emerald-800/80 dark:text-emerald-200/80">
+                <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">
                   {{ t('affiliate.bind.claimDescription', { amount: formatCurrency(bindBonusAmount) }) }}
                 </p>
               </div>
@@ -195,24 +192,24 @@
             </div>
           </div>
 
-            <div class="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-              <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+            <div class="mt-5 overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-4">
+              <p class="text-sm font-semibold text-[var(--apple-text)]">
                 {{ t('affiliate.promo.previewTitle') }}
               </p>
-              <div class="mt-3 break-words rounded-xl border border-white/80 bg-white/85 p-4 text-sm leading-6 text-gray-700 shadow-sm dark:border-white/10 dark:bg-dark-950/60 dark:text-gray-300">
+              <div class="mt-3 break-words rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 text-sm leading-6 text-[var(--apple-muted)]">
                 {{ promoShareText }}
               </div>
             </div>
           </section>
 
           <section class="card min-w-0 p-5 sm:p-6">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-300">
+            <p class="text-xs font-semibold uppercase tracking-normal text-[var(--apple-muted)]">
               {{ t('affiliate.friendBenefits.kicker') }}
             </p>
-            <h2 class="mt-2 text-xl font-black tracking-tight text-gray-950 dark:text-white">
+            <h2 class="mt-2 text-xl font-semibold tracking-normal text-[var(--apple-text)]">
               {{ t('affiliate.friendBenefits.title') }}
             </h2>
-            <p class="mt-1 text-sm leading-6 text-gray-500 dark:text-dark-400">
+            <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">
               {{ t('affiliate.friendBenefits.description') }}
             </p>
 
@@ -220,13 +217,13 @@
               <div
                 v-for="item in proofCards"
                 :key="item.title"
-                class="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900"
+                class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-4"
               >
-                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm dark:bg-white/10 dark:text-emerald-300">
+                <div class="flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] text-[var(--apple-blue)]">
                   <Icon :name="item.icon" size="sm" :stroke-width="2" />
                 </div>
-                <h3 class="mt-3 text-sm font-bold text-gray-950 dark:text-white">{{ item.title }}</h3>
-                <p class="mt-1 text-sm leading-6 text-gray-500 dark:text-dark-400">{{ item.description }}</p>
+                <h3 class="mt-3 text-sm font-semibold text-[var(--apple-text)]">{{ item.title }}</h3>
+                <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">{{ item.description }}</p>
               </div>
             </div>
           </section>
@@ -235,13 +232,13 @@
         <section class="card min-w-0 p-5 sm:p-6">
           <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-300">
+              <p class="text-xs font-semibold uppercase tracking-normal text-[var(--apple-muted)]">
                 {{ t('affiliate.audiences.kicker') }}
               </p>
-              <h2 class="mt-2 text-xl font-black tracking-tight text-gray-950 dark:text-white">
+              <h2 class="mt-2 text-xl font-semibold tracking-normal text-[var(--apple-text)]">
                 {{ t('affiliate.audiences.title') }}
               </h2>
-              <p class="mt-1 text-sm leading-6 text-gray-500 dark:text-dark-400">
+              <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">
                 {{ t('affiliate.audiences.description') }}
               </p>
             </div>
@@ -251,18 +248,18 @@
             <article
               v-for="item in audienceCards"
               :key="item.title"
-              class="min-w-0 rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 dark:border-dark-700 dark:from-dark-900 dark:to-dark-950"
+              class="min-w-0 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-4"
             >
               <div class="flex items-start gap-3">
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] text-[var(--apple-blue)]">
                   <Icon :name="item.icon" size="sm" :stroke-width="2" />
                 </div>
                 <div class="min-w-0">
-                  <h3 class="text-base font-bold text-gray-950 dark:text-white">{{ item.title }}</h3>
-                  <p class="mt-1 text-sm leading-6 text-gray-500 dark:text-dark-400">{{ item.description }}</p>
+                  <h3 class="text-base font-semibold text-[var(--apple-text)]">{{ item.title }}</h3>
+                  <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">{{ item.description }}</p>
                 </div>
               </div>
-              <div class="mt-4 rounded-xl border border-dashed border-gray-300 bg-white/70 p-3 text-sm leading-6 text-gray-700 dark:border-dark-700 dark:bg-white/5 dark:text-gray-300">
+              <div class="mt-4 rounded-lg border border-dashed border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-3 text-sm leading-6 text-[var(--apple-muted)]">
                 {{ item.copy }}
               </div>
               <button class="btn btn-secondary btn-sm mt-3 w-full sm:w-auto" @click="copyAudienceText(item.copy)">
@@ -275,17 +272,17 @@
 
         <section class="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <div class="card min-w-0 p-5 sm:p-6">
-            <p class="text-sm font-semibold text-primary-800 dark:text-primary-200">{{ t('affiliate.rules.title') }}</p>
+            <p class="text-sm font-semibold text-[var(--apple-text)]">{{ t('affiliate.rules.title') }}</p>
             <div class="mt-4 grid gap-3">
               <div
                 v-for="(item, index) in howItWorks"
                 :key="item"
-                class="flex gap-3 rounded-2xl border border-primary-100 bg-primary-50/70 p-3 dark:border-primary-900/40 dark:bg-primary-900/15"
+                class="flex gap-3 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-3"
               >
-                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-600 text-sm font-bold text-white">
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--apple-blue)] text-sm font-semibold text-white">
                   {{ index + 1 }}
                 </span>
-                <p class="min-w-0 text-sm leading-6 text-primary-800 dark:text-primary-200">{{ item }}</p>
+                <p class="min-w-0 text-sm leading-6 text-[var(--apple-muted)]">{{ item }}</p>
               </div>
             </div>
           </div>
@@ -293,8 +290,8 @@
           <div class="card min-w-0 p-5 sm:p-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('affiliate.transfer.title') }}</h3>
-              <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">{{ t('affiliate.transfer.description') }}</p>
+              <h3 class="text-base font-semibold text-[var(--apple-text)]">{{ t('affiliate.transfer.title') }}</h3>
+              <p class="mt-1 text-sm text-[var(--apple-muted)]">{{ t('affiliate.transfer.description') }}</p>
             </div>
             <button
               class="btn btn-primary"
@@ -313,14 +310,14 @@
         </section>
 
         <div class="card min-w-0 p-5 sm:p-6">
-          <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('affiliate.invitees.title') }}</h3>
-          <div v-if="detail.invitees.length === 0" class="mt-4 rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-dark-400">
+          <h3 class="text-base font-semibold text-[var(--apple-text)]">{{ t('affiliate.invitees.title') }}</h3>
+          <div v-if="detail.invitees.length === 0" class="mt-4 rounded-lg border border-dashed border-[color:var(--apple-border)] p-6 text-center text-sm text-[var(--apple-muted)]">
             {{ t('affiliate.invitees.empty') }}
           </div>
           <div v-else class="mt-4 overflow-x-auto">
-            <table class="w-full min-w-[560px] text-left text-sm">
+            <table class="table w-full min-w-[560px] text-left text-sm">
               <thead>
-                <tr class="border-b border-gray-200 text-gray-500 dark:border-dark-700 dark:text-dark-400">
+                <tr>
                   <th class="px-3 py-2 font-medium">{{ t('affiliate.invitees.columns.email') }}</th>
                   <th class="px-3 py-2 font-medium">{{ t('affiliate.invitees.columns.username') }}</th>
                   <th class="px-3 py-2 font-medium text-right">{{ t('affiliate.invitees.columns.rebate') }}</th>
@@ -331,12 +328,11 @@
                 <tr
                   v-for="item in detail.invitees"
                   :key="item.user_id"
-                  class="border-b border-gray-100 last:border-b-0 dark:border-dark-800"
                 >
-                  <td class="px-3 py-3 text-gray-900 dark:text-white">{{ item.email || '-' }}</td>
-                  <td class="px-3 py-3 text-gray-700 dark:text-gray-300">{{ item.username || '-' }}</td>
+                  <td class="px-3 py-3">{{ item.email || '-' }}</td>
+                  <td class="px-3 py-3">{{ item.username || '-' }}</td>
                   <td class="px-3 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400">{{ formatCurrency(item.total_rebate) }}</td>
-                  <td class="px-3 py-3 text-gray-700 dark:text-gray-300">{{ formatDateTime(item.created_at) || '-' }}</td>
+                  <td class="px-3 py-3">{{ formatDateTime(item.created_at) || '-' }}</td>
                 </tr>
               </tbody>
             </table>

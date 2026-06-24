@@ -1,13 +1,42 @@
 <template>
   <AppLayout>
     <TablePageLayout>
+      <template #actions>
+        <div class="page-header mb-0 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div class="min-w-0">
+            <h1 class="page-title">
+              {{ t('tickets.title') }}
+            </h1>
+            <p class="page-description max-w-2xl leading-6">
+              {{ t('tickets.description') }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <span
+                v-for="signal in ticketTrustSignals"
+                :key="signal"
+                class="rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] px-2.5 py-1 text-xs font-medium text-[var(--apple-muted)]"
+              >
+                {{ signal }}
+              </span>
+            </div>
+            <p class="ticket-trust-note mt-3 max-w-2xl px-3 py-2 text-sm leading-6">
+              {{ t('tickets.assurance') }}
+            </p>
+          </div>
+          <button class="btn btn-primary justify-center" @click="openCreateDialog">
+            <Icon name="plus" size="md" />
+            <span class="whitespace-normal text-center leading-5">{{ t('tickets.createTicket') }}</span>
+          </button>
+        </div>
+      </template>
+
       <template #filters>
         <div class="flex flex-wrap items-center gap-3">
           <div class="relative w-full sm:w-64">
             <Icon
               name="search"
               size="md"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--apple-muted-2)]"
             />
             <input
               v-model="searchQuery"
@@ -32,10 +61,6 @@
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
             </button>
-            <button class="btn btn-primary" @click="openCreateDialog">
-              <Icon name="plus" size="md" class="mr-1" />
-              {{ t('tickets.createTicket') }}
-            </button>
           </div>
         </div>
       </template>
@@ -52,11 +77,11 @@
           @sort="handleSort"
         >
           <template #cell-subject="{ value, row }">
-            <button class="max-w-[360px] text-left" @click="openDetail(row)">
-              <span class="block truncate font-medium text-gray-900 hover:text-primary-600 dark:text-white dark:hover:text-primary-400">
+            <button class="group max-w-[360px] text-left" @click="openDetail(row)">
+              <span class="block truncate font-medium text-[var(--apple-text)] transition-colors group-hover:text-[var(--apple-blue)]">
                 {{ value }}
               </span>
-              <span class="mt-1 block text-xs text-gray-500 dark:text-dark-400">
+              <span class="mt-1 block text-xs text-[var(--apple-muted-2)]">
                 {{ row.ticket_no }}
               </span>
             </button>
@@ -75,17 +100,17 @@
           </template>
 
           <template #cell-last_message_at="{ value }">
-            <span class="text-sm text-gray-500 dark:text-dark-400">{{ formatDateTime(value) }}</span>
+            <span class="text-sm text-[var(--apple-muted)]">{{ formatDateTime(value) }}</span>
           </template>
 
           <template #cell-unread_count="{ value }">
             <span v-if="value > 0" class="badge badge-primary">{{ t('tickets.unreadCount', { count: value }) }}</span>
-            <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{ t('tickets.noUnread') }}</span>
+            <span v-else class="text-sm text-[var(--apple-muted-2)]">{{ t('tickets.noUnread') }}</span>
           </template>
 
           <template #cell-actions="{ row }">
             <button
-              class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+              class="ticket-action-link inline-flex min-h-8 items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
               @click="openDetail(row)"
             >
               <Icon name="chatBubble" size="sm" />
@@ -131,7 +156,7 @@
 
         <div
           v-if="selectedTemplate?.requires_super_admin"
-          class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100"
+          class="ticket-warning-note rounded-lg p-3 text-sm"
         >
           {{ t('tickets.form.superAdminHint') }}
         </div>
@@ -166,11 +191,11 @@
           </p>
         </div>
 
-        <div v-if="templateFields.length > 0" class="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-dark-700">
+        <div v-if="templateFields.length > 0" class="ticket-form-section space-y-4 p-4">
           <div v-for="field in templateFields" :key="field.key">
             <label class="input-label">
               {{ field.label }}
-              <span v-if="field.required" class="text-red-500">*</span>
+              <span v-if="field.required" class="text-[var(--apple-danger)]">*</span>
             </label>
 
             <Select
@@ -188,29 +213,29 @@
                 <label
                   v-for="order in recentOrders"
                   :key="order.id"
-                  class="flex gap-3 rounded-lg border border-gray-200 bg-white p-3 text-sm dark:border-dark-700 dark:bg-dark-900"
+                  class="ticket-order-card flex gap-3 p-3 text-sm"
                 >
                   <input
                     type="checkbox"
-                    class="mt-1 h-4 w-4 flex-shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    class="ticket-checkbox mt-1 h-4 w-4 flex-shrink-0 rounded"
                     :checked="selectedRecentOrderIds.includes(order.id)"
                     @change="toggleRecentOrder(order.id, eventChecked($event))"
                   />
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center justify-between gap-3">
-                      <span class="font-medium text-gray-900 dark:text-white">#{{ order.id }}</span>
+                      <span class="font-medium text-[var(--apple-text)]">#{{ order.id }}</span>
                       <span class="badge badge-gray">{{ order.status }}</span>
                     </div>
-                    <div class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+                    <div class="mt-1 text-xs text-[var(--apple-muted-2)]">
                       {{ formatDateTime(order.created_at) }}
                     </div>
-                    <div class="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                    <div class="mt-2 text-xs text-[var(--apple-muted)]">
                       {{ t('tickets.form.orderAmount', { amount: formatAmount(order.amount), pay: formatAmount(order.pay_amount ?? order.amount, order.currency) }) }}
                     </div>
                   </div>
                 </label>
               </div>
-              <p v-else class="text-sm text-amber-600 dark:text-amber-300">
+              <p v-else class="text-sm text-[var(--apple-warning)]">
                 {{ t('tickets.form.noRecentOrders') }}
               </p>
             </div>
@@ -267,7 +292,7 @@
               </div>
               <div
                 v-if="imagePreviewValue(field.key)"
-                class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-800"
+                class="ticket-image-preview flex flex-wrap items-center gap-3 p-3"
               >
                 <img
                   :src="imagePreviewValue(field.key)"
@@ -275,14 +300,14 @@
                   class="h-20 w-20 rounded-md object-cover"
                 />
                 <div class="min-w-0 flex-1 text-sm">
-                  <p class="truncate font-medium text-gray-900 dark:text-white">
+                  <p class="truncate font-medium text-[var(--apple-text)]">
                     {{ imageFileName(field.key) || t('tickets.form.imageSelected') }}
                   </p>
                   <a
                     :href="imagePreviewValue(field.key)"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="mt-1 inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 dark:text-primary-400"
+                    class="ticket-action-link mt-1 inline-flex items-center gap-1"
                   >
                     <Icon name="externalLink" size="xs" />
                     {{ t('tickets.form.viewImage') }}
@@ -308,14 +333,17 @@
         </div>
 
         <TicketAttachmentFields v-model="createForm.attachments" />
+        <p class="ticket-trust-note px-3 py-2 text-xs leading-5">
+          {{ t('tickets.form.privacyNote') }}
+        </p>
       </form>
 
       <template #footer>
-        <div class="flex justify-end gap-3">
-          <button type="button" class="btn btn-secondary" @click="closeCreateDialog">
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-3">
+          <button type="button" class="btn btn-secondary justify-center" @click="closeCreateDialog">
             {{ t('common.cancel') }}
           </button>
-          <button type="submit" form="ticket-create-form" class="btn btn-primary" :disabled="creating">
+          <button type="submit" form="ticket-create-form" class="btn btn-primary justify-center" :disabled="creating">
             {{ creating ? t('common.saving') : t('tickets.submitTicket') }}
           </button>
         </div>
@@ -329,7 +357,7 @@
       @close="closeDetailDialog"
     >
       <div v-if="selectedTicket" class="space-y-5">
-        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800">
+        <div class="ticket-detail-summary p-4">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
@@ -337,10 +365,10 @@
                 <span :class="['badge', priorityBadgeClass(selectedTicket.priority)]">{{ priorityLabel(selectedTicket.priority) }}</span>
                 <span class="badge badge-gray">{{ categoryLabel(selectedTicket.category) }}</span>
               </div>
-              <h3 class="mt-3 break-words text-base font-semibold text-gray-900 dark:text-white">
+              <h3 class="mt-3 break-words text-base font-semibold text-[var(--apple-text)]">
                 {{ selectedTicket.subject }}
               </h3>
-              <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">
+              <p class="mt-1 text-sm text-[var(--apple-muted)]">
                 {{ selectedTicket.ticket_no }} · {{ t('tickets.lastMessageAt') }} {{ formatDateTime(selectedTicket.last_message_at) }}
               </p>
               <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -370,7 +398,7 @@
         </div>
 
         <div class="max-h-[48vh] space-y-3 overflow-y-auto pr-1">
-          <div v-if="detailLoading" class="py-10 text-center text-sm text-gray-500 dark:text-dark-400">
+          <div v-if="detailLoading" class="py-10 text-center text-sm text-[var(--apple-muted)]">
             {{ t('common.loading') }}
           </div>
           <template v-else>
@@ -382,24 +410,24 @@
             >
               <div
                 :class="[
-                  'max-w-[85%] rounded-lg border px-4 py-3 text-sm',
+                  'max-w-full rounded-lg border px-4 py-3 text-sm shadow-sm sm:max-w-[85%]',
                   message.sender_type === 'user'
-                    ? 'border-primary-200 bg-primary-50 text-primary-950 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-100'
-                    : 'border-gray-200 bg-white text-gray-800 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-200'
+                    ? 'ticket-message-user'
+                    : 'ticket-message-support'
                 ]"
               >
-                <div class="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-dark-400">
+                <div class="mb-2 flex flex-wrap items-center gap-2 text-xs text-[var(--apple-muted-2)]">
                   <span class="font-medium">{{ senderLabel(message) }}</span>
                   <span>{{ formatDateTime(message.created_at) }}</span>
                 </div>
-                <p class="whitespace-pre-wrap break-words leading-6">{{ message.body }}</p>
+                <p class="whitespace-pre-wrap break-words leading-6 [overflow-wrap:anywhere]">{{ message.body }}</p>
                 <TicketAttachments :attachments="message.attachments" />
               </div>
             </div>
           </template>
         </div>
 
-        <div v-if="selectedTicket.status === 'closed'" class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600 dark:bg-dark-800 dark:text-gray-300">
+        <div v-if="selectedTicket.status === 'closed'" class="ticket-detail-summary p-4 text-sm text-[var(--apple-muted)]">
           {{ t('tickets.closedReplyHint') }}
         </div>
         <form v-else class="space-y-3" @submit.prevent="handleReply">
@@ -579,6 +607,12 @@ const unreadFilterOptions = computed(() => [
   { value: true, label: t('tickets.filters.onlyUnread') }
 ])
 
+const ticketTrustSignals = computed(() => [
+  t('tickets.trust.privacy'),
+  t('tickets.trust.billing'),
+  t('tickets.trust.traceable')
+])
+
 const selectedTemplate = computed(() => {
   return templates.value.find((item) => item.key === createForm.template_key) || null
 })
@@ -592,7 +626,7 @@ const templateOptions = computed(() => templates.value.map((item) => ({
 
 const groupOptions = computed(() => (prefillData.value.groups || []).map((group) => ({
   value: group.id,
-  label: `${group.name} (${Number(group.rate_multiplier ?? 0).toFixed(2)}x)`
+  label: group.name
 })))
 
 const recentOrders = computed<TicketPrefillOrder[]>(() => prefillData.value.recent_orders || [])
@@ -1122,3 +1156,84 @@ onUnmounted(() => {
   if (searchTimer) window.clearTimeout(searchTimer)
 })
 </script>
+
+<style scoped>
+.ticket-trust-note,
+.ticket-form-section,
+.ticket-detail-summary {
+  border: 1px solid var(--apple-border);
+  border-radius: var(--apple-radius);
+  background: var(--apple-surface-elevated);
+  color: var(--apple-muted);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.ticket-form-section,
+.ticket-detail-summary {
+  color: var(--apple-text);
+}
+
+.ticket-warning-note {
+  border: 1px solid color-mix(in srgb, var(--apple-warning) 26%, var(--apple-border));
+  background: color-mix(in srgb, var(--apple-warning) 10%, var(--apple-surface));
+  color: var(--apple-warning);
+}
+
+.ticket-action-link {
+  color: var(--apple-blue);
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.ticket-action-link:hover {
+  background: var(--apple-hover);
+  color: var(--apple-blue-hover);
+}
+
+.ticket-action-link:focus-visible {
+  outline: 2px solid var(--apple-focus-ring);
+  outline-offset: 2px;
+}
+
+.ticket-order-card,
+.ticket-image-preview {
+  border: 1px solid var(--apple-border-soft);
+  border-radius: var(--apple-radius);
+  background: var(--apple-surface);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.ticket-order-card {
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.ticket-order-card:hover {
+  border-color: color-mix(in srgb, var(--apple-blue) 32%, var(--apple-border));
+  background: color-mix(in srgb, var(--apple-blue) 5%, var(--apple-surface));
+}
+
+.ticket-checkbox {
+  border: 1px solid var(--apple-border);
+  accent-color: var(--apple-blue);
+}
+
+.ticket-checkbox:focus-visible {
+  outline: 2px solid var(--apple-focus-ring);
+  outline-offset: 2px;
+}
+
+.ticket-message-user {
+  border-color: color-mix(in srgb, var(--apple-blue) 34%, var(--apple-border));
+  background: color-mix(in srgb, var(--apple-blue) 11%, var(--apple-surface));
+  color: var(--apple-text);
+}
+
+.ticket-message-support {
+  border-color: var(--apple-border);
+  background: var(--apple-surface);
+  color: var(--apple-text);
+}
+</style>

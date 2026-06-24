@@ -1,25 +1,48 @@
 <template>
   <AppLayout>
     <div class="mx-auto max-w-2xl space-y-6">
-      <!-- Current Balance Card -->
-      <div class="card overflow-hidden">
-        <div class="bg-gradient-to-br from-primary-500 to-primary-600 px-6 py-8 text-center">
-          <div
-            class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm"
-          >
-            <Icon name="creditCard" size="xl" class="text-white" />
+      <div class="page-header mb-0">
+        <h1 class="page-title">
+          {{ t('redeem.title') }}
+        </h1>
+        <p class="page-description max-w-2xl leading-6">
+          {{ t('redeem.description') }}
+        </p>
+      </div>
+
+      <div class="grid gap-2 sm:grid-cols-3">
+        <div
+          v-for="item in redeemTrustItems"
+          :key="item.title"
+          class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-4 py-3"
+        >
+          <div class="flex items-center gap-2 text-sm font-semibold text-[var(--apple-text)]">
+            <Icon :name="item.icon" size="sm" class="text-[var(--apple-muted)]" />
+            <span>{{ item.title }}</span>
           </div>
-          <p class="text-sm font-medium text-primary-100">{{ t('redeem.currentBalance') }}</p>
-          <p class="mt-2 text-4xl font-bold text-white">
+          <p class="mt-1 text-xs leading-5 text-[var(--apple-muted)]">
+            {{ item.description }}
+          </p>
+        </div>
+      </div>
+
+      <div class="card p-6 text-center">
+        <div>
+          <div
+            class="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)]"
+          >
+            <Icon name="creditCard" size="xl" class="text-[var(--apple-blue)]" />
+          </div>
+          <p class="text-sm font-medium text-[var(--apple-muted)]">{{ t('redeem.currentBalance') }}</p>
+          <p class="mt-2 text-4xl font-semibold text-[var(--apple-text)]">
             {{ formatCreditedBalance(user?.balance || 0) }}
           </p>
-          <p class="mt-2 text-sm text-primary-100">
+          <p class="mt-2 text-sm text-[var(--apple-muted)]">
             {{ t('redeem.concurrency') }}: {{ user?.concurrency || 0 }} {{ t('redeem.requests') }}
           </p>
         </div>
       </div>
 
-      <!-- Redeem Form -->
       <div class="card">
         <div class="p-6">
           <form @submit.prevent="handleRedeem" class="space-y-5">
@@ -29,7 +52,7 @@
               </label>
               <div class="relative mt-1">
                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                  <Icon name="gift" size="md" class="text-gray-400 dark:text-dark-500" />
+                  <Icon name="gift" size="md" class="text-[var(--apple-muted)]" />
                 </div>
                 <input
                   id="code"
@@ -51,51 +74,34 @@
               :disabled="!redeemCode || submitting"
               class="btn btn-primary w-full py-3"
             >
-              <svg
-                v-if="submitting"
-                class="-ml-1 mr-2 h-5 w-5 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                ></circle>
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              <Icon v-else name="checkCircle" size="md" class="mr-2" />
+              <Icon
+                :name="submitting ? 'refresh' : 'checkCircle'"
+                size="md"
+                :class="submitting ? 'animate-spin' : ''"
+              />
               {{ submitting ? t('redeem.redeeming') : t('redeem.redeemButton') }}
             </button>
           </form>
         </div>
       </div>
 
-      <!-- Success Message -->
       <transition name="fade">
         <div
           v-if="redeemResult"
-          class="card border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20"
+          class="card border-[color:color-mix(in_srgb,var(--apple-success)_28%,var(--apple-border))]"
         >
           <div class="p-6">
             <div class="flex items-start gap-4">
               <div
-                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30"
+                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[color:color-mix(in_srgb,var(--apple-success)_28%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-success)_10%,var(--apple-surface))]"
               >
-                <Icon name="checkCircle" size="md" class="text-emerald-600 dark:text-emerald-400" />
+                <Icon name="checkCircle" size="md" class="text-[var(--apple-success)]" />
               </div>
-              <div class="flex-1">
-                <h3 class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-semibold text-[var(--apple-success)]">
                   {{ t('redeem.redeemSuccess') }}
                 </h3>
-                <div class="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
+                <div class="mt-2 break-words text-sm text-[var(--apple-muted)]">
                   <p>{{ redeemResult.message }}</p>
                   <div class="mt-3 space-y-1">
                     <p v-if="redeemResult.type === 'balance'" class="font-medium">
@@ -132,28 +138,27 @@
         </div>
       </transition>
 
-      <!-- Error Message -->
       <transition name="fade">
         <div
           v-if="errorMessage"
-          class="card border-red-200 bg-red-50 dark:border-red-800/50 dark:bg-red-900/20"
+          class="card border-[color:color-mix(in_srgb,var(--apple-danger)_28%,var(--apple-border))]"
         >
           <div class="p-6">
             <div class="flex items-start gap-4">
               <div
-                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/30"
+                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[color:color-mix(in_srgb,var(--apple-danger)_28%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-danger)_10%,var(--apple-surface))]"
               >
                 <Icon
                   name="exclamationCircle"
                   size="md"
-                  class="text-red-600 dark:text-red-400"
+                  class="text-[var(--apple-danger)]"
                 />
               </div>
-              <div class="flex-1">
-                <h3 class="text-sm font-semibold text-red-800 dark:text-red-300">
+              <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-semibold text-[var(--apple-danger)]">
                   {{ t('redeem.redeemFailed') }}
                 </h3>
-                <p class="mt-2 text-sm text-red-700 dark:text-red-400">
+                <p class="mt-2 break-words text-sm text-[var(--apple-muted)]">
                   {{ errorMessage }}
                 </p>
               </div>
@@ -162,160 +167,142 @@
         </div>
       </transition>
 
-      <!-- Information Card -->
       <div
-        class="card border-primary-200 bg-primary-50 dark:border-primary-800/50 dark:bg-primary-900/20"
+        class="card"
       >
         <div class="p-6">
           <div class="flex items-start gap-4">
             <div
-              class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/30"
+              class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)]"
             >
-              <Icon name="infoCircle" size="md" class="text-primary-600 dark:text-primary-400" />
+              <Icon name="infoCircle" size="md" class="text-[var(--apple-blue)]" />
             </div>
-            <div class="flex-1">
-              <h3 class="text-sm font-semibold text-primary-800 dark:text-primary-300">
+            <div class="min-w-0 flex-1">
+              <h3 class="text-sm font-semibold text-[var(--apple-text)]">
                 {{ t('redeem.aboutCodes') }}
               </h3>
-              <ul
-                class="mt-2 list-inside list-disc space-y-1 text-sm text-primary-700 dark:text-primary-400"
-              >
-                <li>{{ t('redeem.codeRule1') }}</li>
-                <li>{{ t('redeem.codeRule2') }}</li>
-                <li>
-                  {{ t('redeem.codeRule3') }}
+              <div class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                <div
+                  v-for="item in redeemAssuranceItems"
+                  :key="item"
+                  class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] px-3 py-2 text-[var(--apple-muted)]"
+                >
+                  {{ item }}
+                </div>
+                <div
+                  v-if="contactInfo"
+                  class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] px-3 py-2 text-[var(--apple-muted)]"
+                >
+                  {{ t('redeem.contactLine') }}
                   <span
-                    v-if="contactInfo"
-                    class="ml-1.5 inline-flex items-center rounded-md bg-primary-200/50 px-2 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-800/40 dark:text-primary-200"
+                    class="ml-1.5 inline-flex max-w-full items-center rounded-md border border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-2 py-0.5 text-xs font-medium text-[var(--apple-text)]"
                   >
                     {{ contactInfo }}
                   </span>
-                </li>
-                <li>{{ t('redeem.codeRule4') }}</li>
-              </ul>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Recent Activity -->
       <div class="card">
-        <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+        <div class="card-header">
+          <h2 class="text-lg font-semibold text-[var(--apple-text)]">
             {{ t('redeem.recentActivity') }}
           </h2>
         </div>
         <div class="p-6">
-          <!-- Loading State -->
           <div v-if="loadingHistory" class="flex items-center justify-center py-8">
-            <svg class="h-6 w-6 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
+            <Icon name="refresh" size="md" class="animate-spin text-[var(--apple-blue)]" />
           </div>
 
-          <!-- History List -->
           <div v-else-if="history.length > 0" class="space-y-3">
             <div
               v-for="item in history"
               :key="item.id"
-              class="flex items-center justify-between rounded-xl bg-gray-50 p-4 dark:bg-dark-800"
+              class="flex min-w-0 flex-col gap-3 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div class="flex items-center gap-4">
+              <div class="flex min-w-0 items-center gap-4">
                 <div
                   :class="[
-                    'flex h-10 w-10 items-center justify-center rounded-xl',
+                    'flex h-10 w-10 items-center justify-center rounded-lg border',
                     isBalanceType(item.type)
                       ? item.value >= 0
-                        ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                        : 'bg-red-100 dark:bg-red-900/30'
+                        ? 'border-[color:color-mix(in_srgb,var(--apple-success)_28%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-success)_10%,var(--apple-surface))]'
+                        : 'border-[color:color-mix(in_srgb,var(--apple-danger)_28%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-danger)_10%,var(--apple-surface))]'
                       : isSubscriptionType(item.type)
-                        ? 'bg-purple-100 dark:bg-purple-900/30'
+                        ? 'border-[color:color-mix(in_srgb,var(--apple-blue)_28%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-blue)_10%,var(--apple-surface))]'
                         : item.value >= 0
-                          ? 'bg-blue-100 dark:bg-blue-900/30'
-                          : 'bg-orange-100 dark:bg-orange-900/30'
+                          ? 'border-[color:color-mix(in_srgb,var(--apple-blue)_28%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-blue)_10%,var(--apple-surface))]'
+                          : 'border-[color:color-mix(in_srgb,var(--apple-warning)_28%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-warning)_10%,var(--apple-surface))]'
                   ]"
                 >
-                  <!-- 余额类型图标 -->
                   <Icon
                     v-if="isBalanceType(item.type)"
                     name="dollar"
                     size="md"
                     :class="
                       item.value >= 0
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-red-600 dark:text-red-400'
+                        ? 'text-[var(--apple-success)]'
+                        : 'text-[var(--apple-danger)]'
                     "
                   />
-                  <!-- 订阅类型图标 -->
                   <Icon
                     v-else-if="isSubscriptionType(item.type)"
                     name="badge"
                     size="md"
-                    class="text-purple-600 dark:text-purple-400"
+                    class="text-[var(--apple-blue)]"
                   />
-                  <!-- 并发类型图标 -->
                   <Icon
                     v-else
                     name="bolt"
                     size="md"
                     :class="
                       item.value >= 0
-                        ? 'text-blue-600 dark:text-blue-400'
-                        : 'text-orange-600 dark:text-orange-400'
+                        ? 'text-[var(--apple-blue)]'
+                        : 'text-[var(--apple-warning)]'
                     "
                   />
                 </div>
-                <div>
-                  <p class="text-sm font-medium text-gray-900 dark:text-white">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-medium text-[var(--apple-text)]">
                     {{ getHistoryItemTitle(item) }}
                   </p>
-                  <p class="text-xs text-gray-500 dark:text-dark-400">
+                  <p class="text-xs text-[var(--apple-muted)]">
                     {{ formatDateTime(item.used_at) }}
                   </p>
                 </div>
               </div>
-              <div class="text-right">
+              <div class="min-w-0 text-left sm:text-right">
                 <p
                   :class="[
                     'text-sm font-semibold',
                     isBalanceType(item.type)
                       ? item.value >= 0
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-red-600 dark:text-red-400'
+                        ? 'text-[var(--apple-success)]'
+                        : 'text-[var(--apple-danger)]'
                       : isSubscriptionType(item.type)
-                        ? 'text-purple-600 dark:text-purple-400'
+                        ? 'text-[var(--apple-blue)]'
                         : item.value >= 0
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'text-orange-600 dark:text-orange-400'
+                          ? 'text-[var(--apple-blue)]'
+                          : 'text-[var(--apple-warning)]'
                   ]"
                 >
                   {{ formatHistoryValue(item) }}
                 </p>
                 <p
                   v-if="!isAdminAdjustment(item.type)"
-                  class="font-mono text-xs text-gray-400 dark:text-dark-500"
+                  class="font-mono text-xs text-[var(--apple-muted)]"
                 >
                   {{ item.code.slice(0, 8) }}...
                 </p>
-                <p v-else class="text-xs text-gray-400 dark:text-dark-500">
+                <p v-else class="text-xs text-[var(--apple-muted)]">
                   {{ t('redeem.adminAdjustment') }}
                 </p>
-                <!-- Display notes for admin adjustments -->
                 <p
                   v-if="item.notes"
-                  class="mt-1 text-xs text-gray-500 dark:text-dark-400 italic max-w-[200px] truncate"
+                  class="mt-1 max-w-full truncate text-xs italic text-[var(--apple-muted)] sm:max-w-[220px]"
                   :title="item.notes"
                 >
                   {{ item.notes }}
@@ -324,14 +311,13 @@
             </div>
           </div>
 
-          <!-- Empty State -->
           <div v-else class="empty-state py-8">
             <div
-              class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-dark-800"
+              class="mb-4 flex h-14 w-14 items-center justify-center rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)]"
             >
-              <Icon name="clock" size="xl" class="text-gray-400 dark:text-dark-500" />
+              <Icon name="clock" size="xl" class="text-[var(--apple-muted)]" />
             </div>
-            <p class="text-sm text-gray-500 dark:text-dark-400">
+            <p class="text-sm text-[var(--apple-muted)]">
               {{ t('redeem.historyWillAppear') }}
             </p>
           </div>
@@ -359,6 +345,30 @@ const appStore = useAppStore()
 const subscriptionStore = useSubscriptionStore()
 
 const user = computed(() => authStore.user)
+const redeemTrustItems = computed<Array<{ icon: 'dollar' | 'document' | 'shield'; title: string; description: string }>>(() => [
+  {
+    icon: 'dollar',
+    title: t('redeem.trust.transparentBalance'),
+    description: t('redeem.trust.transparentBalanceDesc')
+  },
+  {
+    icon: 'document',
+    title: t('redeem.trust.auditableHistory'),
+    description: t('redeem.trust.auditableHistoryDesc')
+  },
+  {
+    icon: 'shield',
+    title: t('redeem.trust.recoverableIssues'),
+    description: t('redeem.trust.recoverableIssuesDesc')
+  }
+])
+const redeemAssuranceItems = computed(() => [
+  t('redeem.assurance.official'),
+  t('redeem.assurance.singleUse'),
+  t('redeem.assurance.coverage'),
+  t('redeem.assurance.privacy'),
+  t('redeem.assurance.instantUpdate')
+])
 
 const redeemCode = ref('')
 const submitting = ref(false)

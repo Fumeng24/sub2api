@@ -2,12 +2,12 @@
   <div :class="props.embedded ? 'space-y-4' : 'card'">
     <div
       v-if="!props.embedded"
-      class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+      class="card-header"
     >
-      <h2 class="text-lg font-medium text-gray-900 dark:text-white">
+      <h2 class="text-lg font-semibold text-[var(--apple-text)]">
         {{ t('profile.avatar.title') }}
       </h2>
-      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      <p class="mt-1 text-sm text-[var(--apple-muted)]">
         {{ t('profile.avatar.description') }}
       </p>
     </div>
@@ -15,8 +15,8 @@
     <div :class="props.embedded ? 'space-y-3' : 'flex flex-col gap-5 px-6 py-6 sm:flex-row sm:items-start'">
       <div
         :class="props.embedded
-          ? 'flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-xl font-bold text-white shadow-lg shadow-primary-500/20'
-          : 'flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-3xl font-bold text-white shadow-lg shadow-primary-500/20'"
+          ? 'flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--apple-blue)] text-xl font-semibold text-white'
+          : 'flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--apple-blue)] text-3xl font-semibold text-white'"
       >
         <img
           v-if="avatarPreviewUrl"
@@ -30,13 +30,13 @@
 
       <div :class="props.embedded ? 'space-y-3' : 'min-w-0 flex-1 space-y-4'">
         <div class="space-y-1">
-          <p v-if="props.embedded" class="text-sm font-semibold text-gray-900 dark:text-white">
+          <p v-if="props.embedded" class="text-sm font-semibold text-[var(--apple-text)]">
             {{ t('profile.avatar.title') }}
           </p>
-          <p v-else class="text-sm font-medium text-gray-900 dark:text-white">
+          <p v-else class="text-sm font-medium text-[var(--apple-text)]">
             {{ displayName }}
           </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
+          <p class="text-sm text-[var(--apple-muted)]">
             {{ t('profile.avatar.uploadHint') }}
           </p>
         </div>
@@ -99,8 +99,13 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 const targetAvatarUploadBytes = 20 * 1024
+const maxInlineAvatarUploadBytes = 100 * 1024
 const avatarScaleSteps = [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36]
 const avatarQualitySteps = [0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36]
+const avatarCompressionFormats = [
+  { mime: 'image/webp', extension: 'webp' },
+  { mime: 'image/jpeg', extension: 'jpg' },
+]
 const avatarDraft = ref('')
 const avatarSaving = ref(false)
 
@@ -176,11 +181,18 @@ async function compressAvatarFile(file: File): Promise<File> {
     ctx.clearRect(0, 0, width, height)
     ctx.drawImage(image, 0, 0, width, height)
 
-    for (const quality of avatarQualitySteps) {
-      const blob = await canvasToBlob(canvas, 'image/webp', quality)
-      if (blob.size <= targetAvatarUploadBytes) {
-        const fileName = file.name.replace(/\.[^.]+$/, '') || 'avatar'
-        return new File([blob], `${fileName}.webp`, { type: 'image/webp' })
+    for (const format of avatarCompressionFormats) {
+      for (const quality of avatarQualitySteps) {
+        let blob: Blob
+        try {
+          blob = await canvasToBlob(canvas, format.mime, quality)
+        } catch {
+          continue
+        }
+        if (blob.size <= targetAvatarUploadBytes) {
+          const fileName = file.name.replace(/\.[^.]+$/, '') || 'avatar'
+          return new File([blob], `${fileName}.${format.extension}`, { type: format.mime })
+        }
       }
     }
   }
@@ -201,7 +213,14 @@ async function prepareAvatarUpload(file: File): Promise<File> {
   if (file.size <= targetAvatarUploadBytes) {
     return file
   }
-  return compressAvatarFile(file)
+  try {
+    return await compressAvatarFile(file)
+  } catch (error) {
+    if (file.size <= maxInlineAvatarUploadBytes) {
+      return file
+    }
+    throw error
+  }
 }
 
 async function handleAvatarFileChange(event: Event) {

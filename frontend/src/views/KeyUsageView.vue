@@ -1,13 +1,13 @@
 <template>
-  <div class="relative flex min-h-screen flex-col bg-gray-50 dark:bg-dark-950">
+  <div class="relative flex min-h-screen flex-col bg-[var(--apple-bg)] text-[var(--apple-text)]">
     <!-- Header (same pattern as HomeView) -->
-    <header class="relative z-20 border-b border-gray-200/70 bg-white/90 px-4 py-4 backdrop-blur dark:border-dark-800/70 dark:bg-dark-950/80 sm:px-6">
+    <header class="relative z-20 border-b border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-4 py-4 sm:px-6">
       <nav class="mx-auto flex max-w-6xl items-center justify-between">
         <router-link to="/home" class="flex items-center gap-3">
-          <div class="h-9 w-9 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200 dark:bg-dark-900 dark:ring-dark-800">
+          <div class="h-9 w-9 overflow-hidden rounded-lg bg-[var(--apple-surface)] ring-1 ring-[color:var(--apple-border)]">
             <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
           </div>
-          <span class="truncate text-base font-semibold tracking-tight text-gray-900 dark:text-white">{{ siteName }}</span>
+          <span class="truncate text-base font-semibold tracking-normal text-[var(--apple-text)]">{{ siteName }}</span>
         </router-link>
         <div class="flex items-center gap-3">
           <LocaleSwitcher />
@@ -16,7 +16,7 @@
             :href="docsLink.href"
             :target="docsLink.external ? '_blank' : undefined"
             :rel="docsLink.external ? 'noopener noreferrer' : undefined"
-            class="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+            class="rounded-md p-2 text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)]"
             :title="t('home.viewDocs')"
             @click="handleDocsLinkClick"
           >
@@ -24,7 +24,7 @@
           </a>
           <button
             @click="toggleTheme"
-            class="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+            class="rounded-md p-2 text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)]"
             :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
           >
             <Icon v-if="isDark" name="sun" size="md" />
@@ -35,57 +35,87 @@
     </header>
 
     <!-- Main Content -->
-    <main class="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 sm:py-12">
-      <!-- Hero -->
-      <div class="mb-10 text-center">
-        <h1 class="mb-3 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-          {{ t('keyUsage.title') }}
-        </h1>
-        <p class="text-gray-500 dark:text-dark-400 text-base max-w-md mx-auto">
-          {{ t('keyUsage.subtitle') }}
-        </p>
-      </div>
+    <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
+      <section class="mb-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)] lg:items-center">
+        <div class="min-w-0 text-center lg:text-left">
+          <p class="inline-flex rounded-full border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface)] px-3 py-1 text-xs font-semibold text-[var(--apple-muted)]">
+            {{ t('keyUsage.heroKicker') }}
+          </p>
+          <h1 class="mx-auto mt-5 max-w-3xl text-4xl font-semibold leading-tight tracking-normal text-[var(--apple-text)] sm:text-5xl lg:mx-0 lg:text-6xl">
+            {{ t('keyUsage.title') }}
+          </h1>
+          <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-[var(--apple-muted)] sm:text-lg lg:mx-0">
+            {{ t('keyUsage.subtitle') }}
+          </p>
 
-      <!-- Input Section -->
-      <div class="mx-auto mb-12 max-w-xl">
-        <div class="flex flex-col gap-3 sm:flex-row">
-          <div class="relative min-w-0 flex-1">
-            <div class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-dark-500">
-              <Icon name="lock" size="md" />
-            </div>
-            <input
-              v-model="apiKey"
-              :type="keyVisible ? 'text' : 'password'"
-              :placeholder="t('keyUsage.placeholder')"
-              class="input-ring h-12 w-full rounded-lg border border-gray-200 bg-white pl-12 pr-12 text-sm text-gray-900 transition-all placeholder:text-gray-400 dark:border-dark-700 dark:bg-dark-900 dark:text-white dark:placeholder:text-dark-500"
-              @keydown.enter="queryKey"
-            />
-            <button
-              @click="keyVisible = !keyVisible"
-              class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-700 dark:text-dark-500 dark:hover:text-white"
+          <div class="mt-7 grid gap-2 text-left sm:grid-cols-3">
+            <div
+              v-for="item in keyUsageTrustNotes"
+              :key="item.title"
+              class="rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface)] px-3 py-2.5"
             >
-              <Icon v-if="keyVisible" name="eyeOff" size="md" />
-              <Icon v-else name="eye" size="md" />
+              <div class="flex items-center gap-2 text-xs font-semibold text-[var(--apple-text)]">
+                <Icon :name="item.icon" size="xs" class="text-[var(--apple-blue)]" />
+                <span>{{ item.title }}</span>
+              </div>
+              <p class="mt-1 text-xs leading-5 text-[var(--apple-muted)]">
+                {{ item.description }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm sm:p-5">
+          <div class="mb-4">
+            <h2 class="text-base font-semibold text-[var(--apple-text)]">
+              {{ t('keyUsage.queryPanel.title') }}
+            </h2>
+            <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">
+              {{ t('keyUsage.queryPanel.description') }}
+            </p>
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <div class="relative min-w-0">
+              <div class="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--apple-muted-2)]">
+                <Icon name="lock" size="md" />
+              </div>
+              <input
+                v-model="apiKey"
+                :type="keyVisible ? 'text' : 'password'"
+                :placeholder="t('keyUsage.placeholder')"
+                class="input h-12 pl-12 pr-12"
+                @keydown.enter="queryKey"
+              />
+              <button
+                @click="keyVisible = !keyVisible"
+                class="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--apple-muted-2)] transition-colors hover:text-[var(--apple-text)]"
+                :aria-label="keyVisible ? t('auth.hidePassword') : t('auth.showPassword')"
+                type="button"
+              >
+                <Icon v-if="keyVisible" name="eyeOff" size="md" />
+                <Icon v-else name="eye" size="md" />
+              </button>
+            </div>
+            <button
+              @click="queryKey"
+              :disabled="isQuerying"
+              class="btn btn-primary h-12 w-full justify-center whitespace-nowrap px-6"
+            >
+              <svg v-if="isQuerying" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+              <Icon v-else name="search" size="sm" :stroke-width="2.5" />
+              {{ isQuerying ? t('keyUsage.querying') : t('keyUsage.query') }}
             </button>
           </div>
-          <button
-            @click="queryKey"
-            :disabled="isQuerying"
-            class="flex h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary-600 px-6 text-sm font-medium text-white transition-all hover:bg-primary-700 active:scale-[0.98] disabled:opacity-60 sm:w-auto"
-          >
-            <svg v-if="isQuerying" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.25"/>
-              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-            </svg>
-            <Icon v-else name="search" size="sm" :stroke-width="2.5" />
-            {{ isQuerying ? t('keyUsage.querying') : t('keyUsage.query') }}
-          </button>
-        </div>
-        <p class="mt-3 text-center text-xs text-gray-400 dark:text-dark-500">
-          {{ t('keyUsage.privacyNote') }}
-        </p>
-        <div class="mt-3 flex justify-center">
-          <div class="w-36">
+
+          <p class="mt-3 text-xs leading-5 text-[var(--apple-muted-2)]">
+            {{ t('keyUsage.privacyNote') }}
+          </p>
+
+          <div class="mt-4 w-full sm:w-44">
             <Select
               :model-value="settlementCurrency"
               :options="settlementCurrencyOptions"
@@ -93,57 +123,56 @@
               @update:model-value="setSettlementCurrency"
             />
           </div>
-        </div>
 
-        <!-- Date Range Picker -->
-        <div v-if="showDatePicker" class="mt-4">
-          <div class="flex flex-wrap items-center gap-2 justify-center">
-            <span class="text-xs text-gray-500 dark:text-dark-400">{{ t('keyUsage.dateRange') }}</span>
-            <button
-              v-for="range in dateRanges"
-              :key="range.key"
-              @click="setDateRange(range.key)"
-              class="rounded-md border px-3 py-1.5 text-xs transition-all"
-              :class="currentRange === range.key
-                ? 'bg-primary-500 text-white border-primary-500'
-                : 'border-gray-200 bg-white text-gray-700 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-200 hover:border-primary-300 dark:hover:border-dark-600'"
-            >{{ range.label }}</button>
-            <div v-if="currentRange === 'custom'" class="ml-0 flex w-full flex-col items-stretch gap-2 sm:ml-1 sm:w-auto sm:flex-row sm:items-center">
-              <input
-                v-model="customStartDate"
-                type="date"
-                class="input-ring rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-900 dark:border-dark-700 dark:bg-dark-900 dark:text-white"
-              />
-              <span class="hidden text-xs text-gray-400 sm:inline">-</span>
-              <input
-                v-model="customEndDate"
-                type="date"
-                class="input-ring rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-900 dark:border-dark-700 dark:bg-dark-900 dark:text-white"
-              />
+          <div v-if="showDatePicker" class="mt-4 border-t border-[color:var(--apple-border-soft)] pt-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-xs font-medium text-[var(--apple-muted)]">{{ t('keyUsage.dateRange') }}</span>
               <button
-                @click="queryKey"
-                class="rounded-md bg-primary-600 px-3 py-1.5 text-xs text-white hover:bg-primary-700"
-              >{{ t('keyUsage.apply') }}</button>
+                v-for="range in dateRanges"
+                :key="range.key"
+                @click="setDateRange(range.key)"
+                class="rounded-md border px-3 py-1.5 text-xs transition-all"
+                :class="currentRange === range.key
+                  ? 'border-[color:var(--apple-blue)] bg-[var(--apple-blue)] text-white'
+                  : 'border-[color:var(--apple-border)] bg-[var(--apple-surface)] text-[var(--apple-text)] hover:bg-[var(--apple-hover)]'"
+              >{{ range.label }}</button>
+              <div v-if="currentRange === 'custom'" class="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+                <input
+                  v-model="customStartDate"
+                  type="date"
+                  class="input min-h-9 px-2 py-1.5 text-xs"
+                />
+                <span class="hidden text-xs text-[var(--apple-muted-2)] sm:inline">-</span>
+                <input
+                  v-model="customEndDate"
+                  type="date"
+                  class="input min-h-9 px-2 py-1.5 text-xs"
+                />
+                <button
+                  @click="queryKey"
+                  class="btn btn-primary min-h-9 px-3 py-1.5 text-xs"
+                >{{ t('keyUsage.apply') }}</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- Results Container -->
       <div v-if="showResults">
         <!-- Loading Skeleton -->
         <div v-if="showLoading" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="rounded-lg border border-gray-200 bg-white p-6 dark:border-dark-700 dark:bg-dark-900">
+            <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-6">
               <div class="skeleton h-5 w-24 mb-6"></div>
               <div class="flex justify-center"><div class="skeleton h-40 w-40 rounded-full sm:h-44 sm:w-44"></div></div>
             </div>
-            <div class="rounded-lg border border-gray-200 bg-white p-6 dark:border-dark-700 dark:bg-dark-900">
+            <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-6">
               <div class="skeleton h-5 w-24 mb-6"></div>
               <div class="flex justify-center"><div class="skeleton h-40 w-40 rounded-full sm:h-44 sm:w-44"></div></div>
             </div>
           </div>
-          <div class="rounded-lg border border-gray-200 bg-white p-6 dark:border-dark-700 dark:bg-dark-900">
+          <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-6">
             <div class="skeleton h-5 w-32 mb-6"></div>
             <div class="space-y-4">
               <div class="skeleton h-4 w-full"></div>
@@ -158,14 +187,14 @@
         <div v-else-if="resultData" class="space-y-6">
           <!-- Status Badge -->
           <div v-if="statusInfo" class="fade-up flex items-center justify-center mb-2">
-            <div class="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm dark:border-dark-700 dark:bg-dark-900">
+            <div class="inline-flex max-w-full items-center gap-2 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-4 py-2.5">
               <span
                 class="w-2.5 h-2.5 rounded-full pulse-dot"
                 :class="statusInfo.isActive ? 'bg-emerald-500' : 'bg-rose-500'"
               ></span>
-              <span class="text-sm font-medium text-gray-900 dark:text-white">{{ statusInfo.label }}</span>
-              <span class="text-xs text-gray-400 dark:text-dark-500">|</span>
-              <span class="text-xs text-gray-500 dark:text-dark-400">{{ statusInfo.statusText }}</span>
+              <span class="min-w-0 truncate text-sm font-medium text-[var(--apple-text)]">{{ statusInfo.label }}</span>
+              <span class="text-xs text-[var(--apple-muted-2)]">|</span>
+              <span class="min-w-0 truncate text-xs text-[var(--apple-muted)]">{{ statusInfo.statusText }}</span>
             </div>
           </div>
 
@@ -174,17 +203,17 @@
             <div
               v-for="(ring, i) in ringItems"
               :key="i"
-              class="fade-up rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-primary-200 dark:border-dark-700 dark:bg-dark-900 dark:hover:border-primary-800 sm:p-6"
+              class="fade-up rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-5 transition-colors hover:border-[color:var(--apple-blue)] sm:p-6"
               :class="`fade-up-delay-${Math.min(i + 1, 4)}`"
             >
               <div class="flex items-center justify-between mb-6">
-                <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                <h3 class="text-sm font-semibold uppercase text-[var(--apple-muted)]">
                   {{ ring.title }}
                 </h3>
                 <Icon
                   :name="ring.iconType"
                   size="md"
-                  class="text-gray-400 dark:text-dark-500"
+                  class="text-[var(--apple-muted-2)]"
                   :stroke-width="2"
                 />
               </div>
@@ -195,34 +224,28 @@
                     <circle
                       class="progress-ring"
                       cx="80" cy="80" r="68" fill="none"
-                      :stroke="`url(#ring-grad-${i})`"
+                      :stroke="ringColor(i)"
                       stroke-width="10" stroke-linecap="round"
                       :stroke-dasharray="CIRCUMFERENCE.toFixed(2)"
                       :stroke-dashoffset="getRingOffset(ring)"
                     />
-                    <defs>
-                      <linearGradient :id="`ring-grad-${i}`" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" :stop-color="RING_GRADIENTS[i % 4].from"/>
-                        <stop offset="100%" :stop-color="RING_GRADIENTS[i % 4].to"/>
-                      </linearGradient>
-                    </defs>
                   </svg>
                   <div class="absolute inset-0 flex flex-col items-center justify-center">
                     <template v-if="ring.isBalance">
-                      <span class="text-2xl font-bold tabular-nums" :style="{ color: RING_GRADIENTS[i % 4].from }">
+                      <span class="max-w-32 truncate text-center text-xl font-semibold tabular-nums sm:max-w-36 sm:text-2xl" :style="{ color: ringColor(i) }">
                         {{ ring.amount }}
                       </span>
                     </template>
                     <template v-else>
-                      <span class="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
+                      <span class="text-3xl font-semibold tabular-nums text-[var(--apple-text)]">
                         {{ displayPcts[i] ?? 0 }}%
                       </span>
-                      <span class="text-xs text-gray-500 dark:text-dark-400 mt-0.5">{{ t('keyUsage.used') }}</span>
+                      <span class="text-xs text-[var(--apple-muted)] mt-0.5">{{ t('keyUsage.used') }}</span>
                       <span
-                        class="text-sm font-semibold mt-1 tabular-nums"
-                        :style="{ color: RING_GRADIENTS[i % 4].from }"
+                        class="mt-1 max-w-32 truncate text-center text-sm font-semibold tabular-nums sm:max-w-36"
+                        :style="{ color: ringColor(i) }"
                       >{{ ring.amount }}</span>
-                      <p v-if="ring.resetAt && formatResetTime(ring.resetAt)" class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 tabular-nums">
+                      <p v-if="ring.resetAt && formatResetTime(ring.resetAt)" class="text-xs text-[var(--apple-muted-2)] mt-0.5 tabular-nums">
                         ⟳ {{ formatResetTime(ring.resetAt) }}
                       </p>
                     </template>
@@ -235,12 +258,12 @@
           <!-- Detail Card -->
           <div
             v-if="detailRows.length > 0"
-            class="fade-up fade-up-delay-3 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900"
+            class="fade-up fade-up-delay-3 overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)]"
           >
-            <div class="border-b border-gray-200 px-5 py-4 dark:border-dark-700 sm:px-6">
-              <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.detailInfo') }}</h3>
+            <div class="border-b border-[color:var(--apple-border-soft)] px-5 py-4 sm:px-6">
+              <h3 class="text-sm font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.detailInfo') }}</h3>
             </div>
-            <div class="divide-y divide-gray-100 dark:divide-dark-800">
+            <div class="divide-y divide-[color:var(--apple-border-soft)]">
               <div
                 v-for="(row, i) in detailRows"
                 :key="i"
@@ -256,9 +279,9 @@
                       v-html="row.iconSvg"
                     ></svg>
                   </div>
-                  <span class="break-words text-sm text-gray-700 dark:text-dark-200">{{ row.label }}</span>
+                  <span class="break-words text-sm text-[var(--apple-muted)]">{{ row.label }}</span>
                 </div>
-                <span class="shrink-0 text-right text-sm font-semibold tabular-nums" :class="row.valueClass || 'text-gray-900 dark:text-white'">
+                <span class="min-w-0 max-w-[55%] break-words text-right text-sm font-semibold tabular-nums" :class="row.valueClass || 'text-[var(--apple-text)]'">
                   {{ row.value }}
                 </span>
               </div>
@@ -268,19 +291,19 @@
           <!-- Usage Stats Card -->
           <div
             v-if="usageStatCells.length > 0"
-            class="fade-up fade-up-delay-3 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900"
+            class="fade-up fade-up-delay-3 overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)]"
           >
-            <div class="border-b border-gray-200 px-5 py-4 dark:border-dark-700 sm:px-6">
-              <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.tokenStats') }}</h3>
+            <div class="border-b border-[color:var(--apple-border-soft)] px-5 py-4 sm:px-6">
+              <h3 class="text-sm font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.tokenStats') }}</h3>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-px bg-gray-100 dark:bg-dark-800">
+            <div class="grid grid-cols-2 gap-px bg-[var(--apple-border-soft)] md:grid-cols-4">
               <div
                 v-for="(cell, i) in usageStatCells"
                 :key="i"
-                class="bg-white px-6 py-4 dark:bg-dark-900"
+                class="bg-[var(--apple-surface)] px-4 py-4 sm:px-6"
               >
-                <div class="text-xs text-gray-500 dark:text-dark-400 mb-1">{{ cell.label }}</div>
-                <div class="text-sm font-semibold tabular-nums text-gray-900 dark:text-white">{{ cell.value }}</div>
+                <div class="text-xs text-[var(--apple-muted)] mb-1">{{ cell.label }}</div>
+                <div class="break-words text-sm font-semibold tabular-nums text-[var(--apple-text)]">{{ cell.value }}</div>
               </div>
             </div>
           </div>
@@ -288,19 +311,19 @@
           <!-- Daily Usage Table -->
           <div
             v-if="showDailyUsage"
-            class="fade-up fade-up-delay-4 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900"
+            class="fade-up fade-up-delay-4 overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)]"
           >
-            <div class="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 dark:border-dark-700 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.dailyDetail') }}</h3>
-              <div class="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 dark:border-dark-700 dark:bg-dark-950">
+            <div class="flex flex-col gap-3 border-b border-[color:var(--apple-border-soft)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <h3 class="text-sm font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.dailyDetail') }}</h3>
+              <div class="inline-flex rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-0.5">
                 <button
                   v-for="option in dailyUsageOptions"
                   :key="option.value"
                   @click="setDailyUsageDays(option.value)"
                   class="min-w-12 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
                   :class="dailyUsageDays === option.value
-                    ? 'bg-primary-500 text-white'
-                    : 'text-gray-600 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-800'"
+                    ? 'bg-[var(--apple-blue)] text-white'
+                    : 'text-[var(--apple-muted)] hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)]'"
                 >
                   {{ option.label }}
                 </button>
@@ -309,34 +332,34 @@
             <div v-if="dailyUsageRows.length > 0" class="overflow-x-auto">
               <table class="w-full">
                 <thead>
-                  <tr class="border-b border-gray-200 bg-gray-50 dark:border-dark-700 dark:bg-dark-950">
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.date') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.requests') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.inputTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.outputTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheReadTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheWriteTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cost') }}</th>
+                  <tr class="border-b border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)]">
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.date') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.requests') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.inputTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.outputTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.cacheReadTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.cacheWriteTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.cost') }}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
                     v-for="row in dailyUsageRows"
                     :key="row.date"
-                    class="border-b border-gray-100 last:border-b-0 dark:border-dark-800"
+                    class="border-b border-[color:var(--apple-border-soft)] last:border-b-0"
                   >
-                    <td class="px-4 py-3 text-sm font-medium whitespace-nowrap text-gray-900 dark:text-white">{{ row.date }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.requests) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.input_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.output_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.cache_read_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.cache_write_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right font-medium text-gray-900 dark:text-white">{{ formatMoney(row.actual_cost != null ? row.actual_cost : row.cost) }}</td>
+                    <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-[var(--apple-text)]">{{ row.date }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(row.requests) }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(row.input_tokens) }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(row.output_tokens) }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(row.cache_read_tokens) }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(row.cache_write_tokens) }}</td>
+                    <td class="px-4 py-3 text-right text-sm font-medium tabular-nums text-[var(--apple-text)]">{{ formatMoney(row.actual_cost != null ? row.actual_cost : row.cost) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div v-else class="px-5 py-8 text-center text-sm text-gray-500 dark:text-dark-400 sm:px-6">
+            <div v-else class="px-5 py-8 text-center text-sm text-[var(--apple-muted)] sm:px-6">
               {{ t('keyUsage.noDailyUsage') }}
             </div>
           </div>
@@ -344,39 +367,39 @@
           <!-- Model Stats Table -->
           <div
             v-if="modelStats.length > 0"
-            class="fade-up fade-up-delay-4 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900"
+            class="fade-up fade-up-delay-4 overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)]"
           >
-            <div class="border-b border-gray-200 px-5 py-4 dark:border-dark-700 sm:px-6">
-              <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.modelStats') }}</h3>
+            <div class="border-b border-[color:var(--apple-border-soft)] px-5 py-4 sm:px-6">
+              <h3 class="text-sm font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.modelStats') }}</h3>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full">
                 <thead>
-                  <tr class="border-b border-gray-200 bg-gray-50 dark:border-dark-700 dark:bg-dark-950">
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.model') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.requests') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.inputTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.outputTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheCreationTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheReadTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.totalTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cost') }}</th>
+                  <tr class="border-b border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)]">
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.model') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.requests') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.inputTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.outputTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.cacheCreationTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.cacheReadTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.totalTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-[var(--apple-muted)]">{{ t('keyUsage.cost') }}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
                     v-for="(m, i) in modelStats"
                     :key="i"
-                    class="border-b border-gray-100 last:border-b-0 dark:border-dark-800"
+                    class="border-b border-[color:var(--apple-border-soft)] last:border-b-0"
                   >
-                    <td class="px-4 py-3 text-sm font-medium whitespace-nowrap text-gray-900 dark:text-white">{{ m.model || '-' }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.requests) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.input_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.output_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.cache_creation_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.cache_read_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.total_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right font-medium text-gray-900 dark:text-white">{{ formatMoney(m.actual_cost != null ? m.actual_cost : m.cost) }}</td>
+                    <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-[var(--apple-text)]">{{ m.model || '-' }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(m.requests) }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(m.input_tokens) }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(m.output_tokens) }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(m.cache_creation_tokens) }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(m.cache_read_tokens) }}</td>
+                    <td class="px-4 py-3 text-right text-sm tabular-nums text-[var(--apple-muted)]">{{ fmtNum(m.total_tokens) }}</td>
+                    <td class="px-4 py-3 text-right text-sm font-medium tabular-nums text-[var(--apple-text)]">{{ formatMoney(m.actual_cost != null ? m.actual_cost : m.cost) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -387,26 +410,19 @@
     </main>
 
     <!-- Footer (same pattern as HomeView) -->
-    <footer class="relative z-10 border-t border-gray-200/50 px-6 py-8 dark:border-dark-800/50">
+    <footer class="relative z-10 border-t border-[color:var(--apple-border-soft)] px-6 py-8">
       <div class="mx-auto flex max-w-6xl flex-col items-center justify-center gap-4 text-center sm:flex-row sm:text-left">
-        <p class="text-sm text-gray-500 dark:text-dark-400">
+        <p class="text-sm text-[var(--apple-muted)]">
           &copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}
         </p>
-        <div class="flex items-center gap-4">
+        <div v-if="docsLink" class="flex items-center gap-4">
           <a
-            v-if="docsLink"
             :href="docsLink.href"
             :target="docsLink.external ? '_blank' : undefined"
             :rel="docsLink.external ? 'noopener noreferrer' : undefined"
-            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
+            class="text-sm text-[var(--apple-muted)] transition-colors hover:text-[var(--apple-text)]"
             @click="handleDocsLinkClick"
           >{{ t('home.docs') }}</a>
-          <a
-            :href="githubUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
-          >GitHub</a>
         </div>
       </div>
     </footer>
@@ -441,7 +457,6 @@ const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appS
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
 const rawDocUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const docsLink = computed(() => resolveDocsLink(rawDocUrl.value, appStore.cachedPublicSettings?.custom_menu_items ?? []))
-const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
 const publicBalanceCnyPerCredit = computed(() => appStore.cachedPublicSettings?.payment_balance_recharge_multiplier)
 
 watch(
@@ -470,6 +485,23 @@ function handleDocsLinkClick(event: MouseEvent) {
 }
 
 const currentYear = computed(() => new Date().getFullYear())
+const keyUsageTrustNotes = computed<Array<{ icon: 'lock' | 'document' | 'shield'; title: string; description: string }>>(() => [
+  {
+    icon: 'lock',
+    title: t('keyUsage.trust.sessionQuery'),
+    description: t('keyUsage.trust.sessionQueryDesc')
+  },
+  {
+    icon: 'document',
+    title: t('keyUsage.trust.auditableRecords'),
+    description: t('keyUsage.trust.auditableRecordsDesc')
+  },
+  {
+    icon: 'shield',
+    title: t('keyUsage.trust.privacyBoundary'),
+    description: t('keyUsage.trust.privacyBoundaryDesc')
+  }
+])
 
 // ==================== Key Query State ====================
 
@@ -550,12 +582,7 @@ function setDailyUsageDays(days: 7 | 30 | 90) {
 // ==================== Ring Animation ====================
 
 const CIRCUMFERENCE = 2 * Math.PI * 68
-const RING_GRADIENTS = [
-  { from: '#2563EB', to: '#0EA5E9' },
-  { from: '#6366F1', to: '#A5B4FC' },
-  { from: '#10B981', to: '#6EE7B7' },
-  { from: '#F59E0B', to: '#FCD34D' },
-]
+const RING_COLORS = ['#0071E3', '#30D158', '#FF9F0A', '#64D2FF']
 
 const ringAnimated = ref(false)
 const displayPcts = ref<number[]>([])
@@ -563,7 +590,11 @@ let ringStartRAF: number | null = null
 let ringTickRAF: number | null = null
 let ringDelayTimer: ReturnType<typeof setTimeout> | null = null
 
-const ringTrackColor = computed(() => isDark.value ? '#222222' : '#F0F0EE')
+const ringTrackColor = computed(() => isDark.value ? '#2c2c2e' : '#e5e5ea')
+
+function ringColor(index: number): string {
+  return RING_COLORS[index % RING_COLORS.length]
+}
 
 interface RingItem {
   title: string
@@ -995,8 +1026,8 @@ onUnmounted(() => {
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .input-ring:focus {
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
-  border-color: #2563eb;
+  border-color: var(--apple-blue);
+  box-shadow: 0 0 0 3px var(--apple-focus-ring);
   outline: none;
 }
 
@@ -1008,19 +1039,17 @@ onUnmounted(() => {
 }
 
 /* Skeleton loading */
-@keyframes shimmer-kv {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes skeleton-pulse-kv {
+  0%, 100% { opacity: 0.68; }
+  50% { opacity: 1; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
-  background-size: 200% 100%;
-  animation: shimmer-kv 1.8s ease-in-out infinite;
+  background: #e5e5ea;
+  animation: skeleton-pulse-kv 1.4s ease-in-out infinite;
   border-radius: 8px;
 }
 :global(.dark) .skeleton {
-  background: linear-gradient(90deg, #334155 25%, #1e293b 50%, #334155 75%);
-  background-size: 200% 100%;
+  background: #2c2c2e;
 }
 
 /* Fade up animation */
@@ -1048,6 +1077,5 @@ onUnmounted(() => {
 /* Tabular nums */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
 }
 </style>

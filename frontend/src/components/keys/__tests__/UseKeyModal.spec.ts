@@ -44,9 +44,9 @@ describe('UseKeyModal', () => {
     expect(configToml).toContain('model = "gpt-5.5"')
     expect(configToml).toContain('review_model = "gpt-5.5"')
     expect(configToml).toContain('model_reasoning_effort = "xhigh"')
+    expect(configToml).toContain('model_context_window = 1050000')
+    expect(configToml).toContain('model_auto_compact_token_limit = 880000')
     expect(configToml).not.toContain('model = "gpt-5.4"')
-    expect(configToml).not.toContain('model_context_window')
-    expect(configToml).not.toContain('model_auto_compact_token_limit')
     expect(configToml).toContain('[features]\ngoals = true')
   })
 
@@ -85,9 +85,9 @@ describe('UseKeyModal', () => {
     expect(configToml).toContain('model = "gpt-5.5"')
     expect(configToml).toContain('review_model = "gpt-5.5"')
     expect(configToml).toContain('model_reasoning_effort = "xhigh"')
+    expect(configToml).toContain('model_context_window = 1050000')
+    expect(configToml).toContain('model_auto_compact_token_limit = 880000')
     expect(configToml).not.toContain('model = "gpt-5.4"')
-    expect(configToml).not.toContain('model_context_window')
-    expect(configToml).not.toContain('model_auto_compact_token_limit')
     expect(configToml).toContain('[features]\nresponses_websockets_v2 = true\ngoals = true')
   })
 

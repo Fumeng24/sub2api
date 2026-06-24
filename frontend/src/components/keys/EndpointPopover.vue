@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import type { CustomEndpoint } from '@/types'
 
@@ -68,75 +69,84 @@ onBeforeUnmount(() => {
     <div
       v-for="(item, index) in allEndpoints"
       :key="index"
-      class="flex max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs transition-colors hover:border-primary-200 dark:border-dark-600 dark:bg-dark-800 dark:hover:border-primary-700"
+      class="group/endpoint relative flex w-full max-w-full min-w-0 items-start gap-2 rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface)] px-3 py-2.5 text-xs shadow-sm transition-colors hover:border-[color:var(--apple-border)] hover:bg-[var(--apple-surface-elevated)] sm:w-auto sm:items-center sm:px-2.5 sm:py-1.5"
     >
-      <span class="min-w-0 max-w-[8rem] truncate font-medium text-gray-600 dark:text-gray-300">{{ item.name }}</span>
-      <span
-        v-if="item.isDefault"
-        class="flex-shrink-0 rounded bg-primary-50 px-1 py-px text-[10px] font-medium leading-tight text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
-      >{{ t('keys.endpoints.default') }}</span>
-
-      <span class="flex-shrink-0 text-gray-300 dark:text-dark-500">|</span>
-
-      <div class="group/endpoint relative flex min-w-0 items-center gap-1.5">
-        <div
-          class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[min(24rem,calc(100vw-1rem))] -translate-x-1/2 translate-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left opacity-0 shadow-[0_14px_36px_-20px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/80 transition-all duration-150 group-hover/endpoint:translate-y-0 group-hover/endpoint:opacity-100 group-focus-within/endpoint:translate-y-0 group-focus-within/endpoint:opacity-100 dark:border-slate-700 dark:bg-slate-900 dark:ring-slate-700/70"
+      <div
+        class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[min(24rem,calc(100vw-1rem))] -translate-x-1/2 translate-y-1 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-3 py-2.5 text-left opacity-0 shadow-[0_14px_36px_-20px_rgba(15,23,42,0.35)] ring-1 ring-[color:var(--apple-border-soft)] transition-all duration-150 group-hover/endpoint:translate-y-0 group-hover/endpoint:opacity-100 group-focus-within/endpoint:translate-y-0 group-focus-within/endpoint:opacity-100"
+      >
+        <p
+          v-if="item.description"
+          class="max-w-[24rem] break-words text-xs leading-5 text-[var(--apple-muted)]"
         >
-          <p
-            v-if="item.description"
-            class="max-w-[24rem] break-words text-xs leading-5 text-slate-600 dark:text-slate-200"
-          >
-            {{ item.description }}
-          </p>
-          <p class="mt-1.5 max-w-full break-all font-mono text-[11px] leading-4 text-slate-500 dark:text-slate-300">
-            {{ item.endpoint }}
-          </p>
-          <p
-            class="flex items-center gap-1.5 text-[11px] leading-4 text-primary-600 dark:text-primary-300"
-            :class="item.description ? 'mt-1.5' : ''"
-          >
-            <span class="h-1.5 w-1.5 rounded-full bg-primary-500 dark:bg-primary-300"></span>
-            {{ tooltipHint(item.endpoint) }}
-          </p>
-          <div class="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"></div>
+          {{ item.description }}
+        </p>
+        <p class="mt-1.5 max-w-full break-all font-mono text-[11px] leading-4 text-[var(--apple-muted-2)]">
+          {{ item.endpoint }}
+        </p>
+        <p
+          class="flex items-center gap-1.5 text-[11px] leading-4 text-[var(--apple-blue)]"
+          :class="item.description ? 'mt-1.5' : ''"
+        >
+          <span class="h-1.5 w-1.5 rounded-full bg-[var(--apple-blue)]"></span>
+          {{ tooltipHint(item.endpoint) }}
+        </p>
+        <div class="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-[color:var(--apple-border)] bg-[var(--apple-surface)]"></div>
+      </div>
+
+      <div class="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[var(--apple-surface-elevated)] text-[var(--apple-muted-2)] ring-1 ring-[color:var(--apple-border-soft)] sm:mt-0">
+        <Icon name="server" size="xs" />
+      </div>
+
+      <div class="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5">
+        <div class="flex min-w-0 items-center gap-1.5">
+          <span class="min-w-0 max-w-[8rem] truncate font-medium text-[var(--apple-text)]">{{ item.name }}</span>
+          <span
+            v-if="item.isDefault"
+            class="flex-shrink-0 rounded-md bg-[var(--apple-surface-elevated)] px-1.5 py-px text-[10px] font-medium leading-tight text-[var(--apple-muted)] ring-1 ring-[color:var(--apple-border-soft)]"
+          >{{ t('keys.endpoints.default') }}</span>
         </div>
 
+        <span class="hidden h-3 w-px flex-shrink-0 bg-[var(--apple-border-soft)] sm:inline"></span>
+
         <code
-          class="min-w-0 max-w-[min(28rem,55vw)] cursor-pointer truncate font-mono text-gray-500 decoration-gray-400 decoration-dashed underline-offset-2 hover:text-primary-600 hover:underline focus:text-primary-600 focus:underline focus:outline-none dark:text-gray-400 dark:decoration-gray-500 dark:hover:text-primary-400 dark:focus:text-primary-400 sm:max-w-[28rem]"
+          class="block min-w-0 max-w-full cursor-pointer break-all font-mono text-[11px] leading-4 text-[var(--apple-muted)] decoration-[var(--apple-muted-2)] decoration-dashed underline-offset-2 hover:text-[var(--apple-blue)] hover:underline focus:text-[var(--apple-blue)] focus:underline focus:outline-none sm:max-w-[28rem] sm:text-xs"
+          data-testid="endpoint-url"
           role="button"
           tabindex="0"
           @click="copy(item.endpoint)"
           @keydown.enter.prevent="copy(item.endpoint)"
           @keydown.space.prevent="copy(item.endpoint)"
         >{{ item.endpoint }}</code>
+        <p v-if="item.description" class="text-[11px] leading-4 text-[var(--apple-muted)] sm:hidden">
+          {{ item.description }}
+        </p>
+      </div>
 
+      <div class="flex flex-shrink-0 items-center gap-1">
         <button
           type="button"
-          class="flex-shrink-0 rounded p-0.5 transition-colors"
+          class="flex-shrink-0 rounded-md p-1 transition-colors"
           :class="copiedEndpoint === item.endpoint
-            ? 'text-emerald-500 dark:text-emerald-400'
-            : 'text-gray-400 hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400'"
+            ? 'text-[var(--apple-success)]'
+            : 'text-[var(--apple-muted-2)] hover:bg-[var(--apple-hover)] hover:text-[var(--apple-blue)]'"
           :aria-label="tooltipHint(item.endpoint)"
           @click="copy(item.endpoint)"
         >
-          <svg v-if="copiedEndpoint === item.endpoint" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-          <svg v-else class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
+          <Icon
+            :name="copiedEndpoint === item.endpoint ? 'check' : 'copy'"
+            size="xs"
+            :stroke-width="copiedEndpoint === item.endpoint ? 2.2 : 2"
+          />
         </button>
 
         <a
           :href="speedTestUrl(item.endpoint)"
           target="_blank"
           rel="noopener noreferrer"
-          class="flex-shrink-0 rounded p-0.5 text-gray-400 transition-colors hover:text-amber-500 dark:text-gray-500 dark:hover:text-amber-400"
+          class="flex-shrink-0 rounded-md p-1 text-[var(--apple-muted-2)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-warning)]"
           :title="t('keys.endpoints.speedTest')"
         >
-          <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
+          <Icon name="bolt" size="xs" :stroke-width="2" />
         </a>
       </div>
     </div>

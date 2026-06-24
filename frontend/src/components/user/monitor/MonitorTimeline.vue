@@ -1,7 +1,7 @@
 <template>
-  <div class="mt-4 pt-3 border-t border-gray-100 dark:border-dark-700/60">
+  <div class="mt-4 border-t border-[color:var(--apple-border-soft)] pt-3">
     <div
-      class="flex justify-between text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2"
+      class="mb-2 flex justify-between text-[10px] font-semibold uppercase tracking-wide text-[var(--apple-muted)]"
     >
       <span>{{ t('monitorCommon.history60pts', { n: length }) }}</span>
       <span class="tabular-nums">{{ t('monitorCommon.nextUpdateIn', { n: countdownSeconds }) }}</span>
@@ -9,7 +9,7 @@
 
     <div
       v-if="maintenance"
-      class="flex h-5 w-full items-center justify-center rounded border border-dashed border-gray-300 dark:border-dark-600 text-[10px] uppercase tracking-widest text-gray-400"
+      class="flex h-5 w-full items-center justify-center rounded border border-dashed border-[color:var(--apple-border)] text-[10px] uppercase tracking-wide text-[var(--apple-muted)]"
     >
       {{ t('monitorCommon.maintenancePaused') }}
     </div>
@@ -29,7 +29,7 @@
     </div>
 
     <div
-      class="mt-1 flex justify-between text-[9px] uppercase tracking-widest text-gray-400"
+      class="mt-1 flex justify-between text-[9px] uppercase tracking-wide text-[var(--apple-muted)]"
     >
       <span>{{ t('monitorCommon.past') }}</span>
       <span>{{ t('monitorCommon.now') }}</span>
@@ -74,11 +74,11 @@ const STATUS_HEIGHT: Record<string, number> = {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  operational: 'bg-emerald-500',
-  degraded: 'bg-amber-500',
-  failed: 'bg-red-500',
-  error: 'bg-red-500',
-  empty: 'bg-gray-300 dark:bg-dark-600',
+  operational: 'monitor-timeline-bar--operational',
+  degraded: 'monitor-timeline-bar--degraded',
+  failed: 'monitor-timeline-bar--failed',
+  error: 'monitor-timeline-bar--failed',
+  empty: 'monitor-timeline-bar--empty',
 }
 
 const displayBars = computed<Bar[]>(() => {
@@ -117,3 +117,21 @@ const displayBars = computed<Bar[]>(() => {
   return bars
 })
 </script>
+
+<style scoped>
+.monitor-timeline-bar--operational {
+  background: var(--apple-success);
+}
+
+.monitor-timeline-bar--degraded {
+  background: var(--apple-warning);
+}
+
+.monitor-timeline-bar--failed {
+  background: var(--apple-danger);
+}
+
+.monitor-timeline-bar--empty {
+  background: color-mix(in srgb, var(--apple-muted) 28%, transparent);
+}
+</style>

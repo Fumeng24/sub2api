@@ -8,7 +8,7 @@
       </svg>
     </div>
 
-    <!-- Error state -->
+    <!-- Issue state -->
     <div v-else-if="loadError" class="py-8 text-center text-sm text-red-500">
       {{ t('usage.errors.detail.loadFailed') }}
     </div>
@@ -48,7 +48,7 @@
           <span class="font-medium text-gray-500 dark:text-dark-400">{{ t('usage.errors.platform') }}</span>
           <p class="mt-0.5 text-gray-900 dark:text-dark-100">{{ detail.platform || '-' }}</p>
         </div>
-        <!-- Upstream status code -->
+        <!-- Service status code -->
         <div v-if="detail.upstream_status_code != null">
           <span class="font-medium text-gray-500 dark:text-dark-400">{{ t('usage.errors.detail.upstreamStatus') }}</span>
           <p class="mt-0.5 text-gray-900 dark:text-dark-100">{{ detail.upstream_status_code }}</p>
@@ -61,10 +61,10 @@
         <p class="mt-0.5 text-gray-900 dark:text-dark-100 break-all">{{ detail.message }}</p>
       </div>
 
-      <!-- Error Body -->
+      <!-- Service response body -->
       <div v-if="detail.error_body">
         <span class="font-medium text-gray-500 dark:text-dark-400">{{ t('usage.errors.detail.responseBody') }}</span>
-        <pre class="mt-1 overflow-auto max-h-[40vh] whitespace-pre-wrap break-all rounded-lg bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 p-3 text-xs text-gray-800 dark:text-dark-200">{{ detail.error_body }}</pre>
+        <pre class="mt-1 max-h-[40vh] overflow-auto whitespace-pre-wrap break-all rounded-lg bg-[var(--apple-surface-elevated)] p-3 text-xs text-[var(--apple-text)]">{{ detail.error_body }}</pre>
       </div>
     </div>
   </BaseDialog>

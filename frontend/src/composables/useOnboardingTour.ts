@@ -4,7 +4,7 @@ import 'driver.js/dist/driver.css'
 import { useAuthStore as useUserStore } from '@/stores/auth'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { useI18n } from 'vue-i18n'
-import { getAdminSteps, getUserSteps } from '@/components/Guide/steps'
+import { getAdminSteps } from '@/components/Guide/steps'
 
 export interface OnboardingOptions {
   storageKey?: string
@@ -16,6 +16,7 @@ export function useOnboardingTour(options: OnboardingOptions) {
   const userStore = useUserStore()
   const onboardingStore = useOnboardingStore()
   const storageVersion = 'v4_interactive' // Bump version for new tour type
+  const emojiPattern = /[\u{1f300}-\u{1faff}\u{2600}-\u{27bf}]/gu
 
   // Timing constants for better maintainability
   const TIMING = {
@@ -29,6 +30,37 @@ export function useOnboardingTour(options: OnboardingOptions) {
     return step.popover?.showButtons?.length === 1 &&
            step.popover.showButtons[0] === 'close'
   }
+
+  const cleanTourText = (value?: string): string | undefined => {
+    if (typeof value !== 'string') return value
+    return value
+      .replace(emojiPattern, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  const cleanTourDescription = (value?: string): string | undefined => {
+    if (typeof value !== 'string') return value
+    return value
+      .replace(emojiPattern, '')
+      .replace(/\sstyle="[^"]*"/gi, '')
+      .replace(/<p>\s*(?:->|=>|&rarr;|→)\s*/gi, '<p>')
+      .replace(/\s+(?=<\/(?:p|li|b|strong)>)/gi, '')
+      .trim()
+  }
+
+  const polishTourStep = (step: DriveStep): DriveStep => ({
+    ...step,
+    popover: step.popover
+      ? {
+          ...step.popover,
+          title: cleanTourText(step.popover.title),
+          description: cleanTourDescription(step.popover.description),
+          nextBtnText: cleanTourText(step.popover.nextBtnText),
+          prevBtnText: cleanTourText(step.popover.prevBtnText),
+        }
+      : step.popover
+  })
 
   // Helper: Clean up click listener
   const cleanupClickListener = () => {
@@ -92,10 +124,11 @@ export function useOnboardingTour(options: OnboardingOptions) {
   }
 
   const startTour = async (startIndex = 0) => {
-    // 动态获取当前用户角色和步骤
     const isAdmin = userStore.user?.role === 'admin'
     const isSimpleMode = userStore.isSimpleMode
-    const steps = isAdmin ? getAdminSteps(t, isSimpleMode) : getUserSteps(t)
+    if (!isAdmin || isSimpleMode) return
+
+    const steps = getAdminSteps(t, isSimpleMode).map(polishTourStep)
 
     // 确保 DOM 就绪
     await nextTick()

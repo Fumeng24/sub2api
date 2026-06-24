@@ -6,114 +6,125 @@
     @close="emit('close')"
   >
     <div class="space-y-4">
-      <!-- No Group Assigned Warning -->
-      <div v-if="!platform" class="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-        <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-        </svg>
-        <div>
-          <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+      <div
+        v-if="!platform"
+        class="flex items-start gap-3 rounded-lg border border-[color:color-mix(in_srgb,var(--apple-warning)_28%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-warning)_8%,var(--apple-surface))] p-4"
+      >
+        <Icon name="exclamationTriangle" size="md" class="mt-0.5 flex-shrink-0 text-[var(--apple-warning)]" />
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-[var(--apple-text)]">
             {{ t('keys.useKeyModal.noGroupTitle') }}
           </p>
-          <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+          <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">
             {{ t('keys.useKeyModal.noGroupDescription') }}
           </p>
         </div>
       </div>
 
-      <!-- Platform-specific content -->
       <template v-else>
-        <!-- Description -->
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-          {{ platformDescription }}
-        </p>
+        <section class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-3 shadow-sm sm:p-4">
+          <div class="flex items-start gap-3">
+            <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] text-[var(--apple-muted)]">
+              <Icon name="key" size="sm" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-[var(--apple-text)]">
+                {{ t('keys.useKeyModal.title') }}
+              </p>
+              <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">
+                {{ platformDescription }}
+              </p>
+            </div>
+          </div>
 
-        <!-- Client Tabs -->
-        <div v-if="clientTabs.length" class="border-b border-gray-200 dark:border-dark-700">
-          <nav class="-mb-px flex space-x-6" aria-label="Client">
+          <nav
+            v-if="clientTabs.length"
+            class="mt-4 grid min-w-0 grid-cols-2 gap-1 rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] p-1 sm:flex sm:flex-wrap"
+            aria-label="Client"
+          >
             <button
               v-for="tab in clientTabs"
               :key="tab.id"
+              type="button"
               @click="activeClientTab = tab.id"
               :class="[
-                'whitespace-nowrap py-2.5 px-1 border-b-2 font-medium text-sm transition-colors',
+                'flex min-w-0 items-center justify-center gap-1.5 rounded-md px-2.5 py-2 text-center text-xs font-medium leading-4 transition-colors sm:w-auto sm:text-sm',
                 activeClientTab === tab.id
-                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                  ? 'bg-[var(--apple-surface)] text-[var(--apple-text)] shadow-sm ring-1 ring-[color:var(--apple-border-soft)]'
+                  : 'text-[var(--apple-muted)] hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)]'
               ]"
             >
-              <span class="flex items-center gap-2">
-                <component :is="tab.icon" class="w-4 h-4" />
-                {{ tab.label }}
-              </span>
+              <Icon :name="tab.icon" size="sm" class="flex-shrink-0" />
+              <span class="min-w-0 break-words">{{ tab.label }}</span>
             </button>
           </nav>
-        </div>
+        </section>
 
-        <!-- OS/Shell Tabs -->
-        <div v-if="showShellTabs" class="border-b border-gray-200 dark:border-dark-700">
-          <nav class="-mb-px flex space-x-4" aria-label="Tabs">
-            <button
-              v-for="tab in currentTabs"
-              :key="tab.id"
-              @click="activeTab = tab.id"
-              :class="[
-                'whitespace-nowrap py-2.5 px-1 border-b-2 font-medium text-sm transition-colors',
-                activeTab === tab.id
-                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-              ]"
-            >
-              <span class="flex items-center gap-2">
-                <component :is="tab.icon" class="w-4 h-4" />
-                {{ tab.label }}
-              </span>
-            </button>
-          </nav>
-        </div>
+        <nav
+          v-if="showShellTabs"
+          class="grid min-w-0 grid-cols-2 gap-1 rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] p-1 sm:flex sm:flex-wrap"
+          aria-label="Tabs"
+        >
+          <button
+            v-for="tab in currentTabs"
+            :key="tab.id"
+            type="button"
+            @click="activeTab = tab.id"
+            :class="[
+              'flex min-w-0 items-center justify-center gap-1.5 rounded-md px-2.5 py-2 text-center text-xs font-medium leading-4 transition-colors sm:w-auto sm:text-sm',
+              activeTab === tab.id
+                ? 'bg-[var(--apple-surface)] text-[var(--apple-text)] shadow-sm ring-1 ring-[color:var(--apple-border-soft)]'
+                : 'text-[var(--apple-muted)] hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)]'
+            ]"
+          >
+            <Icon :name="tab.icon" size="sm" class="flex-shrink-0" />
+            <span class="min-w-0 break-words">{{ tab.label }}</span>
+          </button>
+        </nav>
 
-        <!-- Code Blocks (Stacked for multi-file platforms) -->
-        <div class="space-y-4">
+        <div class="space-y-3">
           <div
             v-for="(file, index) in currentFiles"
             :key="index"
             class="relative"
           >
-            <!-- File Hint (if exists) -->
-            <p v-if="file.hint" class="text-xs text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1">
-              <Icon name="exclamationCircle" size="sm" class="flex-shrink-0" />
+            <p
+              v-if="file.hint"
+              class="mb-2 flex items-center gap-1.5 rounded-md border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] px-2.5 py-1.5 text-xs leading-5 text-[var(--apple-muted)]"
+            >
+              <Icon name="infoCircle" size="xs" class="flex-shrink-0 text-[var(--apple-muted-2)]" />
               {{ file.hint }}
             </p>
-            <div class="bg-gray-900 dark:bg-dark-900 rounded-xl overflow-hidden">
-              <!-- Code Header -->
-              <div class="flex items-center justify-between px-4 py-2 bg-gray-800 dark:bg-dark-800 border-b border-gray-700 dark:border-dark-700">
-                <span class="text-xs text-gray-400 font-mono">{{ file.path }}</span>
+            <div class="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 shadow-sm">
+              <div class="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 bg-slate-900/90 px-3 py-2.5 sm:px-4">
+                <span class="min-w-0 truncate font-mono text-xs text-slate-300">{{ file.path }}</span>
                 <button
+                  type="button"
                   @click="copyContent(file.content, index)"
-                  class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
+                  class="flex flex-shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
                   :class="copiedIndex === index
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white'"
+                    ? 'bg-emerald-500/15 text-emerald-300'
+                    : 'bg-white/10 text-slate-300 hover:bg-white/15 hover:text-white'"
                 >
-                  <svg v-if="copiedIndex === index" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-                  </svg>
+                  <Icon
+                    :name="copiedIndex === index ? 'check' : 'copy'"
+                    size="xs"
+                    :stroke-width="copiedIndex === index ? 2 : 1.8"
+                  />
                   {{ copiedIndex === index ? t('keys.useKeyModal.copied') : t('keys.useKeyModal.copy') }}
                 </button>
               </div>
-              <!-- Code Content -->
-              <pre class="p-4 text-sm font-mono text-gray-100 overflow-x-auto"><code v-if="file.highlighted" v-html="file.highlighted"></code><code v-else v-text="file.content"></code></pre>
+              <pre class="max-w-full overflow-x-auto p-3 font-mono text-xs leading-5 text-slate-100 sm:p-4 sm:text-sm"><code v-if="file.highlighted" v-html="file.highlighted"></code><code v-else v-text="file.content"></code></pre>
             </div>
           </div>
         </div>
 
-        <!-- Usage Note -->
-        <div v-if="showPlatformNote" class="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
-          <Icon name="infoCircle" size="md" class="text-blue-500 flex-shrink-0 mt-0.5" />
-          <p class="text-sm text-blue-700 dark:text-blue-300">
+        <div
+          v-if="showPlatformNote"
+          class="flex items-start gap-2.5 rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] p-3"
+        >
+          <Icon name="infoCircle" size="sm" class="mt-0.5 flex-shrink-0 text-[var(--apple-muted-2)]" />
+          <p class="text-sm leading-6 text-[var(--apple-muted)]">
             {{ platformNote }}
           </p>
         </div>
@@ -134,7 +145,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h, watch, type Component } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -156,7 +167,7 @@ interface Emits {
 interface TabConfig {
   id: string
   label: string
-  icon: Component
+  icon: 'terminal' | 'sparkles' | 'cpu' | 'bolt'
 }
 
 interface FileConfig {
@@ -200,113 +211,50 @@ watch(activeClientTab, () => {
   activeTab.value = 'unix'
 })
 
-// Icon components
-const AppleIcon = {
-  render() {
-    return h('svg', {
-      fill: 'currentColor',
-      viewBox: '0 0 24 24',
-      class: 'w-4 h-4'
-    }, [
-      h('path', { d: 'M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z' })
-    ])
-  }
-}
-
-const WindowsIcon = {
-  render() {
-    return h('svg', {
-      fill: 'currentColor',
-      viewBox: '0 0 24 24',
-      class: 'w-4 h-4'
-    }, [
-      h('path', { d: 'M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .15V5.21L20 3zM3 13l6 .09v6.81l-6-1.15V13zm7 .25l10 .15V21l-10-1.91v-5.84z' })
-    ])
-  }
-}
-
-// Terminal icon for Claude Code
-const TerminalIcon = {
-  render() {
-    return h('svg', {
-      fill: 'none',
-      stroke: 'currentColor',
-      viewBox: '0 0 24 24',
-      'stroke-width': '1.5',
-      class: 'w-4 h-4'
-    }, [
-      h('path', {
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
-        d: 'm6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 17.25V6.75A2.25 2.25 0 0 0 18.75 4.5H5.25A2.25 2.25 0 0 0 3 6.75v10.5A2.25 2.25 0 0 0 5.25 20.25Z'
-      })
-    ])
-  }
-}
-
-// Sparkle icon for Gemini
-const SparkleIcon = {
-  render() {
-    return h('svg', {
-      fill: 'none',
-      stroke: 'currentColor',
-      viewBox: '0 0 24 24',
-      'stroke-width': '1.5',
-      class: 'w-4 h-4'
-    }, [
-      h('path', {
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
-        d: 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z'
-      })
-    ])
-  }
-}
-
 const clientTabs = computed((): TabConfig[] => {
   if (!props.platform) return []
   switch (props.platform) {
     case 'openai': {
       const tabs: TabConfig[] = [
-        { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
-        { id: 'codex-ws', label: t('keys.useKeyModal.cliTabs.codexCliWs'), icon: TerminalIcon },
+        { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: 'terminal' },
+        { id: 'codex-ws', label: t('keys.useKeyModal.cliTabs.codexCliWs'), icon: 'terminal' },
       ]
       if (props.allowMessagesDispatch) {
-        tabs.push({ id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon })
+        tabs.push({ id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: 'terminal' })
       }
-      tabs.push({ id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon })
+      tabs.push({ id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: 'terminal' })
       return tabs
     }
     case 'gemini':
       return [
-        { id: 'gemini', label: t('keys.useKeyModal.cliTabs.geminiCli'), icon: SparkleIcon },
-        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
+        { id: 'gemini', label: t('keys.useKeyModal.cliTabs.geminiCli'), icon: 'sparkles' },
+        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: 'terminal' }
       ]
     case 'antigravity':
       return [
-        { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
-        { id: 'gemini', label: t('keys.useKeyModal.cliTabs.geminiCli'), icon: SparkleIcon },
-        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
+        { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: 'terminal' },
+        { id: 'gemini', label: t('keys.useKeyModal.cliTabs.geminiCli'), icon: 'sparkles' },
+        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: 'terminal' }
       ]
     default:
       return [
-        { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
-        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
+        { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: 'terminal' },
+        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: 'terminal' }
       ]
   }
 })
 
 // Shell tabs (3 types for environment variable based configs)
 const shellTabs: TabConfig[] = [
-  { id: 'unix', label: 'macOS / Linux', icon: AppleIcon },
-  { id: 'cmd', label: 'Windows CMD', icon: WindowsIcon },
-  { id: 'powershell', label: 'PowerShell', icon: WindowsIcon }
+  { id: 'unix', label: 'macOS / Linux', icon: 'terminal' },
+  { id: 'cmd', label: 'Windows CMD', icon: 'cpu' },
+  { id: 'powershell', label: 'PowerShell', icon: 'bolt' }
 ]
 
 // OpenAI tabs (2 OS types)
 const openaiTabs: TabConfig[] = [
-  { id: 'unix', label: 'macOS / Linux', icon: AppleIcon },
-  { id: 'windows', label: 'Windows', icon: WindowsIcon }
+  { id: 'unix', label: 'macOS / Linux', icon: 'terminal' },
+  { id: 'windows', label: 'Windows', icon: 'cpu' }
 ]
 
 const showShellTabs = computed(() => activeClientTab.value !== 'opencode')
@@ -528,12 +476,16 @@ ${keyword('$env:')}${variable('GEMINI_MODEL')}${operator('=')}${string(`"${model
 function generateOpenAIFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const isWindows = activeTab.value === 'windows'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
+  const contextWindow = 1050000
+  const autoCompactLimit = 880000
 
   // config.toml content
   const configContent = `model_provider = "OpenAI"
 model = "gpt-5.5"
 review_model = "gpt-5.5"
 model_reasoning_effort = "xhigh"
+model_context_window = ${contextWindow}
+model_auto_compact_token_limit = ${autoCompactLimit}
 disable_response_storage = true
 network_access = "enabled"
 windows_wsl_setup_acknowledged = true
@@ -568,12 +520,16 @@ goals = true`
 function generateOpenAIWsFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const isWindows = activeTab.value === 'windows'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
+  const contextWindow = 1050000
+  const autoCompactLimit = 880000
 
   // config.toml content with WebSocket v2
   const configContent = `model_provider = "OpenAI"
 model = "gpt-5.5"
 review_model = "gpt-5.5"
 model_reasoning_effort = "xhigh"
+model_context_window = ${contextWindow}
+model_auto_compact_token_limit = ${autoCompactLimit}
 disable_response_storage = true
 network_access = "enabled"
 windows_wsl_setup_acknowledged = true

@@ -1,18 +1,29 @@
 <template>
   <AppLayout>
     <div class="mx-auto max-w-7xl space-y-5">
-      <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-dark-700 lg:flex-row lg:items-end lg:justify-between">
+      <div class="page-header mb-0 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div class="min-w-0">
-          <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
-            {{ t('channelStatus.title') }}
+          <h1 class="page-title">
+            {{ t('channelStatus.hero.title') }}
           </h1>
-          <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-            {{ t('channelStatus.description') }}
+          <p class="page-description max-w-2xl leading-6">
+            {{ t('channelStatus.hero.description') }}
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <span
+              v-for="signal in statusTrustSignals"
+              :key="signal"
+              class="rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] px-2.5 py-1 text-xs font-medium text-[var(--apple-muted)]"
+            >
+              {{ signal }}
+            </span>
+          </div>
+          <p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--apple-muted)]">
+            {{ t('channelStatus.hero.assurance') }}
           </p>
         </div>
         <MonitorHero
           :overall-status="overallStatus"
-          :interval-seconds="DEFAULT_INTERVAL_SECONDS"
           :window="currentWindow"
           :loading="loading"
           :auto-refresh="autoRefresh"
@@ -82,6 +93,14 @@ const autoRefresh = useAutoRefresh({
   shouldPause: () => document.hidden || loading.value,
 })
 const countdown = autoRefresh.countdown
+
+const statusTrustSignals = computed(() => [
+  t('channelStatus.hero.signals.stability'),
+  t('channelStatus.hero.signals.full'),
+  t('channelStatus.hero.signals.transparent'),
+  t('channelStatus.hero.signals.privacy'),
+  t('channelStatus.hero.signals.billing'),
+])
 
 // ── Computed ──
 const overallStatus = computed<OverallStatus>(() => {

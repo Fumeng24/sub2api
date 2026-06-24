@@ -8,7 +8,7 @@ const messages: Record<string, string> = {
   'keys.endpoints.default': '默认',
   'keys.endpoints.copied': '已复制',
   'keys.endpoints.copiedHint': '已复制到剪贴板',
-  'keys.endpoints.clickToCopy': '点击可复制此端点',
+  'keys.endpoints.clickToCopy': '复制端点',
   'keys.endpoints.speedTest': '测速',
 }
 
@@ -46,7 +46,7 @@ describe('EndpointPopover', () => {
     })
 
     expect(wrapper.text()).toContain('自定义说明')
-    expect(wrapper.text()).toContain('点击可复制此端点')
+    expect(wrapper.text()).toContain('复制端点')
     expect(wrapper.find('[role="button"]').attributes('title')).toBeUndefined()
     expect(wrapper.find('[title="自定义说明"]').exists()).toBe(false)
   })

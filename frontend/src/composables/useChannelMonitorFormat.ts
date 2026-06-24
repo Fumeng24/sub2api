@@ -156,17 +156,17 @@ export function hslForPct(pct: number | null | undefined): string | undefined {
 }
 
 /**
- * Tailwind gradient class for the provider icon tile background.
+ * Tailwind class for the provider icon tile background.
  */
 export function providerGradient(provider: string): string {
   switch (provider) {
     case PROVIDER_OPENAI:
-      return 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-500/10 dark:to-emerald-500/20'
+      return 'bg-emerald-500/10 dark:bg-emerald-500/15'
     case PROVIDER_ANTHROPIC:
-      return 'bg-gradient-to-br from-orange-50 to-amber-100 dark:from-orange-500/10 dark:to-amber-500/20'
+      return 'bg-orange-500/10 dark:bg-orange-500/15'
     case PROVIDER_GEMINI:
-      return 'bg-gradient-to-br from-sky-50 to-indigo-100 dark:from-sky-500/10 dark:to-indigo-500/20'
+      return 'bg-blue-500/10 dark:bg-blue-500/15'
     default:
-      return 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-dark-700 dark:to-dark-600'
+      return 'bg-gray-100 dark:bg-dark-700'
   }
 }

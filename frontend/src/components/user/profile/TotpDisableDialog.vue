@@ -3,7 +3,7 @@
     <div class="flex min-h-full items-center justify-center p-4">
       <div class="fixed inset-0 bg-black/50 transition-opacity" @click="$emit('close')"></div>
 
-      <div class="relative w-full max-w-md transform rounded-xl bg-white p-6 shadow-xl transition-all dark:bg-dark-800">
+      <div class="relative w-full max-w-md transform rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-6 shadow-sm transition-all">
         <!-- Header -->
         <div class="mb-6">
           <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
@@ -70,7 +70,7 @@
             </button>
             <button
               type="submit"
-              class="btn btn-danger"
+              class="btn btn-secondary text-[var(--apple-danger)] hover:text-[var(--apple-danger)]"
               :disabled="loading || !canSubmit"
             >
               {{ loading ? t('common.processing') : t('profile.totp.confirmDisable') }}

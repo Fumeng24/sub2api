@@ -7,28 +7,28 @@
       <div
         v-for="i in 6"
         :key="i"
-        class="min-h-[260px] animate-pulse rounded-lg border border-gray-200 bg-white p-5 dark:border-dark-700 dark:bg-dark-800"
+        class="card min-h-[260px] animate-pulse p-5"
       >
         <div class="flex items-start gap-3">
-          <div class="h-9 w-9 rounded-lg bg-gray-200 dark:bg-dark-700"></div>
+          <div class="skeleton h-9 w-9 rounded-lg"></div>
           <div class="flex-1 space-y-2">
-            <div class="h-4 w-2/3 rounded bg-gray-200 dark:bg-dark-700"></div>
-            <div class="h-3 w-1/2 rounded bg-gray-200 dark:bg-dark-700"></div>
+            <div class="skeleton h-4 w-2/3"></div>
+            <div class="skeleton h-3 w-1/2"></div>
           </div>
-          <div class="h-6 w-16 rounded-full bg-gray-200 dark:bg-dark-700"></div>
+          <div class="skeleton h-6 w-16 rounded-full"></div>
         </div>
         <div class="mt-5 grid grid-cols-2 gap-2">
-          <div class="h-16 rounded-lg bg-gray-100 dark:bg-dark-900/40"></div>
-          <div class="h-16 rounded-lg bg-gray-100 dark:bg-dark-900/40"></div>
+          <div class="skeleton h-14 rounded-lg"></div>
+          <div class="skeleton h-14 rounded-lg"></div>
         </div>
-        <div class="mt-6 h-5 w-full rounded bg-gray-100 dark:bg-dark-900/40"></div>
+        <div class="skeleton mt-6 h-5 w-full"></div>
       </div>
     </div>
 
     <EmptyState
       v-else-if="items.length === 0"
-      :title="t('channelStatus.empty.title')"
-      :description="t('channelStatus.empty.description')"
+      :title="emptyCopy.title"
+      :description="emptyCopy.description"
     />
 
     <div
@@ -49,6 +49,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UserMonitorView, UserMonitorDetail } from '@/api/channelMonitor'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -66,7 +67,18 @@ const emit = defineEmits<{
   (e: 'cardClick', item: UserMonitorView): void
 }>()
 
-const { t } = useI18n()
+const { locale } = useI18n()
+
+const emptyCopy = computed(() => locale.value.startsWith('zh')
+  ? {
+    title: '状态正在建立',
+    description: '有可展示的服务探测记录后，会在这里呈现可用率、延迟和近期状态。'
+  }
+  : {
+    title: 'Status is being prepared',
+    description: 'Availability, latency, and recent checks will appear here once service probes are available.'
+  }
+)
 
 function resolveAvailability(item: UserMonitorView): number | null {
   if (props.window === '7d') {
