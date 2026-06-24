@@ -59,22 +59,25 @@ function createStreamResponse(lines: string[]) {
   } as Response
 }
 
-function mountModal() {
+function mountModal(account: Record<string, unknown> = {
+  id: 42,
+  name: 'Gemini Image Test',
+  platform: 'gemini',
+  type: 'apikey',
+  status: 'active'
+}, show = false) {
   return mount(AccountTestModal, {
     props: {
-      show: false,
-      account: {
-        id: 42,
-        name: 'Gemini Image Test',
-        platform: 'gemini',
-        type: 'apikey',
-        status: 'active'
-      }
+      show,
+      account
     } as any,
     global: {
       stubs: {
         BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
-        Select: { template: '<div class="select-stub"></div>' },
+        Select: {
+          props: ['modelValue', 'options', 'disabled'],
+          template: '<div class="select-stub" :data-option-count="options.length" :data-model-value="modelValue" :data-disabled="disabled"></div>'
+        },
         TextArea: {
           props: ['modelValue'],
           emits: ['update:modelValue'],
@@ -116,6 +119,29 @@ describe('AccountTestModal', () => {
     vi.restoreAllMocks()
   })
 
+  it('初始打开挂载时会加载 code=0 data 模型响应并启用测试', async () => {
+    getAvailableModels.mockResolvedValueOnce({
+      code: 0,
+      data: [
+        { id: 'gemini-2.5-pro', display_name: 'Gemini 2.5 Pro' },
+        { id: 'gemini-3.1-flash-image', display_name: 'Gemini 3.1 Flash Image' }
+      ]
+    })
+
+    const wrapper = mountModal(undefined, true)
+    await flushPromises()
+
+    expect(getAvailableModels).toHaveBeenCalledWith(42)
+    expect((wrapper.vm as any).availableModels).toHaveLength(2)
+
+    const modelSelect = wrapper.find('.select-stub')
+    expect(modelSelect.attributes('data-option-count')).toBe('2')
+    expect(modelSelect.attributes('data-model-value')).toBe('gemini-3.1-flash-image')
+
+    const startButton = wrapper.findAll('button').find((button) => button.text().includes('admin.accounts.startTest'))
+    expect(startButton?.attributes('disabled')).toBeUndefined()
+  })
+
   it('gemini 图片模型测试会携带提示词并渲染图片预览', async () => {
     const wrapper = mountModal()
     await wrapper.setProps({ show: true })
@@ -143,5 +169,75 @@ describe('AccountTestModal', () => {
     const preview = wrapper.find('img[alt="test-image-1"]')
     expect(preview.exists()).toBe(true)
     expect(preview.attributes('src')).toBe('data:image/png;base64,QUJD')
+  })
+
+  it('OpenAI compact 测试会携带 mode 并渲染状态消息', async () => {
+    getAvailableModels.mockResolvedValueOnce([
+      { id: 'gpt-5.4', display_name: 'GPT-5.4' }
+    ])
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"status","text":"compact probe ok"}\n',
+        'data: {"type":"test_complete","success":true}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 43,
+      name: 'OpenAI OAuth',
+      platform: 'openai',
+      type: 'oauth',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    ;(wrapper.vm as any).testMode = 'compact'
+    await (wrapper.vm as any).startTest()
+    await flushPromises()
+    await flushPromises()
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    const [, request] = (global.fetch as any).mock.calls[0]
+    expect(JSON.parse(request.body)).toMatchObject({
+      model_id: 'gpt-5.4',
+      mode: 'compact'
+    })
+    expect(wrapper.text()).toContain('compact probe ok')
+  })
+
+  it('兼容包了一层的模型响应', async () => {
+    getAvailableModels.mockResolvedValueOnce({
+      data: {
+        models: [
+          { id: 'gemini-2.5-pro', display_name: 'Gemini 2.5 Pro' }
+        ]
+      }
+    })
+
+    const wrapper = mountModal()
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect((wrapper.vm as any).availableModels).toEqual([
+      expect.objectContaining({
+        id: 'gemini-2.5-pro',
+        value: 'gemini-2.5-pro',
+        label: 'Gemini 2.5 Pro'
+      })
+    ])
+    expect((wrapper.vm as any).selectedModelId).toBe('gemini-2.5-pro')
+  })
+
+  it('模型接口失败时使用平台默认模型兜底', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    getAvailableModels.mockRejectedValueOnce(new Error('network failed'))
+
+    const wrapper = mountModal()
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect((wrapper.vm as any).availableModels.length).toBeGreaterThan(0)
+    expect((wrapper.vm as any).selectedModelId).toBeTruthy()
   })
 })

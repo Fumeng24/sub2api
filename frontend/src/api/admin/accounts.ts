@@ -545,14 +545,93 @@ export async function setSchedulable(id: number, schedulable: boolean): Promise<
   return data
 }
 
+type RawAccountModel =
+  | string
+  | (Partial<ClaudeModel> & {
+      value?: unknown
+      name?: unknown
+      label?: unknown
+      displayName?: unknown
+      object?: unknown
+      created?: unknown
+    })
+
+type AccountModelsPayload =
+  | RawAccountModel[]
+  | {
+      models?: RawAccountModel[]
+      data?: RawAccountModel[] | { models?: RawAccountModel[] }
+    }
+
+function extractRawAccountModels(payload: unknown): RawAccountModel[] {
+  if (Array.isArray(payload)) return payload as RawAccountModel[]
+  if (!payload || typeof payload !== 'object') return []
+
+  const source = payload as Record<string, unknown>
+  if (Array.isArray(source.models)) return source.models as RawAccountModel[]
+
+  const nested = source.data
+  if (Array.isArray(nested)) return nested as RawAccountModel[]
+  if (nested && typeof nested === 'object') {
+    const nestedSource = nested as Record<string, unknown>
+    if (Array.isArray(nestedSource.models)) return nestedSource.models as RawAccountModel[]
+  }
+
+  return []
+}
+
+function normalizeAccountModel(model: RawAccountModel): ClaudeModel | null {
+  const source = typeof model === 'object' && model !== null ? model as Record<string, unknown> : {}
+  const id = String(
+    typeof model === 'string'
+      ? model
+      : source.id ?? source.value ?? source.name ?? ''
+  ).trim()
+  if (!id) return null
+
+  const displayName = String(
+    typeof model === 'string'
+      ? model
+      : source.display_name ?? source.displayName ?? source.label ?? source.name ?? id
+  ).trim() || id
+
+  const createdAt =
+    typeof source.created_at === 'string'
+      ? source.created_at
+      : typeof source.created === 'number'
+        ? String(source.created)
+        : ''
+
+  return {
+    id,
+    type: String(source.type ?? source.object ?? 'model'),
+    display_name: displayName,
+    created_at: createdAt
+  }
+}
+
+function extractAccountModels(payload: unknown): ClaudeModel[] {
+  const seen = new Set<string>()
+  const models: ClaudeModel[] = []
+
+  for (const rawModel of extractRawAccountModels(payload)) {
+    const model = normalizeAccountModel(rawModel)
+    if (!model || seen.has(model.id)) continue
+    seen.add(model.id)
+    models.push(model)
+  }
+
+  return models
+}
+
 /**
  * Get available models for an account
  * @param id - Account ID
  * @returns List of available models for this account
  */
 export async function getAvailableModels(id: number): Promise<ClaudeModel[]> {
-  const { data } = await apiClient.get<ClaudeModel[]>(`/admin/accounts/${id}/models`)
-  return data
+  const { data } = await apiClient.get<AccountModelsPayload>(`/admin/accounts/${id}/models`)
+  return extractAccountModels(data)
 }
 
 export interface SyncUpstreamModelsResult {
