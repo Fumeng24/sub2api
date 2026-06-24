@@ -1,24 +1,24 @@
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-white px-4 py-10 text-gray-950 dark:bg-dark-950 dark:text-white sm:px-6">
+  <div class="apple-auth-shell flex min-h-[100dvh] items-center justify-center overflow-x-hidden bg-[var(--apple-bg)] px-3 py-6 text-[var(--apple-text)] sm:px-6 sm:py-10">
     <!-- Content Container -->
-    <div class="w-full max-w-[420px]">
+    <div class="w-full max-w-[430px]">
       <!-- Logo/Brand -->
-      <div class="mb-8 text-center">
+      <div class="mb-6 text-center sm:mb-8">
         <!-- Custom Logo or Default Logo -->
         <template v-if="settingsLoaded || siteName">
           <div
-            class="mb-3 inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200 dark:bg-dark-900 dark:ring-dark-800"
+            class="mb-3 inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-[var(--apple-surface)] ring-1 ring-[color:var(--apple-border)]"
           >
             <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
           </div>
-          <h1 class="text-xl font-semibold tracking-tight text-gray-950 dark:text-white">
+          <h1 class="break-words text-lg font-semibold tracking-normal text-[var(--apple-text)] sm:text-xl">
             {{ siteName }}
           </h1>
         </template>
       </div>
 
       <!-- Card Container -->
-      <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-800 dark:bg-dark-900/80 sm:p-7">
+      <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-5 shadow-sm sm:p-7">
         <slot />
       </div>
 
@@ -28,8 +28,8 @@
       </div>
 
       <!-- Copyright -->
-      <div class="mt-8 text-center text-xs text-gray-400 dark:text-dark-500">
-        &copy; {{ currentYear }} {{ siteName }}. All rights reserved.
+      <div class="mt-6 break-words text-center text-xs leading-5 text-[var(--apple-muted-2)] sm:mt-8">
+        &copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}
       </div>
     </div>
   </div>
@@ -37,10 +37,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
 import { sanitizeUrl } from '@/utils/url'
 
 const appStore = useAppStore()
+const { t } = useI18n()
 
 const siteName = computed(() => appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
@@ -54,12 +56,37 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.apple-auth-shell {
+  padding-top: max(1.5rem, env(safe-area-inset-top));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
 :deep(.input),
 :deep(.btn) {
   border-radius: 0.5rem;
 }
 
 :deep(.input) {
-  min-height: 2.75rem;
+  min-height: 2.875rem;
+  font-size: 1rem;
+}
+
+:deep(.btn) {
+  min-height: 2.875rem;
+}
+
+:deep(.input-label),
+:deep(.input-hint) {
+  line-height: 1.45;
+}
+
+:deep(.input-hint) {
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  :deep(.input) {
+    font-size: 0.875rem;
+  }
 }
 </style>

@@ -5,19 +5,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 主色调 - Wegoo Cobalt Blue
+        // Apple system blue
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
           200: '#bfdbfe',
           300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#2563eb',
-          600: '#1d4ed8',
-          700: '#1e40af',
-          800: '#1e3a8a',
-          900: '#172554',
-          950: '#0b122f'
+          400: '#2997ff',
+          500: '#0077ed',
+          600: '#0071e3',
+          700: '#0066cc',
+          800: '#004a99',
+          900: '#003b7a',
+          950: '#001f40'
         },
         // 辅助色 - 深蓝灰
         accent: {
@@ -33,19 +33,19 @@ export default {
           900: '#0f172a',
           950: '#020617'
         },
-        // 深色模式背景
+        // Apple neutral dark scale
         dark: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617'
+          50: '#f5f5f7',
+          100: '#e8e8ed',
+          200: '#d2d2d7',
+          300: '#a1a1a6',
+          400: '#86868b',
+          500: '#6e6e73',
+          600: '#3a3a3c',
+          700: '#2c2c2e',
+          800: '#1d1d1f',
+          900: '#111113',
+          950: '#000000'
         }
       },
       fontFamily: {
@@ -65,10 +65,10 @@ export default {
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
       },
       boxShadow: {
-        glass: '0 8px 32px rgba(0, 0, 0, 0.08)',
-        'glass-sm': '0 4px 16px rgba(0, 0, 0, 0.06)',
-        glow: '0 0 20px rgba(37, 99, 235, 0.22)',
-        'glow-lg': '0 0 40px rgba(37, 99, 235, 0.3)',
+        glass: '0 1px 2px rgba(0, 0, 0, 0.04)',
+        'glass-sm': '0 1px 2px rgba(0, 0, 0, 0.04)',
+        glow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+        'glow-lg': '0 10px 24px rgba(0, 0, 0, 0.08)',
         card: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06)',
         'card-hover': '0 10px 40px rgba(0, 0, 0, 0.08)',
         'inner-glow': 'inset 0 1px 0 rgba(255, 255, 255, 0.1)'

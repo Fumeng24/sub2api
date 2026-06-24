@@ -172,9 +172,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <NavigationProgress />
-  <RouterView />
-  <Toast />
-  <AnnouncementPopup />
-  <AdminComplianceDialog />
+  <div class="apple-runtime min-h-screen bg-[var(--apple-bg)] text-[var(--apple-text)]">
+    <NavigationProgress />
+    <RouterView />
+    <Toast />
+    <AnnouncementPopup />
+    <AdminComplianceDialog />
+  </div>
 </template>

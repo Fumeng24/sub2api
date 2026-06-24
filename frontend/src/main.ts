@@ -41,7 +41,7 @@ function showBootstrapError(error: unknown) {
     <main style="min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#0f172a;">
       <section style="max-width:520px;width:100%;padding:28px;border:1px solid #fecaca;border-radius:20px;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.08);">
         <h1 style="margin:0 0 12px;font-size:24px;">页面加载失败</h1>
-        <p style="margin:0 0 12px;line-height:1.7;color:#475569;">页面脚本启动失败，通常是缓存异常、网络中断或浏览器扩展拦截导致。请强制刷新页面，或清除本站缓存后重试。</p>
+        <p style="margin:0 0 12px;line-height:1.7;color:#475569;">页面脚本启动失败，通常是缓存异常、网络中断或浏览器扩展拦截导致。请强制刷新页面，或清除浏览器缓存后重试。</p>
         <p style="margin:0;"><a href="/home" style="color:#1d4ed8;font-weight:700;margin-right:12px;">返回首页</a><a href="/login" style="color:#1d4ed8;font-weight:700;">重新登录</a></p>
       </section>
     </main>

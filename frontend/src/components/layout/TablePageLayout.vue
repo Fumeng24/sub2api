@@ -9,7 +9,7 @@
     </div>
 
     <div class="layout-section-scrollable">
-      <div class="card table-scroll-container">
+      <div class="table-scroll-container">
         <slot name="table" />
       </div>
     </div>
@@ -50,7 +50,10 @@ onUnmounted(() => {
 }
 
 .layout-section-panel {
-  @apply rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-dark-700 dark:bg-dark-900;
+  @apply rounded-lg border p-3;
+  background: var(--apple-surface);
+  border-color: var(--apple-border);
+  box-shadow: var(--apple-shadow-sm);
 }
 
 .layout-section-panel :deep(> *) {
@@ -66,7 +69,16 @@ onUnmounted(() => {
 }
 
 .table-scroll-container {
-  @apply flex h-full min-w-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900;
+  @apply flex h-full min-w-0 flex-col overflow-hidden rounded-lg border;
+  background: var(--apple-surface);
+  border-color: var(--apple-border);
+  border-radius: var(--apple-radius);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+:global(.dark) .layout-section-panel,
+:global(.dark) .table-scroll-container {
+  background: color-mix(in srgb, var(--apple-surface) 94%, white 6%);
 }
 
 .table-scroll-container :deep(.table-wrapper) {
@@ -82,7 +94,7 @@ onUnmounted(() => {
 }
 
 .table-scroll-container :deep(thead) {
-  @apply bg-gray-50/95 dark:bg-dark-800/95;
+  background: var(--apple-surface-elevated);
 }
 
 .table-scroll-container :deep(tbody) {
@@ -90,15 +102,23 @@ onUnmounted(() => {
 }
 
 .table-scroll-container :deep(th) {
-  @apply border-b border-gray-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-dark-700 dark:text-dark-300;
+  @apply border-b px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-dark-300;
+  border-color: var(--apple-border);
+  color: var(--apple-muted);
+  letter-spacing: 0;
 }
 
 .table-scroll-container :deep(td) {
-  @apply border-b border-gray-100 px-4 py-3 text-sm text-gray-700 dark:border-dark-800 dark:text-gray-300;
+  @apply border-b px-4 py-3 text-sm text-gray-700 dark:text-gray-300;
+  border-color: var(--apple-border-soft);
+  color: var(--apple-text);
 }
 
 .layout-section-pagination {
-  @apply overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-900;
+  @apply overflow-hidden rounded-lg border;
+  background: var(--apple-surface);
+  border-color: var(--apple-border);
+  box-shadow: none;
 }
 
 .table-page-layout.mobile-mode {
@@ -116,6 +136,7 @@ onUnmounted(() => {
 
 .table-page-layout.mobile-mode .layout-section-panel {
   @apply p-3;
+  border-color: var(--apple-border-soft);
 }
 
 .table-page-layout.mobile-mode .layout-section-pagination {

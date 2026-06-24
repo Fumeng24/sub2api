@@ -9,11 +9,11 @@
     <!-- Logo/Brand -->
     <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
       <!-- Custom Logo or Default Logo -->
-      <div class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow">
+      <div class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg">
         <img v-if="settingsLoaded" :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
       </div>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
-        <span class="sidebar-brand-title text-lg font-bold text-gray-900 dark:text-white">
+        <span class="sidebar-brand-title text-lg font-semibold">
           {{ siteName }}
         </span>
         <!-- Version Badge -->
@@ -28,7 +28,7 @@
         :href="docsLink.href"
         :target="docsLink.external ? '_blank' : undefined"
         :rel="docsLink.external ? 'noopener noreferrer' : undefined"
-        class="sidebar-link mb-4 border border-primary-200 bg-primary-50 text-primary-700 shadow-sm ring-1 ring-primary-100 hover:bg-primary-100 hover:text-primary-800 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-900/40 dark:hover:bg-primary-900/50 dark:hover:text-primary-100"
+        class="sidebar-link sidebar-doc-link mb-4 border"
         :class="{ 'sidebar-link-collapsed': sidebarCollapsed }"
         :title="sidebarCollapsed ? t('nav.docs') : undefined"
         @click="handleDocsLinkClick"
@@ -36,7 +36,7 @@
         <BookIcon class="h-5 w-5 flex-shrink-0" />
         <span class="sidebar-label sidebar-label-flex" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
           <span class="min-w-0 truncate">{{ t('nav.docs') }}</span>
-          <span class="rounded-full bg-primary-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white dark:bg-primary-400 dark:text-primary-950">
+          <span class="sidebar-doc-badge">
             {{ t('nav.docsBadge') }}
           </span>
         </span>
@@ -73,7 +73,7 @@
                 </span>
               </button>
               <!-- Children -->
-              <div v-if="!sidebarCollapsed && isGroupExpanded(item)" class="mb-1 ml-4 border-l border-gray-200 pl-2 dark:border-dark-600">
+              <div v-if="!sidebarCollapsed && isGroupExpanded(item)" class="sidebar-child-group mb-1 ml-4 border-l pl-2">
                 <router-link
                   v-for="child in item.children"
                   :key="child.path"
@@ -152,7 +152,7 @@
               class="sidebar-link mb-1"
               :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
               :title="sidebarCollapsed ? item.label : undefined"
-              :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
+              :data-tour="tourTargetForNavItem(item)"
               @click="handleMenuItemClick(item.path)"
             >
               <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
@@ -168,7 +168,7 @@
               class="sidebar-link mb-1"
               :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
               :title="sidebarCollapsed ? item.label : undefined"
-              :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
+              :data-tour="tourTargetForNavItem(item)"
               @click="handleMenuItemClick(item.path)"
             >
               <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
@@ -194,7 +194,7 @@
               class="sidebar-link mb-1"
               :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
               :title="sidebarCollapsed ? item.label : undefined"
-              :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
+              :data-tour="tourTargetForNavItem(item)"
               @click="handleMenuItemClick(item.path)"
             >
               <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
@@ -210,7 +210,7 @@
               class="sidebar-link mb-1"
               :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
               :title="sidebarCollapsed ? item.label : undefined"
-              :data-tour="item.path === '/keys' ? 'sidebar-my-keys' : undefined"
+              :data-tour="tourTargetForNavItem(item)"
               @click="handleMenuItemClick(item.path)"
             >
               <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
@@ -226,7 +226,7 @@
     </nav>
 
     <!-- Bottom Section -->
-    <div class="mt-auto border-t border-gray-100 p-3 dark:border-dark-800">
+    <div class="sidebar-footer mt-auto border-t p-3">
       <!-- Theme Toggle -->
       <button
         @click="toggleTheme"
@@ -727,26 +727,6 @@ const InvoiceIcon = {
     )
 }
 
-const CardCodePurchaseIcon = {
-  render: () =>
-    h(
-      'svg',
-      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
-      [
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M3.75 7.5A2.25 2.25 0 016 5.25h12A2.25 2.25 0 0120.25 7.5v9A2.25 2.25 0 0118 18.75H6A2.25 2.25 0 013.75 16.5v-9z'
-        }),
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M7.5 10.5h9M7.5 13.5H12m6.75 4.5l-1.5-1.5m0 0l-1.5-1.5m1.5 1.5l1.5-1.5m-1.5 1.5l-1.5 1.5'
-        })
-      ]
-    )
-}
-
 const ChevronDoubleRightIcon = {
   render: () =>
     h(
@@ -846,7 +826,7 @@ const flagAdminPayment = () => adminSettingsStore.paymentEnabled
 function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   const items: NavItem[] = []
   if (withDashboard) {
-    items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })
+    items.push({ path: '/dashboard', label: t('nav.accountOverview'), icon: DashboardIcon })
   }
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
@@ -859,7 +839,6 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment },
     { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
     { path: '/invoices', label: t('nav.invoices'), icon: InvoiceIcon, hideInSimpleMode: true, featureFlag: flagPayment },
-    { path: 'https://catfk.com/shop/wegoo', href: 'https://catfk.com/shop/wegoo', label: t('nav.cardCodePurchase'), icon: CardCodePurchaseIcon },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon },
@@ -1010,6 +989,13 @@ function handleDocsLinkClick(event: MouseEvent) {
   }
 }
 
+function tourTargetForNavItem(item: NavItem) {
+  if (item.path === '/keys' && authStore.isAdmin && !authStore.isSimpleMode) {
+    return 'sidebar-my-keys'
+  }
+  return undefined
+}
+
 function handleMenuItemClick(itemPath: string) {
   if (mobileOpen.value) {
     setTimeout(() => {
@@ -1021,7 +1007,9 @@ function handleMenuItemClick(itemPath: string) {
   const pathToSelector: Record<string, string> = {
     '/admin/groups': '#sidebar-group-manage',
     '/admin/accounts': '#sidebar-channel-manage',
-    '/keys': '[data-tour="sidebar-my-keys"]'
+    ...(authStore.isAdmin && !authStore.isSimpleMode
+      ? { '/keys': '[data-tour="sidebar-my-keys"]' }
+      : {})
   }
 
   const selector = pathToSelector[itemPath]
@@ -1156,6 +1144,24 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--apple-text);
+  letter-spacing: 0;
+}
+
+.sidebar-doc-badge {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--apple-blue) 14%, transparent);
+  padding: 0.125rem 0.375rem;
+  color: var(--apple-blue);
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sidebar-child-group,
+.sidebar-footer {
+  border-color: var(--apple-border-soft);
 }
 
 .sidebar-link-collapsed {
@@ -1190,14 +1196,14 @@ onMounted(() => {
   right: 0.75rem;
   top: 50%;
   height: 1px;
-  background: rgb(229 231 235);
+  background: var(--apple-border-soft);
   opacity: 0;
   transform: translateY(-50%);
   transition: opacity 0.18s ease;
 }
 
 .dark .sidebar-section-title::after {
-  background: rgb(55 65 81);
+  background: var(--apple-border-soft);
 }
 
 .sidebar-section-title-text-collapsed {
@@ -1240,7 +1246,7 @@ onMounted(() => {
 .sidebar-badge {
   min-width: 1.25rem;
   border-radius: 9999px;
-  background: rgb(239 68 68);
+  background: var(--apple-danger);
   padding: 0 0.375rem;
   text-align: center;
   font-size: 0.625rem;

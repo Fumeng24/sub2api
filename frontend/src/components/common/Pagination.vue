@@ -1,10 +1,10 @@
 <template>
-  <div class="flex min-w-0 items-center justify-between gap-3 bg-white px-3 py-3 dark:bg-dark-900 sm:px-4">
+  <div class="pagination-root flex min-w-0 items-center justify-between gap-3 px-3 py-3 sm:px-4">
     <div class="flex min-w-0 flex-1 items-center justify-between gap-3 sm:hidden">
       <button
         @click="goToPage(page - 1)"
         :disabled="page === 1"
-        class="btn btn-secondary btn-sm"
+        class="btn btn-secondary btn-sm shrink-0"
       >
         {{ t('pagination.previous') }}
       </button>
@@ -14,7 +14,7 @@
       <button
         @click="goToPage(page + 1)"
         :disabled="page === totalPages"
-        class="btn btn-secondary btn-sm"
+        class="btn btn-secondary btn-sm shrink-0"
       >
         {{ t('pagination.next') }}
       </button>
@@ -64,13 +64,13 @@
       </div>
 
       <nav
-        class="relative z-0 inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800"
+        class="pagination-nav relative z-0 inline-flex max-w-full overflow-hidden rounded-lg border"
         aria-label="Pagination"
       >
         <button
           @click="goToPage(page - 1)"
           :disabled="page === 1"
-          class="relative inline-flex items-center border-r border-gray-200 px-2.5 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-700 dark:text-gray-400 dark:hover:bg-dark-700"
+          class="pagination-nav-button relative inline-flex items-center border-r px-2.5 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
           :aria-label="t('pagination.previous')"
         >
           <Icon name="chevronLeft" size="md" />
@@ -82,10 +82,10 @@
           @click="typeof pageNum === 'number' && goToPage(pageNum)"
           :disabled="typeof pageNum !== 'number'"
           :class="[
-            'relative inline-flex items-center border-r border-gray-200 px-3.5 py-2 text-sm font-medium last:border-r-0 dark:border-dark-700',
+            'pagination-nav-button relative inline-flex min-w-10 items-center justify-center border-r px-3 py-2 text-sm font-medium last:border-r-0',
             pageNum === page
-              ? 'z-10 bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400'
-              : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-dark-700',
+              ? 'pagination-nav-button-active z-10'
+              : '',
             typeof pageNum !== 'number' && 'cursor-default'
           ]"
           :aria-label="
@@ -99,7 +99,7 @@
         <button
           @click="goToPage(page + 1)"
           :disabled="page === totalPages"
-          class="relative inline-flex items-center px-2.5 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:bg-dark-700"
+          class="pagination-nav-button relative inline-flex items-center px-2.5 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
           :aria-label="t('pagination.next')"
         >
           <Icon name="chevronRight" size="md" />
@@ -233,6 +233,34 @@ const submitJump = () => {
 </script>
 
 <style scoped>
+.pagination-root {
+  background: var(--apple-surface);
+  color: var(--apple-text);
+}
+
+.pagination-nav {
+  background: var(--apple-surface);
+  border-color: var(--apple-border);
+  border-radius: var(--apple-radius);
+}
+
+.pagination-nav-button {
+  border-color: var(--apple-border-soft);
+  color: var(--apple-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pagination-nav-button:hover:not(:disabled) {
+  background: var(--apple-hover);
+  color: var(--apple-text);
+}
+
+.pagination-nav-button-active,
+.pagination-nav-button-active:hover:not(:disabled) {
+  background: var(--apple-blue);
+  color: #fff;
+}
+
 .page-size-select :deep(.select-trigger) {
   @apply px-3 py-1.5 text-sm;
 }

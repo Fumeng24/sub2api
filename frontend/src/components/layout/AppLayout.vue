@@ -1,11 +1,11 @@
 <template>
-  <div class="min-h-screen bg-gray-50 text-gray-900 dark:bg-dark-950 dark:text-gray-100">
+  <div class="app-layout apple-shell min-h-screen text-[var(--apple-text)]">
     <!-- Sidebar -->
     <AppSidebar />
 
     <!-- Main Content Area -->
     <div
-      class="relative min-h-screen overflow-x-hidden transition-all duration-300"
+      class="relative min-h-screen overflow-x-hidden transition-[margin] duration-300"
       :class="[sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64']"
     >
       <!-- Header -->
@@ -13,6 +13,7 @@
 
       <!-- Main Content -->
       <main class="mx-auto w-full max-w-[1680px] min-w-0 px-3 py-4 sm:px-4 md:px-6 lg:px-8 lg:py-6">
+        <LowBalanceRetentionBanner class="mb-4" />
         <GroupRateDiscountNotice v-if="showGroupDiscountNotice" class="mb-4" />
         <slot />
       </main>
@@ -30,18 +31,18 @@ import { useOnboardingTour } from '@/composables/useOnboardingTour'
 import { useOnboardingStore } from '@/stores/onboarding'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
+import LowBalanceRetentionBanner from '@/components/common/LowBalanceRetentionBanner.vue'
 import GroupRateDiscountNotice from '@/components/discount/GroupRateDiscountNotice.vue'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const route = useRoute()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
-const isAdmin = computed(() => authStore.user?.role === 'admin')
 const showGroupDiscountNotice = computed(() => authStore.isAuthenticated && route.meta.requiresAdmin !== true)
 
 const { replayTour } = useOnboardingTour({
-  storageKey: isAdmin.value ? 'admin_guide' : 'user_guide',
-  autoStart: true
+  storageKey: 'admin_guide',
+  autoStart: false
 })
 
 const onboardingStore = useOnboardingStore()
@@ -52,3 +53,10 @@ onMounted(() => {
 
 defineExpose({ replayTour })
 </script>
+
+<style scoped>
+.app-layout {
+  background: var(--apple-bg);
+  color: var(--apple-text);
+}
+</style>
