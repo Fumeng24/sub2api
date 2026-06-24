@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <button type="button" :disabled="buttonDisabled" class="btn btn-secondary w-full" @click="startLogin">
       <span
-        class="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300"
+        class="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-green-200 bg-green-50 text-xs font-semibold text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300"
       >
         W
       </span>
@@ -12,7 +12,7 @@
     <p
       v-if="disabledHint"
       data-testid="wechat-oauth-hint"
-      class="text-sm text-amber-600 dark:text-amber-400"
+      class="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-200"
     >
       {{ disabledHint }}
     </p>
@@ -45,12 +45,8 @@ const props = withDefaults(defineProps<{
 
 const appStore = useAppStore()
 const route = useRoute()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const providerName = computed(() => t('auth.wechatProviderName'))
-
-function localizeWeChatHint(zh: string, en: string): string {
-  return locale.value.startsWith('zh') ? zh : en
-}
 
 const resolvedStart = computed(() => resolveWeChatOAuthStart(appStore.cachedPublicSettings))
 const buttonDisabled = computed(() => props.disabled || resolvedStart.value.mode === null)
@@ -64,10 +60,7 @@ const disabledHint = computed(() => {
     case 'wechat_browser_required':
       return t('auth.oauthFlow.wechatBrowserOnly')
     case 'native_app_required':
-      return localizeWeChatHint(
-        '当前仅配置微信移动应用登录，需要在原生 App 中通过微信 SDK 发起授权。',
-        'This site only has WeChat mobile app login configured. Continue from the native app through the WeChat SDK.',
-      )
+      return t('auth.oauthFlow.wechatNativeAppRequired')
     case 'not_configured':
       return t('auth.oauthFlow.wechatNotConfigured')
     default:

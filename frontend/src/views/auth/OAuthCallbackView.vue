@@ -1,21 +1,21 @@
 <template>
-  <div class="min-h-screen bg-gray-50 px-4 py-10 dark:bg-dark-900">
+  <div class="min-h-screen bg-[var(--apple-bg)] px-4 py-10 text-[var(--apple-text)]">
     <div class="mx-auto max-w-2xl">
-      <div v-if="isProcessing" class="card p-6 text-center">
+      <div v-if="isProcessing" class="card p-6 text-center shadow-none">
         <div class="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"></div>
-        <h1 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
+        <h1 class="mt-4 text-lg font-semibold text-[var(--apple-text)]">
           {{ t('auth.oauth.callbackTitle') }}
         </h1>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        <p class="mt-2 text-sm text-[var(--apple-muted)]">
           {{ t('auth.oauth.callbackHint') }}
         </p>
       </div>
 
-      <div v-else-if="needsRegistrationCompletion" class="card p-6">
-        <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
+      <div v-else-if="needsRegistrationCompletion" class="card p-6 shadow-none">
+        <h1 class="text-lg font-semibold text-[var(--apple-text)]">
           {{ t('auth.oidc.callbackTitle', { providerName }) }}
         </h1>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        <p class="mt-2 text-sm text-[var(--apple-muted)]">
           {{ registrationHint }}
         </p>
 
@@ -65,7 +65,7 @@
               @keyup.enter="handleSubmitRegistration"
             />
           </div>
-          <p v-if="registrationError" class="text-sm text-red-600 dark:text-red-400">
+          <p v-if="registrationError" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
             {{ registrationError }}
           </p>
           <button
@@ -79,11 +79,11 @@
         </div>
       </div>
 
-      <div v-else-if="invalidCallback" class="card p-6 text-center">
-        <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
+      <div v-else-if="invalidCallback" class="card p-6 text-center shadow-none">
+        <h1 class="text-lg font-semibold text-[var(--apple-text)]">
           {{ t('auth.oauth.invalidCallbackTitle') }}
         </h1>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        <p class="mt-2 text-sm text-[var(--apple-muted)]">
           {{ t('auth.oauth.invalidCallbackHint') }}
         </p>
         <button class="btn btn-primary mt-6" type="button" @click="router.replace('/login')">
@@ -91,11 +91,11 @@
         </button>
       </div>
 
-      <div v-else class="card p-6">
-        <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
+      <div v-else class="card p-6 shadow-none">
+        <h1 class="text-lg font-semibold text-[var(--apple-text)]">
           {{ t('auth.oauth.callbackTitle') }}
         </h1>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        <p class="mt-2 text-sm text-[var(--apple-muted)]">
           {{ t('auth.oauth.callbackHint') }}
         </p>
 

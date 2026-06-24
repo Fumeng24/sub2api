@@ -1,13 +1,16 @@
 <template>
   <AuthLayout>
-    <div class="space-y-6">
+    <div class="space-y-5 sm:space-y-6">
       <!-- Title -->
       <div class="text-center">
-        <h2 class="text-xl font-semibold tracking-tight text-gray-950 dark:text-white">
+        <h2 class="text-lg font-semibold tracking-normal text-gray-950 dark:text-white sm:text-xl">
           {{ t('auth.welcomeBack') }}
         </h2>
-        <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-dark-400">
+        <p class="mx-auto mt-2 max-w-[22rem] text-sm leading-5 text-gray-500 dark:text-dark-400 sm:leading-6">
           {{ t('auth.signInToAccount') }}
+        </p>
+        <p class="mx-auto mt-3 max-w-[320px] text-xs leading-5 text-gray-500 dark:text-dark-400">
+          {{ t('auth.valueProps.official') }} · {{ t('auth.valueProps.privacy') }} · {{ t('auth.valueProps.coverage') }}
         </p>
       </div>
 
@@ -61,14 +64,14 @@
               type="button"
               @click="showPassword = !showPassword"
               :disabled="authActionDisabled"
-              class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
+              class="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-400 transition-colors hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-dark-300"
+              :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
             >
               <Icon v-if="showPassword" name="eyeOff" size="md" />
               <Icon v-else name="eye" size="md" />
             </button>
           </div>
-          <div class="mt-2 flex items-center justify-between">
-            <span></span>
+          <div class="mt-2 flex min-h-5 items-center justify-end">
             <router-link
               v-if="passwordResetEnabled && !backendModeEnabled"
               to="/forgot-password"
@@ -93,7 +96,7 @@
         <div
           v-if="inlineErrorMessage"
           role="alert"
-          class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-300"
+          class="break-words rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-300"
         >
           {{ inlineErrorMessage }}
         </div>
@@ -143,7 +146,7 @@
         <div v-if="showOAuthLogin" class="space-y-3 pt-2">
           <div class="flex items-center gap-3">
             <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
-            <span class="text-xs text-gray-500 dark:text-dark-400">
+            <span class="shrink-0 text-xs text-gray-500 dark:text-dark-400">
               {{ t('auth.oauthOrContinue') }}
             </span>
             <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
@@ -407,7 +410,7 @@ function rejectLoginAgreement(): void {
   localStorage.removeItem(LOGIN_AGREEMENT_STORAGE_KEY)
   agreementAccepted.value = false
   showAgreementModal.value = false
-  appStore.showWarning('未同意最新条款前，无法输入账号密码或使用快捷登录。')
+  appStore.showWarning(t('auth.loginAgreementRejected'))
 }
 
 // ==================== Turnstile Handlers ====================

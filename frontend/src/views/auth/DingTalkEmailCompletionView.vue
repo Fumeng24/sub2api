@@ -2,7 +2,7 @@
   <AuthLayout>
     <div class="space-y-6">
       <div class="text-center">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+        <h2 class="text-xl font-semibold tracking-normal text-gray-950 dark:text-white">
           {{ t('auth.dingtalk.createAccountTitle') }}
         </h2>
         <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
@@ -97,7 +97,7 @@ async function handleCreateAccount(payload: PendingOAuthCreateAccountPayload) {
       return
     }
 
-    // 后端把 pending session 转到 choice 状态（用户填的 email 已在系统内）→ 跳回 callback view 走绑定流程
+    // Backend moved the pending session to choice state; return to callback for binding.
     if (data.step === 'choose_account_action_required' || data.existing_account_bindable === true) {
       navigateToBindLogin(payload.email)
       return
@@ -105,7 +105,7 @@ async function handleCreateAccount(payload: PendingOAuthCreateAccountPayload) {
 
     accountActionError.value = t('auth.loginFailed')
   } catch (e: unknown) {
-    // 全局"开放注册"关闭且未开启钉钉企业模式豁免时，引导用户去绑定已有账户而非死路
+    // When public registration is closed, move the user toward existing-account binding.
     const err = e as { response?: { data?: { reason?: string } } }
     if (err.response?.data?.reason === 'REGISTRATION_DISABLED') {
       appStore.showInfo(t('auth.dingtalk.registrationDisabledRedirectToBind'))

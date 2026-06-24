@@ -3,7 +3,7 @@
     <div class="space-y-6">
       <!-- Title -->
       <div class="text-center">
-        <h2 class="text-xl font-semibold tracking-tight text-gray-950 dark:text-white">
+        <h2 class="text-xl font-semibold tracking-normal text-gray-950 dark:text-white">
           {{ t('auth.verifyYourEmail') }}
         </h2>
         <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-dark-400">
@@ -15,13 +15,13 @@
       <!-- No Data Warning -->
       <div
         v-if="!hasRegisterData"
-        class="rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-900/20"
+        class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-500/30 dark:bg-yellow-500/10"
       >
         <div class="flex items-start gap-3">
           <div class="flex-shrink-0">
-            <Icon name="exclamationCircle" size="md" class="text-amber-500" />
+            <Icon name="exclamationCircle" size="md" class="text-yellow-600 dark:text-yellow-300" />
           </div>
-          <div class="text-sm text-amber-700 dark:text-amber-400">
+          <div class="text-sm text-yellow-800 dark:text-yellow-200">
             <p class="font-medium">{{ t('auth.sessionExpired') }}</p>
             <p class="mt-1">{{ t('auth.sessionExpiredDesc') }}</p>
           </div>
@@ -44,7 +44,7 @@
             inputmode="numeric"
             maxlength="6"
             :disabled="isLoading"
-            class="input py-3 text-center font-mono text-xl tracking-[0.35em] sm:tracking-[0.5em]"
+            class="input py-3 text-center font-mono text-xl tracking-normal"
             :class="{ 'input-error': errors.code }"
             placeholder="000000"
           />
@@ -54,7 +54,7 @@
         <!-- Code Status -->
         <div
           v-if="codeSent"
-          class="rounded-md border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800/50 dark:bg-green-900/20"
+          class="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-500/30 dark:bg-green-500/10"
         >
           <div class="flex items-start gap-2.5">
             <div class="flex-shrink-0">
@@ -186,7 +186,7 @@ import {
   oauthAffiliatePayload
 } from '@/utils/oauthAffiliate'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 // ==================== Router & Stores ====================
 
@@ -422,7 +422,7 @@ async function sendCode(): Promise<void> {
     const requestPayload = {
       email: email.value,
       [pendingAuthTokenField.value]: pendingAuthToken.value || undefined,
-      // 优先使用重发时新获取的 token（因为初始 token 可能已被使用）
+      // Prefer the resend token because the initial token may already be consumed.
       turnstile_token: resendTurnstileToken.value || initialTurnstileToken.value || undefined
     } as Parameters<typeof sendVerifyCode>[0]
     const response = isPendingOAuthFlow()
@@ -447,7 +447,7 @@ async function sendCode(): Promise<void> {
     codeSent.value = true
     startCountdown(response.countdown)
 
-    // Reset turnstile state（token 已使用，清除以避免重复使用）
+    // Reset turnstile state after the token has been consumed.
     initialTurnstileToken.value = ''
     showResendTurnstile.value = false
     resendTurnstileToken.value = ''
@@ -586,10 +586,9 @@ function buildEmailSuffixNotAllowedMessage(): string {
   if (normalizedWhitelist.length === 0) {
     return t('auth.emailSuffixNotAllowed')
   }
-  const separator = String(locale.value || '').toLowerCase().startsWith('zh') ? '、' : ', '
   return t('auth.emailSuffixNotAllowedWithAllowed', {
     suffixes: formatRegistrationEmailSuffixWhitelistForMessage(normalizedWhitelist, {
-      separator,
+      separator: t('auth.emailSuffixListSeparator'),
       more: (count) => t('auth.emailSuffixAllowedMore', { count })
     })
   })
