@@ -221,11 +221,11 @@ func injectSiteTitle(html, settingsJSON []byte) []byte {
 	}
 
 	newTitle := []byte("<title>" + cfg.SiteName + " - AI API Gateway</title>")
-	var buf bytes.Buffer
-	buf.Write(html[:titleStart])
-	buf.Write(newTitle)
-	buf.Write(html[titleEnd+len("</title>"):])
-	return buf.Bytes()
+	result := make([]byte, 0, len(html)-titleEnd+titleStart+len(newTitle))
+	result = append(result, html[:titleStart]...)
+	result = append(result, newTitle...)
+	result = append(result, html[titleEnd+len("</title>"):]...)
+	return result
 }
 
 func replaceNoncePlaceholder(html []byte, nonce string) []byte {
@@ -397,20 +397,20 @@ func serveFrontendEntryShim(c *gin.Context, entryScriptPath string, stylesheetPa
 		return
 	}
 
-	var script strings.Builder
+	scriptParts := make([]string, 0, len(stylesheetPaths)*5+3)
 	for _, stylesheetPath := range stylesheetPaths {
-		script.WriteString("if(!document.querySelector('link[href=\"")
-		script.WriteString(jsStringLiteralContent(stylesheetPath))
-		script.WriteString("\"]')){const l=document.createElement('link');l.rel='stylesheet';l.href=")
-		script.WriteString(strconv.Quote(stylesheetPath))
-		script.WriteString(";document.head.appendChild(l);}\n")
+		scriptParts = append(scriptParts,
+			"if(!document.querySelector('link[href=\"",
+			jsStringLiteralContent(stylesheetPath),
+			"\"]')){const l=document.createElement('link');l.rel='stylesheet';l.href=",
+			strconv.Quote(stylesheetPath),
+			";document.head.appendChild(l);}\n",
+		)
 	}
-	script.WriteString("import ")
-	script.WriteString(strconv.Quote(entryScriptPath))
-	script.WriteString(";\n")
+	scriptParts = append(scriptParts, "import ", strconv.Quote(entryScriptPath), ";\n")
 
 	c.Header("Cache-Control", "no-store")
-	c.Data(http.StatusOK, "text/javascript; charset=utf-8", []byte(script.String()))
+	c.Data(http.StatusOK, "text/javascript; charset=utf-8", []byte(strings.Join(scriptParts, "")))
 	c.Abort()
 }
 

@@ -836,17 +836,6 @@ func buildSchedulerAccountWaitScores(
 	return buildSchedulerAccountScoresWithOptions(accounts, groupID, model, endpoint, loadMap, health, false, true, false)
 }
 
-func buildSchedulerAccountCooldownFallbackScores(
-	accounts []*Account,
-	groupID *int64,
-	model string,
-	endpoint string,
-	loadMap map[int64]*AccountLoadInfo,
-	health *accountSchedulerHealthStats,
-) []schedulerAccountScore {
-	return buildSchedulerAccountScoresWithOptions(accounts, groupID, model, endpoint, loadMap, health, true, true, true)
-}
-
 func buildSchedulerAccountScoresWithOptions(
 	accounts []*Account,
 	groupID *int64,

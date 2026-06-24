@@ -765,10 +765,6 @@ func isOpenAIAccountCandidateBetterWithSeed(left openAIAccountCandidateScore, ri
 	return openAIAccountCandidateSeededTieBreakLess(seed, left, right)
 }
 
-func isOpenAIAccountGroupOrderCandidateBetter(left openAIAccountCandidateScore, right openAIAccountCandidateScore) bool {
-	return isOpenAIAccountGroupOrderCandidateBetterWithSeed(left, right, schedulerSeededOrder{})
-}
-
 func isOpenAIAccountGroupOrderCandidateBetterWithSeed(left openAIAccountCandidateScore, right openAIAccountCandidateScore, seed schedulerSeededOrder) bool {
 	if left.excluded != right.excluded {
 		return !left.excluded
@@ -1059,14 +1055,6 @@ func openAIAccountStatusFilterReason(ctx context.Context, account *Account, req 
 		return "privacy_not_set"
 	}
 	return ""
-}
-
-func (s *defaultOpenAIAccountScheduler) openAIAccountCircuitFilterReason(account *Account, req OpenAIAccountScheduleRequest, endpoint string) string {
-	view := s.openAIAccountCircuitHealthState(account, req, endpoint, time.Now())
-	if view.Allowed {
-		return ""
-	}
-	return view.Reason
 }
 
 func (d *OpenAIAccountSelectionDiagnostics) addReason(reason string) {
