@@ -3,156 +3,240 @@ export default {
   home: {
     viewOnGithub: '在 GitHub 上查看',
     viewDocs: '查看文档',
-    docs: '教程',
-    docsBadge: '必看',
+    docs: '文档',
+    docsBadge: '文档',
     switchToLight: '切换到浅色模式',
     switchToDark: '切换到深色模式',
     dashboard: '控制台',
     login: '登录',
     getStarted: '立即开始',
     goToDashboard: '进入控制台',
+    landing: {
+      nav: {
+        home: '首页',
+        primary: '首页导航',
+        docs: '服务说明',
+        continue: '继续使用',
+        signIn: '登录',
+        noDilution: '模型满血',
+        billing: '扣费保障',
+        privacy: '隐私',
+        stability: '稳定性'
+      },
+      hero: {
+        title: '官方满血，永远不掺水。',
+        lead: 'GPT、Claude、Gemini 与图像模型保持 100% 官方能力。不保存用户聊天对话，不主动泄漏用户信息。',
+        meta: '稳定性行业内极佳，异常扣费包赔。',
+        capabilitiesLabel: '平台能力'
+      },
+      claims: {
+        official: '100% 官方满血',
+        noDilution: '永远不掺水',
+        noChats: '对话不留存',
+        billingCovered: '异常扣费包赔'
+      },
+      product: {
+        statusLabel: '模型能力',
+        statusValue: '官方满血，不掺水',
+        statusBadge: '稳定调度',
+        gpt: '官方满血模型',
+        claude: '官方能力，不降级替换',
+        gemini: '多模态能力保持完整',
+        images: '图像',
+        imagesDetail: '生图能力按模型开放',
+        live: '在线',
+        ready: '可用'
+      },
+      metrics: {
+        official: '官方能力',
+        storedChats: '聊天留存',
+        chargeExceptions: '异常扣费',
+        covered: '包赔'
+      },
+      sections: {
+        models: {
+          kicker: '不掺水',
+          title: '官方满血模型，永远不掺水。',
+          description: 'GPT、Claude、Gemini 和图像模型按 100% 官方能力接入，不以替代模型或降级模型填充。'
+        },
+        billing: {
+          kicker: '异常包赔',
+          title: '每一笔扣费都能核对，异常直接包赔。',
+          description: '价格、倍率、Token、请求记录和余额变化保持同链路展示。异常扣费可追溯、可核对、确认后包赔。'
+        },
+        privacy: {
+          kicker: '隐私',
+          title: '聊天内容不留存，用户信息不对外泄露。',
+          description: '对话内容不进入平台留存；扣费核对、服务状态和售后处理只保留必要运行记录。'
+        },
+        stability: {
+          kicker: '稳定性',
+          title: '长期使用，稳定性经得起看。',
+          description: '官方满血、聊天内容不留存、异常扣费包赔和稳定调度，在同一个入口里持续交付。'
+        }
+      },
+      privacyVisual: {
+        label: '对话记录'
+      },
+      lineup: {
+        gpt: '官方满血接入，模型名和能力一致',
+        claude: '长文、代码和 Agent 任务按官方能力承载',
+        gemini: '多模态能力完整可用',
+        images: '生图能力按模型清晰开放'
+      },
+      ledger: {
+        modelSource: '模型来源',
+        official: '官方满血',
+        usageTrail: '用量链路',
+        trace: 'Token、倍率、余额同链路核对',
+        billingExceptions: '异常扣费',
+        covered: '确认包赔',
+        serviceState: '服务状态',
+        online: '行业内极佳稳定性'
+      }
+    },
     // 新增：面向用户的价值主张
-    heroSubtitle: 'GPT 自由，不用先被价格劝退',
-    heroDescription: '注册送额度，特价分组适合高频日常使用；支持 GPT、Claude、Gemini 和图像模型，独家调度算法让使用更稳定。',
+    heroSubtitle: '100% 官方满血，永远不掺水',
+    heroDescription: 'GPT、Claude、Gemini 与图像模型统一接入。不保存用户聊天对话，用户信息不对外泄露；稳定性行业内极佳，异常扣费包赔。',
     terminal: {
-      scheduling: '独家调度算法匹配稳定线路...'
+      scheduling: '模型服务状态同步中...'
     },
     tags: {
-      subscriptionToApi: '注册送额度',
-      stickySession: '独家调度算法',
-      realtimeBilling: '按量计费更省'
+      subscriptionToApi: '官方满血模型',
+      stickySession: '对话不留存',
+      realtimeBilling: '异常扣费包赔'
     },
     valueRail: {
       credit: {
         value: '1 元 = 1 刀',
-        label: '余额更好理解',
-        description: '充值或兑换后按站内余额使用，不需要先买一堆官方订阅。'
+        label: '余额口径清楚',
+        description: '充值、兑换、赠送额度和余额变动按统一口径呈现。'
       },
       models: {
         value: 'GPT / Claude / Gemini',
-        label: '常用模型都能接',
-        description: '写代码、写作、翻译、资料整理、脚本自动化和生图都能覆盖。'
+        label: '官方满血模型',
+        description: '100% 官方模型能力，不拿替代模型冒充，不掺水。'
       },
       compatible: {
         value: 'OpenAI 兼容',
-        label: '迁移成本低',
-        description: '常见 API 工具、Codex、Claude Code、Gemini CLI 等可以按教程快速接入。'
+        label: '访问详情清楚',
+        description: '常见 API 工具、Codex、Claude Code、Gemini CLI 等访问详情集中呈现。'
       },
       billing: {
-        value: '明细可查',
-        label: '用量看得见',
-        description: '余额、请求、Token、缓存命中和消费记录都在仪表盘里展示。'
+        value: '异常包赔',
+        label: '扣费有保障',
+        description: '余额、请求、Token、缓存命中和消费记录都在仪表盘里展示，异常扣费包赔。'
       }
     },
     cost: {
       kicker: '价格先讲清楚',
       title: '不是月费订阅，用多少扣多少',
       description:
-        '站内余额按刀计，实际消耗按「官方标准计费 × 分组倍率」扣费。倍率越低，同样余额能覆盖的官方原价额度越多，适合高频但又想控制成本的用户。',
+        '账户余额按统一口径展示，实际消耗按模型价格与服务档位倍率生成记录。倍率越低，同样余额可覆盖的官方原价额度越多。',
       facts: {
         creditValue: '1 元 = 1 刀',
-        creditLabel: '站内余额口径',
+        creditLabel: '余额展示口径',
         multiplierValue: '倍率计费',
-        multiplierLabel: '官方价 × 分组倍率',
-        recordsValue: '失败可查',
+        multiplierLabel: '官方价 × 服务倍率',
+        recordsValue: '异常包赔',
         recordsLabel: '用量和扣费都有记录'
       },
       formulaTitle: '折扣怎么估算？',
       formula:
-        '人民币折扣 ≈ 分组倍率 ÷ 当前汇率 × 10 折。比如 0.148x 在 1 USD≈¥7.2 时，约等于官方人民币计费 0.21 折。',
-      note: '折扣是便于理解的估算，实际扣费以站内使用记录、模型价格和当前分组倍率为准。'
+        '人民币折扣 ≈ 服务倍率 ÷ 当前汇率 × 10 折。比如 0.148x 在 1 USD≈¥7.2 时，约等于官方人民币计费 0.21 折。',
+      note: '折扣是便于理解的估算，实际扣费以使用记录、模型价格和当前服务倍率为准。'
     },
     quickStart: {
-      kicker: '三步开始',
-      title: '从注册到成功调用，不需要重做项目',
-      register: '注册并领取额度',
-      createKey: '创建 API 密钥',
-      readGuide: '查看接入教程',
+      kicker: '清晰账户',
+      title: '官方满血、隐私边界、扣费保障都在明处',
+      register: '账户余额',
+      createKey: '服务档位',
+      readGuide: '服务状态',
       steps: {
         register: {
-          title: '注册后先领额度',
-          description: '新用户先用赠送额度或小额充值测试，确认模型效果、速度和扣费逻辑。'
+          title: '异常扣费包赔',
+          description: '充值、赠送额度、订阅权益和每一次余额变动都有记录。'
         },
         group: {
-          title: '创建 Key 并选择分组',
-          description: '低成本日常任务选特价类分组，重要任务选更稳定的分组；生图使用名称带“生图”的分组。'
+          title: '100% 官方满血',
+          description: '可用服务档位、官方模型和启用状态放在同一处呈现。'
         },
         connect: {
-          title: '复制配置开始用',
-          description: '在 API Key 页面点“使用密钥”，复制 Codex、Claude Code、Gemini CLI 或 OpenAI 兼容配置。'
+          title: '聊天对话不保存',
+          description: '平台不保存用户聊天对话，用量记录只服务于账单、核查和售后。'
         }
       }
     },
     integration: {
-      kicker: '不是只看首页，能直接跑起来',
-      title: '新用户真正需要的路径都放在这里',
+      kicker: '账户体验本身说话',
+      title: '用户关心的透明度都放在产品里',
       description:
-        '很多用户不是不会用模型，而是不知道第一步该点哪里、失败后该看哪里、余额到底怎么算。WegooAI 把接入、服务状态、可用模型和用量记录拆成明确入口，减少反复问客服的成本。',
+        'WegooAI 把官方满血模型、服务状态、用量记录、余额变动和订单进度放在清晰的位置。用户不需要猜模型是否掺水、扣费是否可查、服务是否稳定。',
       cards: {
         key: {
-          title: '创建 Key 并复制配置',
-          description: '在 API Key 页面创建密钥，点“使用密钥”复制 Codex、Claude Code、Gemini CLI 或 OpenAI 兼容配置。',
-          action: '去创建密钥'
+          title: '服务接入与访问凭证集中呈现',
+          description: '访问凭证、服务档位、可用模型和访问详情集中呈现，长期使用时保持一致。',
+          action: '访问凭证'
         },
         status: {
-          title: '调用失败先看服务状态',
-          description: '连接不上、超时、403/429/5xx 时，先看当前分组状态；如果某个分组波动，及时切换更稳定的分组。',
+          title: '服务状态公开展示',
+          description: '不同模型服务的可用性、延迟和近期状态集中展示，平台稳定性一眼可查。',
           action: '查看服务状态'
         },
         models: {
-          title: '确认分组支持哪些模型',
-          description: '可用渠道页面会展示当前分组可用模型，避免把不支持的模型填进客户端导致报错。',
+          title: '官方满血模型清楚可见',
+          description: '可用模型、服务档位和价格信息集中展示，模型不掺水，选择不靠猜。',
           action: '查看可用模型'
         },
         billing: {
-          title: '看账单判断真实成本',
-          description: '请求、Token、缓存命中和扣费明细都能查。长期高频使用时，先看记录再决定长期用哪个分组。',
+          title: '扣费记录可追溯，异常包赔',
+          description: '请求、Token、缓存命中和扣费明细都能查，异常扣费包赔，长期使用的成本结构保持透明。',
           action: '查看用量记录'
         }
       }
     },
     // 用户痛点区块
     painPoints: {
-      title: '你是否也遇到这些问题？',
+      title: '长期使用最在意的事',
       items: {
         expensive: {
-          title: '订阅费用高',
-          desc: '每个 AI 服务都要单独订阅，每月支出越来越多'
+          title: '异常扣费',
+          desc: '模型价格、服务倍率、Token 和扣费记录集中呈现，异常扣费包赔'
         },
         complex: {
-          title: '多账号难管理',
-          desc: '不同平台的账号、密钥分散各处，管理起来很麻烦'
+          title: '模型掺水',
+          desc: 'GPT、Claude、Gemini 和图像模型坚持 100% 官方满血，不拿替代模型冒充'
         },
         unstable: {
-          title: '服务不稳定',
-          desc: '单一账号容易触发限制，影响正常使用'
+          title: '服务状态',
+          desc: '稳定性行业内极佳，可用性、延迟、近期状态和模型列表持续可见'
         },
         noControl: {
-          title: '用量无法控制',
-          desc: '不知道钱花在哪了，也无法限制团队成员的使用'
+          title: '隐私边界',
+          desc: '不保存用户聊天对话，用户信息不对外泄露'
         }
       }
     },
     // 解决方案区块
     solutions: {
-      title: '我们帮你解决',
-      subtitle: '简单三步，开始省心使用 AI'
+      title: '平台已经做到的保障',
+      subtitle: '官方满血、不掺水、不保存聊天对话、异常扣费包赔'
     },
     features: {
-      unifiedGateway: '一把 Key 调多模型',
-      unifiedGatewayDesc: 'GPT、Claude、Gemini 和图像模型统一接入，日常开发、写作和自动化少切换。',
-      multiAccount: '独家调度算法',
-      multiAccountDesc: '按模型、分组和实时状态智能选择稳定路径，尽量把短时波动挡在用户感知之外。',
-      balanceQuota: '低成本高频使用',
-      balanceQuotaDesc: '按实际用量扣费，特价分组适合长期使用；余额、请求和 Token 消耗都能在仪表盘看清楚。'
+      unifiedGateway: '官方满血模型',
+      unifiedGatewayDesc: 'GPT、Claude、Gemini 和图像模型统一接入，100% 官方模型能力，永远不掺水。',
+      multiAccount: '行业内极佳稳定性',
+      multiAccountDesc: '按模型、服务档位和实时状态选择稳定路径，把短时波动挡在用户感知之外。',
+      balanceQuota: '异常扣费包赔',
+      balanceQuotaDesc: '按实际用量扣费，余额、请求和 Token 消耗都能在仪表盘看清楚，异常扣费直接包赔。'
     },
     // 优势对比
     comparison: {
-      title: '为什么选择我们？',
+      title: '产品口径',
       headers: {
         feature: '对比项',
         official: '官方订阅',
-        us: '本平台'
+        us: 'WegooAI'
       },
       items: {
         pricing: {
@@ -168,12 +252,12 @@ export default {
         management: {
           feature: '账号管理',
           official: '每个服务单独管理',
-          us: '统一密钥，一站管理'
+          us: '统一访问凭证，一站管理'
         },
         stability: {
           feature: '服务稳定性',
           official: '单账号易触发限制',
-          us: '独家调度算法，稳定性极佳'
+          us: '行业内极佳稳定性，服务状态可见'
         },
         control: {
           feature: '用量控制',
@@ -184,7 +268,7 @@ export default {
     },
     providers: {
       title: '已支持的 AI 模型',
-      description: '覆盖常用模型，适合低成本日常高频使用',
+      description: '覆盖常用官方满血模型，适合长期、持续的 AI 使用',
       supported: '已支持',
       soon: '即将推出',
       claude: 'Claude',
@@ -193,16 +277,16 @@ export default {
       more: '更多'
     },
     useCases: {
-      title: '适合真正高频使用 AI 的人',
+      title: '适合持续把 AI 放进工作流的人',
       description:
-        '本站不是只给尝鲜用户看的，更适合每天都要把 AI 放进工作流里的开发者、学生、创作者和自动化用户。',
+        '开发者、学生、创作者和自动化用户都可以在同一个账户里查看模型、费用、状态和记录。',
       coding: {
         title: '代码开发和 Vibe Coding',
         description: '适合 Codex、Claude Code、Cursor、OpenCode 等工作流，用于项目搭建、Bug 修复、代码解释和 Agent 任务。'
       },
       writing: {
         title: '写作、翻译和论文润色',
-        description: 'Claude / Gemini 分组适合长文总结、资料整理、翻译润色、报告生成和复杂分析。'
+        description: 'Claude / Gemini 服务适合长文总结、资料整理、翻译润色、报告生成和复杂分析。'
       },
       automation: {
         title: '脚本自动化和 API 调用',
@@ -210,49 +294,49 @@ export default {
       },
       image: {
         title: 'AI 生图和素材生成',
-        description: '名称带“生图”的分组用于图片生成，适合视觉素材、配图、创意草图和批量出图。'
+        description: '生图服务档位用于图片生成，适合视觉素材、配图、创意草图和批量出图。'
       }
     },
-    trust: {
-      title: '用户最担心的事，页面里说清楚',
+      trust: {
+      title: '用户最在意的事，平台直接承诺',
       description:
-        '新用户不是只看便宜，更关心能不能用、会不会乱扣费、模型是不是假的、出了问题能不能查。',
+        '低价格之外，用户更在意模型是否满血、是否掺水、聊天对话是否留存、信息是否泄露、扣费异常是否包赔。',
       points: {
-        modelTruth: '不使用国产模型冒充 GPT、Claude、Gemini 等模型。',
-        billing: '每次请求的用量和扣费记录可查，异常扣费可通过售后核查。',
-        status: '服务状态公开展示；如果某个分组波动，用户可以及时切换更稳定的分组。',
-        privacy: '后台主要用于计费、排障、风控和售后核查；用户能看到的请求记录，就是后台排障能看到的主要范围。'
+        modelTruth: '100% 官方满血模型，永远不掺水，不使用国产模型冒充 GPT、Claude、Gemini。',
+        billing: '每次请求的用量和扣费记录可查，异常扣费包赔。',
+        status: '稳定性行业内极佳，服务状态、可用性、延迟和模型列表持续更新。',
+        privacy: '不保存用户聊天对话，用户信息不对外泄露。'
       }
     },
     firstRun: {
-      kicker: '第一次使用建议',
-      title: '先跑通，再决定长期用哪个分组',
+      kicker: '长期使用',
+      title: '稳定、清楚、可追溯',
       description:
-        '不同分组在价格、速度、稳定性和可用模型上会有差异。新用户最重要的是先完成一次成功调用，再根据自己的任务选择分组。',
+        '不同服务档位在价格、速度、稳定性和可用模型上清楚展示，用户可以按真实记录理解长期成本。',
       tips: {
         trySmall: {
-          title: '先小额测试',
-          description: '用注册送额度或小额余额测试常用模型，不需要一开始就大量充值。'
+          title: '余额透明',
+          description: '账户余额、赠送额度、充值记录和订阅权益集中展示。'
         },
         serviceStatus: {
-          title: '报错先看服务状态',
-          description: '连接不上、超时、模型不可用时，先看服务状态，再考虑切换分组。'
+          title: '服务稳定',
+          description: '稳定性行业内极佳，可用性、延迟、模型列表和服务状态公开展示。'
         },
         groupChoice: {
-          title: '按任务选分组',
-          description: '日常高频看成本，重要任务看稳定性，图片生成看“生图”分组。'
+          title: '模型满血',
+          description: 'GPT、Claude、Gemini 和图像模型 100% 官方满血，永远不掺水。'
         },
         records: {
-          title: '看记录判断成本',
-          description: '仪表盘会展示请求、Token、缓存和消费，长期使用更容易控预算。'
+          title: '隐私与记录',
+          description: '不保存用户聊天对话，用户信息不对外泄露；用量、Token、缓存和消费明细形成可追溯记录。'
         }
       }
     },
     // CTA 区块
     cta: {
-      title: '准备好开始了吗？',
-      description: '注册即可获得免费试用额度，体验一站式 AI 服务',
-      button: '免费注册'
+      title: '官方满血，永远不掺水',
+      description: '不保存聊天对话，稳定性行业内极佳，异常扣费包赔。',
+      button: '注册账户'
     },
     footer: {
       allRightsReserved: '保留所有权利。'
@@ -263,24 +347,37 @@ export default {
     label: '结算币种',
     cny: '人民币',
     usd: '美元',
-    baseCredit: '站内余额',
+    baseCredit: '账户余额',
   },
 
   // Key Usage Query Page
   keyUsage: {
-    title: 'API Key 用量查询',
-    subtitle: '输入您的 API Key 以查看实时消费金额与使用状态',
+    heroKicker: '用量核对',
+    title: '访问凭证用量记录',
+    subtitle: '余额、额度、Token、模型分布和费用明细集中呈现。',
     placeholder: 'sk-ant-mirror-xxxxxxxxxxxx',
-    query: '查询',
-    querying: '查询中...',
-    privacyNote: '您的 Key 仅在浏览器本地处理，不会被存储',
-    dateRange: '统计范围:',
+    query: '查看记录',
+    querying: '读取中...',
+    privacyNote: '访问凭证仅用于本次浏览器查询，不会保存到页面。',
+    queryPanel: {
+      title: '查询当前凭证记录',
+      description: '余额、限额和扣费明细会按当前访问凭证展示。'
+    },
+    trust: {
+      sessionQuery: '本次查询',
+      sessionQueryDesc: '访问凭证仅用于当前浏览器请求，不在页面内持久保存。',
+      auditableRecords: '记录可核对',
+      auditableRecordsDesc: '按日期、模型与费用展示，扣费口径清楚可查。',
+      privacyBoundary: '隐私边界',
+      privacyBoundaryDesc: '只展示用量与状态，不展开请求正文。'
+    },
+    dateRange: '统计范围',
     dateRangeToday: '今日',
     dateRange7d: '7 天',
     dateRange30d: '30 天',
     dateRange90d: '90 天',
     dateRangeCustom: '自定义',
-    apply: '应用',
+    apply: '更新范围',
     used: '已使用',
     detailInfo: '详细信息',
     tokenStats: 'Token 统计',
@@ -298,7 +395,7 @@ export default {
     totalTokens: '总 Tokens',
     cost: '费用',
     // Status
-    quotaMode: 'Key 限额模式',
+    quotaMode: '凭证限额模式',
     walletBalance: '钱包余额',
     // Ring card titles
     totalQuota: '总额度',
@@ -334,10 +431,10 @@ export default {
     totalCost: '累计费用',
     avgDuration: '平均耗时',
     // Messages
-    enterApiKey: '请输入 API Key',
-    querySuccess: '查询成功',
-    queryFailed: '查询失败',
-    queryFailedRetry: '查询失败，请稍后重试',
+    enterApiKey: '访问凭证为空',
+    querySuccess: '记录已更新',
+    queryFailed: '记录读取失败',
+    queryFailedRetry: '记录读取失败，稍后会恢复。',
     noDailyUsage: '暂无按日用量数据',
   },
 
@@ -524,7 +621,7 @@ export default {
     loadFailed: '文档加载失败',
     retryLater: '请稍后刷新页面重试。',
     notFound: '文档不存在',
-    notFoundDescription: '当前条款文档不存在或已被管理员移除。',
+    notFoundDescription: '当前文档暂不可用或已更新，请返回登录页重新查看。',
     updatedAt: '更新日期：{date}',
     empty: '暂无正文内容',
     loginAgreement: '登录条款',
@@ -534,10 +631,11 @@ export default {
   // Navigation
   nav: {
     dashboard: '仪表盘',
+    accountOverview: '账户概览',
     announcements: '公告',
     tickets: '工单',
     ticketManagement: '工单管理',
-    apiKeys: 'API 密钥',
+    apiKeys: '访问凭证',
     imageGeneration: 'AI 生图',
     usage: '使用记录',
     cardCodePurchase: '卡密购买',
@@ -551,7 +649,7 @@ export default {
     users: '用户管理',
     groups: '分组管理',
     channels: '渠道管理',
-    availableChannels: '可用渠道',
+    availableChannels: '可用模型',
     subscriptions: '订阅管理',
     accounts: '账号管理',
     proxies: 'IP管理',
@@ -568,8 +666,8 @@ export default {
     github: 'GitHub',
     mySubscriptions: '我的订阅',
     buySubscription: '充值/订阅',
-    docs: '教程',
-    docsBadge: '必看',
+    docs: '服务说明',
+    docsBadge: '说明',
     myOrders: '我的订单',
     invoices: '开票申请',
     orderManagement: '订单管理',
@@ -586,16 +684,16 @@ export default {
 
   // Auth
   auth: {
-    welcomeBack: '账户登录',
-    signInToAccount: '请输入邮箱和密码完成身份验证。',
+    welcomeBack: '欢迎回来',
+    signInToAccount: '官方满血模型、余额、扣费和服务状态清楚可查。',
     signIn: '登录',
     signingIn: '登录中...',
     createAccount: '创建账户',
-    signUpToStart: '创建 {siteName} 账户',
+    signUpToStart: '{siteName} 提供官方满血模型，聊天内容不留存，异常扣费包赔。',
     valueProps: {
-      trial: '注册送额度，先体验再充值',
-      discount: '特价分组适合 GPT 高频使用',
-      stability: '独家调度算法，稳定性极佳'
+      official: '官方满血模型',
+      privacy: '聊天内容不留存',
+      coverage: '异常扣费包赔'
     },
     signUp: '注册',
     processing: '处理中...',
@@ -603,111 +701,135 @@ export default {
     rememberMe: '记住我',
     dontHaveAccount: '还没有账户？',
     alreadyHaveAccount: '已有账户？',
-    registrationDisabled: '注册功能暂时关闭，请联系管理员。',
+    registrationDisabled: '注册暂未开放，已有账户仍可登录。',
     emailLabel: '邮箱',
-    emailPlaceholder: '请输入邮箱',
-    emailDeliveryHint: '未收到邮件可查看垃圾邮件。',
+    emailPlaceholder: '邮箱地址',
+    emailDeliveryHint: '邮件通常会在数分钟内送达，垃圾邮件文件夹也可能收取。',
     passwordLabel: '密码',
-    passwordPlaceholder: '请输入密码',
-    createPasswordPlaceholder: '创建一个安全的密码',
+    passwordPlaceholder: '密码',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
+    createPasswordPlaceholder: '设置账户密码',
     passwordHint: '至少 6 个字符',
-    emailRequired: '请输入邮箱',
-    invalidEmail: '请输入有效的邮箱地址',
-    passwordRequired: '请输入密码',
+    emailRequired: '邮箱不能为空',
+    invalidEmail: '邮箱地址格式无效',
+    passwordRequired: '密码不能为空',
     passwordMinLength: '密码至少需要 6 个字符',
-    loginFailed: '登录失败，请检查您的凭据后重试。',
-    loginAgreementRequired: '请先阅读并同意最新条款后再登录。',
+    loginFailed: '登录失败，凭据未通过验证。',
+    loginAgreementRequired: '当前账号尚未完成最新条款确认，暂不能登录。',
     errors: {
       USER_NOT_ACTIVE: '账号已被禁用',
     },
-    registrationFailed: '注册失败，请重试。',
-    registerAgreementRequired: '请先阅读并同意最新条款后再注册。',
-    emailSuffixNotAllowed: '该邮箱域名不在允许注册范围内。',
-    emailSuffixNotAllowedWithAllowed: '该邮箱域名不被允许。可用域名：{suffixes}',
-    emailSuffixAllowedMore: '等 {count} 项',
-    loginSuccess: '登录成功！欢迎回来。',
-    accountCreatedSuccess: '账户创建成功！欢迎使用 {siteName}。',
-    reloginRequired: '会话已过期，请重新登录。',
-    turnstileExpired: '验证已过期，请重试',
-    turnstileFailed: '验证失败，请重试',
-    completeVerification: '请完成验证',
-    verifyYourEmail: '验证您的邮箱',
+    registrationFailed: '注册未完成。',
+    registerAgreementRequired: '当前注册尚未完成最新条款确认，暂不能创建账户。',
+    loginAgreementRejected: '最新条款确认尚未完成，登录保持暂停。',
+    registerAgreementRejected: '最新条款确认尚未完成，注册保持暂停。',
+    agreementPrompt: {
+      checkboxLabel: '已阅读并同意',
+      bannerTitle: '服务保障与条款确认',
+      bannerDescription: '官方满血模型、聊天内容不留存、异常扣费包赔，保障写在明处。',
+      openButton: '查看条款',
+      modalTitle: '服务保障与条款确认',
+      modalDescription: '{date} 更新后的条款集中说明平台保障、服务范围和账号安全边界。',
+      guaranteesLabel: '平台保障',
+      guarantees: {
+        official: '100% 官方满血模型，永不掺水。',
+        privacy: '不保存用户聊天对话，不主动泄漏用户信息。',
+        billing: '稳定性行业内极佳，异常扣费按记录包赔。'
+      },
+      documentsLabel: '相关条款',
+      documentSeparator: '、',
+      reject: '不同意',
+      accept: '同意',
+      recent: '近期'
+    },
+    emailSuffixNotAllowed: '该邮箱域名不在注册范围内。',
+    emailSuffixNotAllowedWithAllowed: '该邮箱域名不在注册范围内。可用域名：{suffixes}',
+    emailSuffixAllowedMore: '另有 {count} 项',
+    emailSuffixListSeparator: '、',
+    loginSuccess: '登录成功。',
+    accountCreatedSuccess: '{siteName} 账户已创建。',
+    reloginRequired: '会话已过期，登录状态需要更新。',
+    turnstileExpired: '验证已过期',
+    turnstileFailed: '验证未通过',
+    completeVerification: '验证尚未完成',
+    verifyYourEmail: '验证邮箱',
     sessionExpired: '会话已过期',
-    sessionExpiredDesc: '请返回注册页面重新开始。',
+    sessionExpiredDesc: '注册会话已失效。',
     verificationCode: '验证码',
-    verificationCodeHint: '请输入发送到您邮箱的6位验证码',
+    verificationCodeHint: '邮箱中的 6 位验证码',
     sendingCode: '发送中...',
     sendCode: '发送验证码',
-    clickToResend: '点击重新发送验证码',
+    clickToResend: '重新发送验证码',
     resendCode: '重新发送验证码',
     sendCodeDesc: '我们将发送验证码到',
-    codeSentSuccess: '验证码已发送，请查收邮箱。',
+    codeSentSuccess: '验证码已发送。',
     verifying: '验证中...',
     verifyAndCreate: '验证并创建账户',
     resendCountdown: '{countdown}秒后可重新发送',
     backToRegistration: '返回注册',
-    sendCodeFailed: '发送验证码失败，请重试。',
-    verifyFailed: '验证失败，请重试。',
-    codeRequired: '请输入验证码',
-    invalidCode: '请输入有效的6位验证码',
+    sendCodeFailed: '验证码发送失败。',
+    verifyFailed: '验证未通过。',
+    codeRequired: '验证码不能为空',
+    invalidCode: '验证码需为 6 位数字',
     promoCodeLabel: '优惠码',
-    promoCodePlaceholder: '输入优惠码（可选）',
-    promoCodeValid: '有效！注册后将获得 ${amount} 赠送余额',
+    promoCodePlaceholder: '优惠码',
+    promoCodeValid: '优惠码有效，注册后获得 ${amount} 赠送余额',
     promoCodeInvalid: '无效的优惠码',
     promoCodeNotFound: '优惠码不存在',
     promoCodeExpired: '此优惠码已过期',
     promoCodeDisabled: '此优惠码已被禁用',
     promoCodeMaxUsed: '此优惠码已达到使用上限',
     promoCodeAlreadyUsed: '您已使用过此优惠码',
-    promoCodeValidating: '优惠码正在验证中，请稍候',
-    promoCodeInvalidCannotRegister: '优惠码无效，请检查后重试或清空优惠码',
+    promoCodeValidating: '优惠码正在验证中',
+    promoCodeInvalidCannotRegister: '优惠码无效，注册暂未继续',
     invitationCodeLabel: '邀请码',
-    invitationCodePlaceholder: '请输入邀请码',
-    invitationCodeRequired: '请输入邀请码',
+    invitationCodePlaceholder: '邀请码',
+    invitationCodeRequired: '邀请码不能为空',
     invitationCodeValid: '邀请码有效',
     invitationCodeInvalid: '邀请码无效或已被使用',
     invitationCodeValidating: '正在验证邀请码...',
-    invitationCodeInvalidCannotRegister: '邀请码无效，请检查后重试',
-    oauthOrContinue: '或使用其他继续',
+    invitationCodeInvalidCannotRegister: '邀请码无效，注册暂未继续',
+    oauthOrContinue: '或使用其他方式继续',
     linuxdo: {
       signIn: '使用 Linux.do 登录',
       orContinue: '或使用邮箱密码继续',
       callbackTitle: '正在完成登录',
-      callbackProcessing: '正在验证登录信息，请稍候...',
-      callbackHint: '如果页面未自动跳转，请返回登录页重试。',
-      callbackMissingToken: '登录信息缺失，请返回重试。',
+      callbackProcessing: '正在验证登录信息...',
+      callbackHint: '页面长时间停留时，登录页可重新发起授权。',
+      callbackMissingToken: '登录信息缺失。',
       backToLogin: '返回登录',
-      invitationRequired: '该 Linux.do 账号尚未注册，站点已开启邀请码注册，请输入邀请码以完成注册。',
-      invalidPendingToken: '注册凭证已失效，请重新使用 Linux.do 登录。',
+      invitationRequired: '该 Linux.do 账号尚未注册，当前注册需要邀请码。',
+      invalidPendingToken: '注册凭证已失效。',
       completeRegistration: '完成注册',
       completing: '正在完成注册...',
-      completeRegistrationFailed: '注册失败，请检查邀请码后重试。'
+      completeRegistrationFailed: '注册未完成，邀请码未通过验证。'
     },
     dingtalk: {
       signIn: '钉钉登录',
       callbackTitle: '正在完成钉钉登录',
-      callbackProcessing: '正在验证钉钉登录信息，请稍候...',
-      callbackHint: '如果页面未自动跳转，请返回登录页重试。',
-      callbackMissingToken: '登录信息缺失，请返回重试。',
+      callbackProcessing: '正在验证钉钉登录信息...',
+      callbackHint: '页面长时间停留时，登录页可重新发起授权。',
+      callbackMissingToken: '登录信息缺失。',
       backToLogin: '返回登录',
-      invitationRequired: '该钉钉账号尚未注册，站点已开启邀请码注册，请输入邀请码以完成注册。',
-      invalidPendingToken: '注册凭证已失效，请重新使用钉钉登录。',
+      invitationRequired: '该钉钉账号尚未注册，当前注册需要邀请码。',
+      invalidPendingToken: '注册凭证已失效。',
       completeRegistration: '完成注册',
       completing: '正在完成注册...',
-      completeRegistrationFailed: '注册失败，请检查邀请码后重试。',
+      completeRegistrationFailed: '注册未完成，邀请码未通过验证。',
       createAccountTitle: '创建钉钉账户',
-      registrationDisabledRedirectToBind: '当前已禁止注册新账户，请使用已有账户邮箱和密码绑定钉钉登录',
+      registrationDisabledRedirectToBind: '当前已禁止注册新账户，已有账户可绑定钉钉登录',
       error: {
         title: '钉钉登录失败',
-        csrf: '登录会话已过期，请重新扫码登录',
-        corp_rejected: '您的钉钉账号不属于本企业，请联系管理员',
+        csrf: '登录会话已过期，需要重新扫码',
+        corp_rejected: '该钉钉账号不属于本企业，平台支持可协助核验',
         dingtalk_not_enabled: '钉钉登录暂未启用',
-        upstream_error: '钉钉服务暂时不可用，请稍后重试',
-        missing_browser_session: '浏览器会话丢失，请重新登录',
+        upstream_error: '钉钉服务暂时不可用',
+        missing_browser_session: '浏览器会话丢失，登录状态需要更新',
         missing_params: '请求参数不完整',
         invalid_state: '登录状态异常',
         provider_error: '钉钉授权失败',
-        session_error: '会话创建失败，请重试',
+        session_error: '会话创建失败',
         retry: '重新登录'
       }
     },
@@ -717,15 +839,15 @@ export default {
     oidc: {
       signIn: '使用 {providerName} 登录',
       callbackTitle: '正在完成 {providerName} 登录',
-      callbackProcessing: '正在验证 {providerName} 登录信息，请稍候...',
-      callbackHint: '如果页面未自动跳转，请返回登录页重试。',
-      callbackMissingToken: '登录信息缺失，请返回重试。',
+      callbackProcessing: '正在验证 {providerName} 登录信息...',
+      callbackHint: '页面长时间停留时，登录页可重新发起授权。',
+      callbackMissingToken: '登录信息缺失。',
       backToLogin: '返回登录',
-      invitationRequired: '该 {providerName} 账号尚未注册，站点已开启邀请码注册，请输入邀请码以完成注册。',
-      invalidPendingToken: '注册凭证已失效，请重新登录。',
+      invitationRequired: '该 {providerName} 账号尚未注册，当前注册需要邀请码。',
+      invalidPendingToken: '注册凭证已失效。',
       completeRegistration: '完成注册',
       completing: '正在完成注册...',
-      completeRegistrationFailed: '注册失败，请检查邀请码后重试。'
+      completeRegistrationFailed: '注册未完成，邀请码未通过验证。'
     },
     oauthFlow: {
       profileDetailsTitle: '使用 {providerName} 资料',
@@ -733,15 +855,15 @@ export default {
       useDisplayName: '使用昵称',
       useAvatar: '使用头像',
       avatarAlt: '{providerName} 头像',
-      reviewProfileBeforeContinue: '请先确认 {providerName} 资料后再继续。',
+      reviewProfileBeforeContinue: '{providerName} 资料确认后继续。',
       chooseHowToContinue: '选择后续操作',
-      chooseAccountActionHint: '请选择绑定已有账户，或创建一个新账户。',
-      suggestedEmail: '建议邮箱：{email}',
+      chooseAccountActionHint: '可绑定已有账户，也可创建新账户。',
+      suggestedEmail: '邮箱：{email}',
       bindExistingAccount: '绑定已有账户',
       createNewAccount: '创建新账户',
-      createAccountHint: '请输入邮箱地址以创建账户并继续。',
-      bindLoginHint: '登录一个已有账户以绑定此次 {providerName} 登录。',
-      signInThenBindDescription: '请先登录已有账户，再将此次 {providerName} 登录绑定到该账户。',
+      createAccountHint: '邮箱地址用于创建账户并继续。',
+      bindLoginHint: '已有账户登录后会绑定此次 {providerName} 登录。',
+      signInThenBindDescription: '已有账户登录后，此次 {providerName} 登录会绑定到该账户。',
       bindSignInToExistingAccount: '将此次 {providerName} 登录绑定到已有账户。',
       bindCurrentAccountTitle: '绑定当前账户',
       bindCurrentAccountDescription: '将此次 {providerName} 登录绑定到当前浏览器已登录的账户。',
@@ -750,12 +872,13 @@ export default {
       useDifferentEmail: '使用其他邮箱',
       backToOptions: '返回选项',
       yourAccount: '当前账户',
-      totpHint: '请输入 {account} 的 6 位验证码，以完成此次 {providerName} 登录绑定。',
+      totpHint: '{account} 的 6 位验证码用于完成此次 {providerName} 登录绑定。',
       verifyAndContinue: '验证并继续',
-      wechatAvailabilityUnknown: '暂时无法确认微信登录可用性，请刷新后重试。',
-      wechatSystemBrowserOnly: '当前微信登录流程仅支持在系统浏览器中继续。',
-      wechatBrowserOnly: '当前微信登录流程仅支持在微信内置浏览器中继续。',
-      wechatNotConfigured: '微信登录尚未配置。'
+      wechatAvailabilityUnknown: '微信登录可用性暂时无法确认。',
+      wechatSystemBrowserOnly: '当前微信登录流程仅在系统浏览器中可用。',
+      wechatBrowserOnly: '当前微信登录流程仅在微信内置浏览器中可用。',
+      wechatNativeAppRequired: '当前仅配置微信移动应用登录，授权由原生 App 的微信 SDK 发起。',
+      wechatNotConfigured: '微信登录暂未开放。'
     },
     linuxdoCallbackPageTitle: 'LinuxDo 登录回调',
     dingtalkCallbackPageTitle: '钉钉登录回调',
@@ -772,9 +895,9 @@ export default {
     },
     oauth: {
       callbackTitle: 'OAuth 回调',
-      callbackHint: '按需将授权码和状态值复制回后台授权流程。',
+      callbackHint: '返回发起授权的页面继续完成登录。',
       invalidCallbackTitle: '无效的登录回调',
-      invalidCallbackHint: '当前页面缺少有效的授权结果，请返回登录页重新发起快捷登录。',
+      invalidCallbackHint: '当前页面缺少有效的授权结果，登录页可重新发起快捷登录。',
       code: '授权码',
       state: '状态',
       fullUrl: '完整URL'
@@ -782,47 +905,47 @@ export default {
     // 忘记密码
     forgotPassword: '忘记密码？',
     forgotPasswordTitle: '重置密码',
-    forgotPasswordHint: '输入您的邮箱地址，我们将向您发送密码重置链接。',
+    forgotPasswordHint: '若邮箱已注册，系统会发送密码重置链接。',
     sendResetLink: '发送重置链接',
     sendingResetLink: '发送中...',
-    sendResetLinkFailed: '发送重置链接失败，请重试。',
+    sendResetLinkFailed: '重置链接发送失败。',
     resetEmailSent: '重置链接已发送',
-    resetEmailSentHint: '如果该邮箱已注册，您将很快收到密码重置链接。',
+    resetEmailSentHint: '若该邮箱已注册，重置链接会发送到对应邮箱。',
     backToLogin: '返回登录',
     rememberedPassword: '想起密码了？',
     // 重置密码
     resetPasswordTitle: '设置新密码',
-    resetPasswordHint: '请在下方输入您的新密码。',
+    resetPasswordHint: '为当前账户设置新的登录密码。',
     newPassword: '新密码',
-    newPasswordPlaceholder: '输入新密码',
+    newPasswordPlaceholder: '新密码',
     confirmPassword: '确认密码',
-    confirmPasswordPlaceholder: '再次输入新密码',
-    confirmPasswordRequired: '请确认您的密码',
+    confirmPasswordPlaceholder: '再次确认新密码',
+    confirmPasswordRequired: '确认密码不能为空',
     passwordsDoNotMatch: '两次输入的密码不一致',
     resetPassword: '重置密码',
     resettingPassword: '重置中...',
-    resetPasswordFailed: '重置密码失败，请重试。',
+    resetPasswordFailed: '密码重置未完成。',
     passwordResetSuccess: '密码重置成功',
-    passwordResetSuccessHint: '您的密码已重置。现在可以使用新密码登录。',
+    passwordResetSuccessHint: '新密码已生效，可用于登录。',
     invalidResetLink: '无效的重置链接',
-    invalidResetLinkHint: '此密码重置链接无效或已过期。请重新请求一个新链接。',
-    requestNewResetLink: '请求新的重置链接',
-    invalidOrExpiredToken: '密码重置链接无效或已过期。请重新请求一个新链接。',
+    invalidResetLinkHint: '此密码重置链接无效或已过期。',
+    requestNewResetLink: '获取新的重置链接',
+    invalidOrExpiredToken: '密码重置链接无效或已过期。',
     registerOnboarding: {
-      title: '注册后不用猜下一步',
-      description: '完成注册后，先领取/确认额度，再创建 API 密钥，最后复制对应客户端配置即可开始调用。',
+      title: '账户状态清楚可见',
+      description: '余额、访问凭证和接入信息集中展示，模型调用会形成可追溯记录。',
       steps: {
         credit: {
-          title: '先看额度',
-          description: '注册送额度和充值余额都会在仪表盘展示。'
+          title: '账户余额',
+          description: '体验额度和充值余额都会在仪表盘展示。'
         },
         key: {
-          title: '创建 Key',
-          description: '选择适合任务的分组，Key 会按分组计费。'
+          title: '访问凭证',
+          description: '访问凭证所属服务档位会关联对应费用记录。'
         },
         connect: {
-          title: '复制配置',
-          description: 'Codex、Claude Code、Gemini CLI 和 API 工具按教程接入。'
+          title: '访问详情',
+          description: 'Codex、Claude Code、Gemini CLI 和 API 工具访问详情集中展示。'
         }
       }
     }
@@ -830,33 +953,52 @@ export default {
 
   // Dashboard
   dashboard: {
-    title: '仪表盘',
-    welcomeMessage: '欢迎回来！这是您账户的概览。',
-    loadFailed: '仪表盘加载失败',
-    loadFailedDesc: '可能是网络抖动或登录状态刚刷新失败，请重试一次。',
+    title: '账户概览',
+    welcomeMessage: '余额、费用、用量和服务状态清楚可见。',
+    hero: {
+      description: '余额、请求、实际扣费和模型服务状态集中呈现，日常核对更直接。',
+      note: '官方满血接入，聊天不保存，异常扣费包赔，服务稳定可用。'
+    },
+    assurance: {
+      official: '官方满血',
+      noRetention: '不保存聊天',
+      billingCover: '异常扣费包赔',
+      stability: '稳定可用'
+    },
+    loadFailed: '账户状态加载失败',
+    loadFailedDesc: '当前状态暂时不可用。',
     retryLoad: '重新加载',
     todayOverview: '今日概览',
     accountSnapshot: '账户状态与用量快照',
+    usageAndSpend: '使用与费用',
+    usageAndSpendDesc: '请求、Token、实际扣费和服务状态保持同步。',
+    liveSnapshot: '实时快照',
     balance: '余额',
     balanceApproxCny: '≈ {amount} CNY',
-    apiKeys: 'API 密钥',
+    apiKeys: '访问凭证',
+    keyStatus: '凭证状态',
+    activeKeys: '{count} 个启用',
     todayRequests: '今日请求',
-    todayCost: '今日消费',
+    todayCost: '今日扣费',
     todayTokens: '今日 Token',
     totalTokens: '累计 Token',
+    totalUsage: '累计请求',
+    totalSpend: '累计扣费',
     cacheToday: '今日缓存',
     performance: '性能指标',
     avgResponse: '平均响应',
     averageTime: '平均时间',
+    serviceStable: '稳定',
+    serviceStatusHint: '请求通道可用，响应和缓存命中可核对。',
     timeRange: '时间范围',
     granularity: '粒度',
     day: '按天',
     hour: '按小时',
-    modelDistribution: '模型分布',
-    groupDistribution: '分组使用分布',
-    platformBreakdown: '按平台拆分',
-    platformBreakdownEmpty: '暂无平台用量',
-    platformCount: '{count} 个平台',
+    modelDistribution: '模型用量',
+    groupDistribution: '服务档位使用分布',
+    platformBreakdown: '按模型服务拆分',
+    platformBreakdownEmpty: '暂无模型服务用量',
+    platformCount: '{count} 个服务',
     platformOther: '其他',
     platformQuota: {
       title: '配额用量',
@@ -868,52 +1010,127 @@ export default {
       disabled: '已禁用',
     },
     tokenUsageTrend: 'Token 使用趋势',
+    usageTrend: '费用与 Token 趋势',
+    usageTrendHint: '按所选时间范围呈现实际扣费、官方原价和 Token 变化。',
     noDataAvailable: '暂无数据',
     model: '模型',
-    group: '分组',
-    noGroup: '无分组',
+    group: '服务档位',
+    noGroup: '暂无服务档位',
     requests: '请求',
     tokens: 'Token',
-    actual: '实际',
-    standard: '标准',
+    actual: '实际扣费',
+    standard: '官方原价',
     input: '输入',
     output: '输出',
     cache: '缓存',
     recentUsage: '最近使用',
+    recentUsageHint: '近期请求、模型名称和实际扣费按时间保留。',
     last7Days: '近 7 天',
-    noUsageRecords: '暂无使用记录',
-    startUsingApi: '开始使用 API 后，您的使用历史将显示在这里。',
-    viewAllUsage: '查看全部',
-    quickActions: '快捷操作',
-    quickActionsHint: '第一次使用建议按顺序完成：创建密钥、复制配置、发起一次测试请求。',
-    firstRun: {
-      title: '新用户三步跑通',
-      description: '先不要急着调复杂项目，先用一个简单请求确认 Key、分组和客户端配置都正常。',
-      steps: {
-        createKey: '创建 API 密钥',
-        selectGroup: '选择适合任务的分组',
-        copyConfig: '点“使用密钥”复制配置'
+    noUsageRecords: '暂无近期请求',
+    startUsingApi: '请求、模型和扣费记录会按时间显示在这里。',
+    viewAllUsage: '全部记录',
+    trustPanel: {
+      kicker: '平台保障',
+      title: '关键保障',
+      description: '模型纯度、隐私、费用和稳定性保持清楚。',
+      items: {
+        official: {
+          title: '官方满血',
+          description: 'GPT、Claude、Gemini 与图像模型按官方能力接入。',
+        },
+        privacy: {
+          title: '不保存聊天',
+          description: '平台不保存聊天内容，用户信息不对外泄露。',
+        },
+        billing: {
+          title: '异常扣费包赔',
+          description: '模型、倍率、Token 和余额变化可核对，异常扣费可赔付。',
+        },
+        stability: {
+          title: '稳定可用',
+          description: '服务状态和可用性保持清楚可见。',
+        },
+      },
+    },
+    quickActionsKicker: '常用入口',
+    quickActions: '账户中心',
+    quickActionsDescription: '访问凭证、账单、订单和支持入口保持在同一区域。',
+    quickActionsBadge: '直达',
+    quickLinks: {
+      keys: {
+        title: '访问凭证',
+        description: '凭证状态、权限和轮换记录。'
+      },
+      usage: {
+        title: '用量记录',
+        description: '请求、Token 与实际扣费明细。'
+      },
+      plans: {
+        title: '余额与订阅',
+        description: '余额、套餐和续费记录。'
+      },
+      orders: {
+        title: '订单记录',
+        description: '支付、入账和订单状态。'
+      },
+      profile: {
+        title: '账户安全',
+        description: '安全、绑定和余额提醒。'
+      },
+      support: {
+        title: '支持与工单',
+        description: '异常扣费、配额和服务问题。'
+      },
+      redeem: {
+        title: '兑换记录',
+        description: '兑换额度与到账记录。'
+      },
+      affiliate: {
+        title: '邀请返利',
+        description: '邀请链接和返利余额。'
       }
     },
-    createApiKey: '创建 API 密钥',
-    generateNewKey: '生成新的 API 密钥',
+    createApiKey: '访问凭证',
+    generateNewKey: '凭证状态与权限',
     serviceStatus: '服务状态',
-    checkGroupHealth: '连接不上或报错时先看这里',
-    viewUsage: '查看使用记录',
-    checkDetailedLogs: '查看详细的使用日志',
+    checkGroupHealth: '可用性、延迟和近期状态',
+    viewUsage: '使用记录',
+    checkDetailedLogs: '请求、模型和扣费明细',
+    buySubscription: '余额与订阅',
+    manageBalanceAndPlans: '余额、套餐和订单记录',
+    accountSettings: '账户设置',
+    accountSettingsHint: '提醒、安全和绑定信息',
     redeemCode: '兑换码',
-    addBalanceWithCode: '使用兑换码充值',
+    addBalanceWithCode: '兑换额度记录可追溯',
+    affiliateInvite: '邀请好友 / 返利',
+    affiliateInviteHint: '邀请链接与返利额度',
+    modelDistributionHint: '按模型汇总请求、Token、实际扣费和官方原价。',
+    serviceTransparency: '模型服务状态',
+    serviceTransparencyDesc: '按模型服务汇总请求、Token、扣费和配额，异常扣费便于核对。',
     balanceEquivalent: {
-      show: '展开看余额相当于官方多少钱',
-      hide: '收起官方额度换算',
-      title: '相当于官方原价额度',
-      description: '按当前站内余额和每个可用 API 分组的有效倍率，折算成对应官方 API 原价美元额度。生图分组不参与这里的美元额度换算。',
-      rate: '本站 {rate} 倍率',
+      show: '官方额度估算',
+      hide: '收起估算',
+      title: '官方额度估算',
+      description: '按当前账户余额和可用服务档位的有效价格，折算成对应官方 API 原价美元额度。图片生成服务不参与这里的美元额度换算。',
+      rate: '{rate} 倍率',
       quota: '官方 API 额度',
       officialQuota: '官方美元额度',
       officialAmount: '官方 {amount}',
-      apiFormula: '公式：站内余额 {balance} ÷ 有效倍率 {rate} = 对应官方原价额度 {quota}',
-      empty: '暂无可用分组'
+      apiFormula: '公式：账户余额 {balance} ÷ 有效价格系数 {rate} = 对应官方原价额度 {quota}',
+      empty: '暂无可用服务档位'
+    },
+    retention: {
+      lowBalanceBanner: {
+        criticalTitle: '账户余额为 0',
+        lowTitle: '账户余额低于提醒线',
+        balanceLabel: '当前 {balance}',
+        criticalMessage: '当前余额为 0。',
+        lowMessage: '当前余额不高于 {threshold}。',
+        primaryAction: '充值',
+        docsAction: '服务说明',
+        usageAction: '查看用量',
+        dismiss24h: '24 小时内隐藏'
+      }
     }
   },
 
@@ -922,130 +1139,128 @@ export default {
     subscription: '订阅'
   },
 
-  // API Keys
+  // Access Credentials
   keys: {
-    title: 'API 密钥',
-    description: '管理您的 API 密钥和访问令牌',
-    searchPlaceholder: '搜索名称或Key...',
+    title: '访问凭证',
+    description: '访问凭证、服务档位、额度和接入信息集中呈现。',
+    hero: {
+      title: '访问凭证',
+      description: '服务接入、可用档位、额度与消耗记录保持清楚可见。',
+      signals: {
+        official: '官方满血',
+        billing: '扣费可核对',
+        status: '状态透明'
+      }
+    },
+    searchPlaceholder: '搜索名称或凭证...',
     endpoints: {
-      title: 'API 端点',
+      title: '服务端点',
       default: '默认',
       copied: '已复制',
       copiedHint: '已复制到剪贴板',
-      clickToCopy: '点击可复制此端点',
+      clickToCopy: '复制端点',
       speedTest: '测速',
     },
-    allGroups: '全部分组',
+    allGroups: '全部服务档位',
     allStatus: '全部状态',
-    createKey: '创建密钥',
-    editKey: '编辑密钥',
-    deleteKey: '删除密钥',
+    createKey: '新增访问凭证',
+    editKey: '编辑访问凭证',
+    deleteKey: '删除访问凭证',
     deleteConfirmMessage: "确定要删除 '{name}' 吗？此操作无法撤销。",
-    apiKey: 'API 密钥',
-    group: '分组',
-    category: '分组平台',
-    categoryLabel: '分组平台',
-    categoryHint: '按所选分组的平台展示，仅用于选择分组。',
-    selectCategory: '选择分组平台',
+    apiKey: '访问凭证',
+    group: '服务档位',
+    category: '服务类型',
+    categoryLabel: '服务类型',
+    categoryHint: '按所选服务档位的模型服务展示，仅用于选择服务档位。',
+    selectCategory: '选择服务类型',
     allCategories: '全部平台',
     categories: {
       openai: 'OpenAI',
       anthropic: 'Anthropic',
       other: '其他'
     },
-    noGroup: '无分组',
-    searchGroup: '搜索分组...',
-    noGroupFound: '未找到匹配的分组',
+    noGroup: '暂无服务档位',
+    searchGroup: '搜索服务档位...',
+    noGroupFound: '未找到匹配的服务档位',
     created: '创建时间',
     copyToClipboard: '复制到剪贴板',
     copied: '已复制！',
-    importToCcSwitch: '导入到 CC Switch',
+    importToCcSwitch: 'CC Switch 访问',
     enable: '启用',
     disable: '禁用',
     nameLabel: '名称',
-    namePlaceholder: '我的 API 密钥',
-    groupLabel: '分组',
-    selectGroup: '选择分组',
+    namePlaceholder: '我的访问凭证',
+    groupLabel: '服务档位',
+    selectGroup: '选择服务档位',
     statusLabel: '状态',
     selectStatus: '选择状态',
-    firstRunGuide: {
-      title: '第一次接入建议从这里开始',
-      description: '先创建一个 API 密钥，选择分组后点“使用密钥”复制配置。确认能跑通一个简单请求后，再接入 Codex、Claude Code、Gemini CLI 或自己的项目。',
-      steps: {
-        create: '创建 Key',
-        group: '选分组',
-        use: '复制配置'
-      }
-    },
     balanceExplain: {
       title: '余额和官方价格怎么对应？',
-      description: '站内 1 元按 1 刀余额展示；实际扣费约等于官方模型价格 × 当前分组倍率。分组倍率越低，同样余额能使用的官方原价额度越多。'
+      description: '1 元按 1 刀余额展示；实际扣费约等于官方模型价格 × 当前服务档位倍率。倍率越低，同样余额能使用的官方原价额度越多。'
     },
     groupChoiceTips: {
       cost: {
-        title: '日常高频看成本',
-        description: '写代码、问答、资料整理这类高频任务，可以优先测试低倍率分组。'
+        title: '高频使用成本清楚',
+        description: '不同服务档位展示各自倍率和费用记录，适合长期使用时比较成本。'
       },
       stability: {
-        title: '重要任务看稳定',
-        description: '长任务、交付任务和工作流自动化，建议优先选择更稳定的分组。'
+        title: '服务稳定性可见',
+      description: '服务状态与访问凭证相邻展示，长任务和自动化工作流更容易持续观察。'
       },
       image: {
-        title: '生图看名称',
-        description: '图片生成请使用名称带“生图”的分组，普通文本分组不一定支持生图。'
+        title: '模型能力区分明确',
+        description: '文本、代码、多模态和图像服务按档位呈现，能力边界更清楚。'
       }
     },
     groupCostPreview: {
       title: '{group} 计费预览',
       description: '当前有效倍率约 {rate}，按 1 USD≈¥{cny} 估算，约等于官方人民币计费 {discount} 折。',
       note: '这是帮助理解的估算；实际扣费以模型价格、当前倍率和使用记录为准。',
-      unavailable: '当前分组倍率暂时无法计算，请以分组说明和使用记录为准。'
+      unavailable: '当前服务档位倍率暂时无法计算，请以服务档位说明和使用记录为准。'
     },
     serviceStatusTip: {
-      title: '连接不上或调用报错？先看服务状态',
-      description: '如果请求失败、连接超时或模型暂时不可用，先确认当前分组状态；若处于波动中，建议及时切换到更稳定的分组。',
+      title: '服务状态与接入信息并排呈现',
+      description: '可用率、延迟和近期状态与服务档位相互对应，长期使用更透明。',
       action: '查看服务状态'
     },
-    createServiceStatusHint:
-      '创建密钥时建议先确认所选分组是否正常；后续如果连接不上或有报错，也可以先查看服务状态，再切换到更稳定的分组。',
     viewServiceStatus: '查看服务状态',
     saving: '保存中...',
-    noKeysYet: '暂无 API 密钥',
-    createFirstKey: '创建您的第一个 API 密钥以开始使用 API。',
-    keyCreatedSuccess: 'API 密钥创建成功',
-    keyUpdatedSuccess: 'API 密钥更新成功',
-    keyDeletedSuccess: 'API 密钥删除成功',
-    keyEnabledSuccess: 'API 密钥已启用',
-    keyDisabledSuccess: 'API 密钥已禁用',
-    failedToLoad: '加载 API 密钥失败',
-    failedToSave: '保存 API 密钥失败',
-    failedToDelete: '删除 API 密钥失败',
-    failedToUpdateStatus: '更新 API 密钥状态失败',
-    clickToChangeGroup: '点击更换分组',
-    groupChangedSuccess: '分组更换成功',
-    failedToChangeGroup: '更换分组失败',
-    groupRequired: '请选择分组',
+    noKeysYet: '暂无访问凭证',
+    createFirstKey: '当前账户暂无访问凭证记录。',
+    keyCreatedSuccess: '访问凭证已新增',
+    keyUpdatedSuccess: '访问凭证更新成功',
+    keyDeletedSuccess: '访问凭证删除成功',
+    keyEnabledSuccess: '访问凭证已启用',
+    keyDisabledSuccess: '访问凭证已禁用',
+    failedToLoad: '加载访问凭证失败',
+    failedToSave: '保存访问凭证失败',
+    failedToDelete: '删除访问凭证失败',
+    failedToUpdateStatus: '更新访问凭证状态失败',
+    clickToChangeGroup: '更换服务档位',
+    groupChangedSuccess: '服务档位更换成功',
+    failedToChangeGroup: '更换服务档位失败',
+    groupRequired: '请选择服务档位',
     usage: '用量',
     today: '今日',
     total: '近30天',
     quota: '额度',
     lastUsedAt: '上次使用时间',
-    useKey: '使用密钥',
+    useKey: '访问详情',
     useKeyModal: {
-      title: '使用 API 密钥',
-      description: '将以下环境变量添加到您的终端配置文件或直接在终端中运行。',
+      title: '访问详情',
+      description: '当前访问凭证的客户端接入信息已整理在下方。',
       copy: '复制',
       copied: '已复制',
-      note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
-      noGroupTitle: '请先分配分组',
+      note: '环境变量内容已按当前访问凭证生成。',
+      noGroupTitle: '尚未分配服务档位',
       noGroupDescription:
-        '此 API 密钥尚未分配分组，请先在密钥列表中点击分组列进行分配，然后才能查看使用配置。',
+        '分配服务档位后会显示对应客户端访问详情。',
       openai: {
-        description: '将以下配置文件添加到 Codex CLI 配置目录中。',
-        configTomlHint: '请确保以下内容位于 config.toml 文件的开头部分',
-        note: '请确保配置目录存在。macOS/Linux 用户可运行 mkdir -p ~/.codex 创建目录。',
+        description: 'Codex CLI 访问配置。',
+        configTomlHint: 'config.toml 配置',
+        note: '目录信息：~/.codex。',
         noteWindows:
-          '按 Win+R，输入 %userprofile%\\.codex 打开配置目录。如目录不存在，请先手动创建。'
+          'Windows 目录信息：%userprofile%\\.codex。'
       },
       cliTabs: {
         claudeCode: 'Claude Code',
@@ -1055,57 +1270,57 @@ export default {
         opencode: 'OpenCode'
       },
       antigravity: {
-        description: '为 Antigravity 分组配置 API 访问。请根据您使用的客户端选择对应的配置方式。',
+        description: 'Antigravity 服务档位的 API 访问详情。',
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
         claudeNote:
-          '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
+          '环境变量内容已按当前访问凭证生成。',
         geminiNote:
-          '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。'
+          '环境变量内容已按当前访问凭证生成。'
       },
       gemini: {
         description:
-          '将以下环境变量添加到您的终端配置文件或直接在终端中运行，以配置 Gemini CLI 访问。',
-        modelComment: '如果你有 Gemini 3 权限可以填：gemini-3-pro-preview',
-        note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。'
+          'Gemini CLI 访问所需环境变量。',
+        modelComment: 'Gemini 3 可用时可填：gemini-3-pro-preview',
+        note: '环境变量内容已按当前访问凭证生成。'
       },
       opencode: {
-        title: 'OpenCode 配置示例',
+        title: 'OpenCode 访问示例',
         subtitle: 'opencode.json',
-        hint: '配置文件路径：~/.config/opencode/opencode.json（或 opencode.jsonc），不存在需手动创建。生成内容已包含 apiKey、baseURL、模型 limit/options/variants 等关键参数；API Key 也可改为通过客户端 /connect 命令配置。'
+        hint: 'OpenCode 配置位置：~/.config/opencode/opencode.json（或 opencode.jsonc）。生成内容包含 apiKey、baseURL、模型 limit/options/variants 等关键参数。'
       }
     },
-    customKeyLabel: '自定义密钥',
-    customKeyPlaceholder: '输入自定义密钥（至少16个字符）',
+    customKeyLabel: '自定义访问凭证',
+    customKeyPlaceholder: '输入自定义访问凭证（至少16个字符）',
     customKeyHint: '仅允许字母、数字、下划线和连字符，最少16个字符。',
-    customKeyTooShort: '自定义密钥至少需要16个字符',
-    customKeyInvalidChars: '自定义密钥只能包含字母、数字、下划线和连字符',
-    customKeyRequired: '请输入自定义密钥',
+    customKeyTooShort: '自定义访问凭证至少需要16个字符',
+    customKeyInvalidChars: '自定义访问凭证只能包含字母、数字、下划线和连字符',
+    customKeyRequired: '请输入自定义访问凭证',
     ipRestriction: 'IP 限制',
     ipWhitelist: 'IP 白名单',
     ipWhitelistPlaceholder: '192.168.1.100\n10.0.0.0/8',
-    ipWhitelistHint: '每行一个 IP 或 CIDR，设置后仅允许这些 IP 使用此密钥',
+    ipWhitelistHint: '每行一个 IP 或 CIDR，设置后仅允许这些 IP 使用此访问凭证',
     ipBlacklist: 'IP 黑名单',
     ipBlacklistPlaceholder: '1.2.3.4\n5.6.0.0/16',
-    ipBlacklistHint: '每行一个 IP 或 CIDR，这些 IP 将被禁止使用此密钥',
-    ipRestrictionEnabled: '已配置 IP 限制',
+    ipBlacklistHint: '每行一个 IP 或 CIDR，这些 IP 将被禁止使用此访问凭证',
+    ipRestrictionEnabled: 'IP 限制已启用',
     ccSwitchNotInstalled:
-      'CC Switch 未安装或协议处理程序未注册。请先安装 CC Switch 或手动复制 API 密钥。',
+      '未检测到 CC Switch 协议处理程序，可使用手动复制方式。',
     ccSwitchDialog: {
-      title: '导入到 CC Switch',
-      description: '按当前密钥分组选择要写入的客户端。CC Switch 会在本机生成对应配置，并可继续管理和切换供应商。',
-      currentGroup: '当前分组',
-      noGroup: '此 API 密钥尚未分配分组，请先在密钥列表中点击分组列进行分配。',
+      title: 'CC Switch 访问',
+      description: '按当前访问凭证和服务档位展示可用客户端访问详情。',
+      currentGroup: '当前服务档位',
+      noGroup: '分配服务档位后会显示 CC Switch 访问详情。',
       endpoint: '端点',
       model: '模型',
       protocol: '协议',
       reasoning: '推理',
-      import: '导入',
+      import: '访问',
       copyLink: '复制链接',
       linkCopied: '链接已复制',
       openOfficial: '打开 CC Switch',
       installHint:
-        '如果浏览器没有调起 CC Switch，请先安装并打开一次 CC Switch；也可以复制链接后在本机执行 open、xdg-open 或 Start-Process。',
+        '协议链接和访问链接已生成，可在客户端侧查看状态。',
       protocols: {
         anthropicMessages: 'Anthropic Messages',
         openaiResponses: 'OpenAI Responses',
@@ -1117,52 +1332,52 @@ export default {
       targets: {
         claudeCode: {
           name: 'Claude Code',
-          description: '写入 Claude Code 供应商配置，使用 Anthropic Messages。'
+          description: 'Claude Code 服务访问详情，使用 Anthropic Messages。'
         },
         claudeDesktop: {
           name: 'Claude Desktop',
-          description: '通过 CC Switch 的 Claude provider 导入，使用 Anthropic Messages。'
+          description: 'CC Switch Claude 服务访问详情，使用 Anthropic Messages。'
         },
         codex: {
           name: 'Codex',
-          description: '写入 Codex 的 auth.json 和 config.toml，CC Switch 原生使用 Responses。'
+          description: 'Codex auth.json 和 config.toml 访问详情，CC Switch 原生使用 Responses。'
         },
         geminiCli: {
           name: 'Gemini CLI',
-          description: '写入 Gemini CLI 环境配置，使用 Gemini Native v1beta 端点。'
+          description: 'Gemini CLI 环境访问详情，使用 Gemini Native v1beta 端点。'
         },
         opencode: {
           name: 'OpenCode',
-          description: '追加 OpenCode provider；CC Switch deeplink 当前写 OpenAI Compatible。'
+          description: 'OpenCode provider；CC Switch deeplink 当前使用 OpenAI Compatible。'
         },
         openclaw: {
           name: 'OpenClaw',
-          description: '追加 OpenClaw provider；CC Switch deeplink 当前写 OpenAI Completions。'
+          description: 'OpenClaw provider；CC Switch deeplink 当前使用 OpenAI Completions。'
         },
         hermes: {
           name: 'Hermes Agent',
-          description: '追加 Hermes 自定义 provider；CC Switch deeplink 当前写 chat_completions。'
+          description: 'Hermes 自定义 provider；CC Switch deeplink 当前使用 chat_completions。'
         }
       }
     },
     ccsClientSelect: {
       title: '选择客户端',
-      description: '请选择您要导入到 CC Switch 的客户端类型：',
+      description: 'CC Switch 可用客户端类型：',
       claudeCode: 'Claude Code',
-      claudeCodeDesc: '导入为 Claude Code 配置',
+      claudeCodeDesc: 'Claude Code 访问',
       geminiCli: 'Gemini CLI',
-      geminiCliDesc: '导入为 Gemini CLI 配置'
+      geminiCliDesc: 'Gemini CLI 访问'
     },
     // 配额和有效期
     quotaLimit: '额度限制',
     quotaAmount: '额度金额 (USD)',
     quotaAmountPlaceholder: '输入 USD 额度限制',
-    quotaAmountHint: '设置此密钥可消费的最大金额。0 = 无限制。',
+    quotaAmountHint: '设置此访问凭证可消费的最大金额。0 = 无限制。',
     quotaUsed: '已用额度',
     reset: '重置',
     resetQuotaUsed: '将已用额度重置为 0',
     resetQuotaTitle: '确认重置额度',
-    resetQuotaConfirmMessage: '确定要将密钥 "{name}" 的已用额度（{used}）重置为 0 吗？此操作不可撤销。',
+    resetQuotaConfirmMessage: '确定要将访问凭证 "{name}" 的已用额度（{used}）重置为 0 吗？此操作不可撤销。',
     quotaResetSuccess: '额度重置成功',
     failedToResetQuota: '重置额度失败',
     rateLimitColumn: '速率限制',
@@ -1171,20 +1386,20 @@ export default {
     rateLimit5h: '5小时限额 (USD)',
     rateLimit1d: '日限额 (USD)',
     rateLimit7d: '7天限额 (USD)',
-    rateLimitHint: '设置此密钥在指定时间窗口内的最大消费额。0 = 无限制。',
+    rateLimitHint: '设置此访问凭证在指定时间窗口内的最大消费额。0 = 无限制。',
     rateLimitUsage: '速率限制用量',
     resetRateLimitUsage: '重置速率限制用量',
     resetRateLimitTitle: '确认重置速率限制',
-    resetRateLimitConfirmMessage: '确定要重置密钥 "{name}" 的速率限制用量吗？所有时间窗口的已用额度将归零。此操作不可撤销。',
+    resetRateLimitConfirmMessage: '确定要重置访问凭证 "{name}" 的速率限制用量吗？所有时间窗口的已用额度将归零。此操作不可撤销。',
     rateLimitResetSuccess: '速率限制已重置',
     failedToResetRateLimit: '重置速率限制失败',
     resetNow: '即将重置',
-    expiration: '密钥有效期',
+    expiration: '凭证有效期',
     expiresInDays: '{days} 天',
     extendDays: '+{days} 天',
     customDate: '自定义',
     expirationDate: '过期时间',
-    expirationDateHint: '选择此 API 密钥的过期时间。',
+    expirationDateHint: '选择此访问凭证的过期时间。',
     currentExpiration: '当前过期时间',
     expiresAt: '过期时间',
     noExpiration: '永久有效',
@@ -1198,23 +1413,37 @@ export default {
 
   imageGeneration: {
     title: 'AI 生图',
-    description: '选择名称带“生图”的分组，系统会自动准备对应生图 Key，并按分组支持的图片模型发起请求',
-    apiKey: '生图 Key',
-    selectKey: '选择生图 Key',
-    noImageKey: '当前没有可用的生图 Key。',
-    createImageKey: '去创建或切换分组',
-    group: '生图分组',
-    selectGroup: '选择生图分组',
-    noImageGroup: '当前没有可用的生图分组。',
-    autoCreatingKeys: '正在自动准备这个分组的生图 Key...',
-    groupKeyUnavailable: '这个分组的生图 Key 还没准备好，请稍后重试。',
-    autoCreatedKey: '已自动创建 {group} 的生图 Key',
-    autoCreateKeyFailed: '自动创建 {group} 的生图 Key 失败',
+    description: '生图服务档位、可用模型、价格预估和生成结果集中展示。',
+    hero: {
+      title: 'AI 生图',
+      description: '仅展示当前账户已开放生图的服务档位，官方模型、单张扣费、本次预估和余额一并可核对。',
+      assurance: '生图能力按已开放服务档位展示，官方满血、不保存用户聊天对话、不主动泄漏用户信息，异常扣费按记录包赔。',
+      signals: {
+        official: '官方模型',
+        noRetention: '不保存聊天对话',
+        privacy: '不主动泄漏信息',
+        billing: '扣费可核对',
+        enabled: '按开放档位展示',
+        stable: '稳定性行业内极佳'
+      }
+    },
+    apiKey: '生图访问',
+    selectKey: '选择生图访问',
+    noImageKey: '当前没有可用的生图访问能力。',
+    createImageKey: '生图访问状态',
+    group: '生图服务档位',
+    selectGroup: '选择生图服务档位',
+    noImageGroup: '当前没有可用的生图服务档位。',
+    autoAccessName: '生图访问 · {group}',
+    autoCreatingKeys: '正在准备这个服务档位的生图访问能力...',
+    groupKeyUnavailable: '这个服务档位的生图访问能力暂未就绪。',
+    autoCreatedKey: '{group} 的生图访问能力已就绪',
+    autoCreateKeyFailed: '{group} 的生图访问能力暂未准备完成',
     model: '模型',
     selectModel: '选择生图模型',
-    noImageModel: '这个分组没有配置可用的图片模型。',
+    noImageModel: '这个服务档位暂无可用图片模型。',
     size: '尺寸',
-    geminiFlashSizeHint: '当前 Gemini Flash 生图上游实测仅返回 1K，已隐藏不可兑现的 2K/4K 选项。',
+    geminiFlashSizeHint: '当前 Gemini Flash 生图服务实测仅返回 1K，已隐藏不可兑现的 2K/4K 选项。',
     quality: '质量',
     count: '数量',
     promptPlaceholder: '输入你想生成的画面，也可以粘贴或拖入参考图',
@@ -1229,18 +1458,19 @@ export default {
     continueEdit: '继续编辑',
     generating: '生成中',
     empty: '生成结果会显示在这里',
-    loadKeysFailed: '加载生图 Key 失败',
+    loadKeysFailed: '加载生图访问能力失败',
     invalidReference: '请选择图片文件',
     referenceTooLarge: '单张参考图不能超过 10MB',
     referenceLimit: '最多可添加 {count} 张参考图',
-    noImagesReturned: '上游没有返回图片数据',
+    noImagesReturned: '暂未收到图片结果',
     generatedSuccess: '图片生成完成',
     generateFailed: '图片生成失败',
-    networkDisconnected: '图片生成耗时较长，浏览器连接已断开。生成可能已经在后端完成；如果用量记录已产生但没有收到图片，请联系管理员处理，也可以稍后重试。',
+    errorSupportHint: '生成异常可通过工单核查；确认异常扣费后包赔。',
+    networkDisconnected: '图片生成耗时较长，浏览器连接已断开。图片可能仍在处理中；用量记录和生成状态会继续保留。',
     cancelled: '已取消生成',
     referenceAdded: '已加入参考图',
     referenceFromResultFailed: '读取结果图失败，无法加入编辑',
-    localCacheWarning: '最近 5 张生成图片会缓存到当前浏览器本地，但仍建议及时保存图片；清理浏览器站点数据后缓存会丢失。',
+    localCacheWarning: '最近 5 张生成图片会在当前浏览器保留；清理站点数据后不再显示。',
     qualityOptions: {
       auto: '自动',
       low: '低',
@@ -1253,22 +1483,38 @@ export default {
       batchCost: '本次预估',
       remainingImages: '还能生成',
       balance: '当前余额',
-      noEstimate: '选择生图分组后显示价格',
-      noKey: '分组 Key 未就绪',
-      autoCreatingKey: '正在准备分组 Key',
-      groupPrice: '分组价',
+      noEstimate: '选择生图服务档位后显示价格',
+      noKey: '服务访问暂未就绪',
+      autoCreatingKey: '正在准备服务访问',
+      groupPrice: '档位价',
       defaultPrice: '默认价',
       balanceLimited: '按余额估算',
-      keyQuotaLimited: '受 Key 额度限制',
+      keyQuotaLimited: '受服务访问额度限制',
       summary: '{source} {base} × 倍率 {multiplier} · {tier}',
       imageCountValue: '{count} 张',
     },
   },
 
+  // Shared model-service usage labels
+  platformUsage: {
+    today: '今日',
+    total: '累计',
+    breakdown: '按模型服务拆分',
+    other: '其他',
+  },
+
   // Usage
   usage: {
     title: '使用记录',
-    description: '查看和分析您的 API 使用历史',
+    description: '模型、Token、费用和异常记录集中展示，扣费口径清楚可查。',
+    trust: {
+      transparentUsage: '用量透明',
+      transparentUsageDesc: '每次请求按时间、模型、Token 与费用留痕。',
+      auditableBilling: '扣费可核对',
+      auditableBillingDesc: '实际扣费与标准费用分开展示，支持导出复核。',
+      recoverableIssues: '异常可处理',
+      recoverableIssuesDesc: '错误请求保留状态与摘要，关联记录后可追溯处理。'
+    },
     costDetails: '成本明细',
     tokenDetails: 'Token 明细',
     cacheTtlOverriddenHint: '缓存 TTL Override 已启用',
@@ -1287,14 +1533,28 @@ export default {
     accountCost: '成本',
     userBilled: '用户扣费',
     accountBilled: '账号计费',
+    inputCost: '输入费用',
+    outputCost: '输出费用',
+    cacheCreationCost: '缓存写入费用',
+    cacheReadCost: '缓存读取费用',
+    inputTokens: '输入 Token',
+    outputTokens: '输出 Token',
+    cacheCreationTokens: '缓存写入 Token',
+    cacheCreation5mTokens: '缓存写入',
+    cacheCreation1hTokens: '缓存写入',
+    cacheReadTokens: '缓存读取 Token',
+    billingMode: '计费方式',
+    billingModeToken: '按 Token',
+    billingModePerRequest: '按次',
+    billingModeImage: '按图片',
     resetNow: '现在',
     resetPending: '待刷新',
     accountMultiplier: '账号倍率',
     avgDuration: '平均耗时',
     inSelectedRange: '所选范围内',
     perRequest: '每次请求',
-    apiKeyFilter: 'API 密钥',
-    allApiKeys: '全部密钥',
+    apiKeyFilter: '访问凭证',
+    allApiKeys: '全部凭证',
     timeRange: '时间范围',
     exportCsv: '导出 CSV',
     exportExcel: '导出 Excel',
@@ -1307,16 +1567,16 @@ export default {
     preparingExport: '正在准备导出...',
     model: '模型',
     requestedModel: '请求',
-    upstreamModel: '上游',
+    upstreamModel: '实际模型',
     reasoningEffort: '推理强度',
     endpoint: '端点',
     endpointDistribution: '端点分布',
     inbound: '入站',
-    upstream: '上游',
+    upstream: '模型服务',
     mapping: '映射',
     path: '路径',
     inboundEndpoint: '入站端点',
-    upstreamEndpoint: '上游端点',
+    upstreamEndpoint: '服务端点',
     type: '类型',
     tokens: 'Token',
     cost: '费用',
@@ -1350,7 +1610,7 @@ export default {
     imageOutputCost: '图片输出成本',
     imageSizeSource: '尺寸来源',
     imageSizeBreakdown: '尺寸明细',
-    imageSizeSourceOutput: '上游输出',
+    imageSizeSourceOutput: '服务输出',
     imageSizeSourceInput: '请求输入',
     imageSizeSourceDefault: '默认计费档位',
     imageSizeSourceLegacy: '历史记录',
@@ -1374,24 +1634,42 @@ export default {
     exportFailed: '使用数据导出失败',
     exportExcelSuccess: '使用数据导出成功（Excel格式）',
     exportExcelFailed: '使用数据导出失败',
+    exportHeaders: {
+      time: '时间',
+      credentialName: '访问凭证名称',
+      model: '模型',
+      reasoningEffort: '推理强度',
+      inboundEndpoint: '入站端点',
+      type: '类型',
+      billingMode: '计费方式',
+      inputTokens: '输入 Token',
+      outputTokens: '输出 Token',
+      cacheReadTokens: '缓存读取 Token',
+      cacheCreationTokens: '缓存写入 Token',
+      rateMultiplier: '倍率',
+      billedCost: '实际扣费（{currency}）',
+      originalCost: '标准费用（{currency}）',
+      firstTokenMs: '首 Token（ms）',
+      durationMs: '耗时（ms）',
+    },
     imageUnit: '张',
     userAgent: 'User-Agent',
-    tabs: { usage: '用量明细', errors: '错误请求' },
+    tabs: { usage: '用量明细', errors: '问题记录' },
     errors: {
-      time: '时间', model: '模型', endpoint: '端点', status: '状态码',
-      category: '分类', platform: '平台', message: '错误信息',
-      keyName: 'Key 名称', keyDeleted: '已删除', allKeys: '全部 Key',
+      time: '时间', model: '模型', endpoint: '端点', status: '服务状态码',
+      category: '分类', platform: '模型服务', message: '问题摘要',
+      keyName: '凭证名称', keyDeleted: '已删除', allKeys: '全部凭证',
       modelPlaceholder: '搜索模型', allCategories: '全部分类',
-      empty: '暂无错误请求', failedToLoad: '加载错误请求失败',
+      empty: '暂无问题记录', failedToLoad: '加载问题记录失败',
       categories: {
         auth: '认证失败', rate_limit: '限流', quota: '余额/订阅',
-        invalid_request: '参数错误', service_unavailable: '服务暂时不可用',
-        upstream: '上游错误', internal: '平台错误', other: '其他', cyber: '安全策略',
+        invalid_request: '请求参数', service_unavailable: '服务暂时不可用',
+        upstream: '模型服务返回', internal: '平台记录', other: '其他', cyber: '安全策略',
       },
       detail: {
-        title: '错误请求详情',
-        responseBody: '上游响应内容',
-        upstreamStatus: '上游状态码',
+        title: '问题记录详情',
+        responseBody: '模型服务返回内容',
+        upstreamStatus: '服务状态码',
         loadFailed: '加载详情失败，请稍后重试',
       },
     },
@@ -1403,7 +1681,7 @@ export default {
       operational: '正常',
       degraded: '降级',
       failed: '失败',
-      error: '错误',
+      error: '异常',
       unknown: '-'
     },
     providers: {
@@ -1433,13 +1711,25 @@ export default {
 
   // Channel Status (user-facing read-only view)
   channelStatus: {
-    title: '渠道状态',
-    description: '查看渠道可用性、延迟和近期状态',
-    searchPlaceholder: '搜索渠道...',
-    allProviders: '全部供应商',
-    loadError: '加载渠道状态失败',
-    detailLoadError: '加载渠道详情失败',
-    detailTitle: '渠道详情',
+    title: '模型服务状态',
+    description: '模型服务状态、服务档位状态、可用率和延迟集中展示。',
+    hero: {
+      title: '服务状态',
+      description: '稳定性、满血可用率、延迟和近期响应连续展示，当前服务透明状态一眼可见。',
+      assurance: '服务状态用于展示平台稳定性和官方满血可用情况，不保存用户聊天对话，不主动泄漏用户信息。',
+      signals: {
+        stability: '稳定性可见',
+        full: '满血状态',
+        transparent: '透明响应',
+        privacy: '不保存聊天对话',
+        billing: '异常扣费包赔'
+      }
+    },
+    searchPlaceholder: '搜索模型或服务...',
+    allProviders: '全部服务',
+    loadError: '加载服务状态失败',
+    detailLoadError: '加载服务详情失败',
+    detailTitle: '模型服务详情',
     closeDetail: '关闭',
     windowTab: {
       '7d': '7 天',
@@ -1447,14 +1737,14 @@ export default {
       '30d': '30 天'
     },
     overall: {
-      operational: 'OPERATIONAL',
-      degraded: 'DEGRADED',
-      unavailable: 'UNAVAILABLE'
+      operational: '运行正常',
+      degraded: '有波动',
+      unavailable: '暂不可用'
     },
     columns: {
       name: '名称',
-      provider: '供应商',
-      groupName: '分组',
+      provider: '模型服务',
+      groupName: '服务档位',
       primaryModel: '主模型',
       availability7d: '7 天可用率',
       latency: '延迟 (ms)'
@@ -1469,46 +1759,58 @@ export default {
       avgLatency7d: '7 天平均延迟 (ms)'
     },
     empty: {
-      title: '暂无可显示的渠道',
-      description: '管理员尚未配置可监控的渠道。'
+      title: '暂无状态数据',
+      description: '服务状态数据生成后会在这里展示。'
     }
   },
 
   // Available Channels (user-facing)
   availableChannels: {
-    title: '可用渠道',
-    description: '查看您可访问的渠道与其支持的模型、定价',
-    searchPlaceholder: '搜索渠道或模型...',
-    empty: '暂无可用渠道',
-    noModels: '未配置模型',
-    noPricing: '未配置定价',
-    channel: '渠道',
-    visible: '可见状态',
-    groupsTitle: '可访问分组',
-    modelsTitle: '支持模型',
-    platformSectionTitle: '平台下的可用分组',
-    groupModelsTitle: '本分组支持模型',
-    exclusive: '专属',
-    public: '公开',
-    subscription: '订阅',
-    exclusiveTooltip: '管理员授权给你的专属分组',
-    publicTooltip: '对所有用户公开的分组',
+    title: '可用模型与价格',
+    eyebrow: '模型核对',
+    description: '官方满血模型、可用分组、支持模型和价格倍率集中展示；不掺水，价格可核对。',
+    assurance: '模型来源、可用分组、价格倍率和支持模型直接展示；100% 官方满血，永远不掺水。',
+    trustSignals: {
+      full: '100% 官方满血',
+      stable: '永远不掺水',
+      noRetention: '不保存聊天对话',
+      privacy: '不主动泄漏信息',
+      transparent: '价格和倍率可核对',
+      billing: '异常扣费包赔'
+    },
+    searchPlaceholder: '搜索模型、分组或服务...',
+    empty: '暂无匹配的模型或服务',
+    noModels: '暂无可用模型',
+    noPricing: '暂无价格信息',
+    channel: '模型来源',
+    visible: '你可用',
+    defaultServiceDescription: '该模型来源当前可用，分组、倍率和支持模型集中展示。',
+    serviceSummary: '服务概览',
+    groupsTitle: '可用分组',
+    modelsTitle: '可用模型',
+    platformSectionTitle: '可用分组',
+    groupModelsTitle: '可用模型',
+    exclusive: '专属可用',
+    public: '公开可用',
+    subscription: '订阅可用',
+    exclusiveTooltip: '已为你开通的专属服务',
+    publicTooltip: '当前公开可用的服务',
     stats: {
-      channels: '渠道',
+      channels: '模型来源',
       platforms: '平台',
-      groups: '分组',
-      models: '模型'
+      groups: '可用分组',
+      models: '可用模型'
     },
     columns: {
-      name: '渠道名',
+      name: '服务名',
       description: '描述',
-      platform: '平台',
-      groups: '我可访问的分组',
+      platform: '模型服务',
+      groups: '服务档位',
       supportedModels: '支持模型'
     },
     pricing: {
-      billingMode: '计费模式',
-      billingModeToken: '按 Token',
+      billingMode: '计价方式',
+      billingModeToken: '按 token',
       billingModePerRequest: '按次',
       billingModeImage: '按图片',
       inputPrice: '输入',
@@ -1517,7 +1819,7 @@ export default {
       cacheReadPrice: '缓存读取',
       imageOutputPrice: '图片输出',
       perRequestPrice: '每次请求',
-      intervals: '阶梯定价',
+      intervals: '阶梯价格',
       unitPerMillion: '/ 1M token',
       unitPerRequest: '/ 次'
     }
@@ -1525,7 +1827,7 @@ export default {
 
   affiliate: {
     title: '邀请返利',
-    description: '把真正便宜、好用、少折腾的 AI API 分享给朋友，好友充值后你还能获得返利',
+    description: '邀请链接、返利比例、可转余额和邀请记录集中展示，官方满血、隐私边界和异常扣费包赔口径也保持一致。',
     yourCode: '我的邀请码',
     inviteLink: '邀请链接',
     copyCode: '复制邀请码',
@@ -1541,26 +1843,26 @@ export default {
       invitedUsers: '邀请人数',
       invitedUsersHint: '已经通过你的链接注册的用户',
       availableQuota: '可转返利额度',
-      availableQuotaHint: '可以随时转入账户余额继续使用',
+      availableQuotaHint: '可转入账户余额的返利额度',
       frozenQuota: '冻结中',
       frozenQuotaHint: '新产生的返利正在冻结期中',
       frozenQuotaLine: '另有 {amount} 正在冻结中',
       totalQuota: '历史返利额度',
-      totalQuotaHint: '累计帮你省下来的使用成本'
+      totalQuotaHint: '累计产生的返利额度'
     },
     hero: {
-      kicker: '推荐给朋友',
-      title: '把你正在用的 AI API 分享给朋友',
-      description: '朋友可以先用注册送额度试试看，觉得合适再充值；你也能在好友充值后获得返利额度，转入余额后继续使用。',
-      pillTrial: '注册送额度，先试再说',
-      pillCheap: '高频使用也不心疼',
-      pillStable: '少掉线，少折腾',
-      shareHint: '适合分享给正在用 Codex、Cursor、Claude、Gemini，或者经常调用 API 的朋友。'
+      kicker: '邀请体系',
+      title: '邀请链接和返利记录清楚可查',
+      description: '邀请链接、绑定状态、返利比例、冻结额度和可转余额集中展示，模型口径、隐私边界和扣费保障保持同一套说法。',
+      pillTrial: '体验额度可见',
+      pillCheap: '返利比例可查',
+      pillStable: '记录持续留痕',
+      shareHint: 'Codex、Cursor、Claude、Gemini 和 API 工具相关信息，以及官方满血、隐私和扣费口径集中展示。'
     },
     sharePanel: {
-      kicker: '你的专属邀请入口',
-      title: '复制链接就能发，不需要解释一堆配置',
-      description: '把邀请链接或下面的现成文案发给朋友即可。对方注册后可以先用赠送额度体验，绑定成功后你也能获得后续返利。'
+      kicker: '专属邀请信息',
+      title: '专属邀请信息',
+      description: '邀请链接、邀请码和可复制展示信息集中放在这里。'
     },
     transfer: {
       title: '返利额度转余额',
@@ -1571,16 +1873,16 @@ export default {
       success: '已转入余额：{amount}'
     },
     bind: {
-      title: '已有邀请码？先绑定，再领取礼包',
-      description: '如果你是朋友邀请来的，请在注册 1 天内填写邀请码。绑定成功后可在本页手动领取礼包，每个账号只能绑定一次。',
+      title: '已有邀请码？绑定后领取礼包',
+      description: '邀请绑定窗口为注册后 1 天内。绑定状态、礼包额度和领取记录会在这里展示。',
       codePlaceholder: '输入邀请码',
       bonusHint: '绑定成功后可手动领取 {amount}',
       button: '绑定邀请码',
       binding: '绑定中...',
       success: '邀请码绑定成功',
-      successWithBonus: '邀请码绑定成功，请手动领取礼包',
+      successWithBonus: '邀请码绑定成功，礼包状态已更新',
       claimTitle: '领取绑定礼包',
-      claimDescription: '你已绑定邀请人，并且仍在新用户领取时间内。点击领取后，{amount} 会直接加入账户余额。',
+      claimDescription: '当前账号已绑定邀请人，{amount} 领取后会加入账户余额。',
       claimButton: '领取 {amount}',
       claiming: '领取中...',
       claimSuccess: '绑定礼包已领取：{amount}',
@@ -1604,106 +1906,130 @@ export default {
     },
     rules: {
       title: '返利规则说明',
-      line1: '将邀请码或邀请链接分享给新用户。',
+      line1: '邀请码和邀请链接会记录邀请关系。',
       line2: '被邀请用户充值后，你可获得 {rate} 的返利额度。',
       durationPermanent: '返利有效期：永久有效。好友绑定后，后续充值都会按当前规则产生返利。',
       durationLimited: '返利有效期：好友注册后 {days} 天内的充值会产生返利，超过后充值不再产生返利。',
-      line4: '返利额度可随时转入账户余额继续使用。',
+      line4: '可用返利额度可转入账户余额。',
       line5: '新产生的返利需要经过冻结期后才能转入余额。'
     },
     friendBenefits: {
-      kicker: '朋友能获得什么',
-      title: '发给朋友时，可以直接讲这些好处',
-      description: '不用让朋友先理解复杂配置，先告诉他：可以试、够便宜、模型多、日常使用更省心。',
-      trialTitle: '先试再充值',
-      trialDescription: '新用户注册后有赠送额度，朋友可以先跑起来，再决定是否继续使用。',
-      valueTitle: '长期用更省',
-      valueDescription: '特价分组适合高频使用，写代码、跑工具、日常问答都不会太心疼。',
-      stabilityTitle: '日常更省心',
-      stabilityDescription: '独家调度算法尽量减少不可用和频繁切换，适合持续使用。',
-      rangeTitle: '模型覆盖更全',
-      rangeDescription: 'GPT、Claude、Gemini 和图像模型都能用，朋友不用反复切换多个平台。'
+      kicker: '邀请权益',
+      title: '邀请权益',
+      description: '体验额度、模型覆盖、价格记录、服务状态和平台保障集中展示。',
+      trialTitle: '体验额度',
+      trialDescription: '体验额度和余额变动会显示在账户记录中。',
+      valueTitle: '价格透明',
+      valueDescription: '服务档位、模型价格、倍率和扣费记录集中展示。',
+      stabilityTitle: '状态可见',
+      stabilityDescription: '模型服务状态和近期可用性保持可查。',
+      rangeTitle: '模型覆盖',
+      rangeDescription: 'GPT、Claude、Gemini 和图像模型统一呈现。'
     },
     audiences: {
-      kicker: '按场景复制文案',
-      title: '不知道怎么开口，就直接复制这一段',
-      description: '不同朋友的使用场景不一样，选择最接近的一段发出去即可。',
-      copyButton: '复制这段',
-      copied: '分享话术已复制',
+      kicker: '可复制展示信息',
+      title: '可复制展示信息',
+      description: '围绕模型覆盖、价格记录、服务状态和平台保障的展示文案。',
+      copyButton: '复制文案',
+      copied: '文案已复制',
       developerTitle: '给开发者 / Codex 用户',
-      developerDescription: '适合正在用 Codex、Cursor、Cline 或自己接 API 的朋友。',
-      developerCopy: '我最近在用这个 API 站跑 Codex / Cursor，比自己到处配 Key 省心很多。支持 GPT、Claude、Gemini，特价分组高频用也不心疼，注册送额度可以先试：{link}',
+      developerDescription: '适合 Codex、Cursor、Cline 或 API 工具场景。',
+      developerCopy: '这个平台支持 GPT、Claude、Gemini 和 API 工具接入，100% 官方满血，不保存用户聊天对话，用户信息不对外泄露，模型状态、价格和用量记录可查。通过我的邀请链接注册后可查看体验额度和返利权益：{link}',
       heavyUserTitle: '给重度 GPT 用户',
-      heavyUserDescription: '适合每天都会用 GPT、Claude 或 Gemini 的朋友。',
-      heavyUserCopy: '如果你现在 GPT 用得很多，可以试试这个站。我自己用了几天，注册送额度还没用完，特价分组比直接硬冲官方划算很多，日常稳定性也不错：{link}',
+      heavyUserDescription: '适合持续使用 GPT、Claude 或 Gemini 的场景。',
+      heavyUserCopy: '这个平台支持 GPT、Claude、Gemini 和生图，100% 官方满血，不保存用户聊天对话，用户信息不对外泄露，模型状态、价格和用量记录可查。通过我的邀请链接注册后可查看体验额度和返利权益：{link}',
       newcomerTitle: '给刚想尝试 AI 的朋友',
-      newcomerDescription: '适合刚想试 GPT / Claude、但不想一上来充值的朋友。',
-      newcomerCopy: '你要是想试 GPT / Claude，可以先用这个，不用一上来充值，注册会送额度。会用普通聊天工具就能开始，用我的邀请链接注册后输入邀请码还能获得更多额度：{link}',
+      newcomerDescription: '适合查看模型覆盖、体验额度和账户记录的场景。',
+      newcomerCopy: '这个平台把 GPT、Claude、Gemini 和生图放在一个账户里，100% 官方满血，不保存用户聊天对话，用户信息不对外泄露，模型状态、价格和用量记录可查。通过我的邀请链接注册后可查看体验额度和返利权益：{link}',
       groupTitle: '发到群里 / 社区',
-      groupDescription: '适合发到开发者群、工具群或 AI 交流群。',
-      groupCopy: '最近发现一个适合高频 AI 使用的 API 站，注册送额度，特价分组很便宜，支持 GPT / Claude / Gemini / 生图，适合 Codex、Cursor 和各种 API 工具。想试的可以走我的邀请链接：{link}'
+      groupDescription: '适合开发者群、工具群或 AI 交流群展示。',
+      groupCopy: '这个平台支持 GPT、Claude、Gemini 和生图，100% 官方满血，不保存用户聊天对话，用户信息不对外泄露，模型状态、价格和用量记录可查，也支持 Codex、Cursor 和 API 工具接入。通过我的邀请链接注册后可查看体验额度和返利权益：{link}'
     },
     promo: {
-      kicker: '分享给朋友的现成文案',
-      title: 'GPT 自由，其实没你想的那么贵',
-      description: '本站注册送额度，很多用户用了三天都还没用完。特价分组便宜到离谱，长期用甚至比 DeepSeek 还划算，还支持 GPT、Claude、Gemini 和图像模型。独家调度算法保障稳定性，日常使用少掉线、少折腾。',
-      highlightTrial: '注册送额度，先白嫖体验',
-      highlightCheap: '特价分组很便宜，GPT 也能当日常工具',
-      highlightRouting: '独家调度算法，稳定性极佳',
+      kicker: '可复制展示信息',
+      title: '模型、价格和记录都在明处',
+      description: '平台支持 GPT、Claude、Gemini 和图像模型，100% 官方满血，不保存用户聊天对话，用户信息不对外泄露，模型状态、价格、余额和用量记录集中展示。',
+      highlightTrial: '体验额度可见',
+      highlightCheap: '价格和倍率可查',
+      highlightRouting: '服务状态可见',
       previewTitle: '默认分享文案',
-      copyButton: '复制宣传文案',
-      copied: '宣传文案已复制',
-      shareText: '我最近基本 GPT 自由了。这个站注册送额度，我用了几天都没用完；特价分组便宜到适合长期高频用，比直接硬冲官方省很多，还支持 GPT、Claude、Gemini 和生图。日常用起来少掉线、少折腾。用我的邀请链接注册，输入后获得更多额度：{link}'
+      copyButton: '复制文案',
+      copied: '文案已复制',
+      shareText: '这个平台支持 GPT、Claude、Gemini 和生图，100% 官方满血，不保存用户聊天对话，用户信息不对外泄露，模型状态、价格和用量记录可查。通过我的邀请链接注册后可查看体验额度和返利权益：{link}'
     }
   },
 
   // Redeem
   redeem: {
     title: '兑换码',
-    description: '输入兑换码以充值余额或增加并发数',
+    description: '兑换权益、余额变化和历史记录集中展示。权益到账、订阅分配和异常处理都有记录可核对。',
+    trust: {
+      transparentBalance: '余额清楚',
+      transparentBalanceDesc: '兑换后的余额、并发和订阅权益会同步展示。',
+      auditableHistory: '记录留痕',
+      auditableHistoryDesc: '历史兑换、平台调整和订阅分配会保留在记录中。',
+      recoverableIssues: '异常可追溯',
+      recoverableIssuesDesc: '兑换失败或权益异常时，可按记录定位处理。'
+    },
     currentBalance: '当前余额',
     concurrency: '并发数',
     requests: '请求',
     redeemCodeLabel: '兑换码',
-    redeemCodePlaceholder: '请输入兑换码',
+    redeemCodePlaceholder: '兑换码',
     redeemCodeHint: '兑换码区分大小写',
-    redeeming: '兑换中...',
-    redeemButton: '兑换',
-    redeemSuccess: '兑换成功！',
-    redeemFailed: '兑换失败',
+    redeeming: '处理中',
+    redeemButton: '确认兑换',
+    redeemSuccess: '兑换已完成',
+    redeemFailed: '兑换未完成',
     added: '已添加',
     concurrentRequests: '并发请求',
     newBalance: '新余额',
     newConcurrency: '新并发数',
-    aboutCodes: '关于兑换码',
+    aboutCodes: '兑换保障',
+    assurance: {
+      official: '官方满血模型，永远不掺水。',
+      singleUse: '每个兑换码只会结算一次。',
+      coverage: '余额、并发和订阅权益使用同一套记录口径。',
+      privacy: '不保存用户聊天对话，不主动泄漏用户信息。',
+      instantUpdate: '兑换成功后账户状态会即时更新。'
+    },
+    contactLine: '支持联系',
     codeRule1: '每个兑换码只能使用一次',
     codeRule2: '兑换码可以增加余额、并发数或试用权限',
     codeRule3: '如有兑换问题，请联系客服',
     codeRule4: '余额和并发数即时更新',
     recentActivity: '最近活动',
-    historyWillAppear: '您的兑换历史将显示在这里',
+    historyWillAppear: '兑换历史会显示在这里',
     balanceAddedRedeem: '余额充值（兑换）',
     balanceAddedAffiliate: '余额充值（返利转入）',
-    balanceAddedAdmin: '余额充值（管理员）',
-    balanceDeductedAdmin: '余额扣除（管理员）',
+    balanceAddedAdmin: '余额充值（平台调整）',
+    balanceDeductedAdmin: '余额扣除（平台调整）',
     concurrencyAddedRedeem: '并发增加（兑换）',
-    concurrencyAddedAdmin: '并发增加（管理员）',
-    concurrencyReducedAdmin: '并发减少（管理员）',
-    adminAdjustment: '管理员调整',
+    concurrencyAddedAdmin: '并发增加（平台调整）',
+    concurrencyReducedAdmin: '并发减少（平台调整）',
+    adminAdjustment: '平台调整',
     subscriptionAssigned: '订阅已分配',
-    subscriptionAssignedDesc: '您已获得 {groupName} 的访问权限',
+    subscriptionAssignedDesc: '您已获得 {groupName} 的服务权限',
     subscriptionDays: '{days} 天',
     days: '天',
-    codeRedeemSuccess: '兑换成功！',
-    failedToRedeem: '兑换失败，请检查兑换码后重试。',
+    codeRedeemSuccess: '兑换已完成',
+    failedToRedeem: '兑换未完成，兑换码或当前权益状态未通过校验。',
     subscriptionRefreshFailed: '兑换成功，但订阅状态刷新失败。',
-    pleaseEnterCode: '请输入兑换码'
+    pleaseEnterCode: '兑换码不能为空'
   },
 
   // Profile
   profile: {
     title: '个人设置',
-    description: '管理您的账户信息和设置',
+    description: '账户资料、登录绑定、安全设置和提醒状态集中展示。',
+    trust: {
+      privacyBoundary: '隐私边界',
+      privacyBoundaryDesc: '第三方资料来源只显示必要状态，不展示登录凭据。',
+      auditableBindings: '绑定可核对',
+      auditableBindingsDesc: '邮箱和登录方式的绑定状态集中展示，变更更清楚。',
+      accountSecurity: '账户安全',
+      accountSecurityDesc: '密码、余额提醒和双因素认证保持在账户侧处理。'
+    },
     accountBalance: '账户余额',
     concurrencyLimit: '并发限制',
     rpmLimit: 'RPM 限制',
@@ -1714,10 +2040,10 @@ export default {
     basicsTitle: '资料与头像',
     basicsDescription: '维护公开展示信息，并保持头像与昵称风格一致。',
     linkedProfileSources: '资料来源',
-    linkedProfileSourcesDescription: '部分头像和昵称可能同步自第三方登录方式。',
+    linkedProfileSourcesDescription: '部分头像和昵称按第三方登录方式同步展示。',
     securityTitle: '安全设置',
     securityDescription: '密码、双因素认证和通知提醒集中放在右侧。',
-    administrator: '管理员',
+    administrator: '平台支持',
     user: '用户',
     username: '用户名',
     email: '邮箱',
@@ -1752,7 +2078,7 @@ export default {
       enable: '启用',
       disable: '禁用',
       featureDisabled: '功能未开放',
-      featureDisabledHint: '管理员尚未开放双因素认证功能',
+      featureDisabledHint: '双因素认证暂未开放',
       setupTitle: '设置双因素认证',
       setupStep1: '使用认证器应用扫描下方二维码',
       setupStep2: '输入应用显示的 6 位验证码',
@@ -1763,17 +2089,17 @@ export default {
       verifyFailed: '验证码错误，请重试',
       enableSuccess: '双因素认证已启用',
       disableTitle: '禁用双因素认证',
-      disableWarning: '禁用后，登录时将不再需要验证码。这可能会降低您的账户安全性。',
+      disableWarning: '禁用后，登录时将不再需要验证码，登录保护状态会同步更新。',
       enterPassword: '请输入当前密码确认',
       confirmDisable: '确认禁用',
       disableSuccess: '双因素认证已禁用',
       disableFailed: '禁用失败，请检查密码是否正确',
       loginTitle: '双因素认证',
-      loginHint: '请输入您认证器应用显示的 6 位验证码',
-      loginFailed: '验证失败，请重试',
+      loginHint: '认证器应用中的 6 位验证码',
+      loginFailed: '验证未通过',
       // New translations for email verification
-      verifyEmailFirst: '请先验证您的邮箱',
-      verifyPasswordFirst: '请先验证您的身份',
+      verifyEmailFirst: '邮箱验证完成后可继续',
+      verifyPasswordFirst: '身份验证完成后可继续',
       emailCode: '邮箱验证码',
       enterEmailCode: '请输入 6 位验证码',
       sendCode: '发送验证码',
@@ -1789,7 +2115,7 @@ export default {
       thresholdPlaceholder: '输入金额',
       systemDefault: '系统默认值',
       extraEmails: '通知邮箱',
-      extraEmailsHint: '必须添加并验证邮箱后，余额不足时才能收到提醒邮件',
+      extraEmailsHint: '已验证邮箱会接收余额不足提醒邮件',
       primaryEmail: '主邮箱',
       noExtraEmails: '暂无额外通知邮箱',
       enterEmail: '输入邮箱地址',
@@ -1817,7 +2143,7 @@ export default {
       description: '仅支持上传头像图片；静态图片会自动压缩到 20KB 以内后再保存。',
       uploadAction: '上传图片',
       uploadHint: '上传图片时会自动压缩静态图片到 20KB 以内，GIF 需自行控制在 20KB 以内',
-      uploadRequired: '请先上传头像图片',
+      uploadRequired: '请选择头像图片',
       saveSuccess: '头像已更新',
       deleteSuccess: '头像已删除',
       invalidType: '请选择图片文件',
@@ -1859,8 +2185,8 @@ export default {
       },
       notes: {
         emailManagedFromProfile: '主邮箱在资料表单中管理',
-        canUnbind: '你可以解绑这个登录方式。',
-        bindAnotherBeforeUnbind: '请先绑定其他登录方式，再解除当前绑定。',
+        canUnbind: '此登录方式支持解除绑定。',
+        bindAnotherBeforeUnbind: '保留至少一种登录方式后，可解除当前绑定。',
       },
       source: {
         avatar: '头像当前来自 {providerName}',
@@ -1901,6 +2227,9 @@ export default {
   errors: {
     somethingWentWrong: '出错了',
     pageNotFound: '页面未找到',
+    pageNotFoundDescription: '你访问的页面不存在，或已经被移动。',
+    goBack: '返回上一页',
+    goHome: '回到首页',
     unauthorized: '未授权',
     forbidden: '禁止访问',
     serverError: '服务器错误',
@@ -3442,7 +3771,7 @@ export default {
         apiModeChatCompletions: 'OpenAI Compatible',
         apiModeChatCompletionsHint: '使用 /v1/chat/completions，发送 messages；适合大多数兼容站。',
         apiModeResponses: 'Responses API',
-        apiModeResponsesHint: '使用 /v1/responses，默认带 instructions + input；适合本站自检/Codex。',
+        apiModeResponsesHint: '使用 /v1/responses，默认带 instructions + input；适合平台自检/Codex。',
         endpoint: '上游地址',
         endpointPlaceholder: 'https://api.example.com',
         useCurrentDomain: '使用当前服务',
@@ -4035,7 +4364,7 @@ export default {
         unlimited: '无限制'
       },
       ineligibleWarning:
-        '该账号无 Antigravity 使用权限，但仍能进行 API 转发。继续使用请自行承担风险。',
+        '该账号无 Antigravity 使用权限，但 API 转发仍可用，账号测试结果已标记该状态。',
       forbidden: '已封禁',
       forbiddenValidation: '需要验证',
       forbiddenViolation: '违规封禁',
@@ -5222,7 +5551,7 @@ export default {
       generatedSuccessfully: '生成成功',
       codesCreated: '已创建 {count} 个兑换码',
       codeType: '类型',
-      amount: '站内余额金额',
+      amount: '账户余额金额',
       value: '面值',
       count: '数量',
       generate: '生成',
@@ -5258,7 +5587,7 @@ export default {
         selectType: '选择类型',
         valueLabel: '面值',
         valuePlaceholder: '请输入面值',
-        balanceHint: '余额兑换码按站内余额一比一到账，例如 10 元卡填写 10',
+        balanceHint: '余额兑换码按账户余额一比一到账，例如 10 元卡填写 10',
         concurrencyHint: '并发数增量',
         countLabel: '数量',
         countPlaceholder: '请输入数量',
@@ -6858,7 +7187,7 @@ export default {
         siteSubtitleHint: '显示在登录和注册页面',
         siteSubtitlePlaceholder: '订阅转 API 转换平台',
         apiBaseUrl: 'API 端点地址',
-        apiBaseUrlHint: '用于"使用密钥"和"导入到 CC Switch"功能，留空则使用当前站点地址',
+        apiBaseUrlHint: '用于"客户端配置"和"CC Switch 配置"功能，留空则使用当前站点地址',
         apiBaseUrlPlaceholder: 'https://api.example.com',
         tablePreferencesTitle: '通用表格设置',
         tablePreferencesDescription: '设置后台与用户侧表格组件的默认分页行为',
@@ -6902,7 +7231,7 @@ export default {
         homeContentIframeWarning:
           '⚠️ iframe 模式提示：部分网站设置了 X-Frame-Options 或 CSP 安全策略，禁止被嵌入到 iframe 中。如果页面显示空白或报错，请确认目标网站允许被嵌入，或考虑使用 HTML 模式自行构建页面内容。',
         hideCcsImportButton: '隐藏 CC Switch 导入按钮',
-        hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入到 CC Switch"按钮'
+        hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"CC Switch 配置"按钮'
       },
       purchase: {
         title: '充值/订阅页面',
@@ -6957,8 +7286,8 @@ export default {
         maxAmount: '最高金额',
         dailyLimit: '每日限额',
         balanceRechargeMultiplier: '余额官方等价汇率',
-        balanceRechargeMultiplierHint: '用于把站内余额展示为官方人民币等价金额，不影响实际充值到账；充值与卡密面值均按站内余额一比一到账。',
-        balanceRechargePreview: '预览：1 站内余额 ≈ 官方 ¥{cny}',
+        balanceRechargeMultiplierHint: '用于把账户余额展示为官方人民币等价金额，不影响实际充值到账；充值与卡密面值均按账户余额一比一到账。',
+        balanceRechargePreview: '预览：1 账户余额 ≈ 官方 ¥{cny}',
         balanceRechargeChangeHint: '修改后只影响前端等价展示，不会改动用户余额或历史订单。',
         rechargeFeeRate: '充值手续费率',
         rechargeFeeRateHint: '用户充值时额外收取的手续费百分比，0 表示不收取手续费',
@@ -7712,28 +8041,41 @@ export default {
   // Recharge / Subscription Page
   purchase: {
     title: '充值/订阅',
-    description: '通过内嵌页面完成充值/订阅',
+    description: '选择余额或套餐，使用 100% 官方满血模型能力，永远不掺水。支付、到账、订阅和售后记录全程可追溯。',
     openInNewTab: '新窗口打开',
     notEnabledTitle: '该功能未开启',
-    notEnabledDesc: '管理员暂未开启充值/订阅入口，请联系管理员。',
-    notConfiguredTitle: '充值/订阅链接未配置',
-    notConfiguredDesc: '管理员已开启入口，但尚未配置充值/订阅链接，请联系管理员。'
+    notEnabledDesc: '充值/订阅入口暂未开放。',
+    notConfiguredTitle: '充值/订阅入口暂未开放',
+    notConfiguredDesc: '充值/订阅入口暂时不可用。'
   },
 
   // Custom Page (iframe embed)
   customPage: {
     title: '自定义页面',
+    defaultTitle: '内容',
+    toc: '目录',
+    openToc: '打开目录',
+    collapseToc: '收起目录',
+    loading: '正在读取内容',
+    unavailableTitle: '内容暂不可用',
+    unavailableDesc: '当前内容暂时无法显示。',
+    markdownNotFoundDesc: '这份内容暂时无法显示。',
+    markdownLoadFailedTitle: '内容读取失败',
+    markdownLoadFailedDesc: '请稍后再试。',
+    copyCode: '复制',
+    copiedCode: '已复制',
+    copyFailed: '复制失败',
     openInNewTab: '新窗口打开',
     notFoundTitle: '页面不存在',
     notFoundDesc: '该自定义页面不存在或已被删除。',
-    notConfiguredTitle: '页面链接未配置',
-    notConfiguredDesc: '该自定义页面的 URL 未正确配置。',
+    notConfiguredTitle: '页面暂不可用',
+    notConfiguredDesc: '该页面暂时不可访问。',
   },
 
   // Announcements Page
   announcements: {
     title: '公告',
-    description: '查看系统公告',
+    description: '重要更新会集中显示在这里。',
     unreadOnly: '仅显示未读',
     markRead: '标记已读',
     markAllRead: '全部已读',
@@ -7749,22 +8091,23 @@ export default {
     empty: '暂无公告',
     emptyUnread: '暂无未读公告',
     total: '条公告',
-    emptyDescription: '暂时没有任何系统公告',
-    readStatus: '您已阅读此公告',
-    markReadHint: '点击"已读"标记此公告'
+    emptyDescription: '重要更新会出现在这里。',
+    readStatus: '此公告已读',
+    markReadHint: '确认后此公告会归入已读'
   },
 
   // Tickets Page
   tickets: {
     title: '工单',
-    description: '提交问题并查看客服回复',
+    description: '用量、订单、账户和异常问题在这里保留沟通记录。',
+    assurance: '用量、订单和异常记录可以随工单一起核对；附件仅用于当前问题处理，异常扣费会按记录追溯。',
     searchPlaceholder: '搜索工单标题或编号...',
     createTicket: '创建工单',
     submitTicket: '提交工单',
     viewDetail: '查看',
     detailTitle: '工单详情',
     empty: '暂无工单',
-    emptyDescription: '遇到问题时可以创建工单，管理员会在这里回复你。',
+    emptyDescription: '工单沟通记录会显示在这里。',
     unreadCount: '{count} 条未读',
     noUnread: '无未读',
     lastMessageAt: '最后消息',
@@ -7774,7 +8117,10 @@ export default {
       namePlaceholder: '名称',
       urlPlaceholder: 'https://... 或选择图片',
       chooseImage: '选择图片',
-      imageSelected: '已选择图片'
+      imageSelected: '已选择图片',
+      invalidImage: '请选择 PNG、JPG、WebP 或 GIF 图片',
+      imageTooLarge: '图片不能超过 {size}MB',
+      readFailed: '读取所选图片失败'
     },
     replyAttachments: {
       title: '附件',
@@ -7782,17 +8128,25 @@ export default {
       namePlaceholder: '名称',
       urlPlaceholder: 'https://... 或选择图片',
       chooseImage: '选择图片',
-      imageSelected: '已选择图片'
+      imageSelected: '已选择图片',
+      invalidImage: '请选择 PNG、JPG、WebP 或 GIF 图片',
+      imageTooLarge: '图片不能超过 {size}MB',
+      readFailed: '读取所选图片失败'
+    },
+    trust: {
+      privacy: '附件仅用于当前问题',
+      billing: '异常扣费按记录包赔',
+      traceable: '用量和订单可追溯'
     },
     context: {
       general: '关联上下文',
       usage: '用量记录',
       order: '订单',
-      api_key: 'API Key'
+      api_key: '访问凭证'
     },
     closeTicket: '关闭工单',
     reopenTicket: '重新打开',
-    closedReplyHint: '该工单已关闭，如需继续沟通请先重新打开。',
+    closedReplyHint: '该工单已关闭，重新打开后可继续沟通。',
     reply: '回复',
     replyPlaceholder: '补充问题、截图链接或新的排查信息...',
     sendReply: '发送回复',
@@ -7815,20 +8169,21 @@ export default {
     },
     form: {
       template: '问题类型',
-      superAdminHint: '该类型普通客服无法直接处理，会自动升级给超级管理员并发送邮件提醒。',
+      superAdminHint: '该类型会进入专项支持队列，并发送邮件提醒。',
       subject: '主题',
       category: '分类',
       priority: '优先级',
       body: '问题描述',
-      bodyPlaceholder: '请尽量说明你遇到的问题、请求 ID、时间范围或相关截图链接。',
+      bodyPlaceholder: '请说明你遇到的问题、请求 ID、时间范围或相关截图链接。',
+      privacyNote: '提交内容和附件只用于本次问题处理。涉及用量或扣费时，关联记录会帮助定位时间、模型与金额。',
       bodyMinLength: '请至少填写 {count} 个字，描述越具体处理越快。',
-      imagePlaceholder: '也可以粘贴支付宝/微信截图或报错截图的图片链接',
+      imagePlaceholder: '也可以粘贴支付宝/微信截图或问题截图的图片链接',
       chooseImage: '选择图片',
       imageSelected: '已选择图片',
       viewImage: '查看图片',
       amountPlaceholder: '请输入未到账金额',
       orderAmount: '到账金额 {amount}，支付金额 {pay}',
-      noRecentOrders: '未找到最近充值记录，请在描述中补充订单号和付款时间。',
+      noRecentOrders: '未找到最近充值记录，描述中可补充订单号和付款时间。',
       contextType: '关联类型',
       contextTypePlaceholder: 'usage / order / api_key',
       contextId: '关联 ID',
@@ -7863,7 +8218,7 @@ export default {
     sender: {
       user: '我',
       admin: '客服',
-      system: '系统'
+      system: '平台'
     },
     errors: {
       requiredFields: '请填写主题和问题描述',
@@ -7882,7 +8237,7 @@ export default {
       imageTooLarge: '图片不能超过 {size}MB',
       imageReadFailed: '读取图片失败，请重新选择',
       TICKET_ATTACHMENT_INVALID: '附件名称和链接必须有效，图片最大 2MB，最多 5 个',
-      TICKET_CLOSED: '工单已关闭，请先重新打开',
+      TICKET_CLOSED: '工单已关闭，重新打开后可继续沟通',
       TICKET_NOT_FOUND: '工单不存在'
     }
   },
@@ -7903,15 +8258,188 @@ export default {
       INVOICE_REJECT_REASON_REQUIRED: '驳回时需要填写原因',
       USER_NOT_FOUND: '用户不存在或已被禁用',
     },
+    page: {
+      title: '发票',
+      description: '符合条件的充值订单、电子发票申请和处理进度集中保留，金额口径清楚可核对。',
+      notice: '已完成的余额充值订单可用于电子发票申请。处理中和已完成的申请会占用可申请额度，已驳回或已取消的申请会释放额度。',
+      trust: {
+        eligibleOrders: '订单金额清楚',
+        amountReserved: '额度占用透明',
+        requestTrace: '进度可追踪',
+        privacy: '仅保留开票上下文',
+      },
+      stats: {
+        totalOrders: '充值订单',
+        availableOnPage: '本页可申请',
+        availableAmount: '可申请金额',
+        lockedAmount: '已占用金额',
+        unavailableOnPage: '本页暂不可用',
+      },
+      orders: {
+        title: '选择订单',
+        description: '已完成的余额充值订单会按可申请金额展示，方便核对本次发票金额。',
+        keywordLabel: '订单号 / 交易单号',
+        keywordPlaceholder: '搜索订单号',
+        statusLabel: '支付状态',
+        invoiceabilityLabel: '可申请状态',
+        startDate: '开始时间',
+        endDate: '结束时间',
+        emptyTitle: '暂无符合条件的订单',
+        emptyDescription: '符合条件的订单会显示在这里。',
+        columns: {
+          orderId: '订单号',
+          tradeNo: '交易单号',
+          amount: '可申请金额',
+          fee: '手续费',
+          method: '支付方式',
+          status: '支付状态',
+          paidAt: '支付时间',
+          invoiceability: '可申请状态',
+          reason: '原因',
+        },
+        invoiceability: {
+          available: '可申请',
+          unavailable: '暂不可用',
+        },
+      },
+      form: {
+        title: '发票信息',
+        selectedSummary: '已选 {count} 笔订单 · {amount}',
+        saveTemplate: '保存开票信息',
+        limitHint: '最低开票金额 {min}，当前可申请 {available}。',
+        taxHint: '完成开票时预计扣除税点/服务费 {tax}（{rate}%）。',
+        templateLabel: '选择模板',
+        noTemplate: '不使用模板',
+        noTemplates: '暂无模板',
+        defaultSuffix: '（默认）',
+        updateTemplate: '更新开票信息',
+        setDefault: '设为默认',
+        deleteTemplate: '删除',
+        typeLabel: '发票类型',
+        amountLabel: '开票金额',
+        amountPlaceholder: '500.00',
+        titleLabel: '发票抬头',
+        titlePlaceholder: '公司全称或个人姓名',
+        taxIdLabel: '税号',
+        taxIdPlaceholder: '纳税人识别号',
+        itemNameLabel: '开票项目',
+        itemNamePlaceholder: '信息技术服务费',
+        receiverEmailLabel: '接收邮箱',
+        receiverEmailPlaceholder: '接收电子发票的邮箱',
+        noteLabel: '备注',
+        notePlaceholder: '可选',
+        submitting: '处理中',
+        submit: '申请开票',
+        minimumNotMet: '当前可申请金额未达到起开金额。',
+        defaultItemName: '信息技术服务费',
+      },
+      records: {
+        title: '申请记录',
+        description: '发票申请状态、发票号码和备注会持续保留，便于后续核对。',
+        emptyTitle: '暂无申请记录',
+        emptyDescription: '提交后的开票申请会显示在这里。',
+        amountByTotal: '按金额',
+        cancel: '取消',
+        columns: {
+          title: '发票抬头',
+          type: '发票类型',
+          amount: '开票金额',
+          orderCount: '申请方式',
+          status: '状态',
+          number: '发票号码',
+          submittedAt: '提交时间',
+          note: '备注',
+          actions: '操作',
+        },
+      },
+      dialog: {
+        createTitle: '保存开票模板',
+        updateTitle: '更新开票模板',
+        templateName: '模板名称',
+        templateNamePlaceholder: '默认模板',
+        defaultTemplateName: '默认模板',
+        defaultTemplate: '设为默认模板',
+      },
+      types: {
+        company_vat_general: '普通发票',
+        company_vat_special: '专用发票',
+        personal: '个人发票',
+      },
+      invoiceability: {
+        all: '全部订单',
+        available: '可申请',
+        unavailable: '暂不可申请',
+      },
+      reasons: {
+        notBalance: '非余额充值订单',
+        notCompleted: '订单未完成',
+        zeroAmount: '订单金额为 0',
+      },
+      status: {
+        pending: '待确认',
+        approved: '已确认',
+        rejected: '已驳回',
+        completed: '已完成',
+        cancelled: '已取消',
+      },
+      messages: {
+        loadSummaryFailed: '加载开票额度失败',
+        loadInvoicesFailed: '加载开票申请失败',
+        loadOrdersFailed: '加载订单失败',
+        loadTemplatesFailed: '加载开票模板失败',
+        submitSuccess: '开票申请已提交',
+        submitFailed: '提交申请失败',
+        cancelSuccess: '已取消开票申请',
+        cancelFailed: '取消失败',
+        templateUpdated: '开票模板已更新',
+        templateSaved: '开票模板已保存',
+        saveTemplateFailed: '保存开票模板失败',
+        defaultTemplateUpdated: '默认模板已更新',
+        defaultTemplateFailed: '设置默认模板失败',
+        deleteTemplateConfirm: '删除这个开票模板？',
+        templateDeleted: '开票模板已删除',
+        deleteTemplateFailed: '删除开票模板失败',
+      },
+    },
+  },
+
+  userOrders: {
+    description: '每笔支付都会保留金额、方式、到账结果和售后上下文。官方满血模型永远不掺水，异常扣费按记录核对，确认后包赔。',
+    newOrder: '充值 / 订阅',
+    statusFilter: '订单状态',
+    cancelDescription: '取消后本次支付会结束，订单记录仍会保留用于核对。',
+    refundNote: '退款说明',
+    refundNotePlaceholder: '金额、订单或到账情况',
+    trust: {
+      amount: '金额口径清楚',
+      status: '状态全程留痕',
+      privacy: '不保存聊天对话',
+      support: '异常扣费包赔',
+    },
+    summary: {
+      label: '订单记录摘要',
+      total: '全部记录',
+      totalHint: '跨页保留，方便长期核对。',
+      currentPage: '当前页记录',
+      currentPageHint: '本页订单金额和状态可直接对照。',
+      completedOnPage: '本页已完成',
+      completedOnPageHint: '已完成订单可与到账记录核对。',
+    },
   },
 
   // User Subscriptions Page
   userSubscriptions: {
     title: '我的订阅',
-    description: '查看您的订阅计划和用量',
+    description: '查看当前套餐、用量窗口和到期时间。100% 官方满血模型能力稳定提供，永远不掺水，订阅状态随订单同步保留。',
     noActiveSubscriptions: '暂无有效订阅',
-    noActiveSubscriptionsDesc: '您没有任何有效订阅。请联系管理员获取订阅。',
+    noActiveSubscriptionsDesc: '订阅生效、到期和用量窗口记录会显示在这里。',
     failedToLoad: '加载订阅失败',
+    trust: {
+      status: '官方满血模型',
+      usageWindow: '用量窗口清晰',
+      privacy: '不保存聊天对话',
+      resetRecord: '稳定性行业内极佳',
+    },
     status: {
       active: '有效',
       expired: '已过期',
@@ -7919,9 +8447,9 @@ export default {
     },
     usage: '用量',
     expires: '到期时间',
-    noExpiration: '无到期时间',
+    noExpiration: '长期有效',
     unlimited: '无限制',
-    unlimitedDesc: '该订阅无用量限制',
+    unlimitedDesc: '该订阅未设置周期用量上限',
     daily: '每日',
     weekly: '每周',
     monthly: '每月',
@@ -7933,8 +8461,8 @@ export default {
     usageOf: '已用 {used} / {limit}',
     reset: '重置',
     resetTitle: '确认提前重置',
-    resetConfirm: '此操作将立即刷新当日额度，代价是扣除 {cost} 订阅时间。\n当前剩余：{before}\n重置后剩余：{after}\n确定继续？',
-    resetSuccess: '重置成功，已扣除 1 天，当前剩余 {days} 天',
+    resetConfirm: '提前刷新当日额度会扣除 {cost} 订阅时间。\n当前剩余：{before}\n重置后剩余：{after}\n确定继续？',
+    resetSuccess: '额度已重置，当前约剩余 {days} 天',
     resetFailed: '重置失败',
     resetError: {
       timeInsufficient: '剩余时间不足 1 天，无法重置',
@@ -7943,7 +8471,7 @@ export default {
       notFound: '订阅不存在',
     },
     autoResetLabel: '自动重置',
-    autoResetHint: '额度用完时自动重置，扣除相应订阅时长',
+    autoResetHint: '当日额度用完时自动刷新，并扣除相应订阅时长',
     autoResetEnabled: '已开启自动重置',
     autoResetDisabled: '已关闭自动重置',
     autoResetFailed: '切换自动重置失败',
@@ -7956,174 +8484,137 @@ export default {
 
   // Onboarding Tour
   onboarding: {
-    restartTour: '重新查看新手引导',
+    restartTour: '配置向导',
     dontShowAgain: '不再提示',
-    dontShowAgainTitle: '永久关闭新手引导',
-    confirmDontShow: '确定不再显示新手引导吗？\n\n您可以随时在右上角头像菜单中重新开启。',
-    confirmExit: '确定要退出新手引导吗？您可以随时在右上角菜单重新开始。',
-    interactiveHint: '按 Enter 或点击继续',
+    dontShowAgainTitle: '关闭账户概览提示',
+    confirmDontShow: '确定不再显示账户概览提示吗？\n\n您可以随时在右上角头像菜单中重新开启。',
+    confirmExit: '确定要退出账户概览提示吗？您可以随时在右上角菜单重新开始。',
+    interactiveHint: '按 Enter 继续',
     navigation: {
       flipPage: '翻页',
       exit: '退出'
     },
-    // Admin tour steps
+    // Admin setup guide
     admin: {
       welcome: {
-        title: '👋 欢迎使用 Sub2API',
+        title: 'Sub2API 配置向导',
         description:
-          '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">Sub2API 是一个强大的 AI 服务中转平台，让您轻松管理和分发 AI 服务。</p><p style="margin-bottom: 12px;"><b>🎯 核心功能：</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>📦 <b>分组管理</b> - 创建不同的服务套餐（VIP、免费试用等）</li><li>🔗 <b>账号池</b> - 连接多个上游 AI 服务商账号</li><li>🔑 <b>密钥分发</b> - 为用户生成独立的 API Key</li><li>💰 <b>计费管理</b> - 灵活的费率和配额控制</li></ul><p style="color: #10b981; font-weight: 600;">接下来，我们将用 3 分钟带您完成首次配置 →</p></div>',
-        nextBtn: '开始配置 🚀',
+          '<p>配置路径由分组、上游账号、API 密钥三部分组成。</p><ul><li><b>分组</b>定义服务范围、费率和可见性。</li><li><b>账号池</b>承载上游模型服务。</li><li><b>API 密钥</b>用于分发和统计调用。</li></ul>',
+        nextBtn: '开始配置',
         prevBtn: '跳过'
       },
       groupManage: {
-        title: '📦 第一步：分组管理',
+        title: '第一步：分组管理',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>什么是分组？</b></p><p style="margin-bottom: 12px;">分组是 Sub2API 的核心概念，它就像一个"服务套餐"：</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 每个分组可以包含多个上游账号</li><li>💰 每个分组有独立的计费倍率</li><li>👥 可以设置为公开或专属分组</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 示例：</b>您可以创建"VIP专线"（高倍率）和"免费试用"（低倍率）两个分组</p><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 点击左侧的"分组管理"开始</p></div>'
+          '<p>分组决定用户可见的服务范围、计费倍率和专属访问权限。</p><ul><li>一个分组可以绑定多个上游账号。</li><li>公开分组面向所有用户，专属分组只面向指定用户。</li><li>费率在分组层统一生效。</li></ul>'
       },
       createGroup: {
-        title: '➕ 创建新分组',
+        title: '创建分组',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">现在让我们创建第一个分组。</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📝 提示：</b>建议先创建一个测试分组，熟悉流程后再创建正式分组</p><p style="color: #10b981; font-weight: 600;">👉 点击"创建分组"按钮</p></div>'
+          '<p>新分组会作为后续账号绑定和密钥授权的基础。</p><p>保存前确认平台类型，创建后平台类型不可修改。</p>'
       },
       groupName: {
-        title: '✏️ 1. 分组名称',
+        title: '1. 分组名称',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">为您的分组起一个易于识别的名称。</p><div style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>💡 命名建议：</b><ul style="margin: 8px 0 0 16px;"><li>"测试分组" - 用于测试</li><li>"VIP专线" - 高质量服务</li><li>"免费试用" - 体验版</li></ul></div><p style="font-size: 13px; color: #6b7280;">填写完成后点击"下一步"继续</p></div>',
-        nextBtn: '下一步'
+          '<p>名称用于后台识别和用户侧展示。</p><p>建议使用清晰、稳定的套餐或服务名称。</p>',
+        nextBtn: '继续'
       },
       groupPlatform: {
-        title: '🤖 2. 选择平台',
+        title: '2. 平台类型',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">选择该分组支持的 AI 平台。</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 平台说明：</b><ul style="margin: 8px 0 0 16px;"><li><b>Anthropic</b> - Claude 系列模型</li><li><b>OpenAI</b> - GPT 系列模型</li><li><b>Google</b> - Gemini 系列模型</li></ul></div><p style="font-size: 13px; color: #6b7280;">一个分组只能选择一个平台</p></div>',
-        nextBtn: '下一步'
+          '<p>平台类型决定该分组可绑定的上游账号类型。</p><ul><li>Anthropic 对应 Claude 系列。</li><li>OpenAI 对应 GPT 系列。</li><li>Google 对应 Gemini 系列。</li></ul>',
+        nextBtn: '继续'
       },
       groupMultiplier: {
-        title: '💰 3. 费率倍数',
+        title: '3. 费率倍数',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">设置该分组的计费倍率，控制用户的实际扣费。</p><div style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚙️ 计费规则：</b><ul style="margin: 8px 0 0 16px;"><li><b>1.0</b> - 原价计费（成本价）</li><li><b>1.5</b> - 用户消耗 $1，扣除 $1.5</li><li><b>2.0</b> - 用户消耗 $1，扣除 $2</li><li><b>0.8</b> - 补贴模式（亏本运营）</li></ul></div><p style="font-size: 13px; color: #6b7280;">建议测试分组设置为 1.0</p></div>',
-        nextBtn: '下一步'
+          '<p>费率倍数控制该分组的实际扣费。</p><ul><li>1.0 表示按原始用量计费。</li><li>大于 1.0 表示加价倍率。</li><li>小于 1.0 表示补贴倍率。</li></ul>',
+        nextBtn: '继续'
       },
       groupExclusive: {
-        title: '🔒 4. 专属分组（可选）',
+        title: '4. 专属分组',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">控制分组的可见性和访问权限。</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔐 权限说明：</b><ul style="margin: 8px 0 0 16px;"><li><b>关闭</b> - 公开分组，所有用户可见</li><li><b>开启</b> - 专属分组，仅指定用户可见</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 使用场景：</b>VIP 用户专属、内部测试、特殊客户等</p></div>',
-        nextBtn: '下一步'
+          '<p>专属分组只对被授权的用户可见。</p><p>适用于高优先级套餐、企业客户或内部服务。</p>',
+        nextBtn: '继续'
       },
       groupSubmit: {
-        title: '✅ 保存分组',
+        title: '保存分组',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">确认信息无误后，点击创建按钮保存分组。</p><p style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ 注意：</b>分组创建后，平台类型不可修改，其他信息可以随时编辑</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>📌 下一步：</b>创建成功后，我们将添加上游账号到这个分组</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"创建"按钮</p></div>'
+          '<p>保存后，分组会进入账号绑定和 API 密钥授权流程。</p><p>平台类型保存后不可修改，名称、费率和可见性可后续调整。</p>'
       },
       accountManage: {
-        title: '🔗 第二步：添加账号',
+        title: '第二步：添加账号',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>太棒了！分组已创建成功 🎉</b></p><p style="margin-bottom: 12px;">现在需要添加上游 AI 服务商的账号，让分组能够实际提供服务。</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 账号的作用：</b><ul style="margin: 8px 0 0 16px;"><li>连接到上游 AI 服务（Claude、GPT 等）</li><li>一个分组可以包含多个账号（负载均衡）</li><li>支持 OAuth 和 Session Key 两种方式</li></ul></div><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 点击左侧的"账号管理"</p></div>'
+          '<p>账号池承载上游模型服务，并通过分组对外提供。</p><ul><li>同一分组可以绑定多个账号。</li><li>系统会按优先级和可用性调度。</li><li>授权方式支持 OAuth 和 Session Key。</li></ul>'
       },
       createAccount: {
-        title: '➕ 添加新账号',
+        title: '添加账号',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">点击按钮开始添加您的第一个上游账号。</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 提示：</b>建议使用 OAuth 方式，更安全且无需手动提取密钥</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"添加账号"按钮</p></div>'
+          '<p>添加可用的上游账号后，分组才能实际承载模型调用。</p><p>OAuth 授权支持自动刷新，适合长期运行。</p>'
       },
       accountName: {
-        title: '✏️ 1. 账号名称',
+        title: '1. 账号名称',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">为账号设置一个便于识别的名称。</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 命名建议：</b>"Claude主账号"、"GPT备用1"、"测试账号" 等</p></div>',
-        nextBtn: '下一步'
+          '<p>名称只用于后台识别，不会影响调度。</p><p>可按平台、用途或优先级命名。</p>',
+        nextBtn: '继续'
       },
       accountPlatform: {
-        title: '🤖 2. 选择平台',
+        title: '2. 平台类型',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">选择该账号对应的服务商平台。</p><p style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px;"><b>⚠️ 重要：</b>平台必须与刚才创建的分组平台一致</p></div>',
-        nextBtn: '下一步'
+          '<p>账号平台必须与目标分组的平台一致。</p><p>不一致的账号不会被该分组调度。</p>',
+        nextBtn: '继续'
       },
       accountType: {
-        title: '🔐 3. 授权方式',
+        title: '3. 授权方式',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">选择账号的授权方式。</p><div style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>✅ 推荐：OAuth 方式</b><ul style="margin: 8px 0 0 16px;"><li>无需手动提取密钥</li><li>更安全，支持自动刷新</li><li>适用于 Claude Code、ChatGPT OAuth</li></ul></div><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 Session Key 方式</b><ul style="margin: 8px 0 0 16px;"><li>需要手动从浏览器提取</li><li>可能需要定期更新</li><li>适用于不支持 OAuth 的平台</li></ul></div></div>',
-        nextBtn: '下一步'
+          '<p>OAuth 适合长期服务，支持授权刷新。</p><p>Session Key 适合不支持 OAuth 的平台，需要按上游状态维护。</p>',
+        nextBtn: '继续'
       },
       accountPriority: {
-        title: '⚖️ 4. 优先级（可选）',
+        title: '4. 调度优先级',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">设置账号的调用优先级。</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📊 优先级规则：</b><ul style="margin: 8px 0 0 16px;"><li>数字越小，优先级越高</li><li>系统优先使用低数值账号</li><li>相同优先级则随机选择</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 使用场景：</b>主账号设置低数值，备用账号设置高数值</p></div>',
-        nextBtn: '下一步'
+          '<p>数字越小，调度优先级越高。</p><p>相同优先级会按可用性和调度策略分配。</p>',
+        nextBtn: '继续'
       },
       accountGroups: {
-        title: '🎯 5. 分配分组',
+        title: '5. 绑定分组',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>关键步骤！</b>将账号分配到刚才创建的分组。</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ 重要提醒：</b><ul style="margin: 8px 0 0 16px;"><li>必须勾选至少一个分组</li><li>未分配分组的账号无法使用</li><li>一个账号可以分配给多个分组</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 提示：</b>请勾选刚才创建的测试分组</p></div>',
-        nextBtn: '下一步'
+          '<p>账号必须绑定到至少一个分组才会参与调用。</p><p>一个账号可以服务多个同平台分组。</p>',
+        nextBtn: '继续'
       },
       accountSubmit: {
-        title: '✅ 保存账号',
+        title: '保存账号',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">确认信息无误后，点击保存按钮。</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 OAuth 授权流程：</b><ul style="margin: 8px 0 0 16px;"><li>点击保存后会跳转到服务商页面</li><li>在服务商页面完成登录授权</li><li>授权成功后自动返回</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>📌 下一步：</b>账号添加成功后，我们将创建 API 密钥</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"保存"按钮</p></div>'
+          '<p>保存后，OAuth 账号会进入上游授权流程。</p><p>授权成功返回后，账号即可按绑定分组参与调度。</p>'
       },
       keyManage: {
-        title: '🔑 第三步：生成密钥',
+        title: '第三步：生成 API 密钥',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>恭喜！账号配置完成 🎉</b></p><p style="margin-bottom: 12px;">最后一步，生成 API Key 来测试服务是否正常工作。</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 API Key 的作用：</b><ul style="margin: 8px 0 0 16px;"><li>用于调用 AI 服务的凭证</li><li>每个 Key 绑定一个分组</li><li>可以设置配额和有效期</li><li>支持独立的使用统计</li></ul></div><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 点击左侧的"API 密钥"</p></div>'
+          '<p>API 密钥承载用户调用、额度控制和用量统计。</p><ul><li>每个密钥绑定一个分组。</li><li>可设置配额、有效期和访问范围。</li><li>用量按密钥独立统计。</li></ul>'
       },
       createKey: {
-        title: '➕ 创建密钥',
+        title: '生成密钥',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">点击按钮创建您的第一个 API Key。</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 提示：</b>创建后请立即复制保存，密钥只显示一次</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"创建密钥"按钮</p></div>'
+          '<p>密钥生成后只展示一次，后台不再回显完整内容。</p><p>请确认所属分组和额度设置符合预期。</p>'
       },
       keyName: {
-        title: '✏️ 1. 密钥名称',
+        title: '1. 密钥名称',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">为密钥设置一个便于管理的名称。</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 命名建议：</b>"测试密钥"、"生产环境"、"移动端" 等</p></div>',
-        nextBtn: '下一步'
+          '<p>名称用于后台检索和用量归因。</p><p>可按用户、业务或接入场景命名。</p>',
+        nextBtn: '继续'
       },
       keyGroup: {
-        title: '🎯 2. 选择分组',
+        title: '2. 绑定分组',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">选择刚才配置好的分组。</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 分组决定：</b><ul style="margin: 8px 0 0 16px;"><li>该密钥可以使用哪些账号</li><li>计费倍率是多少</li><li>是否为专属密钥</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 提示：</b>选择刚才创建的测试分组</p></div>',
-        nextBtn: '下一步'
+          '<p>分组决定密钥可用的账号池、模型范围和计费倍率。</p><p>专属分组只对授权用户开放。</p>',
+        nextBtn: '继续'
       },
       keySubmit: {
-        title: '🎉 生成并复制',
+        title: '生成并保存',
         description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">点击创建后，系统会生成完整的 API Key。</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ 重要提醒：</b><ul style="margin: 8px 0 0 16px;"><li>密钥只显示一次，请立即复制</li><li>丢失后需要重新生成</li><li>妥善保管，不要泄露给他人</li></ul></div><div style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🚀 下一步：</b><ul style="margin: 8px 0 0 16px;"><li>复制生成的 sk-xxx 密钥</li><li>在支持 OpenAI 接口的客户端中使用</li><li>开始体验 AI 服务！</li></ul></div><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"创建"按钮</p></div>'
+          '<p>生成后会显示完整 API Key。</p><p>关闭弹窗后无法再次查看完整密钥，只能重新生成。</p>'
       }
     },
-    // User tour steps
-    user: {
-      welcome: {
-        title: '👋 欢迎使用 Sub2API',
-        description:
-          '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">您好！欢迎来到 Sub2API AI 服务平台。</p><p style="margin-bottom: 12px;"><b>🎯 快速开始：</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>🔑 创建 API 密钥</li><li>📋 复制密钥到您的应用</li><li>🚀 开始使用 AI 服务</li></ul><p style="color: #10b981; font-weight: 600;">只需 1 分钟，让我们开始吧 →</p></div>',
-        nextBtn: '开始 🚀',
-        prevBtn: '跳过'
-      },
-      keyManage: {
-        title: '🔑 API 密钥管理',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">在这里管理您的所有 API 访问密钥。</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 什么是 API 密钥？</b><br/>API 密钥是您访问 AI 服务的凭证，就像一把钥匙，让您的应用能够调用 AI 能力。</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击进入密钥页面</p></div>'
-      },
-      createKey: {
-        title: '➕ 创建新密钥',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">点击按钮创建您的第一个 API 密钥。</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 提示：</b>创建后密钥只显示一次，请务必复制保存</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"创建密钥"</p></div>'
-      },
-      keyName: {
-        title: '✏️ 密钥名称',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">为密钥起一个便于识别的名称。</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 示例：</b>"我的第一个密钥"、"测试用" 等</p></div>',
-        nextBtn: '下一步'
-      },
-      keyGroup: {
-        title: '🎯 选择分组',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">选择管理员为您分配的服务分组。</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 分组说明：</b><br/>不同分组可能有不同的服务质量和计费标准，请根据需要选择。</p></div>',
-        nextBtn: '下一步'
-      },
-      keySubmit: {
-        title: '🎉 完成创建',
-        description:
-          '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">点击确认创建您的 API 密钥。</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ 重要：</b><ul style="margin: 8px 0 0 16px;"><li>创建后请立即复制密钥（sk-xxx）</li><li>密钥只显示一次，丢失需重新生成</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>🚀 如何使用：</b><br/>将密钥配置到支持 OpenAI 接口的任何客户端（如 ChatBox、OpenCat 等），即可开始使用！</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"创建"按钮</p></div>'
-      }
-    }
   },
 
   // Payment System
@@ -8134,15 +8625,21 @@ export default {
     creditedBalance: '到账余额',
     quickAmounts: '快捷到账余额',
     quickAmountPayDescription: '支付 {amount}',
-    quickAmountBelowLimit: '低于通道最低',
-    quickAmountAboveLimit: '高于通道最高',
-    quickAmountUnavailable: '当前通道不可用',
+    quickAmountBelowLimit: '低于最低金额',
+    quickAmountAboveLimit: '高于最高金额',
+    quickAmountUnavailable: '当前不可用',
     customAmount: '自定义支付金额',
+    customBalanceCredit: '自定义到账余额',
     enterAmount: '输入金额',
     paymentMethod: '支付方式',
+    methodNoFee: '无额外手续费',
     fee: '手续费',
     actualPay: '实付金额',
     createOrder: '确认支付',
+    confirmPayment: '确认支付',
+    orderPreview: '本次支付',
+    selectedPlan: '已选套餐',
+    changePlan: '更换套餐',
     methods: {
       easypay: '易支付',
       alipay: '支付宝',
@@ -8171,37 +8668,42 @@ export default {
       refund_failed: '退款失败',
     },
     qr: {
-      scanToPay: '请扫码支付',
+      scanToPay: '扫码支付',
       scanAlipay: '支付宝扫码支付',
       scanWxpay: '微信扫码支付',
-      scanAlipayHint: '请使用手机打开支付宝，扫描二维码完成支付',
-      scanWxpayHint: '请使用手机打开微信，扫描二维码完成支付',
-      payInNewWindow: '请在新窗口中完成支付',
-      payInNewWindowHint: '支付页面已在新窗口打开，请在新窗口中完成支付后返回此页面',
+      scanAlipayHint: '支付宝扫码后，订单状态会自动同步。',
+      scanWxpayHint: '微信扫码后，订单状态会自动同步。',
+      payInNewWindow: '支付窗口已打开',
+      payInNewWindowHint: '支付页面已在新窗口打开，订单状态会在当前页面同步。',
       openPayWindow: '重新打开支付页面',
       copyPayUrl: '复制支付链接',
       copyQrUrl: '复制二维码链接',
       openPayUrl: '打开支付链接',
-      mobileFallbackHint: '本机无法扫码时可复制链接到另一台设备或截图给另一台设备扫。',
+      mobileFallbackHint: '移动端扫码受限时，支付链接和二维码可在其他设备继续使用。',
       expiresIn: '剩余支付时间',
       expired: '订单已过期',
-      expiredDesc: '订单已超时，请重新创建订单',
+      expiredDesc: '该订单已超时，未产生扣款确认。',
       cancelled: '订单已取消',
-      cancelledDesc: '您已取消本次支付',
-      waitingPayment: '等待支付...',
+      cancelledDesc: '本次支付已结束，订单记录会保留。',
+      waitingPayment: '等待支付确认',
+      assuranceTitle: '交易记录与保障',
+      officialAssurance: '100% 官方满血模型，永远不掺水。',
+      orderRecordAssurance: '订单号和支付状态会保留，到账可核对。',
+      billingProtectionAssurance: '稳定性行业内极佳，确认异常扣费后包赔。',
+      privacyAssurance: '不保存用户聊天对话，不主动泄漏用户信息。',
       cancelOrder: '取消订单',
     },
     orders: {
       title: '我的订单',
       empty: '暂无订单',
-      orderId: '订单 ID',
+      orderId: '订单号',
       orderNo: '订单编号',
       amount: '金额',
       payAmount: '实付',
       creditedAmount: '到账金额',
       creditedBalance: '到账余额',
       fee: '手续费',
-      baseAmount: '充值金额',
+      baseAmount: '基础金额',
       includedInPayAmount: '已含在实付金额中',
       status: '状态',
       paymentMethod: '支付方式',
@@ -8216,73 +8718,99 @@ export default {
       success: '支付成功',
       subscriptionSuccess: '订阅成功',
       processing: '支付处理中',
-      processingHint: '支付结果仍在确认中，页面会自动刷新。',
-      failed: '支付失败',
-      backToRecharge: '返回充值',
-      viewOrders: '查看订单',
+      successHint: '到账和订阅状态已同步到账户记录。',
+      processingHint: '支付结果仍在确认中，页面会自动刷新并保留订单记录。',
+      failed: '支付未完成',
+      failedHint: '未确认扣款不会计入到账；订单记录已保留，便于核对。',
+      backToRecharge: '充值 / 订阅',
+      viewOrders: '订单记录',
+      done: '完成',
+      orderSnapshot: '订单明细',
+      returnSnapshot: '支付返回',
+      assuranceTitle: '交易保障',
+      officialModels: '100% 官方满血模型，永远不掺水',
+      privacy: '不保存用户聊天对话，不主动泄漏用户信息',
+      refundProtection: '稳定性行业内极佳，异常扣费包赔',
     },
     currentBalance: '当前余额',
-    groupFallback: '分组 #{id}',
+    groupFallback: '服务档位 #{id}',
     rechargeAccount: '充值账户',
     activeSubscription: '当前订阅',
     noActiveSubscription: '暂无有效订阅',
     tabTopUp: '充值',
     tabSubscribe: '订阅',
     noPlans: '暂无可用订阅套餐',
+    noPlansDesc: '可购买套餐开放后会显示在这里。',
     notAvailable: '充值功能暂未开放',
+    trust: {
+      recharge: '官方满血模型',
+      privacy: '永远不掺水',
+      subscription: '不保存聊天对话',
+      stability: '稳定性行业内极佳',
+      orders: '异常扣费包赔',
+      caption: '支付金额、到账余额、订阅状态和订单进度会保留在账户记录中；平台不保存用户聊天对话，不主动泄漏用户信息。',
+    },
+    support: {
+      title: '交易记录清楚可核对',
+      detail: '订单号、到账状态和页面信息会用于客服核查；异常扣费确认后包赔。',
+      action: '提交工单',
+    },
     confirmSubscription: '确认订阅',
-    confirmCancel: '确定要取消此订单吗？',
-    amountTooLow: '最低金额为 {min}',
-    amountTooHigh: '最高金额为 {max}',
+    confirmCancel: '取消后订单状态会同步更新。',
+    amountTooLow: '最低金额 {min}',
+    amountTooHigh: '最高金额 {max}',
     amountNoMethod: '该金额没有可用的支付方式',
-    rechargeRatePreview: '等价展示：1 站内余额 ≈ 官方 ¥{cny}，实际到账按充值金额一比一计算',
-    refundReason: '退款原因',
-    refundReasonPlaceholder: '请描述您的退款原因',
-    stripeLoadFailed: '支付组件加载失败，请刷新页面重试',
-    stripeMissingParams: '缺少订单ID或支付密钥',
-    stripeNotConfigured: 'Stripe 未配置',
-    airwallexLoadFailed: 'Airwallex 支付组件加载失败，请刷新页面重试',
-    airwallexMissingParams: '缺少 Airwallex 支付参数',
+    rechargeRatePreview: '等价展示：1 账户余额 ≈ 官方 ¥{cny}，实际到账按充值金额一比一计算',
+    refundReason: '退款说明',
+    refundReasonPlaceholder: '金额、订单或到账信息',
+    stripeLoadFailed: '支付组件暂未完成加载，订单记录仍会保留。',
+    stripeMissingParams: '支付信息未就绪',
+    stripeNotConfigured: '该支付方式暂未开放',
+    airwallexLoadFailed: 'Airwallex 支付组件暂未完成加载，订单记录仍会保留。',
+    airwallexMissingParams: '支付信息未就绪',
+    airwallexRedirecting: 'Airwallex 安全收银台正在打开，订单状态会回写到账户记录。',
+    stripeRedirecting: 'Stripe 安全支付页正在打开，订单状态会回写到账户记录。',
+    stripeSecureCaption: '支付由 Stripe 安全处理，平台仅保留订单号、金额和状态用于核对。',
     errors: {
-      tooManyPending: '待支付订单过多（最多 {max} 个），请先完成或取消现有订单',
-      cancelRateLimited: '取消订单过于频繁，请稍后再试',
-      createOrderHint: '请检查支付方式和金额后重试。如仍无法下单，请带上本页错误信息联系支持。',
-      wechatH5NotAuthorized: '当前商户未开通微信 H5 支付，请在微信中打开当前页面继续支付。',
-      wechatPaymentMpNotConfigured: '当前站点未完成公众号/JSAPI 支付配置，暂时无法在微信内直接拉起支付。',
-      wechatJsapiUnavailable: '当前环境未能拉起微信支付，请确认正在微信内打开本页后重试。',
-      wechatJsapiFailed: '微信支付未完成，请重新拉起支付或改用扫码支付。',
-      wechatUnavailable: '当前微信支付暂不可用，请稍后重试。',
-      wechatOpenInWeChatHint: '请复制当前页面链接到微信内打开，或直接改用电脑端微信扫码支付。',
-      wechatScanOnDesktopHint: '电脑端请直接使用微信扫一扫完成支付；移动端请在微信内打开当前页面。',
-      wechatSwitchBrowserHint: '请改用电脑端微信扫码，或在外部浏览器重新打开本页后再试。',
-      mobilePaymentFallbackToQr: '当前商户未开通移动支付，已自动切换为扫码支付。',
+      tooManyPending: '待支付订单过多（最多 {max} 个），现有订单完成或取消后可继续下单',
+      cancelRateLimited: '取消操作较密集，稍后会恢复。',
+      createOrderHint: '支付方式、金额和订单状态都保留在记录里。',
+      wechatH5NotAuthorized: '当前微信 H5 支付暂不可用，微信内页面可继续完成支付。',
+      wechatPaymentMpNotConfigured: '当前微信内支付方式暂未开放。',
+      wechatJsapiUnavailable: '当前环境未能拉起微信支付，微信内页面可继续完成支付。',
+      wechatJsapiFailed: '微信支付未完成，扫码支付仍可使用。',
+      wechatUnavailable: '当前微信支付暂不可用。',
+      wechatOpenInWeChatHint: '当前页面链接可在微信内打开，也可使用电脑端微信扫码支付。',
+      wechatScanOnDesktopHint: '电脑端支持微信扫一扫，移动端支持微信内页面支付。',
+      wechatSwitchBrowserHint: '电脑端微信扫码和外部浏览器支付均可使用。',
+      mobilePaymentFallbackToQr: '移动支付暂不可用，已自动切换为扫码支付。',
       alipayDesktopUnavailable: '当前支付宝桌面支付未成功生成二维码。',
-      alipayDesktopQrHint: '电脑端支付宝应展示扫码单，请刷新后重试，或确认浏览器未拦截当前支付页。',
+      alipayDesktopQrHint: '电脑端支付宝扫码单暂未生成，刷新后可重新获取。',
       alipayMobileUnavailable: '当前页面未成功跳转到支付宝。',
-      alipayMobileOpenHint: '请允许当前页面打开支付宝 App，或改用系统浏览器重新发起支付。',
+      alipayMobileOpenHint: '当前页面可从系统浏览器重新发起支付宝支付。',
       // Structured error codes (reason strings from backend ApplicationError)
-      PAYMENT_DISABLED: '支付系统已关闭',
-      USER_INACTIVE: '账号已被禁用',
-      BALANCE_PAYMENT_DISABLED: '余额充值功能已关闭',
+      PAYMENT_DISABLED: '支付服务暂未开放',
+      USER_INACTIVE: '账户当前未启用',
+      BALANCE_PAYMENT_DISABLED: '余额充值暂未开放',
       INVALID_AMOUNT: '金额无效',
-      INVALID_INPUT: '参数有误',
-      PLAN_NOT_AVAILABLE: '套餐不存在或已下架',
-      GROUP_NOT_FOUND: '订阅分组不可用',
-      GROUP_TYPE_MISMATCH: '分组类型不是订阅类型',
-      TOO_MANY_PENDING: '待支付订单过多（最多 {max} 个），请先完成或取消现有订单',
+      INVALID_INPUT: '输入信息不完整',
+      PLAN_NOT_AVAILABLE: '套餐暂未开放',
+      GROUP_NOT_FOUND: '订阅套餐暂未开放',
+      GROUP_TYPE_MISMATCH: '订阅套餐状态不可用',
+      TOO_MANY_PENDING: '待支付订单过多（最多 {max} 个），现有订单完成或取消后可继续下单',
       DAILY_LIMIT_EXCEEDED: '今日充值已达上限，剩余额度 {remaining}',
-      PAYMENT_GATEWAY_ERROR: '支付方式不可用',
-      NO_AVAILABLE_INSTANCE: '暂无可用的支付通道',
-      PAYMENT_PROVIDER_MISCONFIGURED: '支付通道配置错误，请联系管理员',
-      WXPAY_CONFIG_MISSING_KEY: '微信支付配置缺少必填项：{key}',
-      WXPAY_CONFIG_INVALID_KEY_LENGTH: '微信支付 {key} 长度错误，应为 {expected} 字节（实际 {actual}）',
-      WXPAY_CONFIG_INVALID_KEY: '微信支付 {key} 格式错误，请确认复制了完整的 PEM 内容',
-      PENDING_ORDERS: '该服务商有未完成的订单，请等待订单完成后再操作',
-      PAYMENT_PROVIDER_CONFLICT: '该支付方式已有其他启用中的服务商实例，请先停用后再继续。',
-      CANCEL_RATE_LIMITED: '取消订单过于频繁，请稍后再试',
+      PAYMENT_GATEWAY_ERROR: '支付方式当前未开放',
+      NO_AVAILABLE_INSTANCE: '暂无可用的支付方式',
+      PAYMENT_PROVIDER_MISCONFIGURED: '支付方式暂不可用',
+      WXPAY_CONFIG_MISSING_KEY: '支付信息未就绪',
+      WXPAY_CONFIG_INVALID_KEY_LENGTH: '支付信息未就绪',
+      WXPAY_CONFIG_INVALID_KEY: '支付信息未就绪',
+      PENDING_ORDERS: '该支付方式有未完成订单，订单完成后可继续操作',
+      PAYMENT_PROVIDER_CONFLICT: '该支付方式当前不可切换。',
+      CANCEL_RATE_LIMITED: '取消操作较密集，稍后会恢复',
       NOT_FOUND: '订单不存在',
       FORBIDDEN: '无权限操作此订单',
-      CONFLICT: '订单状态已变更，请刷新',
+      CONFLICT: '订单状态已更新，刷新后可查看最新状态',
       INVALID_ORDER_TYPE: '仅余额订单可申请退款',
       INVALID_STATUS: '当前订单状态不允许此操作',
       BALANCE_NOT_ENOUGH: '退款金额超过余额',
@@ -8290,26 +8818,26 @@ export default {
       REFUND_FAILED: '退款失败',
     },
     airwallexPay: 'Airwallex 支付',
-    stripePay: '立即支付',
-    stripeSuccessProcessing: '支付成功，正在处理订单...',
+    stripePay: '确认支付',
+    stripeSuccessProcessing: '支付成功，订单状态正在同步。',
     stripePopup: {
       redirecting: '正在跳转到支付页面...',
       loadingQr: '正在获取微信支付二维码...',
-      timeout: '等待支付凭证超时，请重试',
+      timeout: '等待支付凭证超时',
       qrFailed: '未能获取微信支付二维码',
     },
-    subscribeNow: '立即开通',
+    subscribeNow: '选择套餐',
     renewNow: '续费',
     selectPlan: '选择套餐',
     planFeatures: '功能特性',
     planCard: {
-      rate: '倍率',
-      dailyLimit: '日限额',
-      weeklyLimit: '周限额',
-      monthlyLimit: '月限额',
-      quota: '配额',
+      rate: '计费倍率',
+      dailyLimit: '每日额度',
+      weeklyLimit: '每周额度',
+      monthlyLimit: '每月额度',
+      quota: '周期额度',
       unlimited: '无限制',
-      models: '模型',
+      models: '可用模型',
     },
     days: '天',
     months: '个月',

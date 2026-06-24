@@ -3,156 +3,240 @@ export default {
   home: {
     viewOnGithub: 'View on GitHub',
     viewDocs: 'View Documentation',
-    docs: 'Guide',
-    docsBadge: 'Start',
+    docs: 'Docs',
+    docsBadge: 'Docs',
     switchToLight: 'Switch to Light Mode',
     switchToDark: 'Switch to Dark Mode',
     dashboard: 'Dashboard',
     login: 'Login',
     getStarted: 'Get Started',
     goToDashboard: 'Go to Dashboard',
+    landing: {
+      nav: {
+        home: 'Home',
+        primary: 'Home navigation',
+        docs: 'Docs',
+        continue: 'Continue',
+        signIn: 'Sign in',
+        noDilution: 'Full models',
+        billing: 'Billing cover',
+        privacy: 'Privacy',
+        stability: 'Stability'
+      },
+      hero: {
+        title: 'Official capability. Never diluted.',
+        lead: 'GPT, Claude, Gemini, and image models keep 100% official capability. User chat conversations are not stored, and user information is not actively disclosed.',
+        meta: 'Best-in-class stability. Abnormal charges covered.',
+        capabilitiesLabel: 'Platform capabilities'
+      },
+      claims: {
+        official: '100% official',
+        noDilution: 'Never diluted',
+        noChats: 'No stored chats',
+        billingCovered: 'Billing exceptions covered'
+      },
+      product: {
+        statusLabel: 'Model capability',
+        statusValue: 'Official. No dilution.',
+        statusBadge: 'Stable routing',
+        gpt: 'Official full capability',
+        claude: 'Official capability, no downgraded substitute',
+        gemini: 'Full multimodal capability',
+        images: 'Images',
+        imagesDetail: 'Image generation available by model',
+        live: 'Live',
+        ready: 'Ready'
+      },
+      metrics: {
+        official: 'Official capability',
+        storedChats: 'Stored chats',
+        chargeExceptions: 'Charge exceptions',
+        covered: 'Covered'
+      },
+      sections: {
+        models: {
+          kicker: 'No dilution',
+          title: 'Official full-capability models, never watered down.',
+          description: 'GPT, Claude, Gemini, and image models are served with 100% official capability, without substitute or downgraded models filling in.'
+        },
+        billing: {
+          kicker: 'Covered exceptions',
+          title: 'Every charge is traceable, with coverage when billing is abnormal.',
+          description: 'Pricing, rates, tokens, request records, and balance changes stay visible in one chain. Confirmed abnormal charges are covered.'
+        },
+        privacy: {
+          kicker: 'Privacy',
+          title: 'Chat content is not retained. User information is not disclosed externally.',
+          description: 'Conversation content is not retained; billing checks, service status, and support handling keep only necessary operational records.'
+        },
+        stability: {
+          kicker: 'Stability',
+          title: 'Steady enough for long-term use.',
+          description: 'Official full capability, no chat retention, abnormal-charge coverage, and stable routing are delivered through one access point.'
+        }
+      },
+      privacyVisual: {
+        label: 'Stored chats'
+      },
+      lineup: {
+        gpt: 'Official full access, model name and capability aligned',
+        claude: 'Long-form, code, and agent work served with official capability',
+        gemini: 'Full multimodal capability available',
+        images: 'Image generation is clearly available by model'
+      },
+      ledger: {
+        modelSource: 'Model source',
+        official: 'Official full capability',
+        usageTrail: 'Usage trail',
+        trace: 'Tokens, rates, and balance trace together',
+        billingExceptions: 'Billing exceptions',
+        covered: 'Covered when confirmed',
+        serviceState: 'Service state',
+        online: 'Best-in-class stability'
+      }
+    },
     // User-focused value proposition
-    heroSubtitle: 'GPT-level freedom without the sticker shock',
-    heroDescription: 'New users get trial credit, discount groups are built for high-frequency daily use, and a proprietary scheduling algorithm keeps GPT, Claude, Gemini, and image models smooth.',
+    heroSubtitle: '100% official full capability, never diluted',
+    heroDescription: 'GPT, Claude, Gemini, and image models in one clear account. We do not store user chat conversations or disclose user information externally; stability is among the best in class, and abnormal charges are covered.',
     terminal: {
-      scheduling: 'Proprietary scheduler found a stable route...'
+      scheduling: 'Model service status syncing...'
     },
     tags: {
-      subscriptionToApi: 'Trial credit included',
-      stickySession: 'Proprietary scheduling',
-      realtimeBilling: 'Pay less as you go'
+      subscriptionToApi: 'Official full capability',
+      stickySession: 'No chat retention',
+      realtimeBilling: 'Abnormal charges covered'
     },
     valueRail: {
       credit: {
         value: '¥1 = $1 credit',
-        label: 'Easy balance math',
-        description: 'Top up or redeem balance credits instead of buying multiple official subscriptions upfront.'
+        label: 'Clear balance unit',
+        description: 'Top-ups, redeemed credit, trial credit, and balance movement use one visible account unit.'
       },
       models: {
         value: 'GPT / Claude / Gemini',
-        label: 'Common models covered',
-        description: 'Coding, writing, translation, research, automation, and image generation are all covered.'
+        label: 'Official full-capability models',
+        description: '100% official model capability, no replacement-model impersonation, never diluted.'
       },
       compatible: {
         value: 'OpenAI compatible',
-        label: 'Low migration cost',
-        description: 'API tools, Codex, Claude Code, Gemini CLI, and common clients can connect with the guide.'
+        label: 'Clear access details',
+        description: 'API tools, Codex, Claude Code, Gemini CLI, and common client access details are presented together.'
       },
       billing: {
-        value: 'Auditable usage',
-        label: 'Spend is visible',
-        description: 'Balance, requests, tokens, cache hits, and cost records are visible on the dashboard.'
+        value: 'Covered if abnormal',
+        label: 'Charges are protected',
+        description: 'Balance, requests, tokens, cache hits, and cost records are visible on the dashboard. Abnormal charges are covered.'
       }
     },
     cost: {
       kicker: 'Pricing first',
       title: 'Not a monthly subscription. Pay only as you use.',
       description:
-        'Balance is counted as site credits, and usage is charged as official list-price cost multiplied by the selected group rate. Lower-rate groups let the same balance cover more official list-price usage.',
+        'Balance is shown with one account unit, and each charge is recorded from model pricing and the selected service tier rate. Lower service rates let the same balance cover more official list-price usage.',
       facts: {
         creditValue: '¥1 = $1 credit',
         creditLabel: 'Site balance unit',
         multiplierValue: 'Rate billing',
-        multiplierLabel: 'Official price × group rate',
-        recordsValue: 'Traceable',
+        multiplierLabel: 'Official price × service rate',
+        recordsValue: 'Covered',
         recordsLabel: 'Usage and billing records'
       },
       formulaTitle: 'How is the discount estimated?',
       formula:
-        'CNY discount ≈ group rate ÷ current FX rate × 10. For example, 0.148x at 1 USD≈¥7.2 is roughly 0.21/10 of official CNY pricing.',
-      note: 'The discount is an estimate for understanding. Actual billing follows usage records, model pricing, and the current group rate.'
+        'CNY discount ≈ service rate ÷ current FX rate × 10. For example, 0.148x at 1 USD≈¥7.2 is roughly 0.21/10 of official CNY pricing.',
+      note: 'The discount is an estimate for understanding. Actual billing follows usage records, model pricing, and the current service rate.'
     },
     quickStart: {
-      kicker: 'Three steps',
-      title: 'Register, create a key, and connect without rebuilding your project',
-      register: 'Register and claim credit',
-      createKey: 'Create API Key',
-      readGuide: 'Read setup guide',
+      kicker: 'Clear account',
+      title: 'Official full capability, privacy boundaries, and charge protection stay visible',
+      register: 'Account balance',
+      createKey: 'Service tier',
+      readGuide: 'Service status',
       steps: {
         register: {
-          title: 'Claim credit after signup',
-          description: 'Start with trial credit or a small top-up to verify model quality, speed, and billing behavior.'
+          title: 'Abnormal charges covered',
+          description: 'Top-ups, trial credit, subscription benefits, and every balance movement stay recorded.'
         },
         group: {
-          title: 'Create a key and choose a group',
-          description: 'Use discount groups for daily high-frequency tasks, stable groups for important tasks, and image groups for generation.'
+          title: '100% official full capability',
+          description: 'Available tiers, official models, and enabled status are presented in one place.'
         },
         connect: {
-          title: 'Copy config and start',
-          description: 'Use the “Use Key” action to copy Codex, Claude Code, Gemini CLI, or OpenAI-compatible configuration.'
+          title: 'No chat retention',
+          description: 'The platform does not store user chat conversations; usage records support billing, review, and support.'
         }
       }
     },
     integration: {
-      kicker: 'Not just a homepage. It helps users run the first call.',
-      title: 'The path new users actually need',
+      kicker: 'The account experience speaks for itself.',
+      title: 'The transparency users care about is built into the product',
       description:
-        'Many users do not fail because of the model itself. They fail because they do not know where to create a key, how to check outages, which models are available, or how billing is calculated. WegooAI makes these steps explicit.',
+        'WegooAI keeps official full-capability models, service status, usage records, balance changes, and order progress in clear places. Users do not have to guess whether models are diluted, billing is traceable, or service is stable.',
       cards: {
         key: {
-          title: 'Create a key and copy config',
-          description: 'Create an API key, then use the “Use Key” action to copy Codex, Claude Code, Gemini CLI, or OpenAI-compatible configuration.',
-          action: 'Create key'
+          title: 'Service access and credentials together',
+          description: 'Access credentials, service tiers, available models, and access details stay in one consistent place.',
+          action: 'Access credentials'
         },
         status: {
-          title: 'Check service status first',
-          description: 'When requests fail, time out, or return 403/429/5xx, check the group status first and switch to a stable group if needed.',
+          title: 'Service status is visible',
+          description: 'Availability, latency, and recent status across model services are presented clearly.',
           action: 'View status'
         },
         models: {
-          title: 'Confirm supported models',
-          description: 'The available channels page shows the models currently available for each group, avoiding unsupported model errors.',
+          title: 'Official full-capability models are clear',
+          description: 'Available models, service tiers, and prices are shown together. Models are never diluted, so model choice is not guesswork.',
           action: 'View models'
         },
         billing: {
-          title: 'Use records to judge real cost',
-          description: 'Requests, tokens, cache hits, and billing records are visible. Use records before choosing a long-term group.',
+          title: 'Charges stay traceable and covered',
+          description: 'Requests, tokens, cache hits, and billing records are visible for long-term cost clarity. Abnormal charges are covered.',
           action: 'View usage'
         }
       }
     },
     // Pain points section
     painPoints: {
-      title: 'Sound Familiar?',
+      title: 'What matters for long-term use',
       items: {
         expensive: {
-          title: 'High Subscription Costs',
-          desc: 'Paying for multiple AI subscriptions that add up every month'
+          title: 'Abnormal charges',
+          desc: 'Model prices, service rates, tokens, and charges stay visible; abnormal charges are covered'
         },
         complex: {
-          title: 'Account Chaos',
-          desc: 'Managing scattered accounts and API keys across different platforms'
+          title: 'Diluted models',
+          desc: 'GPT, Claude, Gemini, and image models are 100% official full capability, never impersonated by replacements'
         },
         unstable: {
-          title: 'Service Interruptions',
-          desc: 'Single accounts hitting rate limits and disrupting your workflow'
+          title: 'Service status',
+          desc: 'Stability is among the best in class; availability, latency, recent status, and model lists stay visible'
         },
         noControl: {
-          title: 'No Usage Control',
-          desc: "Can't track where your money goes or limit team member usage"
+          title: 'Privacy boundary',
+          desc: 'User chat conversations are not stored, and user information is not disclosed externally'
         }
       }
     },
     // Solutions section
     solutions: {
-      title: 'We Solve These Problems',
-      subtitle: 'Three simple steps to stress-free AI access'
+      title: 'Protections already built into the platform',
+      subtitle: 'Official full capability, never diluted, no chat retention, abnormal charges covered'
     },
     features: {
-      unifiedGateway: 'One key for daily AI',
-      unifiedGatewayDesc: 'Use GPT, Claude, Gemini, and image models from one place for coding, writing, and automation.',
-      multiAccount: 'Proprietary scheduling',
-      multiAccountDesc: 'The routing algorithm picks a stable path by model, group, and live status so short-term instability is less visible to users.',
-      balanceQuota: 'Built for frequent use',
-      balanceQuotaDesc: 'Usage-based billing and discount groups make daily use cheaper, with balance, requests, and token spend visible on the dashboard.'
+      unifiedGateway: 'Official full-capability models',
+      unifiedGatewayDesc: 'GPT, Claude, Gemini, and image models are served with 100% official capability, never diluted.',
+      multiAccount: 'Best-in-class stability',
+      multiAccountDesc: 'Best-in-class stability is supported by routing across model, service tier, and live status, keeping short-term fluctuations out of the user path.',
+      balanceQuota: 'Abnormal charges covered',
+      balanceQuotaDesc: 'Usage-based billing keeps balance, requests, and token spend visible on the dashboard. Abnormal charges are covered.'
     },
     // Comparison section
     comparison: {
-      title: 'Why Choose Us?',
+      title: 'Product view',
       headers: {
         feature: 'Comparison',
         official: 'Official Subscriptions',
-        us: 'Our Platform'
+        us: 'WegooAI'
       },
       items: {
         pricing: {
@@ -168,12 +252,12 @@ export default {
         management: {
           feature: 'Account Management',
           official: 'Manage each service separately',
-          us: 'Unified key, one dashboard'
+          us: 'Unified access credentials, one dashboard'
         },
         stability: {
           feature: 'Stability',
           official: 'Single account rate limits',
-          us: 'Proprietary scheduling with excellent stability'
+          us: 'Best-in-class stability with visible service status'
         },
         control: {
           feature: 'Usage Control',
@@ -184,7 +268,7 @@ export default {
     },
     providers: {
       title: 'Supported AI Models',
-      description: 'Popular models for low-cost daily usage',
+      description: 'Popular official full-capability models for sustained daily AI usage',
       supported: 'Supported',
       soon: 'Soon',
       claude: 'Claude',
@@ -193,16 +277,16 @@ export default {
       more: 'More'
     },
     useCases: {
-      title: 'Built for people who actually use AI every day',
+      title: 'Built for people who keep AI in their workflow',
       description:
-        'This is not only for one-off trials. It is more useful for developers, students, creators, and automation users who put AI into daily workflows.',
+        'Developers, students, creators, and automation users can view models, spend, status, and records in one account.',
       coding: {
         title: 'Coding and vibe coding',
         description: 'Works well with Codex, Claude Code, Cursor, OpenCode, project scaffolding, bug fixing, code explanation, and agent tasks.'
       },
       writing: {
         title: 'Writing, translation, papers',
-        description: 'Claude and Gemini groups are useful for long-form summaries, research organization, translation, polishing, reports, and analysis.'
+        description: 'Claude and Gemini services are useful for long-form summaries, research organization, translation, polishing, reports, and analysis.'
       },
       automation: {
         title: 'Scripts and API workflows',
@@ -210,49 +294,49 @@ export default {
       },
       image: {
         title: 'AI image generation',
-        description: 'Groups with image-generation names are used for visual assets, illustrations, drafts, and batch image creation.'
+        description: 'Image generation service tiers are used for visual assets, illustrations, drafts, and batch image creation.'
       }
     },
     trust: {
-      title: 'The concerns new users actually have',
+      title: 'The concerns users actually have',
       description:
-        'Low price is not enough. New users also care whether it works, whether billing is fair, whether models are real, and whether issues can be checked.',
+        'Beyond low prices, users care whether models are full capability, whether models are diluted, whether chat conversations are stored, whether information is leaked, and whether abnormal charges are covered.',
       points: {
-        modelTruth: 'We do not use domestic replacement models to impersonate GPT, Claude, or Gemini.',
-        billing: 'Each request has auditable usage and billing records. Abnormal billing can be reviewed through support.',
-        status: 'Service status is public. If a group is unstable, users can switch to a more stable group in time.',
-        privacy: 'Records are mainly used for billing, troubleshooting, risk control, and support review; the request records users can see are the main records available for troubleshooting.'
+        modelTruth: '100% official full-capability models, never diluted, with no domestic replacement models impersonating GPT, Claude, or Gemini.',
+        billing: 'Each request has auditable usage and billing records. Abnormal charges are covered.',
+        status: 'Stability is among the best in class, with service status, availability, latency, and model lists continuously updated.',
+        privacy: 'User chat conversations are not stored, and user information is not disclosed externally.'
       }
     },
     firstRun: {
-      kicker: 'First-use advice',
-      title: 'Make one successful call first, then choose your long-term group',
+      kicker: 'Long-term use',
+      title: 'Stable, clear, and traceable',
       description:
-        'Groups differ in cost, speed, stability, and model availability. New users should first complete one successful call, then choose a group based on their actual tasks.',
+        'Service tiers show pricing, speed, stability, and available models clearly so long-term cost can be understood from real records.',
       tips: {
         trySmall: {
-          title: 'Start small',
-          description: 'Use signup credit or a small balance to test common models before topping up more.'
+          title: 'Transparent balance',
+          description: 'Balance, trial credit, recharge records, and subscription benefits are shown together.'
         },
         serviceStatus: {
-          title: 'Check status first',
-          description: 'If a request fails, times out, or a model is unavailable, check service status before switching groups.'
+          title: 'Stable service',
+          description: 'Stability is among the best in class, with availability, latency, model lists, and service status publicly visible.'
         },
         groupChoice: {
-          title: 'Choose by task',
-          description: 'Daily high-frequency work cares about cost; important work cares about stability; image generation uses image groups.'
+          title: 'Full-capability models',
+          description: 'GPT, Claude, Gemini, and image models are 100% official full capability, never diluted.'
         },
         records: {
-          title: 'Use records to control cost',
-          description: 'The dashboard shows requests, tokens, cache, and spend, making long-term budget control easier.'
+          title: 'Privacy and records',
+          description: 'User chat conversations are not stored, user information is not disclosed externally, and requests, tokens, cache, and spend form clear usage records.'
         }
       }
     },
     // CTA section
     cta: {
-      title: 'Ready to Get Started?',
-      description: 'Sign up now and get free trial credits to experience seamless AI access',
-      button: 'Sign Up Free'
+      title: 'Official full capability, never diluted',
+      description: 'No chat retention, best-in-class stability, and abnormal charges covered.',
+      button: 'Create account'
     },
     footer: {
       allRightsReserved: 'All rights reserved.'
@@ -268,19 +352,32 @@ export default {
 
   // Key Usage Query Page
   keyUsage: {
-    title: 'API Key Usage',
-    subtitle: 'Enter your API Key to view real-time spending and usage status',
+    heroKicker: 'Usage review',
+    title: 'Credential Usage Records',
+    subtitle: 'Balance, quota, tokens, model distribution, and spend details in one view.',
     placeholder: 'sk-ant-mirror-xxxxxxxxxxxx',
-    query: 'Query',
-    querying: 'Querying...',
-    privacyNote: 'Your Key is processed locally in the browser and will not be stored',
-    dateRange: 'Date Range:',
+    query: 'View Records',
+    querying: 'Loading...',
+    privacyNote: 'The access credential is used for this browser query only and is not saved by the page.',
+    queryPanel: {
+      title: 'Review this credential',
+      description: 'Balance, limits, and spend details are shown for the current access credential.'
+    },
+    trust: {
+      sessionQuery: 'Session query',
+      sessionQueryDesc: 'The access credential is used for this browser request and is not persisted in the page.',
+      auditableRecords: 'Auditable records',
+      auditableRecordsDesc: 'Usage is grouped by date, model, and cost so billing remains reviewable.',
+      privacyBoundary: 'Privacy boundary',
+      privacyBoundaryDesc: 'Only usage and status are shown; request bodies are not expanded.'
+    },
+    dateRange: 'Date Range',
     dateRangeToday: 'Today',
     dateRange7d: '7 Days',
     dateRange30d: '30 Days',
     dateRange90d: '90 Days',
     dateRangeCustom: 'Custom',
-    apply: 'Apply',
+    apply: 'Update Range',
     used: 'Used',
     detailInfo: 'Detail Information',
     tokenStats: 'Token Statistics',
@@ -298,7 +395,7 @@ export default {
     totalTokens: 'Total Tokens',
     cost: 'Cost',
     // Status
-    quotaMode: 'Key Quota Mode',
+    quotaMode: 'Credential Quota Mode',
     walletBalance: 'Wallet Balance',
     // Ring card titles
     totalQuota: 'Total Quota',
@@ -334,10 +431,10 @@ export default {
     totalCost: 'Total Cost',
     avgDuration: 'Avg Duration',
     // Messages
-    enterApiKey: 'Please enter an API Key',
-    querySuccess: 'Query successful',
-    queryFailed: 'Query failed',
-    queryFailedRetry: 'Query failed, please try again later',
+    enterApiKey: 'Access credential is empty',
+    querySuccess: 'Records updated',
+    queryFailed: 'Failed to load records',
+    queryFailedRetry: 'Failed to load records. It should recover shortly.',
     noDailyUsage: 'No daily usage data',
   },
 
@@ -460,7 +557,7 @@ export default {
     contactSupport: 'Contact Support',
     language: 'Language',
     add: 'Add',
-    invalidEmail: 'Please enter a valid email address',
+    invalidEmail: 'Email address format is invalid',
     optional: 'optional',
     selectOption: 'Select an option',
     searchPlaceholder: 'Search...',
@@ -520,11 +617,11 @@ export default {
     acceptFailed: 'Failed to submit acknowledgment'
   },
 
-  legal: {
+    legal: {
     loadFailed: 'Failed to load document',
     retryLater: 'Refresh the page and try again later.',
     notFound: 'Document not found',
-    notFoundDescription: 'This legal document does not exist or has been removed by an administrator.',
+    notFoundDescription: 'This document is temporarily unavailable or has been updated. Return to the login page and review it again.',
     updatedAt: 'Updated: {date}',
     empty: 'No content',
     loginAgreement: 'Login Agreement',
@@ -534,10 +631,11 @@ export default {
   // Navigation
   nav: {
     dashboard: 'Dashboard',
+    accountOverview: 'Account Overview',
     announcements: 'Announcements',
     tickets: 'Tickets',
     ticketManagement: 'Ticket Management',
-    apiKeys: 'API Keys',
+    apiKeys: 'Access Credentials',
     imageGeneration: 'AI Images',
     usage: 'Usage',
     cardCodePurchase: 'Buy Card Code',
@@ -551,7 +649,7 @@ export default {
     users: 'Users',
     groups: 'Groups',
     channels: 'Channels',
-    availableChannels: 'Available Channels',
+    availableChannels: 'Available Models',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     proxies: 'Proxies',
@@ -568,8 +666,8 @@ export default {
     github: 'GitHub',
     mySubscriptions: 'My Subscriptions',
     buySubscription: 'Recharge / Subscription',
-    docs: 'Guide',
-    docsBadge: 'Start',
+    docs: 'Service Info',
+    docsBadge: 'Info',
     myOrders: 'My Orders',
     invoices: 'Invoices',
     orderManagement: 'Orders',
@@ -586,16 +684,16 @@ export default {
 
   // Auth
   auth: {
-    welcomeBack: 'Account Sign-in',
-    signInToAccount: 'Enter your email and password to verify your identity.',
+    welcomeBack: 'Welcome back',
+    signInToAccount: 'Official full-capability models, balance, charges, and service status stay clear.',
     signIn: 'Sign In',
     signingIn: 'Signing in...',
     createAccount: 'Create Account',
-    signUpToStart: 'Create your {siteName} account',
+    signUpToStart: '{siteName} keeps official full-capability models, no chat retention, and abnormal-charge coverage clear.',
     valueProps: {
-      trial: 'Trial credit included',
-      discount: 'Discount groups for frequent GPT use',
-      stability: 'Proprietary scheduling, excellent stability'
+      official: 'Official full-capability models',
+      privacy: 'No chat retention',
+      coverage: 'Abnormal charges covered'
     },
     signUp: 'Sign up',
     processing: 'Processing...',
@@ -603,112 +701,136 @@ export default {
     rememberMe: 'Remember me',
     dontHaveAccount: "Don't have an account?",
     alreadyHaveAccount: 'Already have an account?',
-    registrationDisabled: 'Registration is currently disabled. Please contact the administrator.',
+    registrationDisabled: 'Registration is not open right now. Existing accounts can still sign in.',
     emailLabel: 'Email',
-    emailPlaceholder: 'Enter your email',
-    emailDeliveryHint: 'If it does not arrive, check spam.',
+    emailPlaceholder: 'Email address',
+    emailDeliveryHint: 'Email usually arrives within a few minutes; spam folders may receive it.',
     passwordLabel: 'Password',
-    passwordPlaceholder: 'Enter your password',
-    createPasswordPlaceholder: 'Create a strong password',
+    passwordPlaceholder: 'Password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+    createPasswordPlaceholder: 'Set an account password',
     passwordHint: 'At least 6 characters',
     emailRequired: 'Email is required',
     invalidEmail: 'Please enter a valid email address',
     passwordRequired: 'Password is required',
     passwordMinLength: 'Password must be at least 6 characters',
-    loginFailed: 'Login failed. Please check your credentials and try again.',
-    loginAgreementRequired: 'Please review and accept the latest terms before signing in.',
+    loginFailed: 'Sign-in failed. The credentials were not accepted.',
+    loginAgreementRequired: 'The latest terms confirmation is not complete yet, so sign-in is temporarily unavailable.',
     errors: {
       USER_NOT_ACTIVE: 'Account has been disabled.',
     },
-    registrationFailed: 'Registration failed. Please try again.',
-    registerAgreementRequired: 'Please review and accept the latest terms before creating an account.',
+    registrationFailed: 'Registration was not completed.',
+    registerAgreementRequired: 'The latest terms confirmation is not complete yet, so account creation is temporarily unavailable.',
+    loginAgreementRejected: 'The latest terms confirmation is unfinished, so sign-in remains paused.',
+    registerAgreementRejected: 'The latest terms confirmation is unfinished, so registration remains paused.',
+    agreementPrompt: {
+      checkboxLabel: 'Read and agree to',
+      bannerTitle: 'Service protections and terms',
+      bannerDescription: 'Official full-capability models, no chat retention, and abnormal-charge coverage are stated clearly.',
+      openButton: 'View terms',
+      modalTitle: 'Service protections and terms',
+      modalDescription: 'Terms updated on {date} summarize platform protections, service scope, and account security boundaries.',
+      guaranteesLabel: 'Platform protections',
+      guarantees: {
+        official: '100% official full-capability models. Never diluted.',
+        privacy: 'No chat conversation retention and no active disclosure of user information.',
+        billing: 'Excellent stability, with abnormal charges covered by traceable records.'
+      },
+      documentsLabel: 'Terms included',
+      documentSeparator: ', ',
+      reject: 'Not now',
+      accept: 'Agree',
+      recent: 'Recently'
+    },
     emailSuffixNotAllowed: 'This email domain is not allowed for registration.',
     emailSuffixNotAllowedWithAllowed:
       'This email domain is not allowed. Allowed domains: {suffixes}',
     emailSuffixAllowedMore: 'and {count} more',
-    loginSuccess: 'Login successful! Welcome back.',
-    accountCreatedSuccess: 'Account created successfully! Welcome to {siteName}.',
-    reloginRequired: 'Session expired. Please log in again.',
-    turnstileExpired: 'Verification expired, please try again',
-    turnstileFailed: 'Verification failed, please try again',
-    completeVerification: 'Please complete the verification',
-    verifyYourEmail: 'Verify Your Email',
+    emailSuffixListSeparator: ', ',
+    loginSuccess: 'Signed in.',
+    accountCreatedSuccess: '{siteName} account created.',
+    reloginRequired: 'Session expired. Sign-in needs to be refreshed.',
+    turnstileExpired: 'Verification expired',
+    turnstileFailed: 'Verification was not accepted',
+    completeVerification: 'Verification is not complete',
+    verifyYourEmail: 'Verify Email',
     sessionExpired: 'Session expired',
-    sessionExpiredDesc: 'Please go back to the registration page and start again.',
+    sessionExpiredDesc: 'The registration session has expired.',
     verificationCode: 'Verification Code',
-    verificationCodeHint: 'Enter the 6-digit code sent to your email',
+    verificationCodeHint: 'The 6-digit code from email',
     sendingCode: 'Sending...',
     sendCode: 'Send code',
-    clickToResend: 'Click to resend code',
+    clickToResend: 'Resend verification code',
     resendCode: 'Resend verification code',
     sendCodeDesc: "We'll send a verification code to",
-    codeSentSuccess: 'Verification code sent. Please check your inbox.',
+    codeSentSuccess: 'Verification code sent.',
     verifying: 'Verifying...',
     verifyAndCreate: 'Verify & Create Account',
     resendCountdown: 'Resend code in {countdown}s',
     backToRegistration: 'Back to registration',
-    sendCodeFailed: 'Failed to send verification code. Please try again.',
-    verifyFailed: 'Verification failed. Please try again.',
+    sendCodeFailed: 'Verification code was not sent.',
+    verifyFailed: 'Verification was not completed.',
     codeRequired: 'Verification code is required',
-    invalidCode: 'Please enter a valid 6-digit code',
+    invalidCode: 'Verification code must be 6 digits',
     promoCodeLabel: 'Promo Code',
-    promoCodePlaceholder: 'Enter promo code (optional)',
-    promoCodeValid: 'Valid! You will receive ${amount} bonus balance',
+    promoCodePlaceholder: 'Promo code',
+    promoCodeValid: 'Promo code valid. ${amount} bonus balance will be added after registration',
     promoCodeInvalid: 'Invalid promo code',
     promoCodeNotFound: 'Promo code not found',
     promoCodeExpired: 'This promo code has expired',
     promoCodeDisabled: 'This promo code is disabled',
     promoCodeMaxUsed: 'This promo code has reached its usage limit',
     promoCodeAlreadyUsed: 'You have already used this promo code',
-    promoCodeValidating: 'Promo code is being validated, please wait',
-    promoCodeInvalidCannotRegister: 'Invalid promo code. Please check and try again or clear the promo code field',
+    promoCodeValidating: 'Promo code is being validated',
+    promoCodeInvalidCannotRegister: 'Invalid promo code. Registration has not continued',
     invitationCodeLabel: 'Invitation Code',
-    invitationCodePlaceholder: 'Enter invitation code',
+    invitationCodePlaceholder: 'Invitation code',
     invitationCodeRequired: 'Invitation code is required',
     invitationCodeValid: 'Invitation code is valid',
     invitationCodeInvalid: 'Invalid or used invitation code',
     invitationCodeValidating: 'Validating invitation code...',
-    invitationCodeInvalidCannotRegister: 'Invalid invitation code. Please check and try again',
+    invitationCodeInvalidCannotRegister: 'Invalid invitation code. Registration has not continued',
     oauthOrContinue: 'or continue with others',
     linuxdo: {
       signIn: 'Continue with Linux.do',
       orContinue: 'or continue with email',
       callbackTitle: 'Signing you in',
-      callbackProcessing: 'Completing login, please wait...',
-      callbackHint: 'If you are not redirected automatically, go back to the login page and try again.',
-      callbackMissingToken: 'Missing login token, please try again.',
+      callbackProcessing: 'Completing login...',
+      callbackHint: 'If this page stays open, authorization can be restarted from the login page.',
+      callbackMissingToken: 'Login token is missing.',
       backToLogin: 'Back to Login',
-      invitationRequired: 'This Linux.do account is not yet registered. The site requires an invitation code — please enter one to complete registration.',
-      invalidPendingToken: 'The registration token has expired. Please sign in with Linux.do again.',
+      invitationRequired: 'This Linux.do account is not registered yet. An invitation code is required to complete registration.',
+      invalidPendingToken: 'The registration token has expired.',
       completeRegistration: 'Complete Registration',
       completing: 'Completing registration…',
-      completeRegistrationFailed: 'Registration failed. Please check your invitation code and try again.'
+      completeRegistrationFailed: 'Registration was not completed. The invitation code was not accepted.'
     },
     dingtalk: {
       signIn: 'Continue with DingTalk',
       callbackTitle: 'Signing you in with DingTalk',
-      callbackProcessing: 'Completing DingTalk login, please wait...',
-      callbackHint: 'If you are not redirected automatically, go back to the login page and try again.',
-      callbackMissingToken: 'Missing login token, please try again.',
+      callbackProcessing: 'Completing DingTalk login...',
+      callbackHint: 'If this page stays open, authorization can be restarted from the login page.',
+      callbackMissingToken: 'Login token is missing.',
       backToLogin: 'Back to Login',
-      invitationRequired: 'This DingTalk account is not yet registered. The site requires an invitation code — please enter one to complete registration.',
-      invalidPendingToken: 'The registration token has expired. Please sign in with DingTalk again.',
+      invitationRequired: 'This DingTalk account is not registered yet. An invitation code is required to complete registration.',
+      invalidPendingToken: 'The registration token has expired.',
       completeRegistration: 'Complete Registration',
       completing: 'Completing registration…',
-      completeRegistrationFailed: 'Registration failed. Please check your invitation code and try again.',
+      completeRegistrationFailed: 'Registration was not completed. The invitation code was not accepted.',
       createAccountTitle: 'Create DingTalk Account',
-      registrationDisabledRedirectToBind: 'New account registration is currently disabled. Please bind to your existing account with its email and password.',
+      registrationDisabledRedirectToBind: 'New account registration is disabled. Existing accounts can bind DingTalk sign-in.',
       error: {
         title: 'DingTalk Sign-in Failed',
-        csrf: 'Login session expired, please scan again',
-        corp_rejected: 'Your DingTalk account is not part of this organization. Please contact administrator',
+        csrf: 'Login session expired; a new scan is required',
+        corp_rejected: 'This DingTalk account is outside the organization. Platform support can review access',
         dingtalk_not_enabled: 'DingTalk login is not enabled',
-        upstream_error: 'DingTalk service is temporarily unavailable. Please try again later',
-        missing_browser_session: 'Browser session lost. Please login again',
+        upstream_error: 'DingTalk service is temporarily unavailable',
+        missing_browser_session: 'Browser session lost. Sign-in needs to be restarted',
         missing_params: 'Request parameters are incomplete',
         invalid_state: 'Invalid login state',
         provider_error: 'DingTalk authorization failed',
-        session_error: 'Failed to create session. Please retry',
+        session_error: 'Failed to create session',
         retry: 'Retry Login'
       }
     },
@@ -718,16 +840,16 @@ export default {
     oidc: {
       signIn: 'Continue with {providerName}',
       callbackTitle: 'Signing you in with {providerName}',
-      callbackProcessing: 'Completing login with {providerName}, please wait...',
-      callbackHint: 'If you are not redirected automatically, go back to the login page and try again.',
-      callbackMissingToken: 'Missing login token, please try again.',
+      callbackProcessing: 'Completing login with {providerName}...',
+      callbackHint: 'If this page stays open, authorization can be restarted from the login page.',
+      callbackMissingToken: 'Login token is missing.',
       backToLogin: 'Back to Login',
       invitationRequired:
-        'This {providerName} account is not yet registered. The site requires an invitation code — please enter one to complete registration.',
-      invalidPendingToken: 'The registration token has expired. Please sign in again.',
+        'This {providerName} account is not registered yet. An invitation code is required to complete registration.',
+      invalidPendingToken: 'The registration token has expired.',
       completeRegistration: 'Complete Registration',
       completing: 'Completing registration…',
-      completeRegistrationFailed: 'Registration failed. Please check your invitation code and try again.'
+      completeRegistrationFailed: 'Registration was not completed. The invitation code was not accepted.'
     },
     oauthFlow: {
       profileDetailsTitle: 'Use {providerName} profile details',
@@ -737,13 +859,13 @@ export default {
       avatarAlt: '{providerName} avatar',
       reviewProfileBeforeContinue: 'Review the {providerName} profile details before continuing.',
       chooseHowToContinue: 'Choose how to continue',
-      chooseAccountActionHint: 'Choose whether to bind an existing account or create a new one.',
-      suggestedEmail: 'Suggested email: {email}',
+      chooseAccountActionHint: 'An existing account can be bound, or a new account can be created.',
+      suggestedEmail: 'Email: {email}',
       bindExistingAccount: 'Bind existing account',
       createNewAccount: 'Create new account',
-      createAccountHint: 'Enter an email address to create your account and continue.',
-      bindLoginHint: 'Log in to an existing account to bind this {providerName} sign-in.',
-      signInThenBindDescription: 'Sign in to an existing account, then bind this {providerName} sign-in to it.',
+      createAccountHint: 'Email address is used to create the account and continue.',
+      bindLoginHint: 'An existing account sign-in will bind this {providerName} sign-in.',
+      signInThenBindDescription: 'After existing account sign-in, this {providerName} sign-in will bind to that account.',
       bindSignInToExistingAccount: 'Bind this {providerName} sign-in to an existing account.',
       bindCurrentAccountTitle: 'Bind the current account',
       bindCurrentAccountDescription: 'Bind this {providerName} sign-in to the account currently signed in on this browser.',
@@ -752,12 +874,13 @@ export default {
       useDifferentEmail: 'Use a different email',
       backToOptions: 'Back to options',
       yourAccount: 'your account',
-      totpHint: 'Enter the 6-digit verification code for {account} to finish binding this {providerName} sign-in.',
+      totpHint: 'The 6-digit code for {account} completes this {providerName} sign-in binding.',
       verifyAndContinue: 'Verify and continue',
-      wechatAvailabilityUnknown: 'WeChat sign-in availability could not be confirmed. Refresh and retry.',
+      wechatAvailabilityUnknown: 'WeChat sign-in availability could not be confirmed.',
       wechatSystemBrowserOnly: 'This WeChat sign-in flow is only available in your system browser.',
       wechatBrowserOnly: 'This WeChat sign-in flow is only available inside the WeChat browser.',
-      wechatNotConfigured: 'WeChat sign-in is not configured yet.'
+      wechatNativeAppRequired: 'This site only has WeChat mobile app sign-in configured. Authorization starts from the native app through the WeChat SDK.',
+      wechatNotConfigured: 'WeChat sign-in is not open yet.'
     },
     linuxdoCallbackPageTitle: 'LinuxDo Sign-In Callback',
     dingtalkCallbackPageTitle: 'DingTalk Sign-In Callback',
@@ -774,9 +897,9 @@ export default {
     },
     oauth: {
       callbackTitle: 'OAuth Callback',
-      callbackHint: 'Copy the code and state back to the admin authorization flow when needed.',
+      callbackHint: 'Return to the page that started authorization to continue.',
       invalidCallbackTitle: 'Invalid sign-in callback',
-      invalidCallbackHint: 'This page does not contain a valid authorization result. Return to the login page and start quick sign-in again.',
+      invalidCallbackHint: 'This page does not contain a valid authorization result. Quick sign-in can be restarted from the login page.',
       code: 'Code',
       state: 'State',
       fullUrl: 'Full URL'
@@ -784,47 +907,47 @@ export default {
     // Forgot password
     forgotPassword: 'Forgot password?',
     forgotPasswordTitle: 'Reset Your Password',
-    forgotPasswordHint: 'Enter your email address and we will send you a link to reset your password.',
+    forgotPasswordHint: 'If the email is registered, a password reset link will be sent.',
     sendResetLink: 'Send Reset Link',
     sendingResetLink: 'Sending...',
-    sendResetLinkFailed: 'Failed to send reset link. Please try again.',
+    sendResetLinkFailed: 'Reset link was not sent.',
     resetEmailSent: 'Reset Link Sent',
-    resetEmailSentHint: 'If an account exists with this email, you will receive a password reset link shortly.',
+    resetEmailSentHint: 'If this email is registered, a reset link will be delivered there.',
     backToLogin: 'Back to Login',
     rememberedPassword: 'Remembered your password?',
     // Reset password
     resetPasswordTitle: 'Set New Password',
-    resetPasswordHint: 'Enter your new password below.',
+    resetPasswordHint: 'Set a new sign-in password for this account.',
     newPassword: 'New Password',
-    newPasswordPlaceholder: 'Enter your new password',
+    newPasswordPlaceholder: 'New password',
     confirmPassword: 'Confirm Password',
-    confirmPasswordPlaceholder: 'Confirm your new password',
-    confirmPasswordRequired: 'Please confirm your password',
+    confirmPasswordPlaceholder: 'Confirm new password',
+    confirmPasswordRequired: 'Password confirmation is required',
     passwordsDoNotMatch: 'Passwords do not match',
     resetPassword: 'Reset Password',
     resettingPassword: 'Resetting...',
-    resetPasswordFailed: 'Failed to reset password. Please try again.',
+    resetPasswordFailed: 'Password reset was not completed.',
     passwordResetSuccess: 'Password Reset Successful',
-    passwordResetSuccessHint: 'Your password has been reset. You can now sign in with your new password.',
+    passwordResetSuccessHint: 'The new password is active and can be used for sign-in.',
     invalidResetLink: 'Invalid Reset Link',
-    invalidResetLinkHint: 'This password reset link is invalid or has expired. Please request a new one.',
-    requestNewResetLink: 'Request New Reset Link',
-    invalidOrExpiredToken: 'The password reset link is invalid or has expired. Please request a new one.',
+    invalidResetLinkHint: 'This password reset link is invalid or expired.',
+    requestNewResetLink: 'Get a new reset link',
+    invalidOrExpiredToken: 'The password reset link is invalid or expired.',
     registerOnboarding: {
-      title: 'No guessing after registration',
-      description: 'After signing up, check your credit, create an API key, then copy the client configuration to start calling models.',
+      title: 'Account status stays visible',
+      description: 'Balance, access credentials, and access details are shown together, while model calls become traceable records.',
       steps: {
         credit: {
-          title: 'Check credit',
-          description: 'Signup credit and top-up balance are shown on the dashboard.'
+          title: 'Account balance',
+          description: 'Trial credit and top-up balance are shown on the dashboard.'
         },
         key: {
-          title: 'Create a key',
-          description: 'Choose a group for your task. Billing follows the selected group.'
+          title: 'Access credential',
+          description: 'Each credential connects to a service tier and its billing records.'
         },
         connect: {
-          title: 'Copy config',
-          description: 'Connect Codex, Claude Code, Gemini CLI, and API tools with the guide.'
+          title: 'Access details',
+          description: 'Codex, Claude Code, Gemini CLI, and API tool access details are shown together.'
         }
       }
     }
@@ -832,33 +955,52 @@ export default {
 
   // Dashboard
   dashboard: {
-    title: 'Dashboard',
-    welcomeMessage: "Welcome back! Here's an overview of your account.",
-    loadFailed: 'Dashboard failed to load',
-    loadFailedDesc: 'This may be a temporary network issue or a session refresh failure. Please retry.',
+    title: 'Account Overview',
+    welcomeMessage: 'Balance, spend, usage, and service status stay clear.',
+    hero: {
+      description: 'Balance, requests, actual spend, and model service status are kept together for daily review.',
+      note: 'Official full-capability access, no chat retention, abnormal charges covered, and stable service.'
+    },
+    assurance: {
+      official: 'Official capability',
+      noRetention: 'No chat retention',
+      billingCover: 'Abnormal charges covered',
+      stability: 'Stable service'
+    },
+    loadFailed: 'Account status failed to load',
+    loadFailedDesc: 'Current status is temporarily unavailable.',
     retryLoad: 'Reload',
     todayOverview: 'Today Overview',
     accountSnapshot: 'Account status and usage snapshot',
+    usageAndSpend: 'Usage and spend',
+    usageAndSpendDesc: 'Requests, tokens, actual spend, and service status stay in sync.',
+    liveSnapshot: 'Live snapshot',
     balance: 'Balance',
     balanceApproxCny: '≈ {amount} CNY',
-    apiKeys: 'API Keys',
+    apiKeys: 'Access Credentials',
+    keyStatus: 'Credential status',
+    activeKeys: '{count} active',
     todayRequests: 'Today Requests',
-    todayCost: 'Today Cost',
+    todayCost: 'Today Spend',
     todayTokens: 'Today Tokens',
     totalTokens: 'Total Tokens',
+    totalUsage: 'Total requests',
+    totalSpend: 'Total spend',
     cacheToday: 'Cache (Today)',
     performance: 'Performance',
     avgResponse: 'Avg Response',
     averageTime: 'Average time',
+    serviceStable: 'Stable',
+    serviceStatusHint: 'Request routing is available, with response time and cache hit rate visible.',
     timeRange: 'Time Range',
     granularity: 'Granularity',
     day: 'Day',
     hour: 'Hour',
-    modelDistribution: 'Model Distribution',
-    groupDistribution: 'Group Usage Distribution',
-    platformBreakdown: 'Per-platform Breakdown',
-    platformBreakdownEmpty: 'No platform usage yet',
-    platformCount: '{count} platforms',
+    modelDistribution: 'Model usage',
+    groupDistribution: 'Service Tier Usage',
+    platformBreakdown: 'By model service',
+    platformBreakdownEmpty: 'No model service usage yet',
+    platformCount: '{count} services',
     platformOther: 'Other',
     platformQuota: {
       title: 'Quota Usage',
@@ -870,52 +1012,127 @@ export default {
       disabled: 'Disabled',
     },
     tokenUsageTrend: 'Token Usage Trend',
+    usageTrend: 'Spend and token trend',
+    usageTrendHint: 'Actual spend, official list price, and token movement for the selected range.',
     noDataAvailable: 'No data available',
     model: 'Model',
-    group: 'Group',
-    noGroup: 'No Group',
+    group: 'Service Tier',
+    noGroup: 'No service tier',
     requests: 'Requests',
     tokens: 'Tokens',
-    actual: 'Actual',
-    standard: 'Standard',
+    actual: 'Actual spend',
+    standard: 'Official price',
     input: 'Input',
     output: 'Output',
     cache: 'Cache',
     recentUsage: 'Recent Usage',
+    recentUsageHint: 'Recent requests, model names, and actual spend in time order.',
     last7Days: 'Last 7 days',
-    noUsageRecords: 'No usage records',
-    startUsingApi: 'Start using the API to see your usage history here.',
-    viewAllUsage: 'View all usage',
-    quickActions: 'Quick Actions',
-    quickActionsHint: 'For first use, finish these in order: create a key, copy config, and send one test request.',
-    firstRun: {
-      title: 'Three steps for new users',
-      description: 'Do not start with a complex project. First verify that the key, group, and client configuration all work.',
-      steps: {
-        createKey: 'Create an API key',
-        selectGroup: 'Choose a group for the task',
-        copyConfig: 'Click “Use Key” and copy config'
+    noUsageRecords: 'No recent requests',
+    startUsingApi: 'Requests, models, and spend records will appear here in time order.',
+    viewAllUsage: 'All records',
+    trustPanel: {
+      kicker: 'Platform assurance',
+      title: 'Core safeguards',
+      description: 'Model integrity, privacy, billing, and stability stay clear.',
+      items: {
+        official: {
+          title: 'Official capability',
+          description: 'GPT, Claude, Gemini, and image models are connected with official capability.',
+        },
+        privacy: {
+          title: 'No chat retention',
+          description: 'The platform does not store chat content, and user information is not disclosed externally.',
+        },
+        billing: {
+          title: 'Abnormal charges covered',
+          description: 'Models, rates, tokens, and balance changes stay traceable, with abnormal charges covered.',
+        },
+        stability: {
+          title: 'Stable service',
+          description: 'Service status and availability remain clear.',
+        },
+      },
+    },
+    quickActionsKicker: 'Quick access',
+    quickActions: 'Account center',
+    quickActionsDescription: 'Access credentials, billing, orders, and support stay in the same area.',
+    quickActionsBadge: 'Direct',
+    quickLinks: {
+      keys: {
+        title: 'Access credentials',
+        description: 'Credential status, permissions, and rotation records.'
+      },
+      usage: {
+        title: 'Usage records',
+        description: 'Requests, tokens, and actual spend details.'
+      },
+      plans: {
+        title: 'Balance and plans',
+        description: 'Balance, plans, and renewal records.'
+      },
+      orders: {
+        title: 'Orders',
+        description: 'Payments, credits, and order status.'
+      },
+      profile: {
+        title: 'Account security',
+        description: 'Security, bindings, and balance alerts.'
+      },
+      support: {
+        title: 'Support tickets',
+        description: 'Abnormal charges, quotas, and service issues.'
+      },
+      redeem: {
+        title: 'Redeem records',
+        description: 'Redeemed credit and posting records.'
+      },
+      affiliate: {
+        title: 'Invite rebates',
+        description: 'Invite links and rebate balance.'
       }
     },
-    createApiKey: 'Create API Key',
-    generateNewKey: 'Generate a new API key',
+    createApiKey: 'Access credentials',
+    generateNewKey: 'Credential status and permissions',
     serviceStatus: 'Service Status',
-    checkGroupHealth: 'Check here first when requests fail',
-    viewUsage: 'View Usage',
-    checkDetailedLogs: 'Check detailed usage logs',
+    checkGroupHealth: 'Availability, latency, and recent status',
+    viewUsage: 'Usage records',
+    checkDetailedLogs: 'Request, model, and spend details',
+    buySubscription: 'Balance and plans',
+    manageBalanceAndPlans: 'Balance, plans, and order records',
+    accountSettings: 'Account Settings',
+    accountSettingsHint: 'Alerts, security, and linked identities',
     redeemCode: 'Redeem Code',
-    addBalanceWithCode: 'Add balance with a code',
+    addBalanceWithCode: 'Redeemed credit records stay traceable',
+    affiliateInvite: 'Invite / Rebates',
+    affiliateInviteHint: 'Invite links and rebate credit',
+    modelDistributionHint: 'Requests, tokens, actual spend, and official price grouped by model.',
+    serviceTransparency: 'Model Service Status',
+    serviceTransparencyDesc: 'Requests, tokens, spend, and quotas are grouped by model service so abnormal charges are easier to review.',
     balanceEquivalent: {
-      show: 'Show official-value equivalent',
-      hide: 'Hide official-value estimate',
-      title: 'Equivalent official API value',
-      description: 'Converts your site balance by each available API group rate into the equivalent official API list-price USD value. Image-generation groups are not included in this USD-value estimate.',
-      rate: 'Site {rate} rate',
+      show: 'Value estimate',
+      hide: 'Hide estimate',
+      title: 'Official value estimate',
+      description: 'Converts your balance by each available service tier price into the equivalent official API list-price USD value. Image generation is not included in this estimate.',
+      rate: '{rate} rate',
       quota: 'Official API quota',
       officialQuota: 'Official USD value',
       officialAmount: 'Official {amount}',
-      apiFormula: 'Formula: site balance {balance} ÷ effective rate {rate} = equivalent official list-price value {quota}',
-      empty: 'No available groups'
+      apiFormula: 'Formula: balance {balance} ÷ effective price factor {rate} = equivalent official list-price value {quota}',
+      empty: 'No service tiers available'
+    },
+    retention: {
+      lowBalanceBanner: {
+        criticalTitle: 'Account balance is 0',
+        lowTitle: 'Account balance is below the alert line',
+        balanceLabel: 'Current {balance}',
+        criticalMessage: 'Current balance is 0.',
+        lowMessage: 'Current balance is at or below {threshold}.',
+        primaryAction: 'Top up',
+        docsAction: 'Docs',
+        usageAction: 'View usage',
+        dismiss24h: 'Hide for 24 hours'
+      }
     }
   },
 
@@ -924,129 +1141,127 @@ export default {
     subscription: 'Sub'
   },
 
-  // API Keys
+  // Access Credentials
   keys: {
-    title: 'API Keys',
-    description: 'Manage your API keys and access tokens',
-    searchPlaceholder: 'Search name or key...',
+    title: 'Access Credentials',
+    description: 'Access credentials, service tiers, quota, and connection details in one place',
+    hero: {
+      title: 'Access Credentials',
+      description: 'Service access, available tiers, quota, and spend records stay clear.',
+      signals: {
+        official: 'Full official capability',
+        billing: 'Auditable billing',
+        status: 'Transparent status'
+      }
+    },
+    searchPlaceholder: 'Search name or credential...',
     endpoints: {
-      title: 'API Endpoints',
+      title: 'Service Endpoints',
       default: 'Default',
       copied: 'Copied',
       copiedHint: 'Copied to clipboard',
-      clickToCopy: 'Click to copy this endpoint',
+      clickToCopy: 'Copy endpoint',
       speedTest: 'Speed Test',
     },
-    allGroups: 'All Groups',
+    allGroups: 'All service tiers',
     allStatus: 'All Status',
-    createKey: 'Create API Key',
-    editKey: 'Edit API Key',
-    deleteKey: 'Delete API Key',
+    createKey: 'New Credential',
+    editKey: 'Edit Credential',
+    deleteKey: 'Delete Credential',
     deleteConfirmMessage: "Are you sure you want to delete '{name}'? This action cannot be undone.",
-    apiKey: 'API Key',
-    group: 'Group',
-    category: 'Group Platform',
-    categoryLabel: 'Group Platform',
-    categoryHint: 'Shown from the selected group platform. It is only used while choosing a group.',
-    selectCategory: 'Select group platform',
+    apiKey: 'Access Credential',
+    group: 'Service Tier',
+    category: 'Service Type',
+    categoryLabel: 'Service Type',
+    categoryHint: 'Shown from the model service behind the selected service tier. It is only used while choosing a tier.',
+    selectCategory: 'Select service type',
     allCategories: 'All Platforms',
     categories: {
       openai: 'OpenAI',
       anthropic: 'Anthropic',
       other: 'Other',
     },
-    noGroup: 'No group',
-    searchGroup: 'Search groups...',
-    noGroupFound: 'No groups found',
+    noGroup: 'No service tier',
+    searchGroup: 'Search service tiers...',
+    noGroupFound: 'No service tiers found',
     created: 'Created',
     copyToClipboard: 'Copy to clipboard',
     copied: 'Copied!',
-    importToCcSwitch: 'Import to CC Switch',
+    importToCcSwitch: 'CC Switch Access',
     enable: 'Enable',
     disable: 'Disable',
     nameLabel: 'Name',
-    namePlaceholder: 'My API Key',
-    groupLabel: 'Group',
-    selectGroup: 'Select a group',
+    namePlaceholder: 'My access credential',
+    groupLabel: 'Service Tier',
+    selectGroup: 'Select a service tier',
     statusLabel: 'Status',
     selectStatus: 'Select status',
-    firstRunGuide: {
-      title: 'Start here for your first integration',
-      description: 'Create an API key, choose a group, then click “Use Key” to copy config. Make one simple request before connecting Codex, Claude Code, Gemini CLI, or your own project.',
-      steps: {
-        create: 'Create key',
-        group: 'Choose group',
-        use: 'Copy config'
-      }
-    },
     balanceExplain: {
       title: 'How does balance map to official pricing?',
-      description: '¥1 is shown as $1 site credit. Actual cost is roughly official model price × current group rate. Lower group rates let the same balance cover more official list-price usage.'
+      description: '¥1 is shown as $1 balance credit. Actual cost is roughly official model price × the current service tier rate. Lower rates let the same balance cover more official list-price usage.'
     },
     groupChoiceTips: {
       cost: {
-        title: 'Daily use: watch cost',
-        description: 'For coding, Q&A, and research organization, start by testing lower-rate groups.'
+        title: 'Cost stays visible',
+        description: 'Each service tier shows its rate and usage records for long-term cost comparison.'
       },
       stability: {
-        title: 'Important tasks: watch stability',
-        description: 'For long tasks, deliverables, and automation workflows, prefer more stable groups.'
+        title: 'Service stability is visible',
+        description: 'Service status appears close to access details, making long-running work easier to observe.'
       },
       image: {
-        title: 'Image generation: check group name',
-        description: 'Use groups named for image generation. Regular text groups may not support image generation.'
+        title: 'Capabilities are separated',
+        description: 'Text, code, multimodal, and image services are organized by tier with clear capability boundaries.'
       }
     },
     groupCostPreview: {
       title: '{group} billing preview',
       description: 'Current effective rate is about {rate}. At 1 USD≈¥{cny}, this is roughly {discount}/10 of official CNY pricing.',
       note: 'This is an estimate for understanding. Actual billing follows model pricing, current rate, and usage records.',
-      unavailable: 'The current group rate cannot be calculated. Please rely on group notes and usage records.'
+      unavailable: 'The current service tier rate cannot be calculated. Please rely on tier notes and usage records.'
     },
     serviceStatusTip: {
-      title: 'Can’t connect or seeing errors? Check service status first',
-      description: 'If requests fail, time out, or a model is temporarily unavailable, check the current group status first. When a group is unstable, switch to a more stable group in time.',
+      title: 'Service status sits beside access details',
+      description: 'Availability, latency, and recent status stay connected to the service tier behind each credential.',
       action: 'View Service Status',
     },
-    createServiceStatusHint:
-      'Before creating a key, confirm the selected group is healthy. If you later cannot connect or see errors, check service status first and switch to a more stable group when needed.',
     viewServiceStatus: 'View service status',
     saving: 'Saving...',
-    noKeysYet: 'No API keys yet',
-    createFirstKey: 'Create your first API key to get started with the API.',
-    keyCreatedSuccess: 'API key created successfully',
-    keyUpdatedSuccess: 'API key updated successfully',
-    keyDeletedSuccess: 'API key deleted successfully',
-    keyEnabledSuccess: 'API key enabled successfully',
-    keyDisabledSuccess: 'API key disabled successfully',
-    failedToLoad: 'Failed to load API keys',
-    failedToSave: 'Failed to save API key',
-    failedToDelete: 'Failed to delete API key',
-    failedToUpdateStatus: 'Failed to update API key status',
-    clickToChangeGroup: 'Click to change group',
-    groupChangedSuccess: 'Group changed successfully',
-    failedToChangeGroup: 'Failed to change group',
-    groupRequired: 'Please select a group',
+    noKeysYet: 'No access credentials yet',
+    createFirstKey: 'No access credential records are present on this account.',
+    keyCreatedSuccess: 'Access credential added successfully',
+    keyUpdatedSuccess: 'Access credential updated successfully',
+    keyDeletedSuccess: 'Access credential deleted successfully',
+    keyEnabledSuccess: 'Access credential enabled successfully',
+    keyDisabledSuccess: 'Access credential disabled successfully',
+    failedToLoad: 'Failed to load access credentials',
+    failedToSave: 'Failed to save access credential',
+    failedToDelete: 'Failed to delete access credential',
+    failedToUpdateStatus: 'Failed to update access credential status',
+    clickToChangeGroup: 'Change service tier',
+    groupChangedSuccess: 'Service tier changed successfully',
+    failedToChangeGroup: 'Failed to change service tier',
+    groupRequired: 'Please select a service tier',
     usage: 'Usage',
     today: 'Today',
     total: 'Last 30d',
     quota: 'Quota',
     lastUsedAt: 'Last Used',
-    useKey: 'Use Key',
+    useKey: 'Access Details',
     useKeyModal: {
-      title: 'Use API Key',
+      title: 'Access Details',
       description:
-        'Add the following environment variables to your terminal profile or run directly in terminal to configure API access.',
+        'Client connection details for this access credential are organized below.',
       copy: 'Copy',
       copied: 'Copied',
-      note: 'These environment variables will be active in the current terminal session. For permanent configuration, add them to ~/.bashrc, ~/.zshrc, or the appropriate configuration file.',
-      noGroupTitle: 'Please assign a group first',
-      noGroupDescription: 'This API key has not been assigned to a group. Please click the group column in the key list to assign one before viewing the configuration.',
+      note: 'Environment variable content is generated for the current access credential.',
+      noGroupTitle: 'No service tier assigned',
+      noGroupDescription: 'Client access details appear after a service tier is assigned.',
       openai: {
-        description: 'Add the following configuration files to your Codex CLI config directory.',
-        configTomlHint: 'Make sure the following content is at the beginning of the config.toml file',
-        note: 'Make sure the config directory exists. macOS/Linux users can run mkdir -p ~/.codex to create it.',
-        noteWindows: 'Press Win+R and enter %userprofile%\\.codex to open the config directory. Create it manually if it does not exist.',
+        description: 'Codex CLI access configuration.',
+        configTomlHint: 'config.toml configuration',
+        note: 'Directory reference: ~/.codex.',
+        noteWindows: 'Windows directory reference: %userprofile%\\.codex.',
       },
       cliTabs: {
         claudeCode: 'Claude Code',
@@ -1056,52 +1271,52 @@ export default {
         opencode: 'OpenCode',
       },
       antigravity: {
-        description: 'Configure API access for Antigravity group. Select the configuration method based on your client.',
+        description: 'API access details for Antigravity service tiers.',
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
-        claudeNote: 'These environment variables will be active in the current terminal session. For permanent configuration, add them to ~/.bashrc, ~/.zshrc, or the appropriate configuration file.',
-        geminiNote: 'These environment variables will be active in the current terminal session. For permanent configuration, add them to ~/.bashrc, ~/.zshrc, or the appropriate configuration file.',
+        claudeNote: 'Environment variable content is generated for the current access credential.',
+        geminiNote: 'Environment variable content is generated for the current access credential.',
       },
       gemini: {
-        description: 'Add the following environment variables to your terminal profile or run directly in terminal to configure Gemini CLI access.',
-        modelComment: 'If you have Gemini 3 access, you can use: gemini-3-pro-preview',
-        note: 'These environment variables will be active in the current terminal session. For permanent configuration, add them to ~/.bashrc, ~/.zshrc, or the appropriate configuration file.',
+        description: 'Environment variables for Gemini CLI access.',
+        modelComment: 'Gemini 3 can use: gemini-3-pro-preview when available',
+        note: 'Environment variable content is generated for the current access credential.',
       },
       opencode: {
-        title: 'OpenCode Example',
+        title: 'OpenCode Access Example',
         subtitle: 'opencode.json',
-        hint: 'Config path: ~/.config/opencode/opencode.json (or opencode.jsonc), create it if missing. The generated content includes apiKey, baseURL, model limit/options/variants, and other required fields. API Key can also be configured through the /connect command.',
+        hint: 'OpenCode configuration location: ~/.config/opencode/opencode.json (or opencode.jsonc). The generated content includes apiKey, baseURL, model limit/options/variants, and other required fields.',
       },
     },
-    customKeyLabel: 'Custom Key',
-    customKeyPlaceholder: 'Enter your custom key (min 16 chars)',
+    customKeyLabel: 'Custom credential',
+    customKeyPlaceholder: 'Enter your custom credential (min 16 chars)',
     customKeyHint: 'Only letters, numbers, underscores and hyphens allowed. Minimum 16 characters.',
-    customKeyTooShort: 'Custom key must be at least 16 characters',
-    customKeyInvalidChars: 'Custom key can only contain letters, numbers, underscores, and hyphens',
-    customKeyRequired: 'Please enter a custom key',
+    customKeyTooShort: 'Custom credential must be at least 16 characters',
+    customKeyInvalidChars: 'Custom credential can only contain letters, numbers, underscores, and hyphens',
+    customKeyRequired: 'Please enter a custom credential',
     ipRestriction: 'IP Restriction',
     ipWhitelist: 'IP Whitelist',
     ipWhitelistPlaceholder: '192.168.1.100\n10.0.0.0/8',
-    ipWhitelistHint: 'One IP or CIDR per line. Only these IPs can use this key when set.',
+    ipWhitelistHint: 'One IP or CIDR per line. Only these IPs can use this credential when set.',
     ipBlacklist: 'IP Blacklist',
     ipBlacklistPlaceholder: '1.2.3.4\n5.6.0.0/16',
-    ipBlacklistHint: 'One IP or CIDR per line. These IPs will be blocked from using this key.',
+    ipBlacklistHint: 'One IP or CIDR per line. These IPs will be blocked from using this credential.',
     ipRestrictionEnabled: 'IP restriction enabled',
-    ccSwitchNotInstalled: 'CC Switch is not installed or the protocol handler is not registered. Please install CC Switch first or manually copy the API key.',
+    ccSwitchNotInstalled: 'CC Switch protocol handler was not detected. Manual copy remains available.',
     ccSwitchDialog: {
-      title: 'Import to CC Switch',
-      description: 'Choose the local client to configure for this key group. CC Switch will write the matching client config and keep managing provider switches.',
-      currentGroup: 'Current group',
-      noGroup: 'This API key has not been assigned to a group. Click the group column in the key list to assign one first.',
+      title: 'CC Switch Access',
+      description: 'Available client access details are shown for the current credential and service tier.',
+      currentGroup: 'Current service tier',
+      noGroup: 'CC Switch access details appear after a service tier is assigned.',
       endpoint: 'Endpoint',
       model: 'Model',
       protocol: 'Protocol',
       reasoning: 'Reasoning',
-      import: 'Import',
+      import: 'Access',
       copyLink: 'Copy link',
       linkCopied: 'Link copied',
       openOfficial: 'Open CC Switch',
-      installHint: 'If the browser does not open CC Switch, install it and launch it once first. You can also copy the link and run open, xdg-open, or Start-Process locally.',
+      installHint: 'Protocol and access links have been generated, with status visible on the client side.',
       protocols: {
         anthropicMessages: 'Anthropic Messages',
         openaiResponses: 'OpenAI Responses',
@@ -1113,52 +1328,52 @@ export default {
       targets: {
         claudeCode: {
           name: 'Claude Code',
-          description: 'Writes a Claude Code provider config using Anthropic Messages.',
+          description: 'Claude Code service access details using Anthropic Messages.',
         },
         claudeDesktop: {
           name: 'Claude Desktop',
-          description: 'Imports through the CC Switch Claude provider using Anthropic Messages.',
+          description: 'CC Switch Claude service access details using Anthropic Messages.',
         },
         codex: {
           name: 'Codex',
-          description: 'Writes Codex auth.json and config.toml; CC Switch uses Responses natively.',
+          description: 'Codex auth.json and config.toml access details; CC Switch uses Responses natively.',
         },
         geminiCli: {
           name: 'Gemini CLI',
-          description: 'Writes Gemini CLI environment config with the Gemini Native v1beta endpoint.',
+          description: 'Gemini CLI environment access details with the Gemini Native v1beta endpoint.',
         },
         opencode: {
           name: 'OpenCode',
-          description: 'Adds an OpenCode provider; CC Switch deeplinks currently write OpenAI Compatible.',
+          description: 'OpenCode service profile; CC Switch links currently use OpenAI Compatible.',
         },
         openclaw: {
           name: 'OpenClaw',
-          description: 'Adds an OpenClaw provider; CC Switch deeplinks currently write OpenAI Completions.',
+          description: 'OpenClaw service profile; CC Switch links currently use OpenAI Completions.',
         },
         hermes: {
           name: 'Hermes Agent',
-          description: 'Adds a Hermes custom provider; CC Switch deeplinks currently write chat_completions.',
+          description: 'Hermes custom service profile; CC Switch links currently use chat_completions.',
         },
       },
     },
     ccsClientSelect: {
       title: 'Select Client',
-      description: 'Please select the client type to import to CC Switch:',
+      description: 'Available CC Switch client types:',
       claudeCode: 'Claude Code',
-      claudeCodeDesc: 'Import as Claude Code configuration',
+      claudeCodeDesc: 'Claude Code access',
       geminiCli: 'Gemini CLI',
-      geminiCliDesc: 'Import as Gemini CLI configuration',
+      geminiCliDesc: 'Gemini CLI access',
     },
     // Quota and expiration
     quotaLimit: 'Quota Limit',
     quotaAmount: 'Quota Amount (USD)',
     quotaAmountPlaceholder: 'Enter quota limit in USD',
-    quotaAmountHint: 'Set the maximum amount this key can spend. 0 = unlimited.',
+    quotaAmountHint: 'Set the maximum amount this credential can spend. 0 = unlimited.',
     quotaUsed: 'Quota Used',
     reset: 'Reset',
     resetQuotaUsed: 'Reset used quota to 0',
     resetQuotaTitle: 'Confirm Reset Quota',
-    resetQuotaConfirmMessage: 'Are you sure you want to reset the used quota ({used}) for key "{name}" to 0? This action cannot be undone.',
+    resetQuotaConfirmMessage: 'Are you sure you want to reset the used quota ({used}) for credential "{name}" to 0? This action cannot be undone.',
     quotaResetSuccess: 'Quota reset successfully',
     failedToResetQuota: 'Failed to reset quota',
     rateLimitColumn: 'Rate Limit',
@@ -1167,11 +1382,11 @@ export default {
     rateLimit5h: '5-Hour Limit (USD)',
     rateLimit1d: 'Daily Limit (USD)',
     rateLimit7d: '7-Day Limit (USD)',
-    rateLimitHint: 'Set the maximum spending for this key within each time window. 0 = unlimited.',
+    rateLimitHint: 'Set the maximum spending for this credential within each time window. 0 = unlimited.',
     rateLimitUsage: 'Rate Limit Usage',
     resetRateLimitUsage: 'Reset Rate Limit Usage',
     resetRateLimitTitle: 'Confirm Reset Rate Limit',
-    resetRateLimitConfirmMessage: 'Are you sure you want to reset the rate limit usage for key "{name}"? All time window usage will be reset to zero. This action cannot be undone.',
+    resetRateLimitConfirmMessage: 'Are you sure you want to reset the rate limit usage for credential "{name}"? All time window usage will be reset to zero. This action cannot be undone.',
     rateLimitResetSuccess: 'Rate limit usage reset successfully',
     failedToResetRateLimit: 'Failed to reset rate limit usage',
     resetNow: 'Resetting soon',
@@ -1180,7 +1395,7 @@ export default {
     extendDays: '+{days} days',
     customDate: 'Custom',
     expirationDate: 'Expiration Date',
-    expirationDateHint: 'Select when this API key should expire.',
+    expirationDateHint: 'Select when this access credential should expire.',
     currentExpiration: 'Current expiration',
     expiresAt: 'Expires',
     noExpiration: 'Never',
@@ -1194,23 +1409,37 @@ export default {
 
   imageGeneration: {
     title: 'AI Images',
-    description: 'Choose a group whose name includes “生图”; the page prepares the matching image key and uses the image models supported by that group',
-    apiKey: 'Image Key',
-    selectKey: 'Select an image key',
-    noImageKey: 'No active image key is available.',
-    createImageKey: 'Create one or switch group',
-    group: 'Image group',
-    selectGroup: 'Select an image group',
-    noImageGroup: 'No image generation group is available right now.',
-    autoCreatingKeys: 'Preparing an image key for this group...',
-    groupKeyUnavailable: 'This group key is not ready yet. Please try again shortly.',
-    autoCreatedKey: 'Created an image key for {group}',
-    autoCreateKeyFailed: 'Failed to create an image key for {group}',
+    description: 'Image service tiers, available models, price estimates, and generated results are presented together.',
+    hero: {
+      title: 'AI Images',
+      description: 'Only image-enabled service tiers on this account are shown, with official models, per-image cost, request estimate, and balance kept auditable.',
+      assurance: 'Image access follows enabled service tiers, with official full capability, no chat retention, no active disclosure of user information, and abnormal charges covered by records.',
+      signals: {
+        official: 'Official models',
+        noRetention: 'No chat retention',
+        privacy: 'No active information disclosure',
+        billing: 'Auditable billing',
+        enabled: 'Enabled tiers only',
+        stable: 'Excellent stability'
+      }
+    },
+    apiKey: 'Image access',
+    selectKey: 'Select image access',
+    noImageKey: 'No image access is available right now.',
+    createImageKey: 'Image access status',
+    group: 'Image service tier',
+    selectGroup: 'Select an image service tier',
+    noImageGroup: 'No image generation service tier is available right now.',
+    autoAccessName: 'Image access · {group}',
+    autoCreatingKeys: 'Preparing image access for this service tier...',
+    groupKeyUnavailable: 'Image access for this service tier is not ready yet.',
+    autoCreatedKey: 'Image access for {group} is ready',
+    autoCreateKeyFailed: 'Image access for {group} is not ready yet',
     model: 'Model',
     selectModel: 'Select image model',
-    noImageModel: 'This group does not have any image model configured.',
+    noImageModel: 'This service tier has no available image models yet.',
     size: 'Size',
-    geminiFlashSizeHint: 'The current Gemini Flash image upstream has been verified to return 1K only, so unavailable 2K/4K options are hidden.',
+    geminiFlashSizeHint: 'The current Gemini Flash image service has been verified to return 1K only, so unavailable 2K/4K options are hidden.',
     quality: 'Quality',
     count: 'Count',
     promptPlaceholder: 'Enter the image you want to create, or paste/drop reference images',
@@ -1225,18 +1454,19 @@ export default {
     continueEdit: 'Edit again',
     generating: 'Generating',
     empty: 'Generated images will appear here',
-    loadKeysFailed: 'Failed to load image keys',
+    loadKeysFailed: 'Failed to load image access',
     invalidReference: 'Please choose image files',
     referenceTooLarge: 'Each reference image must be 10MB or smaller',
     referenceLimit: 'You can add up to {count} reference images',
-    noImagesReturned: 'The upstream response did not include image data',
+    noImagesReturned: 'No image result was received yet',
     generatedSuccess: 'Image generation completed',
     generateFailed: 'Image generation failed',
-    networkDisconnected: 'Image generation took too long and the browser connection was interrupted. The request may still have completed on the server; if usage was recorded but no image appeared, contact support or try again later.',
+    errorSupportHint: 'Generation issues can be reviewed by ticket; confirmed abnormal charges are covered.',
+    networkDisconnected: 'Image generation took longer than expected and the browser connection was interrupted. The image may still be processing; usage records and generation status remain available.',
     cancelled: 'Generation cancelled',
     referenceAdded: 'Added as a reference image',
     referenceFromResultFailed: 'Could not read this result image for editing',
-    localCacheWarning: 'The latest 5 generated images are cached in this browser, but you should still save them promptly. Clearing site data will remove the cache.',
+    localCacheWarning: 'The latest 5 generated images are retained in this browser; clearing site data removes them from this view.',
     qualityOptions: {
       auto: 'Auto',
       low: 'Low',
@@ -1249,22 +1479,38 @@ export default {
       batchCost: 'This request',
       remainingImages: 'Remaining',
       balance: 'Balance',
-      noEstimate: 'Select an image group to estimate price',
-      noKey: 'Group key not ready',
-      autoCreatingKey: 'Preparing group key',
-      groupPrice: 'group price',
+      noEstimate: 'Select an image service tier to estimate price',
+      noKey: 'Service access is not ready',
+      autoCreatingKey: 'Preparing service access',
+      groupPrice: 'tier price',
       defaultPrice: 'default price',
       balanceLimited: 'Estimated from balance',
-      keyQuotaLimited: 'Limited by key quota',
+      keyQuotaLimited: 'Limited by service access quota',
       summary: '{source} {base} × multiplier {multiplier} · {tier}',
       imageCountValue: '{count} images',
     },
   },
 
+  // Shared model-service usage labels
+  platformUsage: {
+    today: 'Today',
+    total: 'Total',
+    breakdown: 'By model service',
+    other: 'Other',
+  },
+
   // Usage
   usage: {
     title: 'Usage Records',
-    description: 'View and analyze your API usage history',
+    description: 'Models, tokens, costs, and issue records are shown together with clear billing context.',
+    trust: {
+      transparentUsage: 'Transparent usage',
+      transparentUsageDesc: 'Each request keeps time, model, token, and cost records.',
+      auditableBilling: 'Auditable billing',
+      auditableBillingDesc: 'Billed and standard costs are separated and exportable for review.',
+      recoverableIssues: 'Recoverable issues',
+      recoverableIssuesDesc: 'Failed requests keep status and summary details for follow-up.'
+    },
     costDetails: 'Cost Breakdown',
     tokenDetails: 'Token Breakdown',
     cacheTtlOverriddenHint: 'Cache TTL Override enabled',
@@ -1283,14 +1529,28 @@ export default {
     accountCost: 'Cost',
     userBilled: 'User billed',
     accountBilled: 'Account billed',
+    inputCost: 'Input Cost',
+    outputCost: 'Output Cost',
+    cacheCreationCost: 'Cache Write Cost',
+    cacheReadCost: 'Cache Read Cost',
+    inputTokens: 'Input Tokens',
+    outputTokens: 'Output Tokens',
+    cacheCreationTokens: 'Cache Write Tokens',
+    cacheCreation5mTokens: 'Cache Write',
+    cacheCreation1hTokens: 'Cache Write',
+    cacheReadTokens: 'Cache Read Tokens',
+    billingMode: 'Billing Mode',
+    billingModeToken: 'Per Token',
+    billingModePerRequest: 'Per Request',
+    billingModeImage: 'Per Image',
     resetNow: 'Now',
     resetPending: 'Pending refresh',
     accountMultiplier: 'Account rate',
     avgDuration: 'Avg Duration',
     inSelectedRange: 'in selected range',
     perRequest: 'per request',
-    apiKeyFilter: 'API Key',
-    allApiKeys: 'All API Keys',
+    apiKeyFilter: 'Access Credential',
+    allApiKeys: 'All Credentials',
     timeRange: 'Time Range',
     exportCsv: 'Export CSV',
     exportExcel: 'Export Excel',
@@ -1303,16 +1563,16 @@ export default {
     preparingExport: 'Preparing export...',
     model: 'Model',
     requestedModel: 'Requested',
-    upstreamModel: 'Upstream',
+    upstreamModel: 'Actual Model',
     reasoningEffort: 'Reasoning Effort',
     endpoint: 'Endpoint',
     endpointDistribution: 'Endpoint Distribution',
     inbound: 'Inbound',
-    upstream: 'Upstream',
+    upstream: 'Model Service',
     mapping: 'Mapping',
     path: 'Path',
     inboundEndpoint: 'Inbound Endpoint',
-    upstreamEndpoint: 'Upstream Endpoint',
+    upstreamEndpoint: 'Service Endpoint',
     type: 'Type',
     tokens: 'Tokens',
     cost: 'Cost',
@@ -1346,7 +1606,7 @@ export default {
     imageOutputCost: 'Image Output Cost',
     imageSizeSource: 'Size source',
     imageSizeBreakdown: 'Size breakdown',
-    imageSizeSourceOutput: 'Upstream output',
+    imageSizeSourceOutput: 'Service output',
     imageSizeSourceInput: 'Request input',
     imageSizeSourceDefault: 'Default billing tier',
     imageSizeSourceLegacy: 'Legacy record',
@@ -1370,24 +1630,42 @@ export default {
     exportFailed: 'Failed to export usage data',
     exportExcelSuccess: 'Usage data exported successfully (Excel format)',
     exportExcelFailed: 'Failed to export usage data',
+    exportHeaders: {
+      time: 'Time',
+      credentialName: 'Access Credential Name',
+      model: 'Model',
+      reasoningEffort: 'Reasoning Effort',
+      inboundEndpoint: 'Inbound Endpoint',
+      type: 'Type',
+      billingMode: 'Billing Mode',
+      inputTokens: 'Input Tokens',
+      outputTokens: 'Output Tokens',
+      cacheReadTokens: 'Cache Read Tokens',
+      cacheCreationTokens: 'Cache Write Tokens',
+      rateMultiplier: 'Rate Multiplier',
+      billedCost: 'Billed Cost ({currency})',
+      originalCost: 'Standard Cost ({currency})',
+      firstTokenMs: 'First Token (ms)',
+      durationMs: 'Duration (ms)',
+    },
     imageUnit: ' images',
     userAgent: 'User-Agent',
-    tabs: { usage: 'Usage', errors: 'Error Requests' },
+    tabs: { usage: 'Usage', errors: 'Issue Records' },
     errors: {
-      time: 'Time', model: 'Model', endpoint: 'Endpoint', status: 'Status',
-      category: 'Category', platform: 'Platform', message: 'Message',
-      keyName: 'Key Name', keyDeleted: 'Deleted', allKeys: 'All keys',
+      time: 'Time', model: 'Model', endpoint: 'Endpoint', status: 'Service Status',
+      category: 'Category', platform: 'Model Service', message: 'Issue Summary',
+      keyName: 'Credential Name', keyDeleted: 'Deleted', allKeys: 'All credentials',
       modelPlaceholder: 'Search model', allCategories: 'All categories',
-      empty: 'No error requests', failedToLoad: 'Failed to load error requests',
+      empty: 'No issue records', failedToLoad: 'Failed to load issue records',
       categories: {
         auth: 'Auth failed', rate_limit: 'Rate limited', quota: 'Balance/Subscription',
         invalid_request: 'Invalid request', service_unavailable: 'Service unavailable',
-        upstream: 'Upstream error', internal: 'Platform error', other: 'Other', cyber: 'Cyber policy',
+        upstream: 'Model service returned', internal: 'Platform record', other: 'Other', cyber: 'Cyber policy',
       },
       detail: {
-        title: 'Error Request Detail',
-        responseBody: 'Response Body',
-        upstreamStatus: 'Upstream Status',
+        title: 'Issue Record Detail',
+        responseBody: 'Model Service Response',
+        upstreamStatus: 'Service Status',
         loadFailed: 'Failed to load detail, please try again',
       },
     },
@@ -1399,7 +1677,7 @@ export default {
       operational: 'Operational',
       degraded: 'Degraded',
       failed: 'Failed',
-      error: 'Error',
+      error: 'Issue',
       unknown: '-'
     },
     providers: {
@@ -1429,13 +1707,25 @@ export default {
 
   // Channel Status (user-facing read-only view)
   channelStatus: {
-    title: 'Channel Status',
-    description: 'Inspect channel availability, latency and recent status',
-    searchPlaceholder: 'Search channels...',
-    allProviders: 'All Providers',
-    loadError: 'Failed to load channel status',
-    detailLoadError: 'Failed to load channel detail',
-    detailTitle: 'Channel Detail',
+    title: 'Model Service Status',
+    description: 'Model service status, service tier status, availability, and latency in one view.',
+    hero: {
+      title: 'Service Status',
+      description: 'Stability, full-capability availability, latency, and recent responses are continuously visible.',
+      assurance: 'Service status shows platform stability and official full-capability availability, with no chat retention and no active disclosure of user information.',
+      signals: {
+        stability: 'Visible stability',
+        full: 'Full capability status',
+        transparent: 'Transparent responses',
+        privacy: 'No chat retention',
+        billing: 'Abnormal charges covered'
+      }
+    },
+    searchPlaceholder: 'Search models or services...',
+    allProviders: 'All Services',
+    loadError: 'Failed to load service status',
+    detailLoadError: 'Failed to load service detail',
+    detailTitle: 'Model Service Detail',
     closeDetail: 'Close',
     windowTab: {
       '7d': '7 days',
@@ -1443,14 +1733,14 @@ export default {
       '30d': '30 days'
     },
     overall: {
-      operational: 'OPERATIONAL',
-      degraded: 'DEGRADED',
-      unavailable: 'UNAVAILABLE'
+      operational: 'Operational',
+      degraded: 'Fluctuating',
+      unavailable: 'Unavailable'
     },
     columns: {
       name: 'Name',
-      provider: 'Provider',
-      groupName: 'Group',
+      provider: 'Model Service',
+      groupName: 'Service Tier',
       primaryModel: 'Primary Model',
       availability7d: '7d Availability',
       latency: 'Latency (ms)'
@@ -1465,46 +1755,58 @@ export default {
       avgLatency7d: '7d Avg Latency (ms)'
     },
     empty: {
-      title: 'No channels available',
-      description: 'No monitored channels have been configured yet.'
+      title: 'No status data yet',
+      description: 'Service health data will appear here once it is available.'
     }
   },
 
   // Available Channels (user-facing)
   availableChannels: {
-    title: 'Available Channels',
-    description: 'Channels you can access, along with their supported models and pricing',
-    searchPlaceholder: 'Search channels or models...',
-    empty: 'No available channels',
-    noModels: 'No models configured',
-    noPricing: 'Pricing not configured',
-    channel: 'Channel',
-    visible: 'Visibility',
-    groupsTitle: 'Accessible Groups',
-    modelsTitle: 'Supported Models',
-    platformSectionTitle: 'Available groups on this platform',
-    groupModelsTitle: 'Models in this group',
-    exclusive: 'Exclusive',
-    public: 'Public',
-    subscription: 'Subscription',
-    exclusiveTooltip: 'Exclusive groups granted to you by an admin',
-    publicTooltip: 'Groups open to all users',
+    title: 'Available Models & Pricing',
+    eyebrow: 'Model verification',
+    description: 'Official full-capability models, available groups, supported models, prices, and multipliers in one place. No dilution, easy to verify.',
+    assurance: 'Model source, available groups, pricing multipliers, and supported models are shown directly: 100% official capability, never diluted.',
+    trustSignals: {
+      full: '100% official capability',
+      stable: 'Never diluted',
+      noRetention: 'No chat retention',
+      privacy: 'No active information disclosure',
+      transparent: 'Verifiable prices and multipliers',
+      billing: 'Abnormal charges covered'
+    },
+    searchPlaceholder: 'Search models, groups, or services...',
+    empty: 'No matching models or services',
+    noModels: 'No available models',
+    noPricing: 'No pricing information yet',
+    channel: 'Model Source',
+    visible: 'Available to you',
+    defaultServiceDescription: 'This model source is available, with groups, multipliers, and supported models shown together.',
+    serviceSummary: 'Service summary',
+    groupsTitle: 'Available Groups',
+    modelsTitle: 'Available Models',
+    platformSectionTitle: 'Available groups',
+    groupModelsTitle: 'Available models',
+    exclusive: 'Exclusive access',
+    public: 'Public access',
+    subscription: 'Subscription access',
+    exclusiveTooltip: 'Exclusive services enabled for you',
+    publicTooltip: 'Services currently available to all users',
     stats: {
-      channels: 'Channels',
+      channels: 'Model Sources',
       platforms: 'Platforms',
-      groups: 'Groups',
-      models: 'Models'
+      groups: 'Available Groups',
+      models: 'Available Models'
     },
     columns: {
-      name: 'Channel',
+      name: 'Service',
       description: 'Description',
-      platform: 'Platform',
-      groups: 'Your Accessible Groups',
+      platform: 'Model Service',
+      groups: 'Service Tiers',
       supportedModels: 'Supported Models'
     },
     pricing: {
-      billingMode: 'Billing Mode',
-      billingModeToken: 'Per Token',
+      billingMode: 'Pricing Method',
+      billingModeToken: 'Per token',
       billingModePerRequest: 'Per Request',
       billingModeImage: 'Per Image',
       inputPrice: 'Input',
@@ -1513,7 +1815,7 @@ export default {
       cacheReadPrice: 'Cache Read',
       imageOutputPrice: 'Image Output',
       perRequestPrice: 'Per Request',
-      intervals: 'Tiered Pricing',
+      intervals: 'Tiered Prices',
       unitPerMillion: '/ 1M tokens',
       unitPerRequest: '/ request'
     }
@@ -1521,7 +1823,7 @@ export default {
 
   affiliate: {
     title: 'Affiliate Rebates',
-    description: 'Share a cheaper, smoother AI API experience with friends and earn rebates when they recharge',
+    description: 'Invite links, rebate rates, transferable balance, and invite records are presented together, with the same official full-capability, privacy, and abnormal-charge coverage commitments.',
     yourCode: 'Your Affiliate Code',
     inviteLink: 'Invite Link',
     copyCode: 'Copy Code',
@@ -1537,26 +1839,26 @@ export default {
       invitedUsers: 'Invited Users',
       invitedUsersHint: 'Users who registered through your invite',
       availableQuota: 'Available Rebate Quota',
-      availableQuotaHint: 'Can be moved into your balance anytime',
+      availableQuotaHint: 'Rebate quota available for balance transfer',
       frozenQuota: 'Frozen',
       frozenQuotaHint: 'Recently earned rebates pending release',
       frozenQuotaLine: '{amount} is still pending release',
       totalQuota: 'Historical Rebate Quota',
-      totalQuotaHint: 'Your accumulated savings from sharing'
+      totalQuotaHint: 'Total rebate quota generated'
     },
     hero: {
-      kicker: 'Share with friends',
-      title: 'Share the AI API you are using with friends',
-      description: 'Your friends can use signup credit to try it first, then recharge only if it fits their workflow. When they recharge, you earn rebate quota that can be moved into your balance.',
-      pillTrial: 'Trial credit first',
-      pillCheap: 'Built for frequent use',
-      pillStable: 'Less downtime, less hassle',
-      shareHint: 'Best shared with friends using Codex, Cursor, Claude, Gemini, or API-based AI tools.'
+      kicker: 'Invite system',
+      title: 'Invite links and rebate records stay clear',
+      description: 'Invite links, binding status, rebate rate, frozen quota, and transferable balance are presented together, with consistent model, privacy, and charge-protection language.',
+      pillTrial: 'Trial credit visible',
+      pillCheap: 'Rebate rate visible',
+      pillStable: 'Records retained',
+      shareHint: 'Codex, Cursor, Claude, Gemini, API tool details, official full capability, privacy, and charge protection are presented together.'
     },
     sharePanel: {
-      kicker: 'Your invite entry',
-      title: 'Copy once, send directly',
-      description: 'Send your invite link or one of the ready-made messages below. New users can start with trial credit, and you earn rebates after successful invited recharges.'
+      kicker: 'Dedicated invite information',
+      title: 'Dedicated invite information',
+      description: 'Invite link, invite code, and reusable display text are grouped here.'
     },
     transfer: {
       title: 'Transfer Rebate Quota',
@@ -1567,16 +1869,16 @@ export default {
       success: '{amount} has been transferred to your balance'
     },
     bind: {
-      title: 'Have an invite code? Bind first, then claim your bonus',
-      description: 'If a friend invited you, enter the invite code within 1 day after registration. After binding, claim the bonus manually on this page. Each account can bind an inviter only once.',
+      title: 'Have an invite code? Bind it and claim your bonus',
+      description: 'The invite binding window is 1 day after registration. Binding status, bonus amount, and claim records are shown here.',
       codePlaceholder: 'Enter invite code',
       bonusHint: 'Bind successfully to manually claim {amount}',
       button: 'Bind Code',
       binding: 'Binding...',
       success: 'Invite code bound successfully',
-      successWithBonus: 'Invite code bound successfully. Claim your bonus manually below',
+      successWithBonus: 'Invite code bound successfully. Bonus status updated',
       claimTitle: 'Claim binding bonus',
-      claimDescription: 'Your inviter is bound and you are still within the new-user claim window. After claiming, {amount} will be added to your balance.',
+      claimDescription: 'An inviter is bound on this account; {amount} will be added to balance after claiming.',
       claimButton: 'Claim {amount}',
       claiming: 'Claiming...',
       claimSuccess: 'Binding bonus claimed: {amount}',
@@ -1600,106 +1902,130 @@ export default {
     },
     rules: {
       title: 'Rebate Rules',
-      line1: 'Share your affiliate code or invite link with new users.',
+      line1: 'Affiliate codes and invite links record invite relationships.',
       line2: 'When invitees recharge, you receive {rate} of the recharge as rebate quota.',
       durationPermanent: 'Rebate validity: permanent. After a friend binds your invite, their future recharges continue to generate rebates under the current rules.',
       durationLimited: 'Rebate validity: recharges within {days} days after your friend registers generate rebates. Recharges after that window no longer generate rebates.',
-      line4: 'Transfer available rebate quota into your balance at any time.',
-      line5: 'Newly earned rebates may have a waiting period before they can be transferred.'
+      line4: 'Available rebate quota can be transferred into account balance.',
+      line5: 'Newly earned rebates transfer after the configured freeze period.'
     },
     friendBenefits: {
-      kicker: 'What friends get',
-      title: 'When sharing, mention these benefits directly',
-      description: 'Your friends do not need to understand every configuration first. Start with the parts they can immediately feel: trial credit, lower cost, more models, and smoother daily usage.',
-      trialTitle: 'Try before recharging',
-      trialDescription: 'New users get trial credit, so friends can test it first and decide later.',
-      valueTitle: 'Cheaper for frequent use',
-      valueDescription: 'Discount groups are suitable for coding, tools, automation, and daily AI usage.',
-      stabilityTitle: 'Less hassle day to day',
-      stabilityDescription: 'Proprietary scheduling helps reduce unavailable routes and repeated manual switching.',
-      rangeTitle: 'More model coverage',
-      rangeDescription: 'GPT, Claude, Gemini, and image models are available in one place.'
+      kicker: 'Invite benefits',
+      title: 'Invite benefits',
+      description: 'Trial credit, model coverage, price records, service status, and platform protections are presented together.',
+      trialTitle: 'Trial credit',
+      trialDescription: 'Trial credit and balance movement appear in account records.',
+      valueTitle: 'Transparent pricing',
+      valueDescription: 'Service tiers, model pricing, rates, and charge records are presented together.',
+      stabilityTitle: 'Visible status',
+      stabilityDescription: 'Model service status and recent availability remain reviewable.',
+      rangeTitle: 'Model coverage',
+      rangeDescription: 'GPT, Claude, Gemini, and image models are presented together.'
     },
     audiences: {
-      kicker: 'Copy by situation',
-      title: 'Not sure what to say? Copy one of these',
-      description: 'Choose the message that best matches your friend’s usage scenario.',
-      copyButton: 'Copy this',
-      copied: 'Audience copy copied',
+      kicker: 'Reusable display text',
+      title: 'Reusable display text',
+      description: 'Display copy focused on model coverage, price records, service status, and platform protections.',
+      copyButton: 'Copy text',
+      copied: 'Text copied',
       developerTitle: 'For developers / Codex users',
-      developerDescription: 'For friends using Codex, Cursor, Cline, or API-based tools.',
-      developerCopy: 'I have been using this API site for Codex / Cursor lately. It is much easier than juggling keys everywhere, supports GPT, Claude, and Gemini, and the discount groups are cheap enough for frequent use. You can register with trial credit and test it first: {link}',
+      developerDescription: 'For Codex, Cursor, Cline, or API tool scenarios.',
+      developerCopy: 'This platform supports GPT, Claude, Gemini, and API tools with 100% official full capability. It does not store user chat conversations or disclose user information externally, and model status, pricing, and usage records stay visible. My invite link shows trial credit and rebate benefits after registration: {link}',
       heavyUserTitle: 'For heavy GPT users',
-      heavyUserDescription: 'For friends who use GPT, Claude, or Gemini every day.',
-      heavyUserCopy: 'If you use GPT a lot, try this site. I used the signup credit for days, the discount groups are much cheaper for frequent usage, and daily stability has been solid: {link}',
+      heavyUserDescription: 'For ongoing GPT, Claude, or Gemini usage scenarios.',
+      heavyUserCopy: 'This platform supports GPT, Claude, Gemini, and image generation with 100% official full capability. It does not store user chat conversations or disclose user information externally, and model status, pricing, and usage records stay visible. My invite link shows trial credit and rebate benefits after registration: {link}',
       newcomerTitle: 'For AI newcomers',
-      newcomerDescription: 'For friends who want to try GPT / Claude without recharging first.',
-      newcomerCopy: 'If you want to try GPT / Claude, this is a low-risk way to start. New users get trial credit, and the setup is simple. Register with my invite link and enter the code to receive more credit: {link}',
+      newcomerDescription: 'For viewing model coverage, trial credit, and account records.',
+      newcomerCopy: 'This platform keeps GPT, Claude, Gemini, and image generation in one account with 100% official full capability. It does not store user chat conversations or disclose user information externally, and model status, pricing, and usage records stay visible. My invite link shows trial credit and rebate benefits after registration: {link}',
       groupTitle: 'For groups / communities',
       groupDescription: 'For developer groups, tool groups, or AI communities.',
-      groupCopy: 'Found an API site that works well for frequent AI usage. It includes signup credit, cheap discount groups, GPT / Claude / Gemini / image models, and works with Codex, Cursor, and API tools. If you want to try it, here is my invite link: {link}'
+      groupCopy: 'This platform supports GPT, Claude, Gemini, and image generation with 100% official full capability. It does not store user chat conversations or disclose user information externally, and model status, pricing, and usage records stay visible. It also supports Codex, Cursor, and API tools. My invite link shows trial credit and rebate benefits after registration: {link}'
     },
     promo: {
-      kicker: 'Ready-to-share pitch',
-      title: 'GPT freedom costs less than you think',
-      description: 'New users get trial credit first. The discount groups are built for high-frequency use, often cheaper than expected, with GPT, Claude, Gemini, and image models. A proprietary scheduling algorithm keeps everyday usage highly stable.',
-      highlightTrial: 'Trial credit included',
-      highlightCheap: 'Discount groups for daily GPT usage',
-      highlightRouting: 'Proprietary scheduling, excellent stability',
+      kicker: 'Reusable display text',
+      title: 'Models, pricing, and records stay visible',
+      description: 'The platform supports GPT, Claude, Gemini, and image models with 100% official full capability. It does not store user chat conversations or disclose user information externally, and model status, pricing, balance, and usage records are presented together.',
+      highlightTrial: 'Trial credit visible',
+      highlightCheap: 'Pricing and rates visible',
+      highlightRouting: 'Service status visible',
       previewTitle: 'Default share copy',
-      copyButton: 'Copy promo text',
-      copied: 'Promo text copied',
-      shareText: 'I have basically reached GPT freedom lately. This site gives trial credit on signup, and I used it for days before running out. The discount groups are cheap enough for long-term frequent use, with GPT, Claude, Gemini, and image generation supported. Daily usage feels stable and much less annoying. Register with my invite link and enter the code to receive more credit: {link}'
+      copyButton: 'Copy text',
+      copied: 'Text copied',
+      shareText: 'This platform supports GPT, Claude, Gemini, and image generation with 100% official full capability. It does not store user chat conversations or disclose user information externally, and model status, pricing, and usage records stay visible. My invite link shows trial credit and rebate benefits after registration: {link}'
     }
   },
 
   // Redeem
   redeem: {
     title: 'Redeem Code',
-    description: 'Enter your redeem code to add balance or increase concurrency',
+    description: 'Redeemed benefits, balance movement, and history records are shown together. Crediting, subscription grants, and issue handling stay reviewable.',
+    trust: {
+      transparentBalance: 'Clear balance',
+      transparentBalanceDesc: 'Balance, concurrency, and subscription benefits update into the account view.',
+      auditableHistory: 'Recorded history',
+      auditableHistoryDesc: 'Redeems, platform adjustments, and subscription grants remain in the record.',
+      recoverableIssues: 'Traceable issues',
+      recoverableIssuesDesc: 'Failed redeems or benefit mismatches can be traced from the account record.'
+    },
     currentBalance: 'Current Balance',
     concurrency: 'Concurrency',
     requests: 'requests',
     redeemCodeLabel: 'Redeem Code',
-    redeemCodePlaceholder: 'Enter your redeem code',
+    redeemCodePlaceholder: 'Redeem code',
     redeemCodeHint: 'Redeem codes are case-sensitive',
-    redeeming: 'Redeeming...',
-    redeemButton: 'Redeem Code',
-    redeemSuccess: 'Code Redeemed Successfully!',
-    redeemFailed: 'Redemption Failed',
+    redeeming: 'Processing',
+    redeemButton: 'Confirm redeem',
+    redeemSuccess: 'Redemption complete',
+    redeemFailed: 'Redemption incomplete',
     added: 'Added',
     concurrentRequests: 'concurrent requests',
     newBalance: 'New Balance',
     newConcurrency: 'New Concurrency',
-    aboutCodes: 'About Redeem Codes',
+    aboutCodes: 'Redeem Assurance',
+    assurance: {
+      official: 'Official full-capacity models, never diluted.',
+      singleUse: 'Each redeem code settles once.',
+      coverage: 'Balance, concurrency, and subscription benefits use the same record view.',
+      privacy: 'We do not store user chat conversations or proactively disclose user information.',
+      instantUpdate: 'Account status updates as soon as redemption succeeds.'
+    },
+    contactLine: 'Support contact',
     codeRule1: 'Each code can only be used once',
     codeRule2: 'Codes may add balance, increase concurrency, or grant trial access',
     codeRule3: 'Contact support if you have issues redeeming a code',
     codeRule4: 'Balance and concurrency updates are immediate',
     recentActivity: 'Recent Activity',
-    historyWillAppear: 'Your redemption history will appear here',
+    historyWillAppear: 'Redemption history will appear here',
     balanceAddedRedeem: 'Balance Added (Redeem)',
     balanceAddedAffiliate: 'Balance Added (Affiliate Transfer)',
-    balanceAddedAdmin: 'Balance Added (Admin)',
-    balanceDeductedAdmin: 'Balance Deducted (Admin)',
+    balanceAddedAdmin: 'Balance Added (Platform Adjustment)',
+    balanceDeductedAdmin: 'Balance Deducted (Platform Adjustment)',
     concurrencyAddedRedeem: 'Concurrency Added (Redeem)',
-    concurrencyAddedAdmin: 'Concurrency Added (Admin)',
-    concurrencyReducedAdmin: 'Concurrency Reduced (Admin)',
-    adminAdjustment: 'Admin Adjustment',
+    concurrencyAddedAdmin: 'Concurrency Added (Platform Adjustment)',
+    concurrencyReducedAdmin: 'Concurrency Reduced (Platform Adjustment)',
+    adminAdjustment: 'Platform Adjustment',
     subscriptionAssigned: 'Subscription Assigned',
-    subscriptionAssignedDesc: 'You have been granted access to {groupName}',
+    subscriptionAssignedDesc: 'You have been granted service access to {groupName}',
     subscriptionDays: '{days} days',
     days: ' days',
-    codeRedeemSuccess: 'Code redeemed successfully!',
-    failedToRedeem: 'Failed to redeem code. Please check the code and try again.',
+    codeRedeemSuccess: 'Redemption complete',
+    failedToRedeem: 'Redemption did not complete because the code or current benefit state was not accepted.',
     subscriptionRefreshFailed: 'Redeemed successfully, but failed to refresh subscription status.',
-    pleaseEnterCode: 'Please enter a redeem code'
+    pleaseEnterCode: 'Redeem code is required'
   },
 
   // Profile
   profile: {
     title: 'Profile Settings',
-    description: 'Manage your account information and settings',
+    description: 'Account details, sign-in bindings, security settings, and alerts in one place.',
+    trust: {
+      privacyBoundary: 'Privacy boundary',
+      privacyBoundaryDesc: 'Third-party profile sources show only necessary status, not credentials.',
+      auditableBindings: 'Auditable bindings',
+      auditableBindingsDesc: 'Email and sign-in binding states are shown together for easier review.',
+      accountSecurity: 'Account security',
+      accountSecurityDesc: 'Password, balance alerts, and 2FA stay under account controls.'
+    },
     accountBalance: 'Account Balance',
     concurrencyLimit: 'Concurrency Limit',
     rpmLimit: 'RPM Limit',
@@ -1710,10 +2036,10 @@ export default {
     basicsTitle: 'Profile & Avatar',
     basicsDescription: 'Keep your public profile details and avatar aligned.',
     linkedProfileSources: 'Profile Sources',
-    linkedProfileSourcesDescription: 'Some profile details may stay synced from third-party sign-in methods.',
+    linkedProfileSourcesDescription: 'Some profile details are displayed from linked third-party sign-in methods.',
     securityTitle: 'Security Settings',
     securityDescription: 'Password, two-factor authentication, and alerts live in the right rail.',
-    administrator: 'Administrator',
+    administrator: 'Platform Support',
     user: 'User',
     username: 'Username',
     email: 'Email',
@@ -1748,7 +2074,7 @@ export default {
       enable: 'Enable',
       disable: 'Disable',
       featureDisabled: 'Feature Unavailable',
-      featureDisabledHint: 'Two-factor authentication has not been enabled by the administrator',
+      featureDisabledHint: 'Two-factor authentication is not available yet',
       setupTitle: 'Set Up Two-Factor Authentication',
       setupStep1: 'Scan the QR code below with your authenticator app',
       setupStep2: 'Enter the 6-digit code from your app',
@@ -1759,14 +2085,14 @@ export default {
       verifyFailed: 'Invalid code, please try again',
       enableSuccess: 'Two-factor authentication enabled',
       disableTitle: 'Disable Two-Factor Authentication',
-      disableWarning: 'After disabling, you will no longer need a verification code to log in. This may reduce your account security.',
+      disableWarning: 'After disabling, login will no longer require a verification code, and the login protection status will update.',
       enterPassword: 'Enter your current password to confirm',
       confirmDisable: 'Confirm Disable',
       disableSuccess: 'Two-factor authentication disabled',
       disableFailed: 'Failed to disable, please check your password',
       loginTitle: 'Two-Factor Authentication',
-      loginHint: 'Enter the 6-digit code from your authenticator app',
-      loginFailed: 'Verification failed, please try again',
+      loginHint: 'The 6-digit code from your authenticator app',
+      loginFailed: 'Verification was not accepted',
       // New translations for email verification
       verifyEmailFirst: 'Please verify your email first',
       verifyPasswordFirst: 'Please verify your identity first',
@@ -1785,7 +2111,7 @@ export default {
       thresholdPlaceholder: 'Enter amount',
       systemDefault: 'System Default',
       extraEmails: 'Notification Emails',
-      extraEmailsHint: 'You must add and verify an email address to receive low balance alerts',
+      extraEmailsHint: 'Verified email addresses receive low-balance alerts',
       primaryEmail: 'Primary',
       noExtraEmails: 'No extra notification emails',
       enterEmail: 'Enter email address',
@@ -1855,8 +2181,8 @@ export default {
       },
       notes: {
         emailManagedFromProfile: 'Primary email is managed in the profile form',
-        canUnbind: 'You can unbind this sign-in method',
-        bindAnotherBeforeUnbind: 'Bind another sign-in method before unbinding',
+        canUnbind: 'This sign-in method can be unbound',
+        bindAnotherBeforeUnbind: 'At least one sign-in method remains before this binding is removed',
       },
       source: {
         avatar: 'Avatar is currently synced from {providerName}',
@@ -1897,6 +2223,9 @@ export default {
   errors: {
     somethingWentWrong: 'Something went wrong',
     pageNotFound: 'Page not found',
+    pageNotFoundDescription: 'The page you are looking for does not exist or has been moved.',
+    goBack: 'Go back',
+    goHome: 'Go home',
     unauthorized: 'Unauthorized',
     forbidden: 'Forbidden',
     serverError: 'Server error',
@@ -4819,7 +5148,7 @@ export default {
         unlimited: 'Unlimited'
       },
       ineligibleWarning:
-        'This account is not eligible for Antigravity, but API forwarding still works. Use at your own risk.',
+        'This account is not eligible for Antigravity, but API forwarding still works. The account test result has marked this status.',
       forbidden: 'Forbidden',
       forbiddenValidation: 'Verification Required',
       forbiddenViolation: 'Violation Ban',
@@ -6706,7 +7035,7 @@ export default {
         apiBaseUrl: 'API Base URL',
         apiBaseUrlPlaceholder: 'https://api.example.com',
         apiBaseUrlHint:
-          'Used for "Use Key" and "Import to CC Switch" features. Leave empty to use current site URL.',
+          'Used for "Client Config" and "CC Switch Config" features. Leave empty to use current site URL.',
         tablePreferencesTitle: 'Global Table Preferences',
         tablePreferencesDescription: 'Configure default pagination behavior for shared table components',
         tableDefaultPageSize: 'Default Rows Per Page',
@@ -6746,7 +7075,7 @@ export default {
         homeContentHint: 'Customize the home page content. Supports Markdown/HTML. If you enter a URL (starting with http:// or https://), it will be used as an iframe src to embed an external page. When set, the default status information will no longer be displayed.',
         homeContentIframeWarning: '⚠️ iframe mode note: Some websites have X-Frame-Options or CSP security policies that prevent embedding in iframes. If the page appears blank or shows an error, please verify the target website allows embedding, or consider using HTML mode to build your own content.',
         hideCcsImportButton: 'Hide CC Switch Import Button',
-        hideCcsImportButtonHint: 'When enabled, the "Import to CC Switch" button will be hidden on the API Keys page'
+        hideCcsImportButtonHint: 'When enabled, the "CC Switch Config" button will be hidden on the API Keys page'
       },
       purchase: {
         title: 'Recharge / Subscription Page',
@@ -7557,29 +7886,42 @@ export default {
   // Recharge / Subscription Page
   purchase: {
     title: 'Recharge / Subscription',
-    description: 'Recharge balance or purchase subscription via the embedded page',
+    description: 'Choose balance or a plan for 100% official full-capacity model access, never diluted. Payment, crediting, subscription, and support records stay traceable.',
     openInNewTab: 'Open in new tab',
     notEnabledTitle: 'Feature not enabled',
-    notEnabledDesc: 'The administrator has not enabled the recharge/subscription entry. Please contact admin.',
-    notConfiguredTitle: 'Recharge / Subscription URL not configured',
+    notEnabledDesc: 'Recharge and subscription access is not open yet.',
+    notConfiguredTitle: 'Recharge / Subscription not open yet',
     notConfiguredDesc:
-      'The administrator enabled the entry but has not configured a recharge/subscription URL. Please contact admin.'
+      'Recharge and subscription access is temporarily unavailable.'
   },
 
   // Custom Page (iframe embed)
   customPage: {
     title: 'Custom Page',
+    defaultTitle: 'Content',
+    toc: 'Contents',
+    openToc: 'Show contents',
+    collapseToc: 'Hide contents',
+    loading: 'Loading content',
+    unavailableTitle: 'Content unavailable',
+    unavailableDesc: 'This content is not available right now.',
+    markdownNotFoundDesc: 'This content is not available right now.',
+    markdownLoadFailedTitle: 'Content failed to load',
+    markdownLoadFailedDesc: 'Please try again later.',
+    copyCode: 'Copy',
+    copiedCode: 'Copied',
+    copyFailed: 'Copy failed',
     openInNewTab: 'Open in new tab',
     notFoundTitle: 'Page not found',
     notFoundDesc: 'This custom page does not exist or has been removed.',
-    notConfiguredTitle: 'Page URL not configured',
-    notConfiguredDesc: 'The URL for this custom page has not been properly configured.',
+    notConfiguredTitle: 'Page unavailable',
+    notConfiguredDesc: 'This page is temporarily unavailable.',
   },
 
   // Announcements Page
   announcements: {
     title: 'Announcements',
-    description: 'View system announcements',
+    description: 'Important updates appear here.',
     unreadOnly: 'Show unread only',
     markRead: 'Mark as read',
     markAllRead: 'Mark all as read',
@@ -7595,22 +7937,23 @@ export default {
     empty: 'No announcements',
     emptyUnread: 'No unread announcements',
     total: 'announcements',
-    emptyDescription: 'There are no system announcements at this time',
-    readStatus: 'You have read this announcement',
-    markReadHint: 'Click "Mark as read" to mark this announcement'
+    emptyDescription: 'Important updates will appear here.',
+    readStatus: 'This announcement has been read',
+    markReadHint: 'Confirming moves this announcement to read'
   },
 
   // Tickets Page
   tickets: {
     title: 'Tickets',
-    description: 'Submit issues and view support replies',
+    description: 'Usage, order, account, and issue conversations stay recorded here.',
+    assurance: 'Usage, order, and error records can be reviewed with the ticket. Attachments are used only for the current issue, and billing anomalies can be traced from records.',
     searchPlaceholder: 'Search ticket subject or number...',
     createTicket: 'Create Ticket',
     submitTicket: 'Submit Ticket',
     viewDetail: 'View',
     detailTitle: 'Ticket Details',
     empty: 'No tickets',
-    emptyDescription: 'Create a ticket when you need help. Admin replies will appear here.',
+    emptyDescription: 'Ticket conversations will appear here.',
     unreadCount: '{count} unread',
     noUnread: 'No unread',
     lastMessageAt: 'Last message',
@@ -7620,7 +7963,10 @@ export default {
       namePlaceholder: 'Name',
       urlPlaceholder: 'https://... or choose an image',
       chooseImage: 'Choose image',
-      imageSelected: 'Image selected'
+      imageSelected: 'Image selected',
+      invalidImage: 'Choose a PNG, JPG, WebP, or GIF image',
+      imageTooLarge: 'Image must be at most {size}MB',
+      readFailed: 'Failed to read the selected image'
     },
     replyAttachments: {
       title: 'Attachments',
@@ -7628,17 +7974,25 @@ export default {
       namePlaceholder: 'Name',
       urlPlaceholder: 'https://... or choose an image',
       chooseImage: 'Choose image',
-      imageSelected: 'Image selected'
+      imageSelected: 'Image selected',
+      invalidImage: 'Choose a PNG, JPG, WebP, or GIF image',
+      imageTooLarge: 'Image must be at most {size}MB',
+      readFailed: 'Failed to read the selected image'
+    },
+    trust: {
+      privacy: 'Attachments stay with this issue',
+      billing: 'Abnormal charges covered by records',
+      traceable: 'Usage and orders stay traceable'
     },
     context: {
       general: 'Context',
       usage: 'Usage',
       order: 'Order',
-      api_key: 'API Key'
+      api_key: 'Access Credential'
     },
     closeTicket: 'Close Ticket',
     reopenTicket: 'Reopen',
-    closedReplyHint: 'This ticket is closed. Reopen it before continuing the conversation.',
+    closedReplyHint: 'This ticket is closed. Reopen it to continue the conversation.',
     reply: 'Reply',
     replyPlaceholder: 'Add more details, screenshot links, or troubleshooting context...',
     sendReply: 'Send Reply',
@@ -7661,20 +8015,21 @@ export default {
     },
     form: {
       template: 'Issue Type',
-      superAdminHint: 'This issue type cannot be handled by ordinary support. It will be escalated to super admin and send an email notice.',
+      superAdminHint: 'This issue type enters a dedicated platform support queue and sends an email notice.',
       subject: 'Subject',
       category: 'Category',
       priority: 'Priority',
       body: 'Description',
       bodyPlaceholder: 'Describe the issue, request ID, time range, or relevant screenshot links.',
+      privacyNote: 'Submitted text and attachments are used only for this issue. Linked records help locate time, model, and amount for usage or billing questions.',
       bodyMinLength: 'Please write at least {count} characters. More detail helps support resolve it faster.',
-      imagePlaceholder: 'Or paste an image link for the payment or error screenshot',
+      imagePlaceholder: 'Or paste an image link for the payment or issue screenshot',
       chooseImage: 'Choose image',
       imageSelected: 'Image selected',
       viewImage: 'View image',
       amountPlaceholder: 'Enter the missing amount',
       orderAmount: 'Credit {amount}, paid {pay}',
-      noRecentOrders: 'No recent recharge orders were found. Please include the order number and payment time in your description.',
+      noRecentOrders: 'No recent recharge orders were found. The order number and payment time can be added to the description.',
       contextType: 'Context Type',
       contextTypePlaceholder: 'usage / order / api_key',
       contextId: 'Context ID',
@@ -7709,7 +8064,7 @@ export default {
     sender: {
       user: 'Me',
       admin: 'Support',
-      system: 'System'
+      system: 'Platform'
     },
     errors: {
       requiredFields: 'Please fill in the subject and description',
@@ -7728,7 +8083,7 @@ export default {
       imageTooLarge: 'Image must be at most {size}MB',
       imageReadFailed: 'Failed to read image. Please choose it again.',
       TICKET_ATTACHMENT_INVALID: 'Attachment name and link must be valid; images can be up to 2MB, up to 5 items',
-      TICKET_CLOSED: 'Ticket is closed. Reopen it first',
+      TICKET_CLOSED: 'Ticket is closed. Reopen it to continue',
       TICKET_NOT_FOUND: 'Ticket not found'
     }
   },
@@ -7749,16 +8104,189 @@ export default {
       INVOICE_REJECT_REASON_REQUIRED: 'Reject reason is required',
       USER_NOT_FOUND: 'User not found or disabled',
     },
+    page: {
+      title: 'Invoices',
+      description: 'Eligible top-up orders, e-invoice requests, and processing progress stay together with clear, reviewable amounts.',
+      notice: 'Completed balance top-up orders can be used for e-invoice requests. Pending or completed requests reserve the eligible amount until they are rejected or cancelled.',
+      trust: {
+        eligibleOrders: 'Order amounts are clear',
+        amountReserved: 'Reserved amount is transparent',
+        requestTrace: 'Progress is traceable',
+        privacy: 'Only invoice context is kept',
+      },
+      stats: {
+        totalOrders: 'Top-up orders',
+        availableOnPage: 'Eligible here',
+        availableAmount: 'Eligible amount',
+        lockedAmount: 'Reserved amount',
+        unavailableOnPage: 'Temporarily unavailable',
+      },
+      orders: {
+        title: 'Select orders',
+        description: 'Completed balance top-up orders show the amount eligible for this invoice request.',
+        keywordLabel: 'Order / transaction no.',
+        keywordPlaceholder: 'Search order number',
+        statusLabel: 'Payment status',
+        invoiceabilityLabel: 'Eligibility',
+        startDate: 'Start date',
+        endDate: 'End date',
+        emptyTitle: 'No matching orders',
+        emptyDescription: 'Eligible orders will appear here.',
+        columns: {
+          orderId: 'Order ID',
+          tradeNo: 'Transaction No.',
+          amount: 'Eligible amount',
+          fee: 'Fee',
+          method: 'Payment method',
+          status: 'Payment status',
+          paidAt: 'Paid at',
+          invoiceability: 'Eligibility',
+          reason: 'Reason',
+        },
+        invoiceability: {
+          available: 'Eligible',
+          unavailable: 'Not eligible now',
+        },
+      },
+      form: {
+        title: 'Invoice information',
+        selectedSummary: '{count} orders selected · {amount}',
+        saveTemplate: 'Save invoice info',
+        limitHint: 'Minimum request {min}. Available now {available}.',
+        taxHint: 'Estimated tax/service fee on completion: {tax} ({rate}%).',
+        templateLabel: 'Template',
+        noTemplate: 'Do not use a template',
+        noTemplates: 'No templates yet',
+        defaultSuffix: ' (Default)',
+        updateTemplate: 'Update invoice info',
+        setDefault: 'Set as default',
+        deleteTemplate: 'Delete',
+        typeLabel: 'Invoice type',
+        amountLabel: 'Amount',
+        amountPlaceholder: '500.00',
+        titleLabel: 'Invoice title',
+        titlePlaceholder: 'Company name or personal name',
+        taxIdLabel: 'Tax ID',
+        taxIdPlaceholder: 'Taxpayer identification number',
+        itemNameLabel: 'Invoice item',
+        itemNamePlaceholder: 'Information technology service',
+        receiverEmailLabel: 'Receiver email',
+        receiverEmailPlaceholder: 'Email for the e-invoice',
+        noteLabel: 'Note',
+        notePlaceholder: 'Optional',
+        submitting: 'Processing',
+        submit: 'Request invoice',
+        minimumNotMet: 'Your eligible amount has not reached the minimum request amount.',
+        defaultItemName: 'Information technology service',
+      },
+      records: {
+        title: 'Requests',
+        description: 'Invoice request status, invoice number, and notes remain available for later review.',
+        emptyTitle: 'No invoice requests yet',
+        emptyDescription: 'Submitted requests will appear here.',
+        cancel: 'Cancel',
+        columns: {
+          title: 'Invoice title',
+          type: 'Type',
+          amount: 'Amount',
+          orderCount: 'Request basis',
+          status: 'Status',
+          number: 'Invoice No.',
+          submittedAt: 'Submitted',
+          note: 'Note',
+          actions: 'Actions',
+        },
+        amountByTotal: 'By amount',
+      },
+      dialog: {
+        createTitle: 'Save invoice template',
+        updateTitle: 'Update invoice template',
+        templateName: 'Template name',
+        templateNamePlaceholder: 'Default template',
+        defaultTemplateName: 'Default template',
+        defaultTemplate: 'Set as default template',
+      },
+      types: {
+        company_vat_general: 'General VAT invoice',
+        company_vat_special: 'Special VAT invoice',
+        personal: 'Personal invoice',
+      },
+      invoiceability: {
+        all: 'All orders',
+        available: 'Eligible',
+        unavailable: 'Not eligible now',
+      },
+      reasons: {
+        notBalance: 'Not a balance top-up order',
+        notCompleted: 'Payment is not completed',
+        zeroAmount: 'Order amount is zero',
+      },
+      status: {
+        pending: 'Pending review',
+        approved: 'Approved',
+        rejected: 'Rejected',
+        completed: 'Completed',
+        cancelled: 'Cancelled',
+      },
+      messages: {
+        loadSummaryFailed: 'Failed to load invoice balance',
+        loadInvoicesFailed: 'Failed to load invoice requests',
+        loadOrdersFailed: 'Failed to load orders',
+        loadTemplatesFailed: 'Failed to load invoice templates',
+        submitSuccess: 'Invoice request submitted',
+        submitFailed: 'Failed to submit request',
+        cancelSuccess: 'Invoice request cancelled',
+        cancelFailed: 'Failed to cancel invoice request',
+        templateUpdated: 'Invoice template updated',
+        templateSaved: 'Invoice template saved',
+        saveTemplateFailed: 'Failed to save invoice template',
+        defaultTemplateUpdated: 'Default template updated',
+        defaultTemplateFailed: 'Failed to set default template',
+        deleteTemplateConfirm: 'Delete this invoice template?',
+        templateDeleted: 'Invoice template deleted',
+        deleteTemplateFailed: 'Failed to delete invoice template',
+      },
+    },
+  },
+
+  userOrders: {
+    description: 'Each transaction keeps amount, method, crediting result, and support context. Official full-capacity models are never diluted, and confirmed billing anomalies are covered from records.',
+    newOrder: 'Recharge / Subscribe',
+    statusFilter: 'Order status',
+    cancelDescription: 'Cancellation ends this payment session while keeping the order record available for review.',
+    refundNote: 'Refund Note',
+    refundNotePlaceholder: 'Amount, order, or crediting context',
+    trust: {
+      amount: 'Amounts stay clear',
+      status: 'Status is fully recorded',
+      privacy: 'No chat history stored',
+      support: 'Billing anomalies covered',
+    },
+    summary: {
+      label: 'Order record summary',
+      total: 'All records',
+      totalHint: 'Kept across pages for long-term review.',
+      currentPage: 'This page',
+      currentPageHint: 'Order amounts and status stay easy to match.',
+      completedOnPage: 'Completed here',
+      completedOnPageHint: 'Completed orders can be matched to credited balance.',
+    },
   },
 
   // User Subscriptions Page
   userSubscriptions: {
     title: 'My Subscriptions',
-    description: 'View your subscription plans and usage',
+    description: 'Review your active plans, usage windows, and expiration. 100% official full-capacity model access stays stable, never diluted, and subscription status remains recorded with orders.',
     noActiveSubscriptions: 'No Active Subscriptions',
     noActiveSubscriptionsDesc:
-      "You don't have any active subscriptions. Contact administrator to get one.",
+      'Subscription activation, expiration, and usage window records will appear here.',
     failedToLoad: 'Failed to load subscriptions',
+    trust: {
+      status: 'Full official models',
+      usageWindow: 'Usage windows are clear',
+      privacy: 'No chat history stored',
+      resetRecord: 'Excellent stability',
+    },
     status: {
       active: 'Active',
       expired: 'Expired',
@@ -7766,9 +8294,9 @@ export default {
     },
     usage: 'Usage',
     expires: 'Expires',
-    noExpiration: 'No expiration',
+    noExpiration: 'No expiration date',
     unlimited: 'Unlimited',
-    unlimitedDesc: 'No usage limits on this subscription',
+    unlimitedDesc: 'No periodic usage cap is set for this subscription',
     daily: 'Daily',
     weekly: 'Weekly',
     monthly: 'Monthly',
@@ -7780,8 +8308,8 @@ export default {
     usageOf: '{used} of {limit}',
     reset: 'Reset',
     resetTitle: 'Confirm early reset',
-    resetConfirm: 'This will refresh the daily quota immediately at the cost of {cost} subscription time.\nCurrent remaining: {before}\nAfter reset: {after}\nProceed?',
-    resetSuccess: 'Reset successful. 1 day deducted, {days} days remaining.',
+    resetConfirm: 'Refreshing today\'s quota early deducts {cost} subscription time.\nCurrent remaining: {before}\nAfter reset: {after}\nProceed?',
+    resetSuccess: 'Quota reset. About {days} days remaining.',
     resetFailed: 'Reset failed',
     resetError: {
       timeInsufficient: 'Less than 1 day remaining; cannot reset.',
@@ -7790,7 +8318,7 @@ export default {
       notFound: 'Subscription not found.',
     },
     autoResetLabel: 'Auto reset',
-    autoResetHint: 'Auto reset when daily quota is exhausted (deducts subscription time)',
+    autoResetHint: 'Refreshes today\'s quota when it is exhausted and deducts the corresponding subscription time',
     autoResetEnabled: 'Auto reset enabled',
     autoResetDisabled: 'Auto reset disabled',
     autoResetFailed: 'Failed to toggle auto reset',
@@ -7803,147 +8331,116 @@ export default {
 
   // Onboarding Tour
   onboarding: {
-    restartTour: 'Restart Onboarding Tour',
+    restartTour: 'Setup Guide',
     dontShowAgain: "Don't show again",
-    dontShowAgainTitle: 'Permanently close onboarding guide',
-    confirmDontShow: "Are you sure you don't want to see the onboarding guide again?\n\nYou can restart it anytime from the user menu in the top right corner.",
-    confirmExit: 'Are you sure you want to exit the onboarding guide? You can restart it anytime from the top right menu.',
-    interactiveHint: 'Press Enter or Click to continue',
+    dontShowAgainTitle: 'Close account overview reminder',
+    confirmDontShow: "Hide the account overview reminder?\n\nYou can open it again from the user menu in the top right corner.",
+    confirmExit: 'Exit the account overview reminder? You can open it again from the top right menu.',
+    interactiveHint: 'Press Enter to continue',
     navigation: {
       flipPage: 'Flip Page',
       exit: 'Exit'
     },
-    // Admin tour steps
+    // Admin setup guide
     admin: {
       welcome: {
-        title: '👋 Welcome to Sub2API',
-        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">Sub2API is a powerful AI service gateway platform that helps you easily manage and distribute AI services.</p><p style="margin-bottom: 12px;"><b>🎯 Core Features:</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>📦 <b>Group Management</b> - Create service tiers (VIP, Free Trial, etc.)</li><li>🔗 <b>Account Pool</b> - Connect multiple upstream AI service accounts</li><li>🔑 <b>Key Distribution</b> - Generate independent API Keys for users</li><li>💰 <b>Billing Control</b> - Flexible rate and quota management</li></ul><p style="color: #10b981; font-weight: 600;">Let\'s complete the initial setup in 3 minutes →</p></div>',
-        nextBtn: 'Start Setup 🚀',
+        title: 'Sub2API Setup Guide',
+        description: '<p>The setup path has three parts: groups, upstream accounts, and API keys.</p><ul><li><b>Groups</b> define service scope, rates, and visibility.</li><li><b>Account pools</b> provide upstream model capacity.</li><li><b>API keys</b> distribute access and track usage.</li></ul>',
+        nextBtn: 'Start Setup',
         prevBtn: 'Skip'
       },
       groupManage: {
-        title: '📦 Step 1: Group Management',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>What is a Group?</b></p><p style="margin-bottom: 12px;">Groups are the core concept of Sub2API, like a "service package":</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 Each group can contain multiple upstream accounts</li><li>💰 Each group has independent billing multiplier</li><li>👥 Can be set as public or exclusive</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Example:</b> You can create "VIP Premium" (high rate) and "Free Trial" (low rate) groups</p><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Click "Group Management" on the left sidebar</p></div>'
+        title: 'Step 1: Group Management',
+        description: '<p>Groups define user-visible service scope, billing multipliers, and exclusive access.</p><ul><li>A group can bind multiple upstream accounts.</li><li>Public groups are visible to all users; exclusive groups are restricted.</li><li>Rates apply consistently at group level.</li></ul>'
       },
       createGroup: {
-        title: '➕ Create New Group',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Let\'s create your first group.</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📝 Tip:</b> Recommend creating a test group first to familiarize yourself with the process</p><p style="color: #10b981; font-weight: 600;">👉 Click the "Create Group" button</p></div>'
+        title: 'Create Group',
+        description: '<p>A new group becomes the base for account binding and API key authorization.</p><p>Confirm the platform type before saving; it cannot be changed after creation.</p>'
       },
       groupName: {
-        title: '✏️ 1. Group Name',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Give your group an easy-to-identify name.</p><div style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>💡 Naming Suggestions:</b><ul style="margin: 8px 0 0 16px;"><li>"Test Group" - For testing</li><li>"VIP Premium" - High-quality service</li><li>"Free Trial" - Trial version</li></ul></div><p style="font-size: 13px; color: #6b7280;">Click "Next" when done</p></div>',
-        nextBtn: 'Next'
+        title: '1. Group Name',
+        description: '<p>The name is used for admin identification and user-facing display.</p><p>Use a clear, stable package or service name.</p>',
+        nextBtn: 'Continue'
       },
       groupPlatform: {
-        title: '🤖 2. Select Platform',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Choose the AI platform this group supports.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 Platform Guide:</b><ul style="margin: 8px 0 0 16px;"><li><b>Anthropic</b> - Claude models</li><li><b>OpenAI</b> - GPT models</li><li><b>Google</b> - Gemini models</li></ul></div><p style="font-size: 13px; color: #6b7280;">One group can only have one platform</p></div>',
-        nextBtn: 'Next'
+        title: '2. Platform Type',
+        description: '<p>The platform type determines which upstream accounts can be bound to this group.</p><ul><li>Anthropic maps to Claude models.</li><li>OpenAI maps to GPT models.</li><li>Google maps to Gemini models.</li></ul>',
+        nextBtn: 'Continue'
       },
       groupMultiplier: {
-        title: '💰 3. Rate Multiplier',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Set the billing multiplier to control user charges.</p><div style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚙️ Billing Rules:</b><ul style="margin: 8px 0 0 16px;"><li><b>1.0</b> - Original price (cost price)</li><li><b>1.5</b> - User consumes $1, charged $1.5</li><li><b>2.0</b> - User consumes $1, charged $2</li><li><b>0.8</b> - Subsidy mode (loss-making)</li></ul></div><p style="font-size: 13px; color: #6b7280;">Recommend setting test group to 1.0</p></div>',
-        nextBtn: 'Next'
+        title: '3. Rate Multiplier',
+        description: '<p>The rate multiplier controls actual billing for this group.</p><ul><li>1.0 bills by original usage.</li><li>Values above 1.0 apply markup.</li><li>Values below 1.0 apply subsidy.</li></ul>',
+        nextBtn: 'Continue'
       },
       groupExclusive: {
-        title: '🔒 4. Exclusive Group (Optional)',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Control group visibility and access permissions.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔐 Permission Guide:</b><ul style="margin: 8px 0 0 16px;"><li><b>Off</b> - Public group, visible to all users</li><li><b>On</b> - Exclusive group, only for specified users</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Use Cases:</b> VIP exclusive, internal testing, special customers</p></div>',
-        nextBtn: 'Next'
+        title: '4. Exclusive Group',
+        description: '<p>Exclusive groups are visible only to authorized users.</p><p>Use them for high-priority plans, enterprise customers, or internal services.</p>',
+        nextBtn: 'Continue'
       },
       groupSubmit: {
-        title: '✅ Save Group',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Confirm the information and click create to save the group.</p><p style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ Note:</b> Platform type cannot be changed after creation, but other settings can be edited anytime</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>📌 Next Step:</b> After creation, we\'ll add upstream accounts to this group</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Create" button</p></div>'
+        title: 'Save Group',
+        description: '<p>After saving, the group is ready for account binding and API key authorization.</p><p>Platform type is fixed after creation; name, rate, and visibility can be changed later.</p>'
       },
       accountManage: {
-        title: '🔗 Step 2: Add Account',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Great! Group created successfully 🎉</b></p><p style="margin-bottom: 12px;">Now add upstream AI service accounts to enable actual service delivery.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 Account Purpose:</b><ul style="margin: 8px 0 0 16px;"><li>Connect to upstream AI services (Claude, GPT, etc.)</li><li>One group can contain multiple accounts (load balancing)</li><li>Supports OAuth and Session Key methods</li></ul></div><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Click "Account Management" on the left sidebar</p></div>'
+        title: 'Step 2: Add Account',
+        description: '<p>Account pools provide upstream model capacity through groups.</p><ul><li>A group can bind multiple accounts.</li><li>Scheduling follows priority and availability.</li><li>Authorization supports OAuth and Session Key.</li></ul>'
       },
       createAccount: {
-        title: '➕ Add New Account',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Click the button to start adding your first upstream account.</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Tip:</b> Recommend using OAuth method - more secure and no manual key extraction needed</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Add Account" button</p></div>'
+        title: 'Add Account',
+        description: '<p>Once a usable upstream account is added, the group can carry model traffic.</p><p>OAuth supports token refresh and fits long-running service.</p>'
       },
       accountName: {
-        title: '✏️ 1. Account Name',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Set an easy-to-identify name for the account.</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Naming Suggestions:</b> "Claude Main", "GPT Backup 1", "Test Account", etc.</p></div>',
-        nextBtn: 'Next'
+        title: '1. Account Name',
+        description: '<p>The name is only for admin identification and does not affect scheduling.</p><p>Name accounts by platform, purpose, or priority.</p>',
+        nextBtn: 'Continue'
       },
       accountPlatform: {
-        title: '🤖 2. Select Platform',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Choose the service provider platform for this account.</p><p style="padding: 8px 12px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 13px;"><b>⚠️ Important:</b> Platform must match the group you just created</p></div>',
-        nextBtn: 'Next'
+        title: '2. Platform Type',
+        description: '<p>The account platform must match the target group platform.</p><p>Mismatched accounts are not scheduled by that group.</p>',
+        nextBtn: 'Continue'
       },
       accountType: {
-        title: '🔐 3. Authorization Method',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Choose the account authorization method.</p><div style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>✅ Recommended: OAuth Method</b><ul style="margin: 8px 0 0 16px;"><li>No manual key extraction needed</li><li>More secure with auto-refresh support</li><li>Works with Claude Code, ChatGPT OAuth</li></ul></div><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 Session Key Method</b><ul style="margin: 8px 0 0 16px;"><li>Requires manual extraction from browser</li><li>May need periodic updates</li><li>For platforms without OAuth support</li></ul></div></div>',
-        nextBtn: 'Next'
+        title: '3. Authorization Method',
+        description: '<p>OAuth fits long-running service and supports authorization refresh.</p><p>Session Key fits platforms without OAuth and should be maintained according to upstream status.</p>',
+        nextBtn: 'Continue'
       },
       accountPriority: {
-        title: '⚖️ 4. Priority (Optional)',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Set the account call priority.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📊 Priority Rules:</b><ul style="margin: 8px 0 0 16px;"><li>Lower number = higher priority</li><li>System uses low-value accounts first</li><li>Same priority = random selection</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Use Case:</b> Set main account to lower value, backup accounts to higher value</p></div>',
-        nextBtn: 'Next'
+        title: '4. Scheduling Priority',
+        description: '<p>Lower numbers have higher scheduling priority.</p><p>Accounts with the same priority are distributed by availability and scheduler policy.</p>',
+        nextBtn: 'Continue'
       },
       accountGroups: {
-        title: '🎯 5. Assign Groups',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Key Step!</b> Assign the account to the group you just created.</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ Important Reminder:</b><ul style="margin: 8px 0 0 16px;"><li>Must select at least one group</li><li>Unassigned accounts cannot be used</li><li>One account can be assigned to multiple groups</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Tip:</b> Select the test group you just created</p></div>',
-        nextBtn: 'Next'
+        title: '5. Bind Groups',
+        description: '<p>An account must be bound to at least one group before it can serve requests.</p><p>One account can serve multiple groups on the same platform.</p>',
+        nextBtn: 'Continue'
       },
       accountSubmit: {
-        title: '✅ Save Account',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Confirm the information and click save.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 OAuth Flow:</b><ul style="margin: 8px 0 0 16px;"><li>Will redirect to service provider page after clicking save</li><li>Complete login and authorization on provider page</li><li>Auto-return after successful authorization</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>📌 Next Step:</b> After adding account, we\'ll create an API key</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Save" button</p></div>'
+        title: 'Save Account',
+        description: '<p>After saving, OAuth accounts enter the upstream authorization flow.</p><p>Once authorization returns successfully, the account can participate in scheduling by group.</p>'
       },
       keyManage: {
-        title: '🔑 Step 3: Generate Key',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Congratulations! Account setup complete 🎉</b></p><p style="margin-bottom: 12px;">Final step: generate an API Key to test if the service works properly.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 API Key Purpose:</b><ul style="margin: 8px 0 0 16px;"><li>Credential for calling AI services</li><li>Each key is bound to one group</li><li>Can set quota and expiration</li><li>Supports independent usage statistics</li></ul></div><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Click "API Keys" on the left sidebar</p></div>'
+        title: 'Step 3: Generate API Key',
+        description: '<p>API keys carry user requests, quota control, and usage reporting.</p><ul><li>Each key binds to one group.</li><li>Quota, expiration, and access scope can be configured.</li><li>Usage is tracked independently by key.</li></ul>'
       },
       createKey: {
-        title: '➕ Create Key',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Click the button to create your first API Key.</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Tip:</b> Copy and save immediately after creation - key is only shown once</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Create Key" button</p></div>'
+        title: 'Generate Key',
+        description: '<p>The full key is displayed only once after generation.</p><p>Confirm the group and quota settings before creating it.</p>'
       },
       keyName: {
-        title: '✏️ 1. Key Name',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Set an easy-to-manage name for the key.</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Naming Suggestions:</b> "Test Key", "Production", "Mobile", etc.</p></div>',
-        nextBtn: 'Next'
+        title: '1. Key Name',
+        description: '<p>The name is used for admin search and usage attribution.</p><p>Name keys by user, business line, or integration scenario.</p>',
+        nextBtn: 'Continue'
       },
       keyGroup: {
-        title: '🎯 2. Select Group',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Select the group you just configured.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 Group Determines:</b><ul style="margin: 8px 0 0 16px;"><li>Which accounts this key can use</li><li>What billing multiplier applies</li><li>Whether it\'s an exclusive key</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Tip:</b> Select the test group you just created</p></div>',
-        nextBtn: 'Next'
+        title: '2. Bind Group',
+        description: '<p>The group determines the account pool, model scope, and billing multiplier available to this key.</p><p>Exclusive groups are available only to authorized users.</p>',
+        nextBtn: 'Continue'
       },
       keySubmit: {
-        title: '🎉 Generate and Copy',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">System will generate a complete API Key after clicking create.</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ Important Reminder:</b><ul style="margin: 8px 0 0 16px;"><li>Key is only shown once, copy immediately</li><li>Need to regenerate if lost</li><li>Keep it safe, don\'t share with others</li></ul></div><div style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🚀 Next Steps:</b><ul style="margin: 8px 0 0 16px;"><li>Copy the generated sk-xxx key</li><li>Use in any OpenAI-compatible client</li><li>Start experiencing AI services!</li></ul></div><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Create" button</p></div>'
+        title: 'Generate and Save',
+        description: '<p>The generated API key is shown in full once.</p><p>After the dialog closes, the full key cannot be viewed again and must be regenerated if lost.</p>'
       }
     },
-    // User tour steps
-    user: {
-      welcome: {
-        title: '👋 Welcome to Sub2API',
-        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">Hello! Welcome to the Sub2API AI service platform.</p><p style="margin-bottom: 12px;"><b>🎯 Quick Start:</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>🔑 Create API Key</li><li>📋 Copy key to your application</li><li>🚀 Start using AI services</li></ul><p style="color: #10b981; font-weight: 600;">Just 1 minute, let\'s get started →</p></div>',
-        nextBtn: 'Start 🚀',
-        prevBtn: 'Skip'
-      },
-      keyManage: {
-        title: '🔑 API Key Management',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Manage all your API access keys here.</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 What is an API Key?</b><br/>An API key is your credential for accessing AI services, like a key that allows your application to call AI capabilities.</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click to enter key page</p></div>'
-      },
-      createKey: {
-        title: '➕ Create New Key',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Click the button to create your first API key.</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Tip:</b> Key is only shown once after creation, make sure to copy and save</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Create Key"</p></div>'
-      },
-      keyName: {
-        title: '✏️ Key Name',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Give your key an easy-to-identify name.</p><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Examples:</b> "My First Key", "For Testing", etc.</p></div>',
-        nextBtn: 'Next'
-      },
-      keyGroup: {
-        title: '🎯 Select Group',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Select the service group assigned by the administrator.</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 Group Info:</b><br/>Different groups may have different service quality and billing rates, choose according to your needs.</p></div>',
-        nextBtn: 'Next'
-      },
-      keySubmit: {
-        title: '🎉 Complete Creation',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Click to confirm and create your API key.</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ Important:</b><ul style="margin: 8px 0 0 16px;"><li>Copy the key (sk-xxx) immediately after creation</li><li>Key is only shown once, need to regenerate if lost</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>🚀 How to Use:</b><br/>Configure the key in any OpenAI-compatible client (like ChatBox, OpenCat, etc.) and start using!</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Create" button</p></div>'
-      }
-    }
   },
 
   // Payment System
@@ -7954,15 +8451,21 @@ export default {
     creditedBalance: 'Credited Balance',
     quickAmounts: 'Quick Credited Balance',
     quickAmountPayDescription: 'Pay {amount}',
-    quickAmountBelowLimit: 'Below channel minimum',
-    quickAmountAboveLimit: 'Above channel maximum',
+    quickAmountBelowLimit: 'Below minimum',
+    quickAmountAboveLimit: 'Above maximum',
     quickAmountUnavailable: 'Unavailable now',
     customAmount: 'Custom Payment Amount',
+    customBalanceCredit: 'Custom Credited Balance',
     enterAmount: 'Enter amount',
     paymentMethod: 'Payment Method',
+    methodNoFee: 'No extra fee',
     fee: 'Fee',
     actualPay: 'Actual Payment',
     createOrder: 'Confirm Payment',
+    confirmPayment: 'Confirm Payment',
+    orderPreview: 'This payment',
+    selectedPlan: 'Selected Plan',
+    changePlan: 'Change Plan',
     methods: {
       easypay: 'EasyPay',
       alipay: 'Alipay',
@@ -7994,21 +8497,26 @@ export default {
       scanToPay: 'Scan to Pay',
       scanAlipay: 'Alipay QR Payment',
       scanWxpay: 'WeChat QR Payment',
-      scanAlipayHint: 'Open Alipay on your phone and scan the QR code to pay',
-      scanWxpayHint: 'Open WeChat on your phone and scan the QR code to pay',
-      payInNewWindow: 'Complete Payment in New Window',
-      payInNewWindowHint: 'The payment page has opened in a new window. Please complete the payment there and return to this page.',
+      scanAlipayHint: 'After Alipay confirms the scan, the order status syncs automatically.',
+      scanWxpayHint: 'After WeChat confirms the scan, the order status syncs automatically.',
+      payInNewWindow: 'Payment Window Opened',
+      payInNewWindowHint: 'The payment page opened in a new window. Order status syncs on this page.',
       openPayWindow: 'Reopen Payment Page',
       copyPayUrl: 'Copy payment link',
       copyQrUrl: 'Copy QR link',
       openPayUrl: 'Open payment link',
-      mobileFallbackHint: 'If this device cannot scan the code, copy the link to another device or take a screenshot for another device to scan.',
+      mobileFallbackHint: 'When mobile scanning is limited, the payment link and QR code remain usable on another device.',
       expiresIn: 'Expires in',
       expired: 'Order Expired',
-      expiredDesc: 'This order has expired. Please create a new one.',
+      expiredDesc: 'This order timed out without a confirmed charge.',
       cancelled: 'Order Cancelled',
-      cancelledDesc: 'You have cancelled this payment.',
-      waitingPayment: 'Waiting for payment...',
+      cancelledDesc: 'This payment session has ended, and the order record remains available.',
+      waitingPayment: 'Waiting for payment confirmation',
+      assuranceTitle: 'Transaction records and protection',
+      officialAssurance: '100% official full-capacity models, never diluted.',
+      orderRecordAssurance: 'Order ID and payment status remain available for review.',
+      billingProtectionAssurance: 'Excellent stability, with confirmed billing anomalies covered.',
+      privacyAssurance: 'We do not store user chat conversations or proactively disclose user information.',
       cancelOrder: 'Cancel Order',
     },
     orders: {
@@ -8021,7 +8529,7 @@ export default {
       creditedAmount: 'Credited Amount',
       creditedBalance: 'Credited Balance',
       fee: 'Fee',
-      baseAmount: 'Base Amount',
+      baseAmount: 'Base amount',
       includedInPayAmount: 'included in paid amount',
       status: 'Status',
       paymentMethod: 'Payment Method',
@@ -8036,73 +8544,99 @@ export default {
       success: 'Payment Successful',
       subscriptionSuccess: 'Subscription Successful',
       processing: 'Payment Processing',
-      processingHint: 'Payment confirmation is still pending. This page will refresh automatically.',
-      failed: 'Payment Failed',
-      backToRecharge: 'Back to Recharge',
-      viewOrders: 'View Orders',
+      successHint: 'Crediting and subscription status have synced to account records.',
+      processingHint: 'Payment confirmation is still pending. This page will refresh automatically and keep the order record.',
+      failed: 'Payment Not Completed',
+      failedHint: 'Unconfirmed charges are not credited. The order record remains available for review.',
+      backToRecharge: 'Recharge / Subscribe',
+      viewOrders: 'Order Records',
+      done: 'Done',
+      orderSnapshot: 'Order details',
+      returnSnapshot: 'Payment return',
+      assuranceTitle: 'Transaction assurance',
+      officialModels: '100% official full-capacity models, never diluted',
+      privacy: 'We do not store user chat conversations or proactively disclose user information',
+      refundProtection: 'Excellent stability, with confirmed billing anomalies covered',
     },
     currentBalance: 'Current Balance',
-    groupFallback: 'Group #{id}',
+    groupFallback: 'Service tier #{id}',
     rechargeAccount: 'Recharge Account',
     activeSubscription: 'Active Subscription',
     noActiveSubscription: 'No active subscription',
     tabTopUp: 'Top Up',
     tabSubscribe: 'Subscribe',
     noPlans: 'No subscription plans available',
+    noPlansDesc: 'Available plans will appear here when they are open.',
     notAvailable: 'Top-up is currently unavailable',
+    trust: {
+      recharge: 'Full official models',
+      privacy: 'Never diluted',
+      subscription: 'No chat history stored',
+      stability: 'Excellent stability',
+      orders: 'Billing anomalies covered',
+      caption: 'Payment amount, credited balance, subscription status, and order progress remain in account records. We do not store user chat conversations or proactively disclose user information.',
+    },
+    support: {
+      title: 'Clear records for review',
+      detail: 'Order number, crediting status, and page details support customer-service review. Confirmed billing anomalies are covered.',
+      action: 'Open a ticket',
+    },
     confirmSubscription: 'Confirm Subscription',
-    confirmCancel: 'Are you sure you want to cancel this order?',
-    amountTooLow: 'Minimum amount is {min}',
-    amountTooHigh: 'Maximum amount is {max}',
+    confirmCancel: 'The order status updates after cancellation.',
+    amountTooLow: 'Minimum amount {min}',
+    amountTooHigh: 'Maximum amount {max}',
     amountNoMethod: 'No payment method available for this amount',
     rechargeRatePreview: 'Equivalent display: 1 balance credit ≈ official ¥{cny}; actual crediting is one-to-one with the top-up amount',
-    refundReason: 'Refund Reason',
-    refundReasonPlaceholder: 'Please describe your refund reason',
-    stripeLoadFailed: 'Failed to load payment component. Please refresh and try again.',
-    stripeMissingParams: 'Missing order ID or client secret',
-    stripeNotConfigured: 'Stripe is not configured',
-    airwallexLoadFailed: 'Failed to load Airwallex payment component. Please refresh and try again.',
-    airwallexMissingParams: 'Missing Airwallex payment parameters',
+    refundReason: 'Refund Note',
+    refundReasonPlaceholder: 'Amount, order, or crediting details',
+    stripeLoadFailed: 'The payment component is not ready yet. The order record remains available.',
+    stripeMissingParams: 'Payment details are not ready yet',
+    stripeNotConfigured: 'This payment method is not open right now',
+    airwallexLoadFailed: 'The Airwallex payment component is not ready yet. The order record remains available.',
+    airwallexMissingParams: 'Payment details are not ready yet',
+    airwallexRedirecting: 'Airwallex secure checkout is opening. Order status writes back to account records.',
+    stripeRedirecting: 'Stripe secure payment is opening. Order status writes back to account records.',
+    stripeSecureCaption: 'Stripe securely handles payment details. The platform keeps only order number, amount, and status for review.',
     errors: {
-      tooManyPending: 'Too many pending orders (max {max}). Please complete or cancel existing orders first.',
-      cancelRateLimited: 'Too many cancellations. Please try again later.',
-      createOrderHint: 'Check the payment method and amount, then try again. If the issue persists, contact support with the error shown here.',
-      wechatH5NotAuthorized: 'This merchant has not enabled WeChat H5 payment. Open this page in WeChat to continue.',
-      wechatPaymentMpNotConfigured: 'This site has not completed WeChat MP/JSAPI payment setup, so in-app WeChat payment is unavailable right now.',
-      wechatJsapiUnavailable: 'WeChat payment could not be invoked in the current environment. Reopen this page inside WeChat and try again.',
-      wechatJsapiFailed: 'WeChat payment did not complete. Try invoking it again or switch to QR payment.',
-      wechatUnavailable: 'WeChat payment is temporarily unavailable. Please try again later.',
-      wechatOpenInWeChatHint: 'Open the current page inside WeChat, or switch to desktop WeChat QR payment.',
-      wechatScanOnDesktopHint: 'On desktop, use WeChat Scan to pay; on mobile, reopen the current page inside WeChat.',
-      wechatSwitchBrowserHint: 'Switch to desktop WeChat QR payment, or reopen this page in an external browser and retry.',
-      mobilePaymentFallbackToQr: 'This merchant has not enabled mobile payment. The flow has been switched to QR payment automatically.',
+      tooManyPending: 'Too many pending orders (max {max}). New orders are available after existing orders complete or cancel.',
+      cancelRateLimited: 'Cancellation activity is dense. It restores shortly.',
+      createOrderHint: 'Payment method, amount, and order status remain in the record.',
+      wechatH5NotAuthorized: 'WeChat H5 payment is unavailable right now. The WeChat in-app page can continue the payment.',
+      wechatPaymentMpNotConfigured: 'WeChat in-app payment is not open right now.',
+      wechatJsapiUnavailable: 'WeChat payment could not be invoked in the current environment. The WeChat in-app page can continue the payment.',
+      wechatJsapiFailed: 'WeChat payment did not complete. QR payment remains available.',
+      wechatUnavailable: 'WeChat payment is temporarily unavailable.',
+      wechatOpenInWeChatHint: 'The current page link can open inside WeChat, and desktop WeChat QR payment is also available.',
+      wechatScanOnDesktopHint: 'Desktop supports WeChat Scan. Mobile supports the WeChat in-app payment page.',
+      wechatSwitchBrowserHint: 'Desktop WeChat QR payment and external-browser payment are both available.',
+      mobilePaymentFallbackToQr: 'Mobile payment is unavailable right now. The flow switched to QR payment automatically.',
       alipayDesktopUnavailable: 'The desktop Alipay flow could not generate a QR code.',
-      alipayDesktopQrHint: 'Desktop Alipay should render a QR code. Refresh and retry, or make sure the payment page was not blocked.',
+      alipayDesktopQrHint: 'The desktop Alipay QR code was not generated. Refresh to get a new payment page.',
       alipayMobileUnavailable: 'This page could not hand off to Alipay.',
-      alipayMobileOpenHint: 'Allow the current page to open the Alipay app, or retry from the system browser.',
+      alipayMobileOpenHint: 'Alipay payment can be restarted from the system browser.',
       // Structured error codes (reason strings from backend ApplicationError)
-      PAYMENT_DISABLED: 'Payment system is disabled.',
-      USER_INACTIVE: 'Your account is disabled.',
-      BALANCE_PAYMENT_DISABLED: 'Balance recharge has been disabled.',
+      PAYMENT_DISABLED: 'Payment service is not open right now.',
+      USER_INACTIVE: 'This account is not active right now.',
+      BALANCE_PAYMENT_DISABLED: 'Balance recharge is not open right now.',
       INVALID_AMOUNT: 'Invalid amount.',
-      INVALID_INPUT: 'Invalid request.',
-      PLAN_NOT_AVAILABLE: 'Plan not found or no longer available.',
-      GROUP_NOT_FOUND: 'Subscription group is no longer available.',
-      GROUP_TYPE_MISMATCH: 'Group is not a subscription type.',
-      TOO_MANY_PENDING: 'Too many pending orders (max {max}). Please complete or cancel existing orders first.',
+      INVALID_INPUT: 'Payment details are incomplete.',
+      PLAN_NOT_AVAILABLE: 'This plan is not open right now.',
+      GROUP_NOT_FOUND: 'This subscription plan is not open right now.',
+      GROUP_TYPE_MISMATCH: 'Subscription plan status is unavailable.',
+      TOO_MANY_PENDING: 'Too many pending orders (max {max}). New orders are available after existing orders complete or cancel.',
       DAILY_LIMIT_EXCEEDED: 'Daily recharge limit reached. Remaining: {remaining}.',
-      PAYMENT_GATEWAY_ERROR: 'Payment method is unavailable.',
-      NO_AVAILABLE_INSTANCE: 'No payment channel available right now.',
-      PAYMENT_PROVIDER_MISCONFIGURED: 'Payment provider misconfigured. Please contact an administrator.',
-      WXPAY_CONFIG_MISSING_KEY: 'WeChat Pay config missing required key: {key}.',
-      WXPAY_CONFIG_INVALID_KEY_LENGTH: 'WeChat Pay {key} length is invalid (expected {expected} bytes, got {actual}).',
-      WXPAY_CONFIG_INVALID_KEY: 'WeChat Pay {key} is malformed. Make sure you copied the full PEM content.',
-      PENDING_ORDERS: 'This provider has pending orders. Please wait for them to complete before making changes.',
-      PAYMENT_PROVIDER_CONFLICT: 'Another enabled provider instance is already serving this payment method. Disable it before continuing.',
-      CANCEL_RATE_LIMITED: 'Too many cancellations. Please try again later.',
+      PAYMENT_GATEWAY_ERROR: 'This payment method is not open right now.',
+      NO_AVAILABLE_INSTANCE: 'No payment method is available right now.',
+      PAYMENT_PROVIDER_MISCONFIGURED: 'This payment method is temporarily unavailable.',
+      WXPAY_CONFIG_MISSING_KEY: 'Payment details are not ready yet.',
+      WXPAY_CONFIG_INVALID_KEY_LENGTH: 'Payment details are not ready yet.',
+      WXPAY_CONFIG_INVALID_KEY: 'Payment details are not ready yet.',
+      PENDING_ORDERS: 'This payment method has pending orders. Operations continue after the order completes.',
+      PAYMENT_PROVIDER_CONFLICT: 'This payment method cannot be switched right now.',
+      CANCEL_RATE_LIMITED: 'Cancellation activity is dense. It restores shortly.',
       NOT_FOUND: 'Order not found.',
       FORBIDDEN: 'No permission for this order.',
-      CONFLICT: 'Order status has changed. Please refresh.',
+      CONFLICT: 'Order status has changed. Refresh to view the latest status.',
       INVALID_ORDER_TYPE: 'Only balance orders can request a refund.',
       INVALID_STATUS: 'The current order status does not allow this operation.',
       BALANCE_NOT_ENOUGH: 'Refund amount exceeds balance.',
@@ -8110,26 +8644,26 @@ export default {
       REFUND_FAILED: 'Refund failed.',
     },
     airwallexPay: 'Airwallex Payment',
-    stripePay: 'Pay Now',
-    stripeSuccessProcessing: 'Payment successful, processing your order...',
+    stripePay: 'Confirm payment',
+    stripeSuccessProcessing: 'Payment successful. Order status is syncing.',
     stripePopup: {
       redirecting: 'Redirecting to payment page...',
       loadingQr: 'Loading WeChat Pay QR code...',
-      timeout: 'Timed out waiting for payment credentials, please retry',
+      timeout: 'Timed out waiting for payment credentials',
       qrFailed: 'Failed to get WeChat Pay QR code',
     },
-    subscribeNow: 'Subscribe Now',
+    subscribeNow: 'Select plan',
     renewNow: 'Renew',
     selectPlan: 'Select Plan',
     planFeatures: 'Features',
     planCard: {
-      rate: 'Rate',
-      dailyLimit: 'Daily',
-      weeklyLimit: 'Weekly',
-      monthlyLimit: 'Monthly',
-      quota: 'Quota',
+      rate: 'Billing rate',
+      dailyLimit: 'Daily quota',
+      weeklyLimit: 'Weekly quota',
+      monthlyLimit: 'Monthly quota',
+      quota: 'Cycle quota',
       unlimited: 'Unlimited',
-      models: 'Models',
+      models: 'Available models',
     },
     days: 'days',
     months: 'months',
