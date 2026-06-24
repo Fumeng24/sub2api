@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   BILLING_MODE_IMAGE,
+  BILLING_MODE_PER_REQUEST,
   BILLING_MODE_TOKEN,
   getDisplayBillingMode,
+  getBillingModeLabel,
   isImageUsage,
 } from '../billingMode'
 
@@ -36,5 +38,21 @@ describe('billingMode helpers', () => {
 
     expect(getDisplayBillingMode(row)).toBeNull()
     expect(isImageUsage(row)).toBe(false)
+  })
+
+  it('uses the admin usage namespace by default for billing labels', () => {
+    const t = (key: string) => key
+
+    expect(getBillingModeLabel(BILLING_MODE_PER_REQUEST, t)).toBe('admin.usage.billingModePerRequest')
+    expect(getBillingModeLabel(BILLING_MODE_IMAGE, t)).toBe('admin.usage.billingModeImage')
+    expect(getBillingModeLabel(BILLING_MODE_TOKEN, t)).toBe('admin.usage.billingModeToken')
+  })
+
+  it('allows user-facing billing labels to use the usage namespace', () => {
+    const t = (key: string) => key
+
+    expect(getBillingModeLabel(BILLING_MODE_PER_REQUEST, t, 'usage')).toBe('usage.billingModePerRequest')
+    expect(getBillingModeLabel(BILLING_MODE_IMAGE, t, 'usage')).toBe('usage.billingModeImage')
+    expect(getBillingModeLabel(BILLING_MODE_TOKEN, t, 'usage')).toBe('usage.billingModeToken')
   })
 })

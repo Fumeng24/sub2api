@@ -47,7 +47,7 @@
           :utilization="usageInfo.five_hour.utilization"
           :resets-at="usageInfo.five_hour.resets_at"
           :window-stats="usageInfo.five_hour.window_stats"
-          color="indigo"
+          color="blue"
         />
 
         <!-- 7d Window (OAuth only) -->
@@ -65,7 +65,7 @@
           label="7d S"
           :utilization="usageInfo.seven_day_sonnet.utilization"
           :resets-at="usageInfo.seven_day_sonnet.resets_at"
-          color="purple"
+          color="slate"
         />
 
         <!-- Passive sampling label + active query button -->
@@ -115,7 +115,7 @@
           :resets-at="usageInfo.five_hour.resets_at"
           :window-stats="usageInfo.five_hour.window_stats"
           :show-now-when-idle="true"
-          color="indigo"
+          color="blue"
         />
         <UsageProgressBar
           v-if="usageInfo?.seven_day"
@@ -280,7 +280,7 @@
           :label="t('admin.accounts.usageWindow.gemini3Pro')"
           :utilization="antigravity3ProUsageFromAPI.utilization"
           :resets-at="antigravity3ProUsageFromAPI.resetTime"
-          color="indigo"
+          color="blue"
         />
 
         <!-- Gemini 3 Flash -->
@@ -298,7 +298,7 @@
           :label="t('admin.accounts.usageWindow.gemini3Image')"
           :utilization="antigravity3ImageUsageFromAPI.utilization"
           :resets-at="antigravity3ImageUsageFromAPI.resetTime"
-          color="purple"
+          color="slate"
         />
 
         <!-- Claude -->
@@ -482,7 +482,7 @@
         label="1d"
         :utilization="quotaDailyBar.utilization"
         :resets-at="quotaDailyBar.resetsAt"
-        color="indigo"
+        color="blue"
       />
       <UsageProgressBar
         v-if="quotaWeeklyBar"
@@ -495,7 +495,7 @@
         v-if="quotaTotalBar"
         label="total"
         :utilization="quotaTotalBar.utilization"
-        color="purple"
+        color="slate"
       />
 
       <!-- No data at all -->
@@ -809,13 +809,13 @@ const geminiTierClass = computed(() => {
   }
 
   if (channel === 'google one') {
-    if (level === 'ultra') return 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300'
+    if (level === 'ultra') return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200'
     if (level === 'pro') return 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
     return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
   }
 
   if (channel === 'gcp') {
-    if (level === 'enterprise') return 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300'
+    if (level === 'enterprise') return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200'
     return 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
   }
 
@@ -888,7 +888,7 @@ const geminiUsageBars = computed(() => {
     utilization: number
     resetsAt: string | null
     windowStats?: WindowStats | null
-    color: 'indigo' | 'emerald'
+    color: 'blue' | 'emerald'
   }> = []
 
   if (geminiUsesSharedDaily.value) {
@@ -900,7 +900,7 @@ const geminiUsageBars = computed(() => {
         utilization: sharedDaily.utilization,
         resetsAt: sharedDaily.resets_at,
         windowStats: sharedDaily.window_stats,
-        color: 'indigo'
+        color: 'blue'
       })
     }
     return bars
@@ -914,7 +914,7 @@ const geminiUsageBars = computed(() => {
       utilization: pro.utilization,
       resetsAt: pro.resets_at,
       windowStats: pro.window_stats,
-      color: 'indigo'
+      color: 'blue'
       })
   }
 
@@ -955,7 +955,7 @@ const antigravityTierClass = computed(() => {
     case 'g1-pro-tier':
       return 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
     case 'g1-ultra-tier':
-      return 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300'
+      return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200'
     default:
       return ''
   }
