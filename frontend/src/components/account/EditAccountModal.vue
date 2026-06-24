@@ -158,7 +158,7 @@
                 :class="[
                   'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all',
                   modelRestrictionMode === 'mapping'
-                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                    ? 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-600 dark:text-gray-400 dark:hover:bg-dark-500'
                 ]"
               >
@@ -192,8 +192,8 @@
 
             <!-- Mapping Mode -->
             <div v-else>
-              <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/20">
-                <p class="text-xs text-purple-700 dark:text-purple-400">
+              <div class="mb-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+                <p class="text-xs text-slate-700 dark:text-slate-300">
                   <svg
                     class="mr-1 inline h-4 w-4"
                     fill="none"
@@ -498,7 +498,7 @@
               :class="[
                 'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all',
                 modelRestrictionMode === 'mapping'
-                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                  ? 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-600 dark:text-gray-400 dark:hover:bg-dark-500'
               ]"
             >
@@ -519,8 +519,8 @@
 
           <!-- Mapping Mode -->
           <div v-else>
-            <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/20">
-              <p class="text-xs text-purple-700 dark:text-purple-400">
+            <div class="mb-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+              <p class="text-xs text-slate-700 dark:text-slate-300">
                 {{ t('admin.accounts.mapRequestModels') }}
               </p>
             </div>
@@ -739,7 +739,7 @@
               :class="[
                 'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all',
                 modelRestrictionMode === 'mapping'
-                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                  ? 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-600 dark:text-gray-400 dark:hover:bg-dark-500'
               ]"
             >
@@ -773,8 +773,8 @@
 
           <!-- Mapping Mode -->
           <div v-else>
-            <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/20">
-              <p class="text-xs text-purple-700 dark:text-purple-400">
+            <div class="mb-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+              <p class="text-xs text-slate-700 dark:text-slate-300">
                 <svg
                   class="mr-1 inline h-4 w-4"
                   fill="none"
@@ -974,7 +974,7 @@
               :class="[
                 'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all',
                 modelRestrictionMode === 'mapping'
-                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                  ? 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-600 dark:text-gray-400 dark:hover:bg-dark-500'
               ]"
             >
@@ -1091,8 +1091,8 @@
 
         <!-- Mapping Mode Only (no toggle for Antigravity) -->
         <div>
-          <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/20">
-            <p class="text-xs text-purple-700 dark:text-purple-400">{{ t('admin.accounts.mapRequestModels') }}</p>
+          <div class="mb-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+            <p class="text-xs text-slate-700 dark:text-slate-300">{{ t('admin.accounts.mapRequestModels') }}</p>
           </div>
 
           <div class="mb-3 flex flex-wrap gap-2">

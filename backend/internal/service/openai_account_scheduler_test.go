@@ -872,6 +872,182 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_ImageGenerationBridgeUs
 	}
 }
 
+func TestOpenAIGatewayService_SelectAccountWithSchedulerForImages_IgnoresSchedulerCircuit(t *testing.T) {
+	resetOpenAIAdvancedSchedulerSettingCacheForTest()
+
+	ctx := context.Background()
+	groupID := int64(10116)
+	account := Account{
+		ID:          37043,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    1,
+		GroupIDs:    []int64{groupID},
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{
+				"gpt-image-2": "gpt-image-2",
+			},
+		},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+	endpoint := "images:" + string(OpenAIImagesCapabilityNative)
+	svc.schedulerHealth.reportFailure(account.ID, "gpt-image-2", endpoint, "transient", time.Minute)
+
+	selection, _, err := svc.SelectAccountWithSchedulerForImages(
+		ctx,
+		&groupID,
+		"",
+		"gpt-image-2",
+		nil,
+		OpenAIImagesCapabilityNative,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, account.ID, selection.Account.ID)
+	require.True(t, selection.Acquired)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+
+	scheduler := &defaultOpenAIAccountScheduler{service: svc}
+	diag := scheduler.buildOpenAISelectionDiagnostics(ctx, OpenAIAccountScheduleRequest{
+		GroupID:                 &groupID,
+		RequestedModel:          "gpt-image-2",
+		RequiredTransport:       OpenAIUpstreamTransportHTTPSSE,
+		RequiredImageCapability: OpenAIImagesCapabilityNative,
+		IgnoreSchedulerHealth:   true,
+	}, nil)
+	require.True(t, diag.Collected)
+	require.True(t, diag.IgnoreSchedulerHealth)
+	require.Equal(t, 0, diag.CircuitFilteredCount)
+	require.Equal(t, 1, diag.FinalCandidateCount)
+}
+
+func TestOpenAIGatewayService_SelectAccountWithSchedulerForImages_IgnoresSchedulerProbePending(t *testing.T) {
+	resetOpenAIAdvancedSchedulerSettingCacheForTest()
+
+	ctx := context.Background()
+	groupID := int64(10117)
+	account := Account{
+		ID:          37044,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    1,
+		GroupIDs:    []int64{groupID},
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{
+				"gpt-image-2": "gpt-image-2",
+			},
+		},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+	endpoint := "images:" + string(OpenAIImagesCapabilityNative)
+	svc.schedulerHealth.reportFailure(account.ID, "gpt-image-2", endpoint, "transient", time.Nanosecond)
+	require.Eventually(t, func() bool {
+		snap := svc.schedulerHealth.snapshot(account.ID, "gpt-image-2", endpoint, true)
+		return snap.CircuitState == schedulerCircuitHalfOpen && snap.HalfOpenProbe
+	}, time.Second, time.Millisecond)
+	require.True(t, svc.schedulerHealth.tryBeginHalfOpenProbe(account.ID, "gpt-image-2", endpoint))
+
+	selection, _, err := svc.SelectAccountWithSchedulerForImages(
+		ctx,
+		&groupID,
+		"",
+		"gpt-image-2",
+		nil,
+		OpenAIImagesCapabilityNative,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, account.ID, selection.Account.ID)
+	require.True(t, selection.Acquired)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithSchedulerForImages_StickyIgnoresSchedulerCircuit(t *testing.T) {
+	resetOpenAIAdvancedSchedulerSettingCacheForTest()
+
+	ctx := context.Background()
+	groupID := int64(10118)
+	sessionHash := "image_session_hash"
+	account := Account{
+		ID:          37045,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    1,
+		GroupIDs:    []int64{groupID},
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{
+				"gpt-image-2": "gpt-image-2",
+			},
+		},
+	}
+	cache := &schedulerTestGatewayCache{
+		sessionBindings: map[string]int64{
+			"openai:" + sessionHash: account.ID,
+		},
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: []Account{account}},
+		cache:              cache,
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+		schedulerHealth:    newAccountSchedulerHealthStats(),
+	}
+	endpoint := "images:" + string(OpenAIImagesCapabilityNative)
+	svc.schedulerHealth.reportFailure(account.ID, "gpt-image-2", endpoint, "transient", time.Minute)
+
+	selection, decision, err := svc.SelectAccountWithSchedulerForImages(
+		ctx,
+		&groupID,
+		sessionHash,
+		"gpt-image-2",
+		nil,
+		OpenAIImagesCapabilityNative,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, account.ID, selection.Account.ID)
+	require.Equal(t, openAIAccountScheduleLayerSessionSticky, decision.Layer)
+	require.True(t, decision.StickySessionHit)
+	require.Equal(t, account.ID, cache.sessionBindings["openai:"+sessionHash])
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
 func TestOpenAIGatewayService_SelectAccountWithScheduler_Enabled_EmbeddingsSkipsChatOnlyStickyBindings(t *testing.T) {
 	resetOpenAIAdvancedSchedulerSettingCacheForTest()
 

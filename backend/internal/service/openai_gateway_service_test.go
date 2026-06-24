@@ -3203,6 +3203,99 @@ func TestHandleSSEToJSON_ResponseFailedReturnsProtocolError(t *testing.T) {
 	require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
 }
 
+func TestHandleSSEToJSON_CompactContextWindowFailedReturnsFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses/compact", nil)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+	}
+	body := []byte(strings.Join([]string{
+		`data: {"type":"response.failed","error":{"message":"Your input exceeds the context window."}}`,
+		`data: [DONE]`,
+	}, "\n"))
+
+	usage, err := svc.handleSSEToJSON(context.Background(), resp, c, nil, body, "gpt-5.5", "gpt-5.5")
+	require.Nil(t, usage)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.True(t, isOpenAIContextWindowError("", failoverErr.ResponseBody))
+	require.Empty(t, rec.Body.String())
+}
+
+func TestHandlePassthroughSSEToJSON_CompactContextWindowFailedReturnsFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/backend-api/codex/responses/compact", nil)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+	}
+	account := &Account{ID: 12, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Name: "openai-oauth"}
+	body := []byte(strings.Join([]string{
+		`data: {"type":"response.failed","error":{"message":"too many input tokens for the context window"}}`,
+		`data: [DONE]`,
+	}, "\n"))
+
+	result, err := svc.handlePassthroughSSEToJSON(context.Background(), resp, c, account, body, "gpt-5.5", "gpt-5.5")
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.True(t, isOpenAIContextWindowError("", failoverErr.ResponseBody))
+	require.Empty(t, rec.Body.String())
+}
+
+func TestHandleNonStreamingResponse_CompactJSONResponseFailedReturnsFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses/compact", nil)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"type":"response.failed","error":{"message":"maximum context length exceeded"}}`)),
+	}
+	account := &Account{ID: 13, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Name: "openai-apikey"}
+
+	result, err := svc.handleNonStreamingResponse(context.Background(), resp, c, account, "gpt-5.5", "gpt-5.5")
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.True(t, isOpenAIContextWindowError("", failoverErr.ResponseBody))
+	require.Empty(t, rec.Body.String())
+}
+
+func TestHandleNonStreamingResponsePassthrough_CompactJSONResponseFailedReturnsFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/backend-api/codex/responses/compact", nil)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"type":"response.failed","error":{"message":"input is too long for the context window"}}`)),
+	}
+	account := &Account{ID: 14, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Name: "openai-oauth"}
+
+	result, err := svc.handleNonStreamingResponsePassthrough(context.Background(), resp, c, account, "gpt-5.5", "gpt-5.5")
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.True(t, isOpenAIContextWindowError("", failoverErr.ResponseBody))
+	require.Empty(t, rec.Body.String())
+}
+
 func TestOpenAICompatSSEFrameParserResetsEventTypeAtFrameBoundary(t *testing.T) {
 	var parser openAICompatSSEFrameParser
 

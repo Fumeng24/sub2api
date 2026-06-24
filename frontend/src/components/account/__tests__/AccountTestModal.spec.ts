@@ -189,4 +189,67 @@ describe('AccountTestModal', () => {
 
     expect(wrapper.text()).toContain('已通过 /v1/chat/completions 验证')
   })
+
+  it('loads wrapped model payloads', async () => {
+    getAvailableModelsMock.mockResolvedValueOnce({
+      data: {
+        models: [
+          { id: 'gpt-5.5', display_name: 'GPT-5.5' }
+        ]
+      }
+    })
+
+    const wrapper = mount(AccountTestModal, {
+      props: {
+        show: false,
+        account: buildAccount()
+      },
+      global: {
+        stubs: {
+          BaseDialog: BaseDialogStub,
+          Select: SelectStub,
+          TextArea: TextAreaStub,
+          Icon: true
+        }
+      }
+    })
+
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect((wrapper.vm as any).availableModels).toEqual([
+      expect.objectContaining({
+        id: 'gpt-5.5',
+        value: 'gpt-5.5',
+        label: 'GPT-5.5'
+      })
+    ])
+    expect((wrapper.vm as any).selectedModelId).toBe('gpt-5.5')
+  })
+
+  it('falls back to platform default models when model loading fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    getAvailableModelsMock.mockRejectedValueOnce(new Error('network failed'))
+
+    const wrapper = mount(AccountTestModal, {
+      props: {
+        show: false,
+        account: buildAccount()
+      },
+      global: {
+        stubs: {
+          BaseDialog: BaseDialogStub,
+          Select: SelectStub,
+          TextArea: TextAreaStub,
+          Icon: true
+        }
+      }
+    })
+
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect((wrapper.vm as any).availableModels.length).toBeGreaterThan(0)
+    expect((wrapper.vm as any).selectedModelId).toBeTruthy()
+  })
 })

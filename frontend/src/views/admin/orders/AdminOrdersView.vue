@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="space-y-4">
+    <div class="admin-apple-page space-y-4">
       <!-- Filters -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-900">
         <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -134,6 +134,7 @@ import {
   formatOrderPaymentAmount,
   shouldShowCreditedBalance,
 } from '@/components/payment/orderAmounts'
+import '../adminApple.css'
 
 interface AuditLog {
   id: number

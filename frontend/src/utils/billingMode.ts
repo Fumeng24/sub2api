@@ -2,11 +2,15 @@ export const BILLING_MODE_TOKEN = 'token'
 export const BILLING_MODE_PER_REQUEST = 'per_request'
 export const BILLING_MODE_IMAGE = 'image'
 
-export function getBillingModeLabel(mode: string | null | undefined, t: (key: string) => string): string {
+export function getBillingModeLabel(
+  mode: string | null | undefined,
+  t: (key: string) => string,
+  namespace = 'admin.usage'
+): string {
   switch (mode) {
-    case BILLING_MODE_PER_REQUEST: return t('admin.usage.billingModePerRequest')
-    case BILLING_MODE_IMAGE: return t('admin.usage.billingModeImage')
-    default: return t('admin.usage.billingModeToken')
+    case BILLING_MODE_PER_REQUEST: return t(`${namespace}.billingModePerRequest`)
+    case BILLING_MODE_IMAGE: return t(`${namespace}.billingModeImage`)
+    default: return t(`${namespace}.billingModeToken`)
   }
 }
 

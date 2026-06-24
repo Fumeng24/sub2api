@@ -6,29 +6,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Wegoo AI 是低成本大模型 API 聚合平台，支持 GPT/Codex、Claude、Gemini 与 AI 生图，兼容 OpenAI API 格式。1 元 = 1 刀，注册送额度，适合编程、自动化、写作、论文润色和高频 AI 使用。"
+      content="Wegoo AI 提供官方满血 AI 模型服务，支持 GPT/Codex、Claude、Gemini 与 AI 生图。模型永远不掺水，不保存聊天对话，用户信息不对外泄露，稳定性行业内极佳，异常扣费包赔。"
     />
     <meta
       name="keywords"
-      content="Wegoo AI,AI API,大模型 API,AI API 聚合平台,Token 聚合平台,OpenAI API 兼容,ChatGPT API,Claude API,Gemini API,Codex API,GPT-5 API,AI API Key,Claude API Key,Gemini API Key,便宜 AI API,稳定 AI API,低成本 API,API 中转,图像生成 API,AI 生图 API,Cursor API,Cline API,Codex TUI,Claude Code,一键迁移 API"
+      content="Wegoo AI,AI API,官方满血模型,不掺水 AI API,OpenAI API 兼容,ChatGPT API,Claude API,Gemini API,Codex API,GPT-5 API,AI API Key,Claude API Key,Gemini API Key,稳定 AI API,异常扣费包赔,图像生成 API,AI 生图 API,Cursor API,Cline API,Codex TUI,Claude Code"
     />
     <meta name="robots" content="index,follow" />
-    <meta name="theme-color" content="#1d4ed8" />
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#050505" media="(prefers-color-scheme: dark)" />
     <link rel="canonical" href="https://ai.wegoo.site/home" />
     <meta property="og:site_name" content="Wegoo AI" />
-    <meta property="og:title" content="低成本大模型 API 聚合平台 - Wegoo AI" />
+    <meta property="og:title" content="官方满血 AI 模型服务 - Wegoo AI" />
     <meta
       property="og:description"
-      content="兼容 OpenAI API 格式，支持 GPT/Codex、Claude、Gemini 与 AI 生图。1 元 = 1 刀，注册送额度，适合编程、自动化、写作和高频 AI 使用。"
+      content="支持 GPT/Codex、Claude、Gemini 与 AI 生图。模型永远不掺水，不保存聊天对话，用户信息不对外泄露，稳定性行业内极佳，异常扣费包赔。"
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://ai.wegoo.site/home" />
     <meta property="og:image" content="https://ai.wegoo.site/logo.png" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="低成本大模型 API 聚合平台 - Wegoo AI" />
+    <meta name="twitter:title" content="官方满血 AI 模型服务 - Wegoo AI" />
     <meta
       name="twitter:description"
-      content="兼容 OpenAI API 格式，支持 GPT/Codex、Claude、Gemini 与 AI 生图。1 元 = 1 刀，注册送额度，适合编程、自动化、写作和高频 AI 使用。"
+      content="支持 GPT/Codex、Claude、Gemini 与 AI 生图。模型永远不掺水，不保存聊天对话，用户信息不对外泄露，稳定性行业内极佳，异常扣费包赔。"
     />
     <meta name="twitter:image" content="https://ai.wegoo.site/logo.png" />
     <script type="application/ld+json">
@@ -59,7 +60,7 @@
             "applicationCategory": "DeveloperApplication",
             "operatingSystem": "Web",
             "url": "https://ai.wegoo.site/home",
-            "description": "低成本大模型 API 聚合平台，支持 GPT/Codex、Claude、Gemini 与 AI 生图，兼容 OpenAI API 格式，1 元 = 1 刀，注册送额度，适合编程、自动化、写作和高频 AI 使用。",
+            "description": "官方满血 AI 模型服务，支持 GPT/Codex、Claude、Gemini 与 AI 生图。模型永远不掺水，不保存聊天对话，用户信息不对外泄露，稳定性行业内极佳，异常扣费包赔。",
             "offers": {
               "@type": "Offer",
               "price": "0",
@@ -69,24 +70,87 @@
         ]
       }
     </script>
-    <title>低成本大模型 API 聚合平台 - GPT Claude Gemini Codex API - Wegoo AI</title>
+    <title>官方满血 AI 模型服务 - GPT Claude Gemini Codex API - Wegoo AI</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --boot-bg: #f5f5f7;
+        --boot-text: #1d1d1f;
+        --boot-muted: #6e6e73;
+        --boot-ring: rgb(0 0 0 / 10%);
+        --boot-accent: #0071e3;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --boot-bg: #050505;
+          --boot-text: #f5f5f7;
+          --boot-muted: #a1a1a6;
+          --boot-ring: rgb(255 255 255 / 12%);
+          --boot-accent: #2997ff;
+        }
+      }
+
+      .boot-shell {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        box-sizing: border-box;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--boot-bg);
+        color: var(--boot-text);
+      }
+
+      .boot-panel {
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+        width: 100%;
+        max-width: 360px;
+        text-align: center;
+      }
+
+      .boot-spinner {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 2px solid var(--boot-ring);
+        border-top-color: var(--boot-accent);
+        animation: wegoo-spin 0.8s linear infinite;
+      }
+
+      .boot-panel h1 {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .boot-panel p {
+        margin: 0;
+        line-height: 1.7;
+        color: var(--boot-muted);
+      }
+
+      @keyframes wegoo-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="app">
-      <main style="min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #0f172a;">
-        <section style="max-width: 360px; width: 100%; padding: 24px; border: 1px solid #dbe5ef; border-radius: 20px; background: #ffffff; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08); text-align: center;">
-          <div style="width: 34px; height: 34px; margin: 0 auto 14px; border-radius: 999px; border: 3px solid #dbeafe; border-top-color: #1d4ed8; animation: wegoo-spin .8s linear infinite;"></div>
-          <h1 style="margin: 0; font-size: 18px;">Wegoo AI 正在加载</h1>
+      <main class="boot-shell">
+        <section class="boot-panel">
+          <div class="boot-spinner"></div>
+          <h1>Wegoo AI 正在加载</h1>
           <noscript>
-            <p style="margin: 16px 0 0; line-height: 1.7; color: #b45309;">当前浏览器未执行 JavaScript，请开启后刷新页面。</p>
+            <p>当前浏览器未执行 JavaScript，请开启后刷新页面。</p>
           </noscript>
         </section>
       </main>
-      <style>
-        @keyframes wegoo-spin {
-          to { transform: rotate(360deg); }
-        }
-      </style>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -72,11 +72,15 @@
         </div>
       </div>
     </div>
+
+    <p v-if="attachmentError" class="text-xs leading-5 text-[var(--apple-danger)]">
+      {{ attachmentError }}
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type { TicketAttachment } from '@/types'
@@ -97,6 +101,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const maxInlineImageBytes = 2 * 1024 * 1024
 const attachments = computed(() => props.modelValue || [])
+const attachmentError = ref('')
 
 function addAttachment() {
   if (attachments.value.length >= props.maxItems) return
@@ -112,14 +117,27 @@ async function handleAttachmentFile(index: number, event: Event) {
   const input = event.target as HTMLInputElement | null
   const file = input?.files?.[0]
   if (input) input.value = ''
-  if (!file || !isAllowedInlineImageType(file.type) || file.size > maxInlineImageBytes) return
-  const dataURL = await readFileAsDataURL(file)
-  const next = attachments.value.map((item, i) => (
-    i === index
-      ? { ...item, name: item.name || file.name, url: dataURL, content_type: file.type, size: file.size }
-      : item
-  ))
-  emit('update:modelValue', next)
+  attachmentError.value = ''
+  if (!file) return
+  if (!isAllowedInlineImageType(file.type)) {
+    attachmentError.value = t(`${props.i18nPrefix}.invalidImage`)
+    return
+  }
+  if (file.size > maxInlineImageBytes) {
+    attachmentError.value = t(`${props.i18nPrefix}.imageTooLarge`, { size: 2 })
+    return
+  }
+  try {
+    const dataURL = await readFileAsDataURL(file)
+    const next = attachments.value.map((item, i) => (
+      i === index
+        ? { ...item, name: item.name || file.name, url: dataURL, content_type: file.type, size: file.size }
+        : item
+    ))
+    emit('update:modelValue', next)
+  } catch {
+    attachmentError.value = t(`${props.i18nPrefix}.readFailed`)
+  }
 }
 
 function removeAttachment(index: number) {

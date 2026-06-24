@@ -1,5 +1,5 @@
 <template>
-  <header class="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur dark:border-dark-800 dark:bg-dark-900/95">
+  <header class="app-header sticky top-0 z-30 border-b backdrop-blur">
     <div class="mx-auto flex h-14 w-full max-w-[1680px] items-center justify-between gap-3 px-3 sm:h-16 sm:px-4 md:px-6 lg:px-8">
       <!-- Left: Mobile Menu Toggle + Page Title -->
       <div class="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
@@ -12,10 +12,10 @@
         </button>
 
         <div class="hidden min-w-0 sm:block">
-          <h1 class="truncate text-base font-semibold leading-6 text-gray-900 dark:text-white">
+          <h1 class="truncate text-base font-semibold leading-6 text-[var(--apple-text)]">
             {{ pageTitle }}
           </h1>
-          <p v-if="pageDescription" class="truncate text-xs text-gray-500 dark:text-dark-400">
+          <p v-if="pageDescription" class="truncate text-xs text-[var(--apple-muted)]">
             {{ pageDescription }}
           </p>
         </div>
@@ -30,7 +30,7 @@
         <router-link
           v-if="user && showTicketShortcut"
           :to="ticketLink"
-          class="relative flex items-center rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
+          class="header-icon-button relative flex items-center rounded-lg p-2 transition-colors"
           :title="t('tickets.title')"
         >
           <Icon name="chatBubble" size="md" />
@@ -48,7 +48,7 @@
           :href="docsLink.href"
           :target="docsLink.external ? '_blank' : undefined"
           :rel="docsLink.external ? 'noopener noreferrer' : undefined"
-          class="hidden items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-primary-700 dark:border-dark-700 dark:bg-dark-800 dark:text-dark-200 dark:hover:border-dark-600 dark:hover:bg-dark-700 dark:hover:text-primary-300 sm:flex"
+          class="header-action-link hidden items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors sm:flex"
           @click="handleDocsLinkClick"
         >
           <Icon name="book" size="sm" />
@@ -68,26 +68,14 @@
         <!-- Balance Display -->
         <div
           v-if="user"
-          class="hidden items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 dark:border-dark-700 dark:bg-dark-800 sm:flex"
+          class="header-balance hidden items-center gap-2 rounded-lg border px-3 py-1.5 sm:flex"
         >
-          <svg
-            class="h-4 w-4 text-primary-600 dark:text-primary-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"
-            />
-          </svg>
+          <Icon name="dollar" size="sm" class="text-[var(--apple-blue)]" />
           <div class="flex min-w-[5.75rem] flex-col leading-tight">
-            <span class="text-sm font-semibold text-primary-700 dark:text-primary-300">
+            <span class="text-sm font-semibold text-[var(--apple-blue)]">
               {{ formattedBalance }}
             </span>
-            <span class="text-[11px] font-medium text-primary-600/80 dark:text-primary-300/80">
+            <span class="text-[11px] font-medium text-[var(--apple-muted)]">
               {{ formattedBalanceSubtitle }}
             </span>
           </div>
@@ -97,10 +85,10 @@
         <div v-if="user" class="relative" ref="dropdownRef">
           <button
             @click="toggleDropdown"
-            class="flex items-center gap-2 rounded-lg p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
+            class="header-user-button flex items-center gap-2 rounded-lg p-1.5 transition-colors"
             aria-label="User Menu"
           >
-            <div class="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-primary-600 text-sm font-medium text-white shadow-sm">
+            <div class="header-avatar flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg text-sm font-medium text-white">
               <img
                 v-if="avatarUrl"
                 :src="avatarUrl"
@@ -109,55 +97,55 @@
               >
               <span v-else>{{ userInitials }}</span>
             </div>
-            <div class="hidden text-left md:block">
-              <div class="text-sm font-medium text-gray-900 dark:text-white">
+            <div class="hidden min-w-0 text-left md:block">
+              <div class="max-w-32 truncate text-sm font-medium text-[var(--apple-text)]">
                 {{ displayName }}
               </div>
-              <div class="text-xs capitalize text-gray-500 dark:text-dark-400">
+              <div class="text-xs capitalize text-[var(--apple-muted)]">
                 {{ user.role }}
               </div>
             </div>
-            <Icon name="chevronDown" size="sm" class="hidden text-gray-400 md:block" />
+            <Icon name="chevronDown" size="sm" class="hidden text-[var(--apple-muted-2)] md:block" />
           </button>
 
           <!-- Dropdown Menu -->
           <transition name="dropdown">
             <div v-if="dropdownOpen" class="dropdown right-0 mt-2 w-56 max-w-[calc(100vw-1rem)]">
               <!-- User Info -->
-              <div class="border-b border-gray-100 px-4 py-3 dark:border-dark-700">
-                <div class="text-sm font-medium text-gray-900 dark:text-white">
+              <div class="border-b border-[color:var(--apple-border-soft)] px-4 py-3">
+                <div class="truncate text-sm font-medium text-[var(--apple-text)]">
                   {{ displayName }}
                 </div>
-                <div class="text-xs text-gray-500 dark:text-dark-400">{{ user.email }}</div>
+                <div class="truncate text-xs text-[var(--apple-muted)]">{{ user.email }}</div>
               </div>
 
               <!-- Balance (mobile only) -->
-              <div class="border-b border-gray-100 px-4 py-2 dark:border-dark-700 sm:hidden">
-                <div class="text-xs text-gray-500 dark:text-dark-400">
+              <div class="border-b border-[color:var(--apple-border-soft)] px-4 py-2 sm:hidden">
+                <div class="text-xs text-[var(--apple-muted)]">
                   {{ t('common.balance') }}
                 </div>
-                <div class="text-sm font-semibold text-primary-600 dark:text-primary-400">
+                <div class="text-sm font-semibold text-[var(--apple-blue)]">
                   {{ formattedBalance }}
                 </div>
-                <div class="text-xs font-medium text-primary-600/80 dark:text-primary-400/80">
+                <div class="text-xs font-medium text-[var(--apple-muted)]">
                   {{ formattedBalanceSubtitle }}
                 </div>
               </div>
 
-              <div class="border-b border-gray-100 px-4 py-2.5 dark:border-dark-700">
-                <div class="mb-2 text-xs text-gray-500 dark:text-dark-400">
+              <div class="border-b border-[color:var(--apple-border-soft)] px-4 py-2.5">
+                <div class="mb-2 text-xs text-[var(--apple-muted)]">
                   {{ t('settlementCurrency.label') }}
                 </div>
-                <div class="inline-flex rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
+                <div class="header-segmented inline-flex rounded-lg p-1">
                   <button
                     v-for="option in settlementCurrencyOptions"
                     :key="option.value"
                     type="button"
-                    class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+                    class="header-segmented-button rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
                     :class="
                       settlementCurrency === option.value
-                        ? 'bg-white text-primary-600 shadow-sm dark:bg-dark-800 dark:text-primary-300'
-                        : 'text-gray-500 hover:text-gray-800 dark:text-dark-300 dark:hover:text-white'
+                        ? 'header-segmented-button-active'
+                        : ''
                     "
                     @click.stop="setSettlementCurrency(option.value)"
                   >
@@ -214,21 +202,21 @@
 
               </div>
 
-              <div class="border-t border-gray-100 px-4 py-2.5 dark:border-dark-700 sm:hidden">
-                <div class="mb-2 text-xs text-gray-500 dark:text-dark-400">
+              <div class="border-t border-[color:var(--apple-border-soft)] px-4 py-2.5 sm:hidden">
+                <div class="mb-2 text-xs text-[var(--apple-muted)]">
                   {{ t('common.language') }}
                 </div>
-                <div class="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
+                <div class="header-segmented grid grid-cols-2 gap-1 rounded-lg p-1">
                   <button
                     v-for="option in availableLocales"
                     :key="option.code"
                     type="button"
                     :disabled="localeSwitching"
-                    class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
+                    class="header-segmented-button rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60"
                     :class="
                       currentLocaleCode === option.code
-                        ? 'bg-white text-primary-600 shadow-sm dark:bg-dark-800 dark:text-primary-300'
-                        : 'text-gray-500 hover:text-gray-800 dark:text-dark-300 dark:hover:text-white'
+                        ? 'header-segmented-button-active'
+                        : ''
                     "
                     @click.stop="setHeaderLocale(option.code)"
                   >
@@ -240,58 +228,30 @@
               <!-- Contact Support (only show if configured) -->
               <div
                 v-if="contactInfo"
-                class="border-t border-gray-100 px-4 py-2.5 dark:border-dark-700"
+                class="border-t border-[color:var(--apple-border-soft)] px-4 py-2.5"
               >
-                <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <svg
-                    class="h-3.5 w-3.5 flex-shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"
-                    />
-                  </svg>
+                <div class="flex items-center gap-2 text-xs text-[var(--apple-muted)]">
+                  <Icon name="chatBubble" size="sm" class="flex-shrink-0" />
                   <span>{{ t('common.contactSupport') }}:</span>
-                  <span class="font-medium text-gray-700 dark:text-gray-300">{{
+                  <span class="min-w-0 break-all font-medium text-[var(--apple-text)]">{{
                     contactInfo
                   }}</span>
                 </div>
               </div>
 
-              <div v-if="showOnboardingButton" class="border-t border-gray-100 py-1 dark:border-dark-700">
+              <div v-if="showOnboardingButton" class="border-t border-[color:var(--apple-border-soft)] py-1">
                 <button @click="handleReplayGuide" class="dropdown-item w-full">
-                  <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path
-                      d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 14a1 1 0 110 2 1 1 0 010-2zm1.07-7.75c0-.6-.49-1.25-1.32-1.25-.7 0-1.22.4-1.43 1.02a1 1 0 11-1.9-.62A3.41 3.41 0 0111.8 5c2.02 0 3.25 1.4 3.25 2.9 0 2-1.83 2.55-2.43 3.12-.43.4-.47.75-.47 1.23a1 1 0 01-2 0c0-1 .16-1.82 1.1-2.7.69-.64 1.82-1.05 1.82-2.06z"
-                    />
-                  </svg>
+                  <Icon name="questionCircle" size="sm" />
                   {{ $t('onboarding.restartTour') }}
                 </button>
               </div>
 
-              <div class="border-t border-gray-100 py-1 dark:border-dark-700">
+              <div class="border-t border-[color:var(--apple-border-soft)] py-1">
                 <button
                   @click="handleLogout"
-                  class="dropdown-item w-full text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  class="dropdown-item header-danger-item w-full"
                 >
-                  <svg
-                    class="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"
-                    />
-                  </svg>
+                  <Icon name="login" size="sm" />
                   {{ t('nav.logout') }}
                 </button>
               </div>
@@ -367,7 +327,7 @@ const formattedBalanceSubtitle = computed(() => {
   })
 })
 
-// 只在标准模式的管理员下显示新手引导按钮
+// 只在标准模式的管理员下显示配置向导入口
 const showOnboardingButton = computed(() => {
   return !authStore.isSimpleMode && user.value?.role === 'admin'
 })
@@ -516,6 +476,73 @@ watch(
 </script>
 
 <style scoped>
+.app-header {
+  background: color-mix(in srgb, var(--apple-surface) 92%, transparent);
+  border-color: var(--apple-border);
+  color: var(--apple-text);
+}
+
+.header-icon-button,
+.header-user-button {
+  color: var(--apple-muted);
+}
+
+.header-icon-button:hover,
+.header-user-button:hover {
+  background: var(--apple-hover);
+  color: var(--apple-text);
+}
+
+.header-action-link,
+.header-balance {
+  background: var(--apple-surface);
+  border-color: var(--apple-border);
+  color: var(--apple-text);
+  box-shadow: none;
+}
+
+.header-action-link:hover {
+  background: var(--apple-surface-elevated);
+  border-color: var(--apple-border);
+  color: var(--apple-blue);
+}
+
+.header-balance {
+  background: var(--apple-surface-elevated);
+}
+
+.header-avatar {
+  background: var(--apple-blue);
+}
+
+.header-segmented {
+  background: var(--apple-surface-elevated);
+}
+
+.header-segmented-button {
+  min-width: 0;
+  color: var(--apple-muted);
+}
+
+.header-segmented-button:hover:not(:disabled) {
+  color: var(--apple-text);
+}
+
+.header-segmented-button-active {
+  background: var(--apple-surface);
+  color: var(--apple-blue);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.header-danger-item {
+  color: var(--apple-danger);
+}
+
+.header-danger-item:hover {
+  background: color-mix(in srgb, var(--apple-danger) 10%, transparent);
+  color: var(--apple-danger);
+}
+
 .dropdown-enter-active,
 .dropdown-leave-active {
   transition: all 0.2s ease;

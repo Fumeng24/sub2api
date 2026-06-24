@@ -11,6 +11,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,28 @@ import (
 // OAuthHandler handles OAuth-related operations for accounts
 type OAuthHandler struct {
 	oauthService *service.OAuthService
+}
+
+func sortedMappedModelIDs(mapping map[string]string) []string {
+	if len(mapping) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(mapping))
+	modelIDs := make([]string, 0, len(mapping))
+	for modelID := range mapping {
+		modelID = strings.TrimSpace(modelID)
+		if modelID == "" {
+			continue
+		}
+		if _, ok := seen[modelID]; ok {
+			continue
+		}
+		seen[modelID] = struct{}{}
+		modelIDs = append(modelIDs, modelID)
+	}
+	sort.Strings(modelIDs)
+	return modelIDs
 }
 
 // NewOAuthHandler creates a new OAuth handler
@@ -1189,6 +1212,29 @@ type ApplyOAuthCredentialsRequest struct {
 	Extra       map[string]any `json:"extra"`
 }
 
+var oauthCredentialSettingsToPreserve = []string{
+	"model_mapping",
+	"compact_model_mapping",
+}
+
+func preserveOAuthCredentialSettings(existing, incoming map[string]any) map[string]any {
+	out := make(map[string]any, len(incoming)+len(oauthCredentialSettingsToPreserve))
+	for key, value := range incoming {
+		out[key] = value
+	}
+
+	for _, key := range oauthCredentialSettingsToPreserve {
+		if _, hasIncoming := out[key]; hasIncoming {
+			continue
+		}
+		if value, ok := existing[key]; ok {
+			out[key] = value
+		}
+	}
+
+	return out
+}
+
 // ApplyOAuthCredentials 将"重新授权"得到的新凭据原子落库。
 // POST /api/v1/admin/accounts/:id/apply-oauth-credentials
 //
@@ -1230,7 +1276,7 @@ func (h *AccountHandler) ApplyOAuthCredentials(c *gin.Context) {
 
 	updatedAccount, err := h.adminService.UpdateAccount(ctx, accountID, &service.UpdateAccountInput{
 		Type:        req.Type,
-		Credentials: req.Credentials,
+		Credentials: preserveOAuthCredentialSettings(existing.Credentials, req.Credentials),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -2194,10 +2240,15 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 			response.Success(c, openai.DefaultModels)
 			return
 		}
+		modelIDs := sortedMappedModelIDs(mapping)
+		if len(modelIDs) == 0 {
+			response.Success(c, openai.DefaultModels)
+			return
+		}
 
 		// Return mapped models
 		var models []openai.Model
-		for requestedModel := range mapping {
+		for _, requestedModel := range modelIDs {
 			var found bool
 			for _, dm := range openai.DefaultModels {
 				if dm.ID == requestedModel {
@@ -2233,9 +2284,14 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 			response.Success(c, geminicli.DefaultModels)
 			return
 		}
+		modelIDs := sortedMappedModelIDs(mapping)
+		if len(modelIDs) == 0 {
+			response.Success(c, geminicli.DefaultModels)
+			return
+		}
 
 		var models []geminicli.Model
-		for requestedModel := range mapping {
+		for _, requestedModel := range modelIDs {
 			var found bool
 			for _, dm := range geminicli.DefaultModels {
 				if dm.ID == requestedModel {
@@ -2278,10 +2334,15 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		response.Success(c, claude.DefaultModels)
 		return
 	}
+	modelIDs := sortedMappedModelIDs(mapping)
+	if len(modelIDs) == 0 {
+		response.Success(c, claude.DefaultModels)
+		return
+	}
 
 	// Return mapped models (keys of the mapping are the available model IDs)
 	var models []claude.Model
-	for requestedModel := range mapping {
+	for _, requestedModel := range modelIDs {
 		// Try to find display info from default models
 		var found bool
 		for _, dm := range claude.DefaultModels {

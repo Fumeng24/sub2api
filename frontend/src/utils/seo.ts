@@ -5,7 +5,7 @@ import { resolveDocumentTitle } from '@/router/title'
 const DEFAULT_SITE_NAME = 'Wegoo AI'
 const DEFAULT_ORIGIN = 'https://ai.wegoo.site'
 const DEFAULT_DESCRIPTION =
-  '大模型 API 聚合平台，支持 GPT、Claude、Gemini、Codex 与图像生成 API，兼容 OpenAI 格式，一键迁移，注册送额度，低成本稳定接入。'
+  '官方满血 AI 模型服务，支持 GPT、Claude、Gemini、Codex 与图像生成 API。模型永远不掺水，不保存聊天对话，用户信息不对外泄露，异常扣费包赔，稳定性行业内极佳。'
 const DEFAULT_IMAGE_PATH = '/logo.png'
 const NOINDEX_ROBOTS = 'noindex,nofollow'
 const INDEX_ROBOTS = 'index,follow'

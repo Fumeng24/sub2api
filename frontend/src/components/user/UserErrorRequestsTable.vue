@@ -39,44 +39,44 @@
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-auto">
-      <table class="min-w-full text-sm">
+    <div class="table-container min-h-0 flex-1 overflow-auto rounded-none border-x-0">
+      <table class="table min-w-full">
         <thead>
           <tr>
-            <th class="px-4 py-2 text-left">{{ t('usage.errors.model') }}</th>
-            <th class="px-4 py-2 text-left">{{ t('usage.errors.keyName') }}</th>
-            <th class="px-4 py-2 text-left">{{ t('usage.errors.endpoint') }}</th>
-            <th class="px-4 py-2 text-left">{{ t('usage.errors.status') }}</th>
-            <th class="px-4 py-2 text-left">{{ t('usage.errors.category') }}</th>
-            <th class="px-4 py-2 text-left">{{ t('usage.errors.message') }}</th>
-            <th class="px-4 py-2 text-left">{{ t('usage.errors.platform') }}</th>
-            <th class="px-4 py-2 text-left">{{ t('usage.errors.time') }}</th>
+            <th>{{ t('usage.errors.model') }}</th>
+            <th>{{ t('usage.errors.keyName') }}</th>
+            <th>{{ t('usage.errors.endpoint') }}</th>
+            <th>{{ t('usage.errors.status') }}</th>
+            <th>{{ t('usage.errors.category') }}</th>
+            <th>{{ t('usage.errors.message') }}</th>
+            <th>{{ t('usage.errors.platform') }}</th>
+            <th>{{ t('usage.errors.time') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="(row, i) in rows"
             :key="i"
-            class="border-t border-gray-100 dark:border-dark-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800"
+            class="cursor-pointer"
             @click="openDetail(row.id)"
           >
-            <td class="px-4 py-2">{{ row.model || '-' }}</td>
-            <td class="px-4 py-2">
+            <td>{{ row.model || '-' }}</td>
+            <td>
               <span>{{ row.key_name || '-' }}</span>
               <span
                 v-if="row.key_deleted"
                 class="ml-1 inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-gray-100 text-gray-500 dark:bg-dark-700 dark:text-gray-400"
               >{{ t('usage.errors.keyDeleted') }}</span>
             </td>
-            <td class="px-4 py-2">{{ row.inbound_endpoint || '-' }}</td>
-            <td class="px-4 py-2"><span class="badge" :class="statusClass(row.status_code)">{{ row.status_code || '-' }}</span></td>
-            <td class="px-4 py-2">{{ t('usage.errors.categories.' + row.category) }}</td>
-            <td class="px-4 py-2 max-w-[280px] truncate" :title="row.message">{{ row.message || '-' }}</td>
-            <td class="px-4 py-2">{{ row.platform || '-' }}</td>
-            <td class="px-4 py-2">{{ formatDateTime(row.created_at) }}</td>
+            <td>{{ row.inbound_endpoint || '-' }}</td>
+            <td><span class="badge" :class="statusClass(row.status_code)">{{ row.status_code || '-' }}</span></td>
+            <td>{{ t('usage.errors.categories.' + row.category) }}</td>
+            <td class="max-w-[280px] truncate" :title="row.message">{{ row.message || '-' }}</td>
+            <td>{{ row.platform || '-' }}</td>
+            <td>{{ formatDateTime(row.created_at) }}</td>
           </tr>
           <tr v-if="!loading && rows.length === 0">
-            <td colspan="8" class="px-4 py-8 text-center text-gray-400">{{ t('usage.errors.empty') }}</td>
+            <td colspan="8" class="py-8 text-center text-[var(--apple-muted)]">{{ t('usage.errors.empty') }}</td>
           </tr>
         </tbody>
       </table>
@@ -136,7 +136,7 @@ const keyOptions = computed(() => [
   ...(props.apiKeys ?? []).map((k) => ({ value: k.id, label: k.name })),
 ])
 
-// 模型候选取自当前已加载错误中出现过的模型；creatable 允许输入任意片段做后端模糊。
+// 模型候选取自当前已加载问题记录中出现过的模型；creatable 允许输入任意片段做服务端模糊。
 const modelOptions = computed(() => {
   const seen = new Set<string>()
   const opts: { value: string; label: string }[] = []

@@ -3,11 +3,9 @@
     <span
       ref="triggerEl"
       :class="[
-        'inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors',
-        effectivePlatform
-          ? platformBadgeClass(effectivePlatform)
-          : 'border-gray-200 bg-gray-50 text-gray-700 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300',
+        'supported-model-chip inline-flex cursor-help items-center gap-1 px-2 py-0.5 text-xs font-medium transition-colors',
       ]"
+      :style="platformToneStyle(effectivePlatform)"
       @mouseenter="onEnter"
       @mouseleave="onLeave"
       @focusin="onEnter"
@@ -21,7 +19,7 @@
       />
       <span
         v-if="showPlatform && model.platform"
-        class="rounded bg-gray-200/60 px-1 text-[10px] uppercase text-gray-600 dark:bg-dark-700 dark:text-gray-400"
+        class="supported-model-platform px-1 text-[10px] uppercase"
       >
         {{ model.platform }}
       </span>
@@ -36,33 +34,32 @@
         v-show="show"
         ref="popoverEl"
         role="tooltip"
-        class="pointer-events-none fixed z-[99999] w-80 max-w-[min(22rem,calc(100vw-1rem))] rounded-lg border bg-white text-xs shadow-xl dark:bg-dark-800"
-        :class="[popoverBorderClass]"
-        :style="popoverStyle"
+        class="supported-model-popover pointer-events-none fixed z-[99999] w-80 max-w-[min(22rem,calc(100vw-1rem))] text-xs"
+        :style="[popoverStyle, platformToneStyle(effectivePlatform)]"
       >
         <!-- Header：平台主题色背景，含模型名 + 平台徽章 -->
         <div
-          class="flex items-center justify-between gap-2 rounded-t-lg border-b px-3 py-2"
-          :class="[popoverHeaderClass, popoverBorderClass]"
+          class="supported-model-popover-header flex items-center justify-between gap-2 px-3 py-2"
+          :style="platformToneStyle(effectivePlatform)"
         >
           <span class="truncate font-semibold">{{ model.name }}</span>
           <span
             v-if="model.platform"
-            class="flex-shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide dark:bg-dark-900/60"
+            class="supported-model-popover-platform flex-shrink-0 px-1.5 py-0.5 text-[10px] uppercase"
           >
             {{ model.platform }}
           </span>
         </div>
 
         <div class="p-3">
-          <div v-if="!model.pricing" class="text-gray-500 dark:text-gray-400">
+          <div v-if="!model.pricing" class="supported-model-muted">
             {{ noPricingLabel }}
           </div>
 
-          <div v-else class="space-y-2 text-gray-700 dark:text-gray-300">
-            <div class="flex justify-between">
-              <span class="text-gray-500 dark:text-gray-400">{{ t(prefixKey('billingMode')) }}</span>
-              <span>{{ billingModeLabel }}</span>
+          <div v-else class="space-y-2">
+            <div class="supported-model-pricing-row flex justify-between gap-3">
+              <span>{{ t(prefixKey('billingMode')) }}</span>
+              <strong>{{ billingModeLabel }}</strong>
             </div>
 
             <template v-if="model.pricing.billing_mode === BILLING_MODE_TOKEN">
@@ -123,23 +120,22 @@
 
             <div
               v-if="model.pricing.intervals && model.pricing.intervals.length > 0"
-              class="mt-2 border-t pt-2"
-              :class="[popoverBorderClass]"
+              class="supported-model-intervals mt-2 pt-2"
             >
-              <div class="mb-1 font-medium text-gray-600 dark:text-gray-400">
+              <div class="mb-1 font-medium">
                 {{ t(prefixKey('intervals')) }}
               </div>
               <div class="space-y-1">
                 <div
                   v-for="(iv, idx) in model.pricing.intervals"
                   :key="idx"
-                  class="flex justify-between text-[11px]"
+                  class="supported-model-interval flex justify-between gap-3 text-[11px]"
                 >
-                  <span class="text-gray-500 dark:text-gray-400">
+                  <span>
                     <template v-if="iv.tier_label">{{ iv.tier_label }}</template>
                     <template v-else>{{ formatRange(iv.min_tokens, iv.max_tokens) }}</template>
                   </span>
-                  <span>{{ formatInterval(iv, model.pricing.billing_mode) }}</span>
+                  <strong>{{ formatInterval(iv, model.pricing.billing_mode) }}</strong>
                 </div>
               </div>
             </div>
@@ -166,7 +162,6 @@ import {
 import type { UserPricingInterval, UserSupportedModel } from '@/api/channels'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import type { GroupPlatform } from '@/types'
-import { platformBadgeClass, platformBorderClass, platformBadgeLightClass } from '@/utils/platformColors'
 
 const props = withDefaults(
   defineProps<{
@@ -195,19 +190,6 @@ const { t } = useI18n()
 
 /** 按 token 定价展示时的换算单位：每百万 token。 */
 const perMillionScale = 1_000_000
-
-// Popover border + header classes echo the platform theme so each card reads
-// at a glance which model family it belongs to.
-const popoverBorderClass = computed(() =>
-  effectivePlatform.value
-    ? platformBorderClass(effectivePlatform.value)
-    : 'border-gray-200 dark:border-dark-600',
-)
-const popoverHeaderClass = computed(() =>
-  effectivePlatform.value
-    ? platformBadgeLightClass(effectivePlatform.value)
-    : 'bg-gray-50 text-gray-700 dark:bg-dark-700/60 dark:text-gray-300',
-)
 
 function prefixKey(k: string): string {
   return `${props.pricingKeyPrefix}.${k}`
@@ -239,6 +221,19 @@ function formatInterval(iv: UserPricingInterval, mode: BillingMode): string {
   const input = formatScaled(iv.input_price, perMillionScale)
   const output = formatScaled(iv.output_price, perMillionScale)
   return `${input} / ${output}`
+}
+
+const platformTones: Record<string, string> = {
+  anthropic: '#bf5b16',
+  openai: '#248a3d',
+  gemini: '#0071e3',
+  antigravity: '#7d3ac1',
+}
+
+function platformToneStyle(platform: string): Record<string, string> {
+  return {
+    '--model-accent': platformTones[platform] ?? 'var(--apple-blue)',
+  }
 }
 
 // ── Popover positioning ─────────────────────────────────────────────
@@ -299,3 +294,64 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updatePosition)
 })
 </script>
+
+<style scoped>
+.supported-model-chip {
+  --model-accent: var(--apple-blue);
+  border: 1px solid color-mix(in srgb, var(--model-accent) 20%, var(--apple-border));
+  border-radius: calc(var(--apple-radius) - 2px);
+  background: color-mix(in srgb, var(--model-accent) 6%, var(--apple-surface));
+  color: color-mix(in srgb, var(--model-accent) 78%, var(--apple-text));
+}
+
+.supported-model-chip:hover,
+.supported-model-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--model-accent) 34%, var(--apple-border));
+  background: color-mix(in srgb, var(--model-accent) 10%, var(--apple-surface));
+  outline: none;
+}
+
+.supported-model-platform,
+.supported-model-popover-platform {
+  border-radius: calc(var(--apple-radius) - 4px);
+  background: color-mix(in srgb, var(--apple-surface) 72%, var(--model-accent) 10%);
+  color: var(--apple-muted);
+  font-weight: 650;
+}
+
+.supported-model-popover {
+  border: 1px solid color-mix(in srgb, var(--model-accent) 22%, var(--apple-border));
+  border-radius: var(--apple-radius);
+  background: var(--apple-surface);
+  color: var(--apple-text);
+  box-shadow: var(--apple-shadow-md);
+}
+
+.supported-model-popover-header {
+  border-bottom: 1px solid var(--apple-border-soft);
+  border-radius: var(--apple-radius) var(--apple-radius) 0 0;
+  background: color-mix(in srgb, var(--model-accent) 7%, var(--apple-surface-elevated));
+  color: var(--apple-text);
+}
+
+.supported-model-muted {
+  color: var(--apple-muted);
+}
+
+.supported-model-pricing-row,
+.supported-model-interval {
+  color: var(--apple-muted);
+}
+
+.supported-model-pricing-row strong,
+.supported-model-interval strong {
+  color: var(--apple-text);
+  font-weight: 600;
+  text-align: right;
+}
+
+.supported-model-intervals {
+  border-top: 1px solid var(--apple-border-soft);
+  color: var(--apple-muted);
+}
+</style>

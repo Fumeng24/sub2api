@@ -4,13 +4,29 @@
       data-testid="profile-shell"
       class="mx-auto max-w-[950px] space-y-5"
     >
-      <div class="border-b border-gray-200 pb-4 dark:border-dark-700">
-        <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+      <div class="page-header mb-0">
+        <h1 class="page-title">
           {{ t('profile.title') }}
         </h1>
-        <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+        <p class="page-description max-w-2xl leading-6">
           {{ t('profile.description') }}
         </p>
+      </div>
+
+      <div class="grid gap-2 sm:grid-cols-3">
+        <div
+          v-for="item in profileTrustItems"
+          :key="item.title"
+          class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-4 py-3"
+        >
+          <div class="flex items-center gap-2 text-sm font-semibold text-[var(--apple-text)]">
+            <Icon :name="item.icon" size="sm" class="text-[var(--apple-muted)]" />
+            <span>{{ item.title }}</span>
+          </div>
+          <p class="mt-1 text-xs leading-5 text-[var(--apple-muted)]">
+            {{ item.description }}
+          </p>
+        </div>
       </div>
 
       <ProfileInfoCard
@@ -26,17 +42,17 @@
 
       <div
         v-if="contactInfo"
-        class="rounded-lg border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10"
+        class="card p-5"
       >
-        <div class="flex items-center gap-4">
-          <div class="rounded-lg bg-blue-100 p-3 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+        <div class="flex min-w-0 items-center gap-4">
+          <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-3 text-[var(--apple-blue)]">
             <Icon name="chat" size="lg" />
           </div>
-          <div>
-            <h3 class="font-semibold text-blue-900 dark:text-blue-100">
+          <div class="min-w-0">
+            <h3 class="font-semibold text-[var(--apple-text)]">
               {{ t('common.contactSupport') }}
             </h3>
-            <p class="text-sm font-medium text-blue-800 dark:text-blue-200">{{ contactInfo }}</p>
+            <p class="break-words text-sm font-medium text-[var(--apple-muted)]">{{ contactInfo }}</p>
           </div>
         </div>
       </div>
@@ -75,6 +91,23 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
+const profileTrustItems = computed<Array<{ icon: 'shield' | 'link' | 'lock'; title: string; description: string }>>(() => [
+  {
+    icon: 'shield',
+    title: t('profile.trust.privacyBoundary'),
+    description: t('profile.trust.privacyBoundaryDesc')
+  },
+  {
+    icon: 'link',
+    title: t('profile.trust.auditableBindings'),
+    description: t('profile.trust.auditableBindingsDesc')
+  },
+  {
+    icon: 'lock',
+    title: t('profile.trust.accountSecurity'),
+    description: t('profile.trust.accountSecurityDesc')
+  }
+])
 
 const contactInfo = ref('')
 const balanceLowNotifyEnabled = ref(false)

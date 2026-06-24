@@ -1,10 +1,10 @@
 <template>
   <div class="card">
-    <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-      <h2 class="text-lg font-medium text-gray-900 dark:text-white">
+    <div class="card-header">
+      <h2 class="text-lg font-semibold text-[var(--apple-text)]">
         {{ t('profile.balanceNotify.title') }}
       </h2>
-      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      <p class="mt-1 text-sm text-[var(--apple-muted)]">
         {{ t('profile.balanceNotify.description') }}
       </p>
     </div>
@@ -14,7 +14,7 @@
         <label class="input-label mb-0">{{ t('profile.balanceNotify.enabled') }}</label>
         <label class="relative inline-flex items-center cursor-pointer">
           <input type="checkbox" v-model="notifyEnabled" @change="handleToggle" class="sr-only peer" />
-          <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-primary-600"></div>
+          <div class="h-6 w-11 rounded-full border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] transition-colors after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-[var(--apple-surface)] after:shadow-sm after:transition-all after:content-[''] peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[color:var(--apple-focus-ring)] peer-checked:bg-[var(--apple-blue)] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
         </label>
       </div>
 
@@ -23,10 +23,10 @@
         <div>
           <label class="input-label">
             {{ t('profile.balanceNotify.threshold') }}
-            <span class="text-xs text-gray-400 ml-2">{{ t('profile.balanceNotify.thresholdHint') }}</span>
+            <span class="ml-2 text-xs text-[var(--apple-muted)]">{{ t('profile.balanceNotify.thresholdHint') }}</span>
           </label>
           <div class="flex items-center gap-2">
-            <span class="text-gray-500">{{ settlementAmountPrefix }}</span>
+            <span class="text-[var(--apple-muted)]">{{ settlementAmountPrefix }}</span>
             <input
               v-model.number="customThreshold"
               type="number"
@@ -48,20 +48,20 @@
         <!-- Email list with toggles -->
         <div>
           <label class="input-label">{{ t('profile.balanceNotify.extraEmails') }}</label>
-          <p class="mb-2 text-xs text-yellow-600 dark:text-yellow-400">{{ t('profile.balanceNotify.extraEmailsHint') }}</p>
+          <p class="mb-2 text-xs text-[var(--apple-muted)]">{{ t('profile.balanceNotify.extraEmailsHint') }}</p>
 
           <!-- Saved email entries -->
           <div v-if="emailEntries.length > 0" class="space-y-2 mb-3">
             <div v-for="(entry, idx) in emailEntries" :key="idx"
-              class="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-dark-700 rounded-lg">
+              class="flex min-w-0 flex-col gap-2 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="flex items-center gap-2 min-w-0 flex-1">
                 <label class="relative inline-flex items-center cursor-pointer shrink-0">
                   <input type="checkbox" :checked="!entry.disabled" @change="handleEmailToggle(entry)" class="sr-only peer" />
-                  <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:border-gray-500 peer-checked:bg-primary-600"></div>
+                  <div class="h-5 w-9 rounded-full border border-[color:var(--apple-border)] bg-[var(--apple-surface)] transition-colors after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-[var(--apple-surface-elevated)] after:shadow-sm after:transition-all after:content-[''] peer-focus:outline-none peer-checked:bg-[var(--apple-blue)] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                 </label>
-                <span class="text-sm text-gray-700 dark:text-gray-300 truncate">{{ entry.email }}</span>
+                <span class="truncate text-sm text-[var(--apple-text)]">{{ entry.email }}</span>
               </div>
-              <div class="flex items-center gap-2 shrink-0">
+              <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <template v-if="!entry.verified">
                   <!-- Inline verify flow for saved unverified emails -->
                   <template v-if="verifyingEmail === entry.email">
@@ -69,29 +69,29 @@
                       v-model="verifyCode"
                       type="text"
                       maxlength="6"
-                      class="w-20 rounded border border-gray-300 px-2 py-1 text-xs dark:border-dark-500 dark:bg-dark-700"
+                      class="input w-20 px-2 py-1 text-xs"
                       :placeholder="t('profile.balanceNotify.codePlaceholder')"
                     />
-                    <button @click="verifySavedEmail(entry.email)" :disabled="!verifyCode || verifyCode.length !== 6 || verifyingSaved" class="text-xs text-primary-600 hover:text-primary-700">
+                    <button @click="verifySavedEmail(entry.email)" :disabled="!verifyCode || verifyCode.length !== 6 || verifyingSaved" class="text-xs font-medium text-[var(--apple-blue)]">
                       {{ t('profile.balanceNotify.verify') }}
                     </button>
-                    <span v-if="verifyCountdown > 0" class="text-xs text-gray-400">{{ verifyCountdown }}s</span>
-                    <button v-else @click="sendCodeForSaved(entry.email)" :disabled="sendingSavedCode" class="text-xs text-gray-500 hover:text-gray-700">
+                    <span v-if="verifyCountdown > 0" class="text-xs text-[var(--apple-muted)]">{{ verifyCountdown }}s</span>
+                    <button v-else @click="sendCodeForSaved(entry.email)" :disabled="sendingSavedCode" class="text-xs font-medium text-[var(--apple-muted)] hover:text-[var(--apple-text)]">
                       {{ t('profile.balanceNotify.resend') }}
                     </button>
-                    <button @click="verifyingEmail = ''" class="text-xs text-gray-400 hover:text-gray-600">
+                    <button @click="verifyingEmail = ''" class="text-xs font-medium text-[var(--apple-muted)] hover:text-[var(--apple-text)]">
                       {{ t('common.cancel') }}
                     </button>
                   </template>
                   <template v-else>
-                    <button @click="sendCodeForSaved(entry.email)" :disabled="sendingSavedCode" class="text-xs text-primary-600 hover:text-primary-700">
+                    <button @click="sendCodeForSaved(entry.email)" :disabled="sendingSavedCode" class="text-xs font-medium text-[var(--apple-blue)]">
                       {{ t('profile.balanceNotify.verify') }}
                     </button>
                     <span class="text-xs text-yellow-500">{{ t('profile.balanceNotify.unverified') }}</span>
                   </template>
                 </template>
                 <span v-else class="text-xs text-green-500">{{ t('profile.balanceNotify.verified') }}</span>
-                <button @click="handleRemoveEmail(entry.email)" class="text-red-500 hover:text-red-700 text-xs">
+                <button @click="handleRemoveEmail(entry.email)" class="text-xs font-medium text-[var(--apple-danger)]">
                   {{ t('profile.balanceNotify.removeEmail') }}
                 </button>
               </div>
@@ -101,29 +101,29 @@
           <!-- Pending (unverified) emails in verification flow -->
           <div v-if="pendingEmails.length > 0" class="space-y-2 mb-3">
             <div v-for="(pe, idx) in pendingEmails" :key="pe.email"
-              class="flex items-center gap-2 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <span class="flex-1 text-sm text-gray-700 dark:text-gray-300">{{ pe.email }}</span>
-              <div v-if="!pe.codeSent" class="flex items-center gap-1">
-                <button @click="sendCodeFor(idx)" :disabled="pe.sending" class="text-xs text-primary-600 hover:text-primary-700">
+              class="flex min-w-0 flex-col gap-2 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] px-3 py-2 sm:flex-row sm:items-center">
+              <span class="min-w-0 flex-1 truncate text-sm text-[var(--apple-text)]">{{ pe.email }}</span>
+              <div v-if="!pe.codeSent" class="flex flex-wrap items-center gap-2">
+                <button @click="sendCodeFor(idx)" :disabled="pe.sending" class="text-xs font-medium text-[var(--apple-blue)]">
                   {{ t('profile.balanceNotify.sendCode') }}
                 </button>
-                <button @click="pendingEmails.splice(idx, 1)" class="text-xs text-red-500 hover:text-red-700 ml-1">
+                <button @click="pendingEmails.splice(idx, 1)" class="text-xs font-medium text-[var(--apple-danger)]">
                   {{ t('profile.balanceNotify.removeEmail') }}
                 </button>
               </div>
-              <div v-else class="flex items-center gap-1">
+              <div v-else class="flex flex-wrap items-center gap-2">
                 <input
                   v-model="pe.code"
                   type="text"
                   maxlength="6"
-                  class="w-20 rounded border border-gray-300 px-2 py-1 text-xs dark:border-dark-500 dark:bg-dark-700"
+                  class="input w-20 px-2 py-1 text-xs"
                   :placeholder="t('profile.balanceNotify.codePlaceholder')"
                 />
-                <button @click="verifyPending(idx)" :disabled="!pe.code || pe.code.length !== 6 || pe.verifying" class="text-xs text-primary-600 hover:text-primary-700">
+                <button @click="verifyPending(idx)" :disabled="!pe.code || pe.code.length !== 6 || pe.verifying" class="text-xs font-medium text-[var(--apple-blue)]">
                   {{ t('profile.balanceNotify.verify') }}
                 </button>
-                <span v-if="pe.countdown > 0" class="text-xs text-gray-400">{{ pe.countdown }}s</span>
-                <button v-else @click="sendCodeFor(idx)" :disabled="pe.sending" class="text-xs text-gray-500 hover:text-gray-700">
+                <span v-if="pe.countdown > 0" class="text-xs text-[var(--apple-muted)]">{{ pe.countdown }}s</span>
+                <button v-else @click="sendCodeFor(idx)" :disabled="pe.sending" class="text-xs font-medium text-[var(--apple-muted)] hover:text-[var(--apple-text)]">
                   {{ t('profile.balanceNotify.resend') }}
                 </button>
               </div>
@@ -131,7 +131,7 @@
           </div>
 
           <!-- Add new email input (hidden when at limit) -->
-          <div v-if="canAddMore" class="flex gap-2">
+          <div v-if="canAddMore" class="flex flex-col gap-2 sm:flex-row">
             <input
               v-model="newEmail"
               type="email"
@@ -142,12 +142,12 @@
             <button
               @click="addPendingEmail"
               :disabled="!newEmail"
-              class="btn btn-secondary whitespace-nowrap"
+              class="btn btn-secondary w-full whitespace-nowrap sm:w-auto"
             >
               {{ t('common.add') }}
             </button>
           </div>
-          <p v-else class="text-xs text-gray-400">
+          <p v-else class="text-xs text-[var(--apple-muted)]">
             {{ t('profile.balanceNotify.maxEmailsReached') }}
           </p>
         </div>

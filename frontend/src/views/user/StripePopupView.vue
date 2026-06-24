@@ -1,12 +1,12 @@
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-slate-950">
+  <div class="flex min-h-screen items-center justify-center bg-[var(--apple-bg)] p-4">
     <div
-      class="w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+      class="w-full max-w-md space-y-4 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-6 shadow-sm"
     >
       <!-- Amount + Order ID -->
       <div v-if="amount" class="text-center">
-        <p class="text-3xl font-bold" :style="{ color: methodColor }">¥{{ amount }}</p>
-        <p v-if="orderId" class="mt-1 text-sm text-gray-500 dark:text-slate-400">
+        <p class="text-3xl font-semibold text-[var(--apple-text)]">¥{{ amount }}</p>
+        <p v-if="orderId" class="mt-1 text-sm text-[var(--apple-muted)]">
           {{ t('payment.orders.orderId') }}: {{ orderId }}
         </p>
       </div>
@@ -14,28 +14,20 @@
       <!-- Error -->
       <div v-if="error" class="space-y-3">
         <div
-          class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-700 dark:bg-red-900/30 dark:text-red-400"
+          class="rounded-lg border border-[color:color-mix(in_srgb,var(--apple-danger)_30%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-danger)_10%,var(--apple-surface))] p-3 text-sm text-[var(--apple-danger)]"
         >
           {{ error }}
         </div>
-        <button
-          class="w-full text-sm underline dark:text-blue-400 dark:hover:text-blue-300"
-          :style="{ color: methodColor }"
-          @click="closeWindow"
-        >
+        <button class="btn btn-secondary w-full" @click="closeWindow">
           {{ t('common.close') }}
         </button>
       </div>
 
       <!-- Success -->
       <div v-else-if="success" class="space-y-3 py-4 text-center">
-        <div class="text-5xl text-green-600 dark:text-green-400">✓</div>
-        <p class="text-sm text-gray-500 dark:text-slate-400">{{ t('payment.result.success') }}</p>
-        <button
-          class="text-sm underline dark:text-blue-400 dark:hover:text-blue-300"
-          :style="{ color: methodColor }"
-          @click="closeWindow"
-        >
+        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg border border-[color:color-mix(in_srgb,var(--apple-success)_30%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-success)_10%,var(--apple-surface))] text-2xl text-[var(--apple-success)]">✓</div>
+        <p class="text-sm text-[var(--apple-muted)]">{{ t('payment.result.success') }}</p>
+        <button class="btn btn-secondary" @click="closeWindow">
           {{ t('common.close') }}
         </button>
       </div>
@@ -46,7 +38,7 @@
           class="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
           :style="{ borderColor: methodColor, borderTopColor: 'transparent' }"
         />
-        <span class="ml-3 text-sm text-gray-500 dark:text-slate-400">{{ hint }}</span>
+        <span class="ml-3 text-sm text-[var(--apple-muted)]">{{ hint }}</span>
       </div>
     </div>
   </div>

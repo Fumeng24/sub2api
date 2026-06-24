@@ -1,26 +1,29 @@
 <template>
   <AuthLayout>
-    <div class="space-y-6">
+    <div class="space-y-5 sm:space-y-6">
       <!-- Title -->
       <div class="text-center">
-        <h2 class="text-xl font-semibold tracking-tight text-gray-950 dark:text-white">
+        <h2 class="text-lg font-semibold tracking-normal text-gray-950 dark:text-white sm:text-xl">
           {{ t('auth.createAccount') }}
         </h2>
-        <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-dark-400">
+        <p class="mx-auto mt-2 max-w-[22rem] text-sm leading-5 text-gray-500 dark:text-dark-400 sm:leading-6">
           {{ t('auth.signUpToStart', { siteName }) }}
+        </p>
+        <p class="mx-auto mt-3 max-w-[320px] text-xs leading-5 text-gray-500 dark:text-dark-400">
+          {{ t('auth.valueProps.official') }} · {{ t('auth.valueProps.privacy') }} · {{ t('auth.valueProps.coverage') }}
         </p>
       </div>
 
       <!-- Registration Disabled Message -->
       <div
         v-if="!registrationEnabled && settingsLoaded"
-        class="rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-900/20"
+        class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-500/30 dark:bg-yellow-500/10"
       >
         <div class="flex items-start gap-3">
           <div class="flex-shrink-0">
-            <Icon name="exclamationCircle" size="md" class="text-amber-500" />
+            <Icon name="exclamationCircle" size="md" class="text-yellow-600 dark:text-yellow-300" />
           </div>
-          <p class="text-sm text-amber-700 dark:text-amber-400">
+          <p class="min-w-0 break-words text-sm leading-5 text-yellow-800 dark:text-yellow-200">
             {{ t('auth.registrationDisabled') }}
           </p>
         </div>
@@ -76,7 +79,8 @@
               type="button"
               :disabled="registrationActionDisabled"
               @click="showPassword = !showPassword"
-              class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-dark-300"
+              class="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-400 transition-colors hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-dark-300"
+              :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
             >
               <Icon v-if="showPassword" name="eyeOff" size="md" />
               <Icon v-else name="eye" size="md" />
@@ -125,9 +129,9 @@
           </div>
           <!-- Invitation code validation result -->
           <transition name="fade">
-            <div v-if="invitationValidation.valid" class="mt-2 flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 dark:bg-green-900/20">
-              <Icon name="checkCircle" size="sm" class="text-green-600 dark:text-green-400" />
-              <span class="text-sm text-green-700 dark:text-green-400">
+            <div v-if="invitationValidation.valid" class="mt-2 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-500/30 dark:bg-green-500/10">
+              <Icon name="checkCircle" size="sm" class="mt-0.5 flex-shrink-0 text-green-600 dark:text-green-400" />
+              <span class="min-w-0 break-words text-sm leading-5 text-green-700 dark:text-green-400">
                 {{ t('auth.invitationCodeValid') }}
               </span>
             </div>
@@ -173,9 +177,9 @@
           </div>
           <!-- Promo code validation result -->
           <transition name="fade">
-            <div v-if="promoValidation.valid" class="mt-2 flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 dark:bg-green-900/20">
-              <Icon name="gift" size="sm" class="text-green-600 dark:text-green-400" />
-              <span class="text-sm text-green-700 dark:text-green-400">
+            <div v-if="promoValidation.valid" class="mt-2 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-500/30 dark:bg-green-500/10">
+              <Icon name="gift" size="sm" class="mt-0.5 flex-shrink-0 text-green-600 dark:text-green-400" />
+              <span class="min-w-0 break-words text-sm leading-5 text-green-700 dark:text-green-400">
                 {{ t('auth.promoCodeValid', { amount: promoValidation.bonusAmount?.toFixed(2) }) }}
               </span>
             </div>
@@ -208,7 +212,7 @@
         <div
           v-if="inlineErrorMessage"
           role="alert"
-          class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-300"
+          class="break-words rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-300"
         >
           {{ inlineErrorMessage }}
         </div>
@@ -254,7 +258,7 @@
       <div v-if="showOAuthLogin" class="space-y-3 pt-1">
         <div class="flex items-center gap-3">
           <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
-          <span class="text-xs text-gray-500 dark:text-dark-400">
+          <span class="shrink-0 text-xs text-gray-500 dark:text-dark-400">
             {{ t('auth.oauthOrContinue') }}
           </span>
           <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
@@ -337,7 +341,7 @@ import {
 } from '@/utils/oauthAffiliate'
 import type { LoginAgreementDocument } from '@/types'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const LOGIN_AGREEMENT_STORAGE_KEY = 'sub2api_login_agreement_consent'
 
 // ==================== Router & Stores ====================
@@ -576,7 +580,7 @@ function rejectLoginAgreement(): void {
   localStorage.removeItem(LOGIN_AGREEMENT_STORAGE_KEY)
   agreementAccepted.value = false
   showAgreementModal.value = false
-  appStore.showWarning('未同意最新条款前，无法注册或使用快捷登录。')
+  appStore.showWarning(t('auth.registerAgreementRejected'))
 }
 
 // ==================== Promo Code Validation ====================
@@ -622,7 +626,7 @@ async function validatePromoCodeDebounced(code: string): Promise<void> {
       promoValidation.valid = false
       promoValidation.invalid = true
       promoValidation.bonusAmount = null
-      // 根据错误码显示对应的翻译
+      // Show the translated message for known error codes.
       promoValidation.message = getPromoErrorMessage(result.error_code)
     }
   } catch (error) {
@@ -747,10 +751,9 @@ function buildEmailSuffixNotAllowedMessage(): string {
   if (normalizedWhitelist.length === 0) {
     return t('auth.emailSuffixNotAllowed')
   }
-  const separator = String(locale.value || '').toLowerCase().startsWith('zh') ? '、' : ', '
   return t('auth.emailSuffixNotAllowedWithAllowed', {
     suffixes: formatRegistrationEmailSuffixWhitelistForMessage(normalizedWhitelist, {
-      separator,
+      separator: t('auth.emailSuffixListSeparator'),
       more: (count) => t('auth.emailSuffixAllowedMore', { count })
     })
   })

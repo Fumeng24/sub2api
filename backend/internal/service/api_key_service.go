@@ -951,7 +951,7 @@ func isUserVisibleImageGenerationGroup(group *Group) bool {
 	if platform != PlatformOpenAI && platform != PlatformGemini {
 		return false
 	}
-	return strings.Contains(group.Name, "生图")
+	return true
 }
 
 func filterImageModelsSupportedByAccounts(models []string, platform string, accounts []Account) []string {

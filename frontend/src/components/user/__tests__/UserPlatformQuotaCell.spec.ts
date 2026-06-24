@@ -25,19 +25,19 @@ describe('UserPlatformQuotaCell', () => {
   it('quotas 为 undefined 时渲染加载占位 …', () => {
     const w = mount(UserPlatformQuotaCell, { props: { quotas: undefined } })
     expect(w.text()).toContain('…')
-    expect(w.html()).not.toContain('admin.users.platformQuota.cellNotConfigured')
+    expect(w.html()).not.toContain('dashboard.noDataAvailable')
   })
 
-  it('空数组渲染「未配置」', () => {
+  it('空数组渲染「暂无数据」', () => {
     const w = mount(UserPlatformQuotaCell, { props: { quotas: [] } })
-    expect(w.html()).toContain('admin.users.platformQuota.cellNotConfigured')
+    expect(w.html()).toContain('dashboard.noDataAvailable')
   })
 
   it('平台有记录但全部 limit 为 null 时视为未配置', () => {
     const w = mount(UserPlatformQuotaCell, {
       props: { quotas: [item({ platform: 'openai', daily_usage_usd: 5 })] },
     })
-    expect(w.html()).toContain('admin.users.platformQuota.cellNotConfigured')
+    expect(w.html()).toContain('dashboard.noDataAvailable')
   })
 
   it('已配置平台渲染 已用/限额，null 档显示 —，金额去尾零', () => {

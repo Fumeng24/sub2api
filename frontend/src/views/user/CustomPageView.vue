@@ -1,43 +1,58 @@
 <template>
   <AppLayout>
-    <div class="custom-page-layout">
-      <div class="card flex-1 min-h-0 overflow-hidden">
-        <div v-if="loading" class="flex h-full items-center justify-center py-12">
-          <div
-            class="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"
-          ></div>
+    <div class="custom-page-view">
+      <header v-if="menuItem" class="custom-page-hero">
+        <div class="min-w-0">
+          <h1 class="custom-page-title">
+            {{ pageTitle }}
+          </h1>
+        </div>
+      </header>
+
+      <section
+        class="custom-page-panel"
+        :class="{
+          'custom-page-panel--markdown': isMarkdownMode,
+          'custom-page-panel--embedded': isValidUrl,
+        }"
+      >
+        <div v-if="loading" class="custom-state custom-state--loading">
+          <div class="custom-spinner" aria-hidden="true"></div>
+          <p class="custom-state-copy">{{ loadingLabel }}</p>
         </div>
 
         <div
           v-else-if="!menuItem"
-          class="flex h-full items-center justify-center p-10 text-center"
+          class="custom-state"
         >
-          <div class="max-w-md">
-            <div
-              class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-dark-700"
-            >
-              <Icon name="link" size="lg" class="text-gray-400" />
+          <div class="custom-state-inner">
+            <div class="custom-state-icon">
+              <Icon name="document" size="lg" />
             </div>
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('customPage.notFoundTitle') }}
-            </h3>
-            <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
-              {{ t('customPage.notFoundDesc') }}
+            <h2 class="custom-state-title">
+              {{ unavailableTitle }}
+            </h2>
+            <p class="custom-state-copy">
+              {{ unavailableDesc }}
             </p>
           </div>
         </div>
 
-        <!-- Markdown mode with TOC -->
-        <div v-else-if="isMarkdownMode" class="flex h-full overflow-hidden">
-          <!-- TOC Sidebar -->
+        <div v-else-if="isMarkdownMode" class="markdown-shell">
           <aside
-            v-show="tocVisible"
+            v-show="tocVisible && tocItems.length > 0"
             class="toc-sidebar"
           >
             <div class="toc-header">
-              <span class="toc-title">目录</span>
-              <button class="toc-close-btn" @click="tocVisible = false">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+              <span class="toc-title">{{ tocLabel }}</span>
+              <button
+                class="toc-close-btn"
+                type="button"
+                :aria-label="collapseTocLabel"
+                :title="collapseTocLabel"
+                @click="tocVisible = false"
+              >
+                <Icon name="chevronLeft" size="sm" :stroke-width="2" />
               </button>
             </div>
             <nav class="toc-nav">
@@ -57,51 +72,47 @@
             </nav>
           </aside>
 
-          <!-- TOC Toggle Button (when collapsed) -->
           <button
             v-show="!tocVisible && tocItems.length > 0"
             class="toc-toggle-btn"
+            type="button"
+            :aria-label="openTocLabel"
+            :title="openTocLabel"
             @click="tocVisible = true"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-            <span class="ml-1 text-xs">目录</span>
+            <Icon name="menu" size="sm" :stroke-width="2" />
           </button>
 
-          <!-- Content -->
           <div
             ref="markdownContainer"
-            class="markdown-page-content flex-1 h-full overflow-auto p-6 md:p-10"
+            class="markdown-page-content"
             v-html="renderedHtml"
             @scroll="onContentScroll"
           ></div>
         </div>
 
-        <!-- URL not configured -->
-        <div v-else-if="!isValidUrl" class="flex h-full items-center justify-center p-10 text-center">
-          <div class="max-w-md">
-            <div
-              class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-dark-700"
-            >
-              <Icon name="link" size="lg" class="text-gray-400" />
+        <div v-else-if="!isValidUrl" class="custom-state">
+          <div class="custom-state-inner">
+            <div class="custom-state-icon">
+              <Icon name="link" size="lg" />
             </div>
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('customPage.notConfiguredTitle') }}
-            </h3>
-            <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
-              {{ t('customPage.notConfiguredDesc') }}
+            <h2 class="custom-state-title">
+              {{ unavailableTitle }}
+            </h2>
+            <p class="custom-state-copy">
+              {{ unavailableDesc }}
             </p>
           </div>
         </div>
 
-        <!-- Iframe embed mode -->
         <div v-else class="custom-embed-shell">
           <a
             :href="embeddedUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="btn btn-secondary btn-sm custom-open-fab"
+            class="custom-open-fab"
           >
-            <Icon name="externalLink" size="sm" class="mr-1.5" :stroke-width="2" />
+            <Icon name="externalLink" size="sm" :stroke-width="2" />
             {{ t('customPage.openInNewTab') }}
           </a>
           <iframe
@@ -110,7 +121,7 @@
             allowfullscreen
           ></iframe>
         </div>
-      </div>
+      </section>
     </div>
   </AppLayout>
 </template>
@@ -161,6 +172,14 @@ const menuItem = computed(() => {
   }
   return null
 })
+
+const pageTitle = computed(() => menuItem.value?.label || t('customPage.defaultTitle'))
+const tocLabel = computed(() => t('customPage.toc'))
+const openTocLabel = computed(() => t('customPage.openToc'))
+const collapseTocLabel = computed(() => t('customPage.collapseToc'))
+const loadingLabel = computed(() => t('customPage.loading'))
+const unavailableTitle = computed(() => t('customPage.unavailableTitle'))
+const unavailableDesc = computed(() => t('customPage.unavailableDesc'))
 
 const markdownSlug = computed(() => {
   const item = menuItem.value
@@ -220,6 +239,16 @@ function buildPageImageUrl(slug: string, src: string): string {
   return `/api/v1/pages/${encodeURIComponent(slug)}/images/${encodedPath}${suffix}`
 }
 
+function markdownStateHtml(kind: 'notFound' | 'loadFailed'): string {
+  const title = kind === 'notFound'
+    ? t('customPage.unavailableTitle')
+    : t('customPage.markdownLoadFailedTitle')
+  const description = kind === 'notFound'
+    ? t('customPage.markdownNotFoundDesc')
+    : t('customPage.markdownLoadFailedDesc')
+  return `<div class="markdown-inline-state"><p class="markdown-inline-state-title">${title}</p><p>${description}</p></div>`
+}
+
 async function fetchAndRenderMarkdown(slug: string) {
   loading.value = true
   tocItems.value = []
@@ -229,7 +258,7 @@ async function fetchAndRenderMarkdown(slug: string) {
       headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {},
     })
     if (!resp.ok) {
-      renderedHtml.value = '<p class="text-red-500">Page not found</p>'
+      renderedHtml.value = markdownStateHtml('notFound')
       return
     }
     let raw = await resp.text()
@@ -262,7 +291,7 @@ async function fetchAndRenderMarkdown(slug: string) {
     renderedHtml.value = withIds
     tocItems.value = toc
   } catch {
-    renderedHtml.value = '<p class="text-red-500">Failed to load page</p>'
+    renderedHtml.value = markdownStateHtml('loadFailed')
   } finally {
     loading.value = false
     await nextTick()
@@ -316,16 +345,16 @@ function injectCopyButtons() {
     if (pre.querySelector('.copy-btn')) return
     const btn = document.createElement('button')
     btn.className = 'copy-btn'
-    btn.textContent = '复制'
+    btn.textContent = t('customPage.copyCode')
     btn.addEventListener('click', async () => {
       const code = pre.querySelector('code')?.textContent ?? pre.textContent ?? ''
       try {
         await navigator.clipboard.writeText(code)
-        btn.textContent = '已复制 ✓'
-        setTimeout(() => { btn.textContent = '复制' }, 2000)
+        btn.textContent = t('customPage.copiedCode')
+        setTimeout(() => { btn.textContent = t('customPage.copyCode') }, 2000)
       } catch {
-        btn.textContent = '失败'
-        setTimeout(() => { btn.textContent = '复制' }, 2000)
+        btn.textContent = t('customPage.copyFailed')
+        setTimeout(() => { btn.textContent = t('customPage.copyCode') }, 2000)
       }
     })
     pre.style.position = 'relative'
@@ -373,79 +402,310 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.custom-page-layout {
-  @apply flex flex-col;
-  height: calc(100vh - 64px - 4rem);
+.custom-page-view {
+  --custom-bg: var(--apple-bg, #f5f5f7);
+  --custom-surface: var(--apple-surface, #ffffff);
+  --custom-surface-elevated: var(--apple-surface-elevated, #fbfbfd);
+  --custom-text: var(--apple-text, #1d1d1f);
+  --custom-muted: var(--apple-muted, #6e6e73);
+  --custom-muted-2: var(--apple-muted-2, #86868b);
+  --custom-border: var(--apple-border, rgb(0 0 0 / 10%));
+  --custom-border-soft: var(--apple-border-soft, rgb(0 0 0 / 6%));
+  --custom-blue: var(--apple-blue, #0071e3);
+  --custom-blue-hover: var(--apple-blue-hover, #0077ed);
+  --custom-hover: var(--apple-hover, rgb(0 0 0 / 4%));
+  --custom-focus-ring: var(--apple-focus-ring, rgb(0 113 227 / 28%));
+  --custom-shadow-sm: var(--apple-shadow-sm, 0 1px 2px rgb(0 0 0 / 4%));
+  --custom-shadow-md: var(--apple-shadow-md, 0 10px 24px rgb(0 0 0 / 8%));
+  --custom-radius: var(--apple-radius, 8px);
+
+  display: flex;
+  min-height: calc(100vh - 64px - 3rem);
+  min-height: calc(100dvh - 64px - 3rem);
+  flex-direction: column;
+  gap: 1rem;
+  color: var(--custom-text);
 }
 
-.toc-sidebar {
-  @apply flex flex-col h-full border-r border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-800;
-  width: min(240px, 30%);
-  min-width: 160px;
-  max-width: 280px;
+:global(.dark) .custom-page-view {
+  --custom-bg: var(--apple-bg, #000000);
+  --custom-surface: var(--apple-surface, #161617);
+  --custom-surface-elevated: var(--apple-surface-elevated, #1d1d1f);
+  --custom-text: var(--apple-text, #f5f5f7);
+  --custom-muted: var(--apple-muted, #a1a1a6);
+  --custom-muted-2: var(--apple-muted-2, #86868b);
+  --custom-border: var(--apple-border, rgb(255 255 255 / 12%));
+  --custom-border-soft: var(--apple-border-soft, rgb(255 255 255 / 8%));
+  --custom-blue: var(--apple-blue, #2997ff);
+  --custom-blue-hover: var(--apple-blue-hover, #6bbcff);
+  --custom-hover: var(--apple-hover, rgb(255 255 255 / 8%));
+  --custom-focus-ring: var(--apple-focus-ring, rgb(41 151 255 / 34%));
+  --custom-shadow-sm: var(--apple-shadow-sm, 0 1px 2px rgb(0 0 0 / 18%));
+  --custom-shadow-md: var(--apple-shadow-md, 0 10px 28px rgb(0 0 0 / 32%));
+}
+
+.custom-page-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--custom-border);
+  padding-bottom: 1rem;
+}
+
+.custom-page-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--custom-text);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.custom-page-panel {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
   overflow: hidden;
+  border: 1px solid var(--custom-border);
+  border-radius: var(--custom-radius);
+  background: var(--custom-surface);
+  box-shadow: var(--custom-shadow-sm);
 }
 
-@media (max-width: 640px) {
-  .toc-sidebar {
-    position: absolute;
-    left: 0;
-    top: 0;
-    z-index: 20;
-    width: 70%;
-    max-width: 240px;
-    height: 100%;
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+.custom-page-panel--markdown {
+  background: var(--custom-surface);
+}
+
+.custom-page-panel--embedded {
+  background: var(--custom-surface);
+}
+
+.custom-state {
+  display: flex;
+  min-height: min(560px, calc(100dvh - 12rem));
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+.custom-state-inner {
+  max-width: 28rem;
+}
+
+.custom-state-icon {
+  display: inline-flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--custom-border-soft);
+  border-radius: var(--custom-radius);
+  background: var(--custom-surface-elevated);
+  color: var(--custom-muted);
+}
+
+.custom-state-title {
+  margin: 1rem 0 0;
+  color: var(--custom-text);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+.custom-state-copy {
+  margin: 0.5rem auto 0;
+  max-width: 28rem;
+  color: var(--custom-muted);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.custom-state--loading {
+  min-height: min(480px, calc(100dvh - 12rem));
+  flex-direction: column;
+}
+
+.custom-spinner {
+  height: 2rem;
+  width: 2rem;
+  border: 2px solid var(--custom-border);
+  border-top-color: var(--custom-blue);
+  border-radius: 999px;
+  animation: custom-page-spin 0.75s linear infinite;
+}
+
+@keyframes custom-page-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
+.markdown-shell {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.toc-sidebar {
+  display: flex;
+  width: clamp(12rem, 22vw, 17rem);
+  min-width: 12rem;
+  height: 100%;
+  flex-direction: column;
+  border-right: 1px solid var(--custom-border-soft);
+  background: var(--custom-surface-elevated);
+  overflow: hidden;
+}
+
 .toc-header {
-  @apply flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-dark-600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--custom-border-soft);
+  padding: 0.875rem 1rem;
 }
 
 .toc-title {
-  @apply text-sm font-semibold text-gray-700 dark:text-dark-200;
+  color: var(--custom-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .toc-close-btn {
-  @apply p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-dark-200 hover:bg-gray-200 dark:hover:bg-dark-600 transition-colors;
+  display: inline-flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--custom-radius);
+  background: transparent;
+  color: var(--custom-muted);
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.toc-close-btn:hover {
+  background: var(--custom-hover);
+  color: var(--custom-text);
+}
+
+.toc-close-btn:focus-visible,
+.toc-toggle-btn:focus-visible,
+.custom-open-fab:focus-visible {
+  outline: 2px solid var(--custom-focus-ring);
+  outline-offset: 2px;
 }
 
 .toc-nav {
-  @apply flex-1 overflow-y-auto py-2 px-2;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0.5rem;
 }
 
 .toc-item {
-  @apply block px-2 py-1.5 text-sm rounded transition-colors truncate;
-  @apply text-gray-600 dark:text-dark-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-dark-600;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--custom-radius);
+  padding: 0.45rem 0.625rem;
+  color: var(--custom-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.toc-item:hover {
+  background: var(--custom-hover);
+  color: var(--custom-text);
 }
 
 .toc-item.toc-active {
-  @apply text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 font-medium;
+  background: color-mix(in srgb, var(--custom-blue) 10%, var(--custom-surface));
+  color: var(--custom-blue);
+  font-weight: 600;
 }
 
-.toc-level-1 { padding-left: 8px; }
-.toc-level-2 { padding-left: 20px; }
-.toc-level-3 { padding-left: 32px; }
-.toc-level-4 { padding-left: 44px; }
+.toc-level-1 { padding-left: 0.625rem; }
+.toc-level-2 { padding-left: 1rem; }
+.toc-level-3 { padding-left: 1.375rem; }
+.toc-level-4 { padding-left: 1.75rem; }
 
 .toc-toggle-btn {
-  @apply absolute left-2 top-2 z-10 flex items-center px-2 py-1.5 rounded-md text-sm;
-  @apply bg-white dark:bg-dark-700 border border-gray-200 dark:border-dark-500;
-  @apply text-gray-600 dark:text-dark-300 hover:bg-gray-100 dark:hover:bg-dark-600;
-  @apply shadow-sm transition-colors cursor-pointer;
+  position: absolute;
+  left: 0.875rem;
+  top: 0.875rem;
+  z-index: 10;
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--custom-border);
+  border-radius: var(--custom-radius);
+  background: color-mix(in srgb, var(--custom-surface) 92%, transparent);
+  color: var(--custom-muted);
+  box-shadow: var(--custom-shadow-sm);
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+  backdrop-filter: saturate(180%) blur(16px);
+}
+
+.toc-toggle-btn:hover {
+  background: var(--custom-surface-elevated);
+  color: var(--custom-text);
 }
 
 .custom-embed-shell {
-  @apply relative;
-  @apply h-full w-full overflow-hidden rounded-2xl;
-  @apply bg-gradient-to-b from-gray-50 to-white dark:from-dark-900 dark:to-dark-950;
-  @apply p-0;
+  position: relative;
+  height: 100%;
+  min-height: min(720px, calc(100dvh - 12rem));
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--custom-radius);
+  background: var(--custom-surface);
 }
 
 .custom-open-fab {
-  @apply absolute right-3 top-3 z-10;
-  @apply shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-dark-800/80;
+  position: absolute;
+  right: 0.875rem;
+  top: 0.875rem;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.25rem;
+  max-width: calc(100% - 1.75rem);
+  border: 1px solid var(--custom-border);
+  border-radius: var(--custom-radius);
+  background: color-mix(in srgb, var(--custom-surface) 88%, transparent);
+  padding: 0.45rem 0.75rem;
+  color: var(--custom-text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  box-shadow: var(--custom-shadow-sm);
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  backdrop-filter: saturate(180%) blur(16px);
+}
+
+.custom-open-fab:hover {
+  background: var(--custom-surface-elevated);
+  border-color: var(--custom-border);
+  color: var(--custom-blue);
 }
 
 .custom-embed-frame {
@@ -458,47 +718,325 @@ onUnmounted(() => {
   box-shadow: none;
   background: transparent;
 }
+
+@media (max-width: 768px) {
+  .custom-page-view {
+    min-height: calc(100vh - 64px - 2rem);
+    min-height: calc(100dvh - 64px - 2rem);
+    gap: 0.75rem;
+  }
+
+  .custom-page-hero {
+    padding-bottom: 0.875rem;
+  }
+
+  .custom-page-title {
+    font-size: 1.375rem;
+  }
+
+  .custom-page-panel {
+    min-height: calc(100vh - 64px - 7rem);
+    min-height: calc(100dvh - 64px - 7rem);
+  }
+
+  .toc-sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    width: min(82vw, 20rem);
+    max-width: none;
+    border-right: 1px solid var(--custom-border);
+    box-shadow: var(--custom-shadow-md);
+  }
+
+  .custom-state {
+    min-height: calc(100vh - 64px - 8rem);
+    min-height: calc(100dvh - 64px - 8rem);
+    padding: 1.5rem;
+  }
+
+  .custom-embed-shell {
+    min-height: calc(100vh - 64px - 8rem);
+    min-height: calc(100dvh - 64px - 8rem);
+  }
+
+  .custom-open-fab {
+    right: 0.625rem;
+    top: 0.625rem;
+    max-width: calc(100% - 1.25rem);
+  }
+}
 </style>
 
 <style>
 .markdown-page-content {
-  line-height: 1.7;
+  --markdown-bg: var(--apple-bg, #f5f5f7);
+  --markdown-surface: var(--apple-surface, #ffffff);
+  --markdown-surface-elevated: var(--apple-surface-elevated, #fbfbfd);
+  --markdown-text: var(--apple-text, #1d1d1f);
+  --markdown-muted: var(--apple-muted, #6e6e73);
+  --markdown-muted-2: var(--apple-muted-2, #86868b);
+  --markdown-border: var(--apple-border, rgb(0 0 0 / 10%));
+  --markdown-border-soft: var(--apple-border-soft, rgb(0 0 0 / 6%));
+  --markdown-blue: var(--apple-blue, #0071e3);
+  --markdown-blue-hover: var(--apple-blue-hover, #0077ed);
+  --markdown-hover: var(--apple-hover, rgb(0 0 0 / 4%));
+  --markdown-radius: var(--apple-radius, 8px);
+
+  height: 100%;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: clamp(1.5rem, 3vw, 3rem);
+  color: var(--markdown-text);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.dark .markdown-page-content {
+  --markdown-bg: var(--apple-bg, #000000);
+  --markdown-surface: var(--apple-surface, #161617);
+  --markdown-surface-elevated: var(--apple-surface-elevated, #1d1d1f);
+  --markdown-text: var(--apple-text, #f5f5f7);
+  --markdown-muted: var(--apple-muted, #a1a1a6);
+  --markdown-muted-2: var(--apple-muted-2, #86868b);
+  --markdown-border: var(--apple-border, rgb(255 255 255 / 12%));
+  --markdown-border-soft: var(--apple-border-soft, rgb(255 255 255 / 8%));
+  --markdown-blue: var(--apple-blue, #2997ff);
+  --markdown-blue-hover: var(--apple-blue-hover, #6bbcff);
+  --markdown-hover: var(--apple-hover, rgb(255 255 255 / 8%));
+}
+
+.markdown-page-content > :first-child {
+  margin-top: 0;
+}
+
+.markdown-page-content > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-page-content h1,
+.markdown-page-content h2,
+.markdown-page-content h3,
+.markdown-page-content h4 {
+  color: var(--markdown-text);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.25;
+  scroll-margin-top: 1.25rem;
+}
+
+.markdown-page-content h1 {
+  margin: 0 0 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--markdown-border-soft);
+  font-size: clamp(1.875rem, 4vw, 2.75rem);
+}
+
+.markdown-page-content h2 {
+  margin: 2.25rem 0 0.875rem;
+  font-size: clamp(1.45rem, 2.8vw, 2rem);
+}
+
+.markdown-page-content h3 {
+  margin: 1.75rem 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.markdown-page-content h4 {
+  margin: 1.5rem 0 0.625rem;
+  font-size: 1.0625rem;
+}
+
+.markdown-page-content p {
+  margin: 0 0 1rem;
+  color: var(--markdown-text);
+}
+
+.markdown-page-content ul,
+.markdown-page-content ol {
+  margin: 0 0 1.25rem;
+  padding-left: 1.4rem;
+}
+
+.markdown-page-content li {
+  margin: 0.35rem 0;
+  padding-left: 0.15rem;
+}
+
+.markdown-page-content li::marker {
+  color: var(--markdown-muted-2);
+}
+
+.markdown-page-content a {
+  color: var(--markdown-blue);
+  text-decoration: none;
+}
+
+.markdown-page-content a:hover {
+  color: var(--markdown-blue-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.markdown-page-content blockquote {
+  margin: 1.5rem 0;
+  border-left: 2px solid var(--markdown-blue);
+  padding: 0.15rem 0 0.15rem 1rem;
+  color: var(--markdown-muted);
+}
+
+.markdown-page-content blockquote p {
   color: inherit;
 }
-.markdown-page-content h1 { @apply text-3xl font-bold mt-8 mb-4 pb-2 border-b border-gray-200 dark:border-dark-600; }
-.markdown-page-content h2 { @apply text-2xl font-bold mt-6 mb-3; }
-.markdown-page-content h3 { @apply text-xl font-semibold mt-5 mb-2; }
-.markdown-page-content h4 { @apply text-lg font-semibold mt-4 mb-2; }
-.markdown-page-content p { @apply mb-4; }
-.markdown-page-content ul { @apply list-disc pl-6 mb-4; }
-.markdown-page-content ol { @apply list-decimal pl-6 mb-4; }
-.markdown-page-content li { @apply mb-1; }
-.markdown-page-content a { @apply text-primary-500 hover:text-primary-600 underline; }
-.markdown-page-content blockquote { @apply border-l-4 border-gray-300 dark:border-dark-500 pl-4 italic text-gray-600 dark:text-dark-300 my-4; }
-.markdown-page-content img { @apply max-w-full h-auto rounded-lg my-4; }
-.markdown-page-content table { @apply w-full border-collapse my-4; }
-.markdown-page-content th { @apply border border-gray-300 dark:border-dark-500 px-3 py-2 bg-gray-50 dark:bg-dark-700 font-semibold text-left; }
-.markdown-page-content td { @apply border border-gray-300 dark:border-dark-500 px-3 py-2; }
-.markdown-page-content code { @apply bg-gray-100 dark:bg-dark-700 px-1.5 py-0.5 rounded text-sm font-mono; }
-.markdown-page-content pre { @apply bg-gray-900 dark:bg-dark-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 relative; }
-.markdown-page-content pre code { @apply bg-transparent p-0 text-inherit; }
-.markdown-page-content hr { @apply my-6 border-gray-200 dark:border-dark-600; }
 
-.copy-btn {
+.markdown-page-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem 0;
+  border-radius: var(--markdown-radius);
+}
+
+.markdown-page-content table {
+  width: 100%;
+  margin: 1.5rem 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--markdown-border);
+  border-radius: var(--markdown-radius);
+  font-size: 0.875rem;
+}
+
+.markdown-page-content th,
+.markdown-page-content td {
+  border-bottom: 1px solid var(--markdown-border-soft);
+  padding: 0.75rem 0.875rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-page-content th {
+  background: var(--markdown-surface-elevated);
+  color: var(--markdown-muted);
+  font-weight: 600;
+}
+
+.markdown-page-content tr:last-child td {
+  border-bottom: 0;
+}
+
+.markdown-page-content code {
+  border: 1px solid var(--markdown-border-soft);
+  border-radius: 6px;
+  background: var(--markdown-surface-elevated);
+  padding: 0.1rem 0.35rem;
+  color: var(--markdown-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+}
+
+.markdown-page-content pre {
+  position: relative;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--markdown-border);
+  border-radius: var(--markdown-radius);
+  background: #0b0b0f;
+  padding: 1rem;
+  color: #f5f5f7;
+}
+
+.markdown-page-content pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: 0.875rem;
+}
+
+.markdown-page-content hr {
+  margin: 2rem 0;
+  border: 0;
+  border-top: 1px solid var(--markdown-border-soft);
+}
+
+.markdown-page-content iframe {
+  display: block;
+  max-width: 100%;
+  margin: 1.5rem 0;
+  border: 1px solid var(--markdown-border);
+  border-radius: var(--markdown-radius);
+  background: var(--markdown-surface-elevated);
+}
+
+.markdown-inline-state {
+  max-width: 32rem;
+  margin: 12vh auto 0;
+  border: 1px solid var(--markdown-border);
+  border-radius: var(--markdown-radius);
+  background: var(--markdown-surface-elevated);
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.markdown-inline-state-title {
+  margin-bottom: 0.35rem;
+  color: var(--markdown-text);
+  font-weight: 600;
+}
+
+.markdown-inline-state p {
+  color: var(--markdown-muted);
+}
+
+.markdown-page-content .copy-btn {
   position: absolute;
   top: 8px;
   right: 8px;
-  padding: 4px 10px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 10%);
+  padding: 4px 9px;
+  color: #f5f5f7;
   font-size: 12px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  color: #e2e8f0;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-family: inherit;
+  line-height: 1.2;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.2s, background 0.2s;
-  font-family: inherit;
+  transition: opacity 0.16s ease, background-color 0.16s ease;
 }
-.copy-btn:hover { background: rgba(255, 255, 255, 0.25); }
-pre:hover .copy-btn { opacity: 1; }
+
+.markdown-page-content .copy-btn:hover {
+  background: rgb(255 255 255 / 18%);
+}
+
+.markdown-page-content pre:hover .copy-btn,
+.markdown-page-content .copy-btn:focus-visible {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .markdown-page-content {
+    padding: 3.5rem 1.125rem 1.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .markdown-page-content h1 {
+    font-size: 1.75rem;
+  }
+
+  .markdown-page-content h2 {
+    font-size: 1.375rem;
+  }
+
+  .markdown-page-content table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .markdown-page-content .copy-btn {
+    opacity: 1;
+  }
+}
 </style>

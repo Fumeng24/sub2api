@@ -1,19 +1,20 @@
 <template>
   <div class="space-y-5">
     <!-- Date Range Filter -->
-    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
+    <div class="card p-4">
       <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
         <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('dashboard.timeRange') }}:</span>
+          <span class="text-sm font-medium text-[var(--apple-text)]">{{ t('dashboard.timeRange') }}:</span>
           <DateRangePicker :start-date="startDate" :end-date="endDate" @update:startDate="$emit('update:startDate', $event)" @update:endDate="$emit('update:endDate', $event)" @change="$emit('dateRangeChange', $event)" />
         </div>
         <div class="flex min-w-0 items-center gap-2 lg:justify-end">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('dashboard.granularity') }}:</span>
+          <span class="text-sm font-medium text-[var(--apple-text)]">{{ t('dashboard.granularity') }}:</span>
           <div class="w-full sm:w-28">
             <Select :model-value="granularity" :options="[{value:'day', label:t('dashboard.day')}, {value:'hour', label:t('dashboard.hour')}]" @update:model-value="$emit('update:granularity', $event)" @change="$emit('granularityChange')" />
           </div>
         </div>
-        <button @click="$emit('refresh')" :disabled="loading" class="btn btn-secondary w-full sm:w-auto">
+        <button type="button" @click="$emit('refresh')" :disabled="loading" class="btn btn-secondary w-full sm:w-auto">
+          <Icon name="refresh" size="sm" :class="loading ? 'animate-spin' : ''" />
           {{ t('common.refresh') }}
         </button>
       </div>
@@ -22,34 +23,39 @@
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <!-- Model Distribution Chart -->
-      <div class="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-        <div v-if="loading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-sm dark:bg-dark-800/50">
+      <div class="card relative overflow-hidden p-4">
+        <div v-if="loading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-dark-800/60">
           <LoadingSpinner size="md" />
         </div>
-        <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{{ t('dashboard.modelDistribution') }}</h3>
+        <div class="mb-4">
+          <h3 class="text-sm font-semibold text-[var(--apple-text)]">{{ t('dashboard.modelDistribution') }}</h3>
+          <p class="mt-1 text-xs leading-5 text-[var(--apple-muted)]">
+            {{ t('dashboard.modelDistributionHint') }}
+          </p>
+        </div>
         <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:gap-6">
           <div class="mx-auto h-48 w-48 shrink-0 xl:mx-0">
             <Doughnut v-if="modelData" :data="modelData" :options="doughnutOptions" />
-            <div v-else class="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noDataAvailable') }}</div>
+            <div v-else class="flex h-full items-center justify-center text-sm text-[var(--apple-muted)]">{{ t('dashboard.noDataAvailable') }}</div>
           </div>
-          <div class="max-h-48 min-w-0 flex-1 overflow-auto">
-            <table class="w-full text-xs">
+          <div class="table-container max-h-48 min-w-0 flex-1 overflow-auto">
+            <table class="table text-xs">
               <thead>
-                <tr class="text-gray-500 dark:text-gray-400">
-                  <th class="pb-2 text-left">{{ t('dashboard.model') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.requests') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.tokens') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.actual') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.standard') }}</th>
+                <tr>
+                  <th class="text-left">{{ t('dashboard.model') }}</th>
+                  <th class="text-right">{{ t('dashboard.requests') }}</th>
+                  <th class="text-right">{{ t('dashboard.tokens') }}</th>
+                  <th class="text-right">{{ t('dashboard.actual') }}</th>
+                  <th class="text-right">{{ t('dashboard.standard') }}</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="model in models" :key="model.model" class="border-t border-gray-100 dark:border-gray-700">
-                  <td class="max-w-[100px] truncate py-1.5 font-medium text-gray-900 dark:text-white" :title="model.model">{{ model.model }}</td>
-                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatNumber(model.requests) }}</td>
-                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatTokens(model.total_tokens) }}</td>
-                  <td class="py-1.5 text-right text-green-600 dark:text-green-400">{{ formatSettlementAmount(model.actual_cost, 4) }}</td>
-                  <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">{{ formatSettlementAmount(model.cost, 4) }}</td>
+                <tr v-for="model in models" :key="model.model">
+                  <td class="max-w-[100px] truncate font-medium" :title="model.model">{{ model.model }}</td>
+                  <td class="text-right">{{ formatNumber(model.requests) }}</td>
+                  <td class="text-right">{{ formatTokens(model.total_tokens) }}</td>
+                  <td class="text-right text-emerald-600 dark:text-emerald-400">{{ formatSettlementAmount(model.actual_cost, 4) }}</td>
+                  <td class="text-right text-[var(--apple-muted)]">{{ formatSettlementAmount(model.cost, 4) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -57,8 +63,21 @@
         </div>
       </div>
 
-      <!-- Token Usage Trend Chart -->
-      <TokenUsageTrend :trend-data="trend" :loading="loading" />
+      <div class="card relative overflow-hidden p-4">
+        <div v-if="loading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-dark-800/60">
+          <LoadingSpinner size="md" />
+        </div>
+        <div class="mb-4">
+          <h3 class="text-sm font-semibold text-[var(--apple-text)]">{{ t('dashboard.usageTrend') }}</h3>
+          <p class="mt-1 text-xs leading-5 text-[var(--apple-muted)]">
+            {{ t('dashboard.usageTrendHint') }}
+          </p>
+        </div>
+        <div class="h-56">
+          <Line v-if="trendChartData" :data="trendChartData" :options="trendChartOptions" />
+          <div v-else class="flex h-full items-center justify-center text-sm text-[var(--apple-muted)]">{{ t('dashboard.noDataAvailable') }}</div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -69,8 +88,8 @@ import { useI18n } from 'vue-i18n'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
-import { Doughnut } from 'vue-chartjs'
-import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
+import Icon from '@/components/icons/Icon.vue'
+import { Doughnut, Line } from 'vue-chartjs'
 import { useSettlementCurrency } from '@/composables/useSettlementCurrency'
 import type { TrendDataPoint, ModelStat } from '@/types'
 import { formatNumberLocaleString as formatNumber, formatTokensK as formatTokens } from '@/utils/format'
@@ -102,4 +121,130 @@ const doughnutOptions = {
     }
   }
 }
+
+const chartPalette = computed(() => {
+  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+  return {
+    text: isDark ? '#e5e7eb' : '#374151',
+    grid: isDark ? '#374151' : '#e5e7eb',
+    actual: '#2563eb',
+    standard: '#64748b',
+    tokens: '#10b981',
+  }
+})
+
+const trendChartData = computed(() => {
+  if (!props.trend?.length) return null
+
+  return {
+    labels: props.trend.map((d) => d.date),
+    datasets: [
+      {
+        label: t('dashboard.actual'),
+        data: props.trend.map((d) => d.actual_cost),
+        borderColor: chartPalette.value.actual,
+        backgroundColor: `${chartPalette.value.actual}1f`,
+        fill: true,
+        tension: 0.35,
+        pointRadius: 2,
+        yAxisID: 'ySpend',
+      },
+      {
+        label: t('dashboard.standard'),
+        data: props.trend.map((d) => d.cost),
+        borderColor: chartPalette.value.standard,
+        backgroundColor: 'transparent',
+        borderDash: [4, 4],
+        fill: false,
+        tension: 0.35,
+        pointRadius: 2,
+        yAxisID: 'ySpend',
+      },
+      {
+        label: t('dashboard.tokens'),
+        data: props.trend.map((d) => d.total_tokens),
+        borderColor: chartPalette.value.tokens,
+        backgroundColor: `${chartPalette.value.tokens}14`,
+        fill: false,
+        tension: 0.35,
+        pointRadius: 2,
+        yAxisID: 'yTokens',
+      },
+    ],
+  }
+})
+
+const trendChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: {
+    intersect: false,
+    mode: 'index' as const,
+  },
+  plugins: {
+    legend: {
+      position: 'top' as const,
+      labels: {
+        color: chartPalette.value.text,
+        usePointStyle: true,
+        pointStyle: 'circle',
+        boxWidth: 8,
+        padding: 14,
+        font: {
+          size: 11,
+        },
+      },
+    },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          const value = Number(context.raw ?? 0)
+          if (context.dataset.yAxisID === 'yTokens') {
+            return `${context.dataset.label}: ${formatTokens(value)}`
+          }
+          return `${context.dataset.label}: ${formatSettlementAmount(value, 4)}`
+        },
+      },
+    },
+  },
+  scales: {
+    x: {
+      grid: {
+        color: chartPalette.value.grid,
+      },
+      ticks: {
+        color: chartPalette.value.text,
+        font: {
+          size: 10,
+        },
+      },
+    },
+    ySpend: {
+      position: 'left' as const,
+      grid: {
+        color: chartPalette.value.grid,
+      },
+      ticks: {
+        color: chartPalette.value.text,
+        font: {
+          size: 10,
+        },
+        callback: (value: string | number) => formatSettlementAmount(Number(value), 4),
+      },
+    },
+    yTokens: {
+      position: 'right' as const,
+      grid: {
+        drawOnChartArea: false,
+      },
+      ticks: {
+        color: chartPalette.value.tokens,
+        font: {
+          size: 10,
+        },
+        callback: (value: string | number) => formatTokens(Number(value)),
+      },
+    },
+  },
+}))
 </script>

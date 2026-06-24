@@ -12,7 +12,7 @@ import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
-import { resolveDocumentTitle } from './title'
+import { resolveRouteDocumentTitle } from './title'
 import { applyRouteSeo } from '@/utils/seo'
 import { recoverFromChunkLoadError } from '@/utils/chunkRecovery'
 
@@ -40,9 +40,9 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Home',
-      seoTitle: '低成本大模型 API 聚合平台 - GPT Claude Gemini Codex API',
+      seoTitle: '官方满血 AI 模型服务 - GPT Claude Gemini Codex API',
       description:
-        'Wegoo AI 支持 GPT/Codex、Claude、Gemini 与 AI 生图，兼容 OpenAI API 格式。1 元 = 1 刀，注册送额度，适合编程、自动化、写作和高频 AI 使用。',
+        'Wegoo AI 提供 GPT/Codex、Claude、Gemini 与 AI 生图服务，坚持 100% 官方满血、永远不掺水，不保存用户聊天对话，异常扣费包赔。',
       canonicalPath: '/home'
     }
   },
@@ -65,9 +65,9 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: false,
       title: 'Register',
       titleKey: 'auth.createAccount',
-      seoTitle: '注册 Wegoo AI，试用低成本大模型 API',
+      seoTitle: '注册 Wegoo AI，使用官方满血 AI 模型服务',
       description:
-        '注册后获取赠送额度，按 1 元 = 1 刀的站内余额试用 ChatGPT API、Claude API、Gemini API、Codex API 和 AI 生图，兼容原有 OpenAI 调用方式。',
+        'Wegoo AI 支持 ChatGPT API、Claude API、Gemini API、Codex API 和 AI 生图，模型官方满血、不保存聊天对话、扣费记录清楚可查。',
       canonicalPath: '/register'
     }
   },
@@ -825,23 +825,12 @@ router.beforeEach(async (to, _from, next) => {
 
   // Set page title and route-level SEO tags.
   const appStore = useAppStore()
-  let documentTitle: string | undefined
-  // For custom pages, use menu item label as document title
-  if (to.name === 'CustomPage') {
-    const id = to.params.id as string
-    const publicItems = appStore.cachedPublicSettings?.custom_menu_items ?? []
-    const adminSettingsStore = useAdminSettingsStore()
-    const menuItem = publicItems.find((item) => item.id === id)
-      ?? (authStore.isAdmin ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
-    if (menuItem?.label) {
-      const siteName = appStore.siteName || 'Sub2API'
-      documentTitle = `${menuItem.label} - ${siteName}`
-    } else {
-      documentTitle = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)
-    }
-  } else {
-    documentTitle = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)
-  }
+  const adminSettingsStore = useAdminSettingsStore()
+  const customMenuItems = [
+    ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
+    ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
+  ]
+  const documentTitle = resolveRouteDocumentTitle(to, appStore.siteName, customMenuItems)
   applyRouteSeo(to, { siteName: appStore.siteName, title: documentTitle })
 
   // Check if route requires authentication

@@ -252,7 +252,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				var imageUpstreamErr *service.OpenAIImagesUpstreamError
 				if errors.As(err, &imageUpstreamErr) {
 					retryableServerError := service.IsOpenAIImagesRetryableUpstreamError(imageUpstreamErr)
-					h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, parsed.Model, schedulerEndpoint, !retryableServerError, nil)
+					h.gatewayService.ReportOpenAIAccountScheduleTerminal(account.ID, parsed.Model, schedulerEndpoint)
 					logEvent := "openai.images.upstream_user_error"
 					if retryableServerError {
 						logEvent = "openai.images.upstream_server_error_after_flush"
@@ -289,7 +289,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 						continue
 					}
 					if shouldReportOpenAIImagesScheduleFailure(scheduleDecision) {
-						h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, parsed.Model, schedulerEndpoint, failoverErr)
+						h.gatewayService.ReportOpenAIImagesScheduleFailure(account.ID, parsed.Model, schedulerEndpoint)
 					}
 					h.gatewayService.RecordOpenAIAccountSwitch()
 					failedAccountIDs[account.ID] = struct{}{}
@@ -310,7 +310,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				if h.handleOpenAIForwardTerminalError(c, reqLog, account, parsed.Model, schedulerEndpoint, sessionHash, apiKey.GroupID, "openai.images.forward_terminal_error", err) {
 					return
 				}
-				h.gatewayService.ReportOpenAIAccountScheduleResultForRequest(account.ID, parsed.Model, schedulerEndpoint, false, nil)
+				h.gatewayService.ReportOpenAIAccountScheduleTerminal(account.ID, parsed.Model, schedulerEndpoint)
 				upstreamErrorAlreadyCommunicated := openAIForwardErrorAlreadyCommunicated(c, writerSizeBeforeForward, err)
 				wroteFallback := false
 				if !upstreamErrorAlreadyCommunicated {

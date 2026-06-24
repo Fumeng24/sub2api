@@ -1,41 +1,41 @@
 <template>
   <button
     type="button"
-    class="group flex min-h-[260px] min-w-0 w-full flex-col rounded-lg border border-gray-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-blue-200 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:hover:border-blue-900/50 dark:hover:bg-dark-800/80"
+    class="card card-hover group flex min-h-[260px] min-w-0 w-full flex-col p-5 text-left"
     @click="emit('click')"
   >
     <!-- Header: icon + name/model + status chip -->
     <div class="flex items-start gap-3">
       <span
         class="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg ring-1 ring-black/5 dark:ring-white/10"
-        :class="[providerGradient(item.provider), providerTintClass]"
+        :class="['bg-[var(--apple-surface-elevated)]', providerTintClass]"
       >
         <ProviderIcon :provider="item.provider" :size="20" />
       </span>
-      <div class="flex-1 min-w-0">
-        <div class="text-base font-semibold truncate text-gray-900 dark:text-gray-100">
+      <div class="min-w-0 flex-1">
+        <div class="break-words text-base font-semibold leading-5 text-[var(--apple-text)]">
           {{ item.name }}
         </div>
-        <div class="mt-0.5 flex items-center gap-1.5 min-w-0">
+        <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
           <span
-            class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium flex-shrink-0"
+            class="monitor-provider-badge inline-flex flex-shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium"
             :class="providerBadgeClass(item.provider)"
           >
             {{ providerLabel(item.provider) }}
           </span>
-          <span class="font-mono text-xs truncate text-gray-500 dark:text-gray-400">
+          <span class="min-w-0 break-all font-mono text-xs text-[var(--apple-muted)]">
             {{ item.primary_model }}
           </span>
           <span
             v-if="item.group_name"
-            class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-300 flex-shrink-0"
+            class="inline-flex max-w-full flex-shrink-0 items-center rounded-md border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--apple-muted)]"
           >
-            {{ item.group_name }}
+            <span class="truncate">{{ item.group_name }}</span>
           </span>
         </div>
       </div>
       <span
-        class="flex-shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold"
+        class="monitor-status-badge flex-shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold"
         :class="statusBadgeClass(item.primary_status)"
       >
         {{ statusLabel(item.primary_status) }}
@@ -43,19 +43,29 @@
     </div>
 
     <!-- Metrics -->
-    <MonitorMetricPair
-      primary-icon="bolt"
-      :primary-label="t('monitorCommon.dialogLatency')"
-      :primary-value="formatLatency(item.primary_latency_ms)"
-      primary-unit="ms"
-      secondary-icon="globe"
-      :secondary-label="t('monitorCommon.endpointPing')"
-      :secondary-value="formatLatency(item.primary_ping_latency_ms)"
-      secondary-unit="ms"
-    />
+    <div class="mt-5 grid grid-cols-2 overflow-hidden rounded-lg border border-[color:var(--apple-border-soft)]">
+      <div class="min-w-0 border-r border-[color:var(--apple-border-soft)] px-3 py-2.5">
+        <div class="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--apple-muted)]">
+          <Icon name="bolt" size="xs" />
+          <span class="truncate">{{ t('monitorCommon.dialogLatency') }}</span>
+        </div>
+        <div class="mt-1 font-mono text-base font-semibold tabular-nums text-[var(--apple-text)]">
+          {{ formatLatency(item.primary_latency_ms) }}<span class="ml-0.5 text-xs font-normal text-[var(--apple-muted)]">ms</span>
+        </div>
+      </div>
+      <div class="min-w-0 px-3 py-2.5">
+        <div class="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--apple-muted)]">
+          <Icon name="globe" size="xs" />
+          <span class="truncate">{{ t('monitorCommon.endpointPing') }}</span>
+        </div>
+        <div class="mt-1 font-mono text-base font-semibold tabular-nums text-[var(--apple-text)]">
+          {{ formatLatency(item.primary_ping_latency_ms) }}<span class="ml-0.5 text-xs font-normal text-[var(--apple-muted)]">ms</span>
+        </div>
+      </div>
+    </div>
 
     <!-- Divider -->
-    <div class="mt-4 border-t border-gray-100 dark:border-dark-700/60"></div>
+    <div class="mt-4 border-t border-[color:var(--apple-border-soft)]"></div>
 
     <!-- Availability row -->
     <MonitorAvailabilityRow
@@ -76,19 +86,26 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UserMonitorView } from '@/api/channelMonitor'
+import type { MonitorStatus } from '@/api/admin/channelMonitor'
+import { useChannelMonitorFormat } from '@/composables/useChannelMonitorFormat'
 import {
-  useChannelMonitorFormat,
-  providerGradient,
-} from '@/composables/useChannelMonitorFormat'
+  PROVIDER_OPENAI,
+  PROVIDER_ANTHROPIC,
+  PROVIDER_GEMINI,
+  STATUS_OPERATIONAL,
+  STATUS_DEGRADED,
+  STATUS_FAILED,
+  STATUS_ERROR,
+} from '@/constants/channelMonitor'
+import Icon from '@/components/icons/Icon.vue'
 import ProviderIcon from './ProviderIcon.vue'
-import MonitorMetricPair from './MonitorMetricPair.vue'
 import MonitorAvailabilityRow from './MonitorAvailabilityRow.vue'
 import MonitorTimeline from './MonitorTimeline.vue'
 
 const PROVIDER_TINT: Record<string, string> = {
-  openai: 'text-emerald-600 dark:text-emerald-300',
-  anthropic: 'text-orange-600 dark:text-orange-300',
-  gemini: 'text-sky-600 dark:text-sky-300',
+  [PROVIDER_OPENAI]: 'monitor-provider-tint--openai',
+  [PROVIDER_ANTHROPIC]: 'monitor-provider-tint--anthropic',
+  [PROVIDER_GEMINI]: 'monitor-provider-tint--gemini',
 }
 
 const props = defineProps<{
@@ -105,15 +122,41 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const {
   statusLabel,
-  statusBadgeClass,
   providerLabel,
-  providerBadgeClass,
   formatLatency,
 } = useChannelMonitorFormat()
 
 const providerTintClass = computed(() =>
-  PROVIDER_TINT[props.item.provider] ?? 'text-gray-500 dark:text-gray-300'
+  PROVIDER_TINT[props.item.provider] ?? 'text-[var(--apple-muted)]'
 )
+
+function statusBadgeClass(status: MonitorStatus | '') {
+  switch (status) {
+    case STATUS_OPERATIONAL:
+      return 'monitor-status-badge--operational'
+    case STATUS_DEGRADED:
+      return 'monitor-status-badge--degraded'
+    case STATUS_FAILED:
+      return 'monitor-status-badge--failed'
+    case STATUS_ERROR:
+      return 'monitor-status-badge--error'
+    default:
+      return 'monitor-status-badge--neutral'
+  }
+}
+
+function providerBadgeClass(provider: string) {
+  switch (provider) {
+    case PROVIDER_OPENAI:
+      return 'monitor-provider-badge--openai'
+    case PROVIDER_ANTHROPIC:
+      return 'monitor-provider-badge--anthropic'
+    case PROVIDER_GEMINI:
+      return 'monitor-provider-badge--gemini'
+    default:
+      return 'monitor-provider-badge--neutral'
+  }
+}
 
 const availabilityLabel = computed(() => {
   const win = t(`channelStatus.windowTab.${props.window}`)
@@ -126,3 +169,56 @@ const extraModelsCountLabel = computed(() => {
   return t('monitorCommon.extraModelsCount', { n: count })
 })
 </script>
+
+<style scoped>
+.monitor-provider-badge,
+.monitor-status-badge {
+  border: 1px solid transparent;
+}
+
+.monitor-provider-badge--openai,
+.monitor-status-badge--operational {
+  background: color-mix(in srgb, var(--apple-success) 11%, transparent);
+  border-color: color-mix(in srgb, var(--apple-success) 20%, transparent);
+  color: var(--apple-success);
+}
+
+.monitor-provider-badge--anthropic,
+.monitor-status-badge--degraded {
+  background: color-mix(in srgb, var(--apple-warning) 12%, transparent);
+  border-color: color-mix(in srgb, var(--apple-warning) 22%, transparent);
+  color: var(--apple-warning);
+}
+
+.monitor-provider-badge--gemini {
+  background: color-mix(in srgb, var(--apple-blue) 11%, transparent);
+  border-color: color-mix(in srgb, var(--apple-blue) 20%, transparent);
+  color: var(--apple-blue);
+}
+
+.monitor-status-badge--failed {
+  background: color-mix(in srgb, var(--apple-danger) 11%, transparent);
+  border-color: color-mix(in srgb, var(--apple-danger) 20%, transparent);
+  color: var(--apple-danger);
+}
+
+.monitor-provider-badge--neutral,
+.monitor-status-badge--neutral,
+.monitor-status-badge--error {
+  background: var(--apple-surface-elevated);
+  border-color: var(--apple-border-soft);
+  color: var(--apple-muted);
+}
+
+.monitor-provider-tint--openai {
+  color: var(--apple-success);
+}
+
+.monitor-provider-tint--anthropic {
+  color: var(--apple-warning);
+}
+
+.monitor-provider-tint--gemini {
+  color: var(--apple-blue);
+}
+</style>

@@ -1,35 +1,50 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-7xl space-y-5">
-      <section class="space-y-4">
-        <div class="flex flex-col gap-4 border-b border-gray-200 pb-4 dark:border-dark-700 lg:flex-row lg:items-end lg:justify-between">
-          <div class="max-w-2xl">
-            <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+    <div class="mx-auto max-w-6xl space-y-5">
+      <section class="available-models-hero">
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div class="min-w-0 max-w-2xl">
+            <p class="available-models-hero__eyebrow">
+              {{ t('availableChannels.eyebrow') }}
+            </p>
+            <h1 class="page-title">
               {{ t('availableChannels.title') }}
             </h1>
-            <p class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
+            <p class="page-description mt-2 leading-6">
               {{ t('availableChannels.description') }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <span
+                v-for="signal in modelTrustSignals"
+                :key="signal"
+                class="min-w-0 rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] px-2.5 py-1 text-xs font-medium text-[var(--apple-muted)]"
+              >
+                {{ signal }}
+              </span>
+            </div>
+            <p class="mt-3 max-w-2xl text-sm leading-6 text-[var(--apple-muted)]">
+              {{ t('availableChannels.assurance') }}
             </p>
           </div>
 
-          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[420px]">
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[440px]">
             <div
               v-for="item in summaryItems"
               :key="item.label"
-              class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-dark-700 dark:bg-dark-800"
+              class="available-models-stat"
             >
-              <p class="text-[11px] font-medium text-gray-500 dark:text-gray-400">{{ item.label }}</p>
-              <p class="mt-1 text-xl font-semibold text-gray-950 dark:text-white">{{ item.value }}</p>
+              <p>{{ item.label }}</p>
+              <strong>{{ item.value }}</strong>
             </div>
           </div>
         </div>
 
-        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800 sm:flex-row sm:items-center">
+        <div class="available-models-toolbar">
           <div class="relative min-w-0 flex-1">
             <Icon
               name="search"
               size="md"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--apple-muted)]"
             />
             <input
               v-model="searchQuery"
@@ -85,9 +100,9 @@ const searchQuery = ref('')
 
 /**
  * 搜索过滤：
- * - 命中渠道名/描述 → 整个渠道（所有 platforms）都保留
+ * - 命中服务名/描述 → 整个服务（所有 platforms）都保留
  * - 否则按 platform/group/model 维度在 sections 里过滤，保留有匹配的 section
- * - 所有 sections 都不匹配时，渠道本身被过滤掉
+ * - 所有 sections 都不匹配时，服务本身被过滤掉
  */
 const filteredChannels = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -137,6 +152,15 @@ const summaryItems = computed(() => [
   { label: t('availableChannels.stats.models'), value: summary.value.models },
 ])
 
+const modelTrustSignals = computed(() => [
+  t('availableChannels.trustSignals.full'),
+  t('availableChannels.trustSignals.stable'),
+  t('availableChannels.trustSignals.noRetention'),
+  t('availableChannels.trustSignals.privacy'),
+  t('availableChannels.trustSignals.transparent'),
+  t('availableChannels.trustSignals.billing'),
+])
+
 function groupModels(group: UserAvailableGroup) {
   return group.supported_models || []
 }
@@ -156,7 +180,7 @@ function channelModelCount(channel: UserAvailableChannel): number {
 async function loadChannels() {
   loading.value = true
   try {
-    // 渠道列表和用户专属倍率并发拉取。专属倍率失败不阻塞渠道展示——
+    // 服务列表和用户专属倍率并发拉取。专属倍率失败不阻塞服务展示——
     // 失败时只是无法渲染专属倍率角标，降级为仅显示默认倍率。
     const [list, rates] = await Promise.all([
       userChannelsAPI.getAvailable(),
@@ -177,3 +201,77 @@ async function loadChannels() {
 
 onMounted(loadChannels)
 </script>
+
+<style scoped>
+.available-models-hero {
+  border: 1px solid var(--apple-border);
+  border-radius: var(--apple-radius);
+  background: var(--apple-surface);
+  padding: 20px;
+  box-shadow: var(--apple-shadow-sm);
+}
+
+:global(.dark) .available-models-hero {
+  background: color-mix(in srgb, var(--apple-surface) 94%, white 6%);
+}
+
+.available-models-hero__eyebrow {
+  margin: 0 0 6px;
+  color: var(--apple-muted);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.available-models-stat {
+  min-width: 0;
+  border-left: 1px solid var(--apple-border-soft);
+  padding: 6px 0 6px 12px;
+  overflow: hidden;
+}
+
+.available-models-stat p {
+  margin: 0;
+  color: var(--apple-muted);
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.available-models-stat strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--apple-text);
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+.available-models-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .available-models-hero {
+    padding: 16px;
+  }
+
+  .available-models-stat {
+    border-left: 0;
+    border-radius: var(--apple-radius);
+    background: var(--apple-surface-elevated);
+    padding: 10px 12px;
+  }
+
+  .available-models-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+</style>

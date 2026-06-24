@@ -1,5 +1,6 @@
 <template>
   <AppLayout>
+    <div class="admin-apple-page admin-table-page">
     <TablePageLayout>
       <template #filters>
         <div
@@ -3539,6 +3540,7 @@
       @close="showRPMOverridesModal = false"
       @success="loadGroups"
     />
+    </div>
   </AppLayout>
 </template>
 
@@ -3573,6 +3575,7 @@ import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesMo
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
 import { VueDraggable } from "vue-draggable-plus";
 import { createStableObjectKeyResolver } from "@/utils/stableObjectKey";
+import "./adminApple.css";
 import { useKeyedDebouncedSearch } from "@/composables/useKeyedDebouncedSearch";
 import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
 import {

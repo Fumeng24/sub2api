@@ -2115,7 +2115,7 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 	}
 	schedulerEndpoint := s.openAISchedulerEndpoint(ctx, requireCompact, requiredCapability)
 	allowHalfOpen := options.RequireCodexImageGenerationBridge || isOpenAIImageGenerationSchedulerEndpoint(schedulerEndpoint)
-	if !s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+	if !options.IgnoreSchedulerHealth && !s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
 	}
@@ -2286,6 +2286,11 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			cacheAffinityGroup = openAIAccountCacheAffinityGroup(account)
 		}
 	}
+	allowSchedulerHealthFilter := !options.IgnoreSchedulerHealth
+	healthStats := s.schedulerHealth
+	if !allowSchedulerHealthFilter {
+		healthStats = nil
+	}
 	bindCacheAffinity := func(accountID int64) {
 		if cacheAffinityHash != "" && accountID > 0 {
 			_ = s.setStickySessionAccountID(ctx, groupID, cacheAffinityHash, accountID, openaiStickySessionTTL)
@@ -2320,7 +2325,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		}
 		if !isOpenAIAccountEligibleForRequest(ctx, account, requestedModel, requireCompact, excludedIDs, requiredCapability, options) ||
 			s.isOpenAIAccountRuntimeBlocked(account) ||
-			!s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+			(allowSchedulerHealthFilter && !s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen)) {
 			retryExcluded := cloneExcludedAccountIDs(excludedIDs)
 			if retryExcluded == nil {
 				retryExcluded = make(map[int64]struct{}, 1)
@@ -2330,7 +2335,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		}
 		result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
 		if err == nil && result != nil && result.Acquired {
-			if !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+			if allowSchedulerHealthFilter && !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
 				if result.ReleaseFunc != nil {
 					result.ReleaseFunc()
 				}
@@ -2438,7 +2443,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 						if deleteOnHardInvalid && bindingHash != "" {
 							_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
 						}
-					} else if !s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+					} else if allowSchedulerHealthFilter && !s.isOpenAIAccountSchedulerHealthAllowedForSelection(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
 						if deleteOnHardInvalid && bindingHash != "" {
 							_ = s.deleteStickySessionAccountID(ctx, groupID, bindingHash)
 						}
@@ -2449,7 +2454,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 					} else {
 						result, err := s.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
 						if err == nil && result != nil && result.Acquired {
-							if !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+							if allowSchedulerHealthFilter && !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(account.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
 								if result.ReleaseFunc != nil {
 									result.ReleaseFunc()
 								}
@@ -2614,7 +2619,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		return s.recheckSelectedOpenAIAccountFromDBForSelection(ctx, fresh, requestedModel, requireCompact, excludedIDs, requiredCapability, options)
 	}
 	tryAcquireFromLoadMap := func(loadMap map[int64]*AccountLoadInfo) (*AccountSelectionResult, bool, error) {
-		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth, allowHalfOpen)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, healthStats, allowHalfOpen)
 		selectionOrder := orderScores(scores, "load")
 		if len(selectionOrder) == 0 {
 			return nil, false, nil
@@ -2630,7 +2635,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			}
 			result, err := s.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
 			if err == nil && result != nil && result.Acquired {
-				if !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(fresh.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+				if allowSchedulerHealthFilter && !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(fresh.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
 					if result.ReleaseFunc != nil {
 						result.ReleaseFunc()
 					}
@@ -2652,7 +2657,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 
 	loadMap, err := s.concurrencyService.GetAccountsLoadBatch(ctx, accountLoads)
 	if err != nil {
-		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, s.schedulerHealth, allowHalfOpen)
+		scores := buildSchedulerAccountScores(candidates, groupID, requestedModel, schedulerEndpoint, nil, healthStats, allowHalfOpen)
 		selectionOrder := orderScores(scores, "load_error")
 		for _, item := range selectionOrder {
 			fresh := resolveCandidate(item.Account)
@@ -2664,7 +2669,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			}
 			result, err := s.tryAcquireAccountSlot(ctx, fresh.ID, fresh.Concurrency)
 			if err == nil && result != nil && result.Acquired {
-				if !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(fresh.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
+				if allowSchedulerHealthFilter && !s.tryBeginOpenAIAccountSchedulerHalfOpenProbe(fresh.ID, requestedModel, schedulerEndpoint, allowHalfOpen) {
 					if result.ReleaseFunc != nil {
 						result.ReleaseFunc()
 					}
@@ -2723,7 +2728,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	if loadMap == nil {
 		loadMap = make(map[int64]*AccountLoadInfo)
 	}
-	waitScores := buildSchedulerAccountWaitScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, s.schedulerHealth)
+	waitScores := buildSchedulerAccountWaitScores(candidates, groupID, requestedModel, schedulerEndpoint, loadMap, healthStats)
 	waitOrder := orderScores(waitScores, "wait")
 	for _, item := range waitOrder {
 		fresh := resolveCandidate(item.Account)
@@ -5068,6 +5073,9 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	if originalModel != "" && mappedModel != "" && originalModel != mappedModel {
 		body = s.replaceModelInResponseBody(body, mappedModel, originalModel)
 	}
+	if err := s.openAICompactFailedContextWindowError(c, account, resp, body, true, extractOpenAISSEErrorMessage(body)); err != nil {
+		return nil, err
+	}
 	if err := s.validateOpenAICompactResponseForFailover(c, account, resp, body, true); err != nil {
 		return nil, err
 	}
@@ -5119,6 +5127,9 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(ctx context.Context, r
 			msg := extractOpenAISSEErrorMessage(terminalPayload)
 			if msg == "" {
 				msg = "Upstream compact response failed"
+			}
+			if err := s.openAICompactFailedContextWindowError(c, account, resp, terminalPayload, true, msg); err != nil {
+				return nil, err
 			}
 			if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, msg, terminalPayload) {
 				return nil, s.newOpenAIStreamFailoverError(c, account, true, resp.Header.Get("x-request-id"), terminalPayload, msg)
@@ -6520,6 +6531,9 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	if account.Type == AccountTypeOAuth && bodyLooksLikeSSE {
 		return s.handleSSEToJSON(ctx, resp, c, account, body, originalModel, mappedModel)
 	}
+	if err := s.openAICompactFailedContextWindowError(c, account, resp, body, false, extractOpenAISSEErrorMessage(body)); err != nil {
+		return nil, err
+	}
 
 	usageValue, usageOK := extractOpenAIUsageFromJSONBytes(body)
 	if !usageOK {
@@ -6599,6 +6613,9 @@ func (s *OpenAIGatewayService) handleSSEToJSON(ctx context.Context, resp *http.R
 			if msg == "" {
 				msg = "Upstream compact response failed"
 			}
+			if err := s.openAICompactFailedContextWindowError(c, account, resp, terminalPayload, false, msg); err != nil {
+				return nil, err
+			}
 			if s.autoDisableCodexImageBridgeForUnsupportedUpstream(ctx, account, msg, terminalPayload) {
 				return nil, s.newOpenAIStreamFailoverError(c, account, false, resp.Header.Get("x-request-id"), terminalPayload, msg)
 			}
@@ -6669,6 +6686,44 @@ func extractOpenAISSEErrorMessage(payload []byte) string {
 		}
 	}
 	return sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(payload)))
+}
+
+func (s *OpenAIGatewayService) openAICompactFailedContextWindowError(
+	c *gin.Context,
+	account *Account,
+	resp *http.Response,
+	payload []byte,
+	passthrough bool,
+	message string,
+) error {
+	if !isOpenAIResponsesCompactPath(c) || !openAIFailedPayloadIsContextWindowError(payload, message) {
+		return nil
+	}
+	upstreamDetail := ""
+	if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
+		maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
+		if maxBytes <= 0 {
+			maxBytes = 2048
+		}
+		upstreamDetail = truncateString(string(payload), maxBytes)
+	}
+	return s.newOpenAICompactContextWindowFailoverError(c, account, resp, payload, passthrough, message, upstreamDetail)
+}
+
+func openAIFailedPayloadIsContextWindowError(payload []byte, message string) bool {
+	if len(bytes.TrimSpace(payload)) == 0 || !gjson.ValidBytes(payload) {
+		return false
+	}
+	root := gjson.ParseBytes(payload)
+	eventType := strings.ToLower(strings.TrimSpace(root.Get("type").String()))
+	status := strings.ToLower(strings.TrimSpace(root.Get("status").String()))
+	if status == "" {
+		status = strings.ToLower(strings.TrimSpace(root.Get("response.status").String()))
+	}
+	if eventType != "response.failed" && status != "failed" {
+		return false
+	}
+	return isOpenAIContextWindowError(message, payload)
 }
 
 func (s *OpenAIGatewayService) writeOpenAINonStreamingProtocolError(resp *http.Response, c *gin.Context, message string) error {

@@ -410,41 +410,46 @@ type upstreamModelEntry struct {
 }
 
 func extractUpstreamModelIDs(body []byte) ([]string, error) {
-	var response struct {
-		Data   []upstreamModelEntry `json:"data"`
-		Models []upstreamModelEntry `json:"models"`
-	}
-	if err := json.Unmarshal(body, &response); err != nil {
-		var arrayResponse []upstreamModelEntry
-		if arrayErr := json.Unmarshal(body, &arrayResponse); arrayErr != nil {
-			return nil, fmt.Errorf("parse upstream model list: %w", err)
-		}
-
-		models := make([]string, 0, len(arrayResponse))
-		for _, entry := range arrayResponse {
-			models = append(models, upstreamModelEntryID(entry))
+	var objectResponse map[string]json.RawMessage
+	if err := json.Unmarshal(body, &objectResponse); err == nil {
+		models := make([]string, 0)
+		for _, key := range []string{"data", "models"} {
+			raw, ok := objectResponse[key]
+			if !ok {
+				continue
+			}
+			ids, decodeErr := decodeUpstreamModelIDArray(raw)
+			if decodeErr != nil {
+				return nil, fmt.Errorf("parse upstream model list %q: %w", key, decodeErr)
+			}
+			models = append(models, ids...)
 		}
 		return dedupeAndSortModelIDs(models), nil
 	}
 
-	models := make([]string, 0, len(response.Data)+len(response.Models))
-	for _, entry := range response.Data {
-		models = append(models, upstreamModelEntryID(entry))
+	models, err := decodeUpstreamModelIDArray(body)
+	if err != nil {
+		return nil, fmt.Errorf("parse upstream model list: %w", err)
 	}
-	for _, entry := range response.Models {
-		models = append(models, upstreamModelEntryID(entry))
-	}
-
-	if len(models) == 0 {
-		var arrayResponse []upstreamModelEntry
-		if err := json.Unmarshal(body, &arrayResponse); err == nil {
-			for _, entry := range arrayResponse {
-				models = append(models, upstreamModelEntryID(entry))
-			}
-		}
-	}
-
 	return dedupeAndSortModelIDs(models), nil
+}
+
+func decodeUpstreamModelIDArray(body []byte) ([]string, error) {
+	var entries []upstreamModelEntry
+	if err := json.Unmarshal(body, &entries); err == nil {
+		models := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			models = append(models, upstreamModelEntryID(entry))
+		}
+		return models, nil
+	}
+
+	var ids []string
+	if err := json.Unmarshal(body, &ids); err == nil {
+		return ids, nil
+	}
+
+	return nil, fmt.Errorf("expected array of model objects or strings")
 }
 
 func upstreamModelEntryID(entry upstreamModelEntry) string {
@@ -460,6 +465,7 @@ func dedupeAndSortModelIDs(models []string) []string {
 	result := make([]string, 0, len(models))
 	for _, model := range models {
 		model = strings.TrimSpace(model)
+		model = strings.TrimPrefix(model, "models/")
 		if model == "" {
 			continue
 		}

@@ -1,9 +1,9 @@
 <template>
-    <AppLayout>
-      <TablePageLayout>
-        <template #filters>
-          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <div class="grid gap-3 md:grid-cols-[minmax(220px,1fr)_10rem_10rem] md:items-center">
+  <AppLayout>
+    <TablePageLayout>
+      <template #filters>
+        <div class="space-y-3">
+          <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(10rem,12rem)_minmax(10rem,12rem)] md:items-center">
             <SearchInput
               v-model="filterSearch"
               :placeholder="t('keys.searchPlaceholder')"
@@ -23,65 +23,84 @@
               @update:model-value="onStatusFilterChange"
             />
           </div>
-            <div
-              v-if="publicSettings?.api_base_url || (publicSettings?.custom_endpoints?.length ?? 0) > 0"
-              class="mt-3"
-            >
-              <EndpointPopover
-                :api-base-url="publicSettings?.api_base_url || ''"
-                :custom-endpoints="publicSettings?.custom_endpoints || []"
+          <details class="group/access rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface)]">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] marker:hidden [&::-webkit-details-marker]:hidden">
+              <span class="flex min-w-0 items-center gap-2">
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--apple-surface-elevated)] text-[var(--apple-blue)] ring-1 ring-[color:var(--apple-border-soft)]">
+                  <Icon name="link" size="sm" />
+                </span>
+                <span class="truncate font-medium text-[var(--apple-text)]">{{ t('keys.useKey') }}</span>
+              </span>
+              <Icon
+                name="chevronDown"
+                size="sm"
+                class="shrink-0 text-[var(--apple-muted-2)] transition-transform group-open/access:rotate-180"
               />
-            </div>
-          </div>
-        </template>
+            </summary>
 
-        <template #actions>
-        <div class="flex min-w-0 flex-col gap-4 border-b border-gray-200 pb-4 dark:border-dark-700 lg:flex-row lg:items-end lg:justify-between">
-          <div class="min-w-0">
-            <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
-              {{ t('keys.title') }}
+            <div class="space-y-3 border-t border-[color:var(--apple-border-soft)] px-3 py-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  @click="router.push('/monitor')"
+                >
+                  <Icon name="chart" size="sm" />
+                  {{ t('keys.serviceStatusTip.action') }}
+                </button>
+              </div>
+
+              <div v-if="hasConfiguredEndpoints" class="max-w-full">
+                <EndpointPopover
+                  :api-base-url="publicSettings?.api_base_url || ''"
+                  :custom-endpoints="publicSettings?.custom_endpoints || []"
+                />
+              </div>
+            </div>
+          </details>
+        </div>
+      </template>
+
+      <template #actions>
+        <div class="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div class="min-w-0 max-w-3xl">
+            <h1 class="text-2xl font-semibold tracking-normal text-[var(--apple-text)]">
+              {{ t('keys.hero.title') }}
             </h1>
-            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-dark-300">
-              {{ t('keys.description') }}
+            <p class="mt-1 max-w-2xl text-sm leading-6 text-[var(--apple-muted)]">
+              {{ t('keys.hero.description') }}
             </p>
-            <div class="min-w-0">
-              <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">
-                {{ t('keys.serviceStatusTip.title') }}
-              </p>
-              <p class="mt-1 max-w-2xl text-sm leading-5 text-gray-500 dark:text-dark-300">
-                {{ t('keys.serviceStatusTip.description') }}
-              </p>
+            <div class="mt-3 grid gap-2 sm:flex sm:flex-wrap">
+              <span
+                v-for="signal in keyTrustSignals"
+                :key="signal"
+                class="min-w-0 rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] px-2.5 py-1 text-xs font-medium text-[var(--apple-muted)]"
+              >
+                <span class="block truncate">{{ signal }}</span>
+              </span>
             </div>
           </div>
 
           <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:justify-end">
             <button
-              type="button"
-              class="btn btn-secondary justify-center"
-              @click="router.push('/monitor')"
-            >
-              {{ t('keys.serviceStatusTip.action') }}
-              <Icon name="arrowRight" size="sm" class="ml-1" />
-            </button>
-            <button
               @click="loadApiKeys"
               :disabled="loading"
-              class="btn btn-secondary justify-center"
+              class="btn btn-secondary w-full justify-center sm:w-auto"
               :title="t('common.refresh')"
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+              <span>{{ t('common.refresh') }}</span>
             </button>
             <button
               @click="showCreateModal = true"
-              class="btn btn-primary justify-center"
-              data-tour="keys-create-btn"
+              class="btn btn-primary w-full justify-center sm:w-auto"
             >
-              <Icon name="plus" size="md" class="mr-2" />
+              <Icon name="plus" size="md" />
               {{ t('keys.createKey') }}
             </button>
           </div>
         </div>
-        </template>
+      </template>
 
       <template #table>
         <DataTable
@@ -100,11 +119,11 @@
               </code>
               <button
                 @click="copyToClipboard(value, row.id)"
-                class="rounded-lg p-1 transition-colors hover:bg-gray-100 dark:hover:bg-dark-700"
+                class="rounded-lg p-1 transition-colors hover:bg-[var(--apple-hover)]"
                 :class="
                   copiedKeyId === row.id
-                    ? 'text-green-500'
-                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                    ? 'text-[var(--apple-success)]'
+                    : 'text-[var(--apple-muted-2)] hover:text-[var(--apple-text)]'
                 "
                 :title="copiedKeyId === row.id ? t('keys.copied') : t('keys.copyToClipboard')"
               >
@@ -121,12 +140,12 @@
 
           <template #cell-name="{ value, row }">
             <div class="flex items-center gap-1.5">
-              <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
+              <span class="font-medium text-[var(--apple-text)]">{{ value }}</span>
               <Icon
                 v-if="row.ip_whitelist?.length > 0 || row.ip_blacklist?.length > 0"
                 name="shield"
                 size="sm"
-                class="text-blue-500"
+                class="text-[var(--apple-blue)]"
                 :title="t('keys.ipRestrictionEnabled')"
               />
             </div>
@@ -137,7 +156,7 @@
               <button
                 :ref="(el) => setGroupButtonRef(row.id, el)"
                 @click="openGroupSelector(row)"
-                class="-mx-2 -my-1 flex max-w-full min-w-0 cursor-pointer flex-wrap items-center justify-end gap-x-2 gap-y-1 rounded-lg px-2 py-1 text-right transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700 md:flex-nowrap md:justify-start md:text-left"
+                class="-mx-2 -my-1 flex max-w-full min-w-0 cursor-pointer flex-wrap items-center justify-end gap-x-2 gap-y-1 rounded-lg px-2 py-1 text-right transition-all duration-200 hover:bg-[var(--apple-hover)] md:flex-nowrap md:justify-start md:text-left"
                 :title="t('keys.clickToChangeGroup')"
               >
                 <GroupBadge
@@ -160,12 +179,12 @@
                   :discount-daily-end-time="row.group.group_rate_discount_daily_end_time"
                   :discount-timezone="row.group.group_rate_discount_timezone"
                 />
-                <span v-else class="shrink-0 whitespace-nowrap text-sm text-gray-400 dark:text-dark-500">{{
+                <span v-else class="shrink-0 whitespace-nowrap text-sm text-[var(--apple-muted-2)]">{{
                   t('keys.noGroup')
                 }}</span>
-                <span class="shrink-0 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
+                <span class="shrink-0 whitespace-nowrap text-xs text-[var(--apple-muted)]">{{ t('keys.selectGroup') }}</span>
                 <svg
-                  class="h-3.5 w-3.5 shrink-0 text-gray-400 opacity-60 transition-opacity group-hover/dropdown:opacity-100"
+                  class="h-3.5 w-3.5 shrink-0 text-[var(--apple-muted-2)] opacity-60 transition-opacity group-hover/dropdown:opacity-100"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -184,37 +203,37 @@
           <template #cell-usage="{ row }">
             <div class="text-sm">
               <div class="flex items-center gap-1.5">
-                <span class="text-gray-500 dark:text-gray-400">{{ t('keys.today') }}:</span>
-                <span class="font-medium text-gray-900 dark:text-white">
+                <span class="text-[var(--apple-muted)]">{{ t('keys.today') }}:</span>
+                <span class="font-medium text-[var(--apple-text)]">
                   {{ formatSettlementAmount(usageStats[row.id]?.today_actual_cost ?? 0, 4) }}
                 </span>
               </div>
               <div class="mt-0.5 flex items-center gap-1.5">
-                <span class="text-gray-500 dark:text-gray-400">{{ t('keys.total') }}:</span>
-                <span class="font-medium text-gray-900 dark:text-white">
+                <span class="text-[var(--apple-muted)]">{{ t('keys.total') }}:</span>
+                <span class="font-medium text-[var(--apple-text)]">
                   {{ formatSettlementAmount(usageStats[row.id]?.total_actual_cost ?? 0, 4) }}
                 </span>
               </div>
               <!-- Quota progress (if quota is set) -->
               <div v-if="row.quota > 0" class="mt-1.5">
                 <div class="flex items-center gap-1.5">
-                  <span class="text-gray-500 dark:text-gray-400">{{ t('keys.quota') }}:</span>
+                  <span class="text-[var(--apple-muted)]">{{ t('keys.quota') }}:</span>
                   <span :class="[
                     'font-medium',
-                    row.quota_used >= row.quota ? 'text-red-500' :
-                    row.quota_used >= row.quota * 0.8 ? 'text-yellow-500' :
-                    'text-gray-900 dark:text-white'
+                    row.quota_used >= row.quota ? 'text-[var(--apple-danger)]' :
+                    row.quota_used >= row.quota * 0.8 ? 'text-[var(--apple-warning)]' :
+                    'text-[var(--apple-text)]'
                   ]">
                     {{ formatSettlementAmountPair(row.quota_used ?? 0, row.quota ?? 0, 2) }}
                   </span>
                 </div>
-                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]">
                   <div
                     :class="[
                       'h-full rounded-full transition-all',
-                      row.quota_used >= row.quota ? 'bg-red-500' :
-                      row.quota_used >= row.quota * 0.8 ? 'bg-yellow-500' :
-                      'bg-primary-500'
+                      row.quota_used >= row.quota ? 'bg-[var(--apple-danger)]' :
+                      row.quota_used >= row.quota * 0.8 ? 'bg-[var(--apple-warning)]' :
+                      'bg-[var(--apple-blue)]'
                     ]"
                     :style="{ width: Math.min((row.quota_used / row.quota) * 100, 100) + '%' }"
                   />
@@ -228,84 +247,84 @@
               <!-- 5h window -->
               <div v-if="row.rate_limit_5h > 0">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="text-gray-500 dark:text-gray-400">5h</span>
+                  <span class="text-[var(--apple-muted)]">5h</span>
                   <span :class="[
                     'font-medium tabular-nums',
-                    row.usage_5h >= row.rate_limit_5h ? 'text-red-500' :
-                    row.usage_5h >= row.rate_limit_5h * 0.8 ? 'text-yellow-500' :
-                    'text-gray-700 dark:text-gray-300'
+                    row.usage_5h >= row.rate_limit_5h ? 'text-[var(--apple-danger)]' :
+                    row.usage_5h >= row.rate_limit_5h * 0.8 ? 'text-[var(--apple-warning)]' :
+                    'text-[var(--apple-text)]'
                   ]">
                     {{ formatSettlementAmountPair(row.usage_5h ?? 0, row.rate_limit_5h ?? 0, 2) }}
                   </span>
                 </div>
-                <div class="h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                <div class="h-1 w-full overflow-hidden rounded-full bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]">
                   <div
                     :class="[
                       'h-full rounded-full transition-all',
-                      row.usage_5h >= row.rate_limit_5h ? 'bg-red-500' :
-                      row.usage_5h >= row.rate_limit_5h * 0.8 ? 'bg-yellow-500' :
-                      'bg-emerald-500'
+                      row.usage_5h >= row.rate_limit_5h ? 'bg-[var(--apple-danger)]' :
+                      row.usage_5h >= row.rate_limit_5h * 0.8 ? 'bg-[var(--apple-warning)]' :
+                      'bg-[var(--apple-success)]'
                     ]"
                     :style="{ width: Math.min((row.usage_5h / row.rate_limit_5h) * 100, 100) + '%' }"
                   />
                 </div>
-                <div v-if="row.reset_5h_at && formatResetTime(row.reset_5h_at)" class="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+                <div v-if="row.reset_5h_at && formatResetTime(row.reset_5h_at)" class="text-[10px] text-[var(--apple-muted-2)] tabular-nums">
                   ⟳ {{ formatResetTime(row.reset_5h_at) }}
                 </div>
               </div>
               <!-- 1d window -->
               <div v-if="row.rate_limit_1d > 0">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="text-gray-500 dark:text-gray-400">1d</span>
+                  <span class="text-[var(--apple-muted)]">1d</span>
                   <span :class="[
                     'font-medium tabular-nums',
-                    row.usage_1d >= row.rate_limit_1d ? 'text-red-500' :
-                    row.usage_1d >= row.rate_limit_1d * 0.8 ? 'text-yellow-500' :
-                    'text-gray-700 dark:text-gray-300'
+                    row.usage_1d >= row.rate_limit_1d ? 'text-[var(--apple-danger)]' :
+                    row.usage_1d >= row.rate_limit_1d * 0.8 ? 'text-[var(--apple-warning)]' :
+                    'text-[var(--apple-text)]'
                   ]">
                     {{ formatSettlementAmountPair(row.usage_1d ?? 0, row.rate_limit_1d ?? 0, 2) }}
                   </span>
                 </div>
-                <div class="h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                <div class="h-1 w-full overflow-hidden rounded-full bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]">
                   <div
                     :class="[
                       'h-full rounded-full transition-all',
-                      row.usage_1d >= row.rate_limit_1d ? 'bg-red-500' :
-                      row.usage_1d >= row.rate_limit_1d * 0.8 ? 'bg-yellow-500' :
-                      'bg-emerald-500'
+                      row.usage_1d >= row.rate_limit_1d ? 'bg-[var(--apple-danger)]' :
+                      row.usage_1d >= row.rate_limit_1d * 0.8 ? 'bg-[var(--apple-warning)]' :
+                      'bg-[var(--apple-success)]'
                     ]"
                     :style="{ width: Math.min((row.usage_1d / row.rate_limit_1d) * 100, 100) + '%' }"
                   />
                 </div>
-                <div v-if="row.reset_1d_at && formatResetTime(row.reset_1d_at)" class="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+                <div v-if="row.reset_1d_at && formatResetTime(row.reset_1d_at)" class="text-[10px] text-[var(--apple-muted-2)] tabular-nums">
                   ⟳ {{ formatResetTime(row.reset_1d_at) }}
                 </div>
               </div>
               <!-- 7d window -->
               <div v-if="row.rate_limit_7d > 0">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="text-gray-500 dark:text-gray-400">7d</span>
+                  <span class="text-[var(--apple-muted)]">7d</span>
                   <span :class="[
                     'font-medium tabular-nums',
-                    row.usage_7d >= row.rate_limit_7d ? 'text-red-500' :
-                    row.usage_7d >= row.rate_limit_7d * 0.8 ? 'text-yellow-500' :
-                    'text-gray-700 dark:text-gray-300'
+                    row.usage_7d >= row.rate_limit_7d ? 'text-[var(--apple-danger)]' :
+                    row.usage_7d >= row.rate_limit_7d * 0.8 ? 'text-[var(--apple-warning)]' :
+                    'text-[var(--apple-text)]'
                   ]">
                     {{ formatSettlementAmountPair(row.usage_7d ?? 0, row.rate_limit_7d ?? 0, 2) }}
                   </span>
                 </div>
-                <div class="h-1 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                <div class="h-1 w-full overflow-hidden rounded-full bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]">
                   <div
                     :class="[
                       'h-full rounded-full transition-all',
-                      row.usage_7d >= row.rate_limit_7d ? 'bg-red-500' :
-                      row.usage_7d >= row.rate_limit_7d * 0.8 ? 'bg-yellow-500' :
-                      'bg-emerald-500'
+                      row.usage_7d >= row.rate_limit_7d ? 'bg-[var(--apple-danger)]' :
+                      row.usage_7d >= row.rate_limit_7d * 0.8 ? 'bg-[var(--apple-warning)]' :
+                      'bg-[var(--apple-success)]'
                     ]"
                     :style="{ width: Math.min((row.usage_7d / row.rate_limit_7d) * 100, 100) + '%' }"
                   />
                 </div>
-                <div v-if="row.reset_7d_at && formatResetTime(row.reset_7d_at)" class="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+                <div v-if="row.reset_7d_at && formatResetTime(row.reset_7d_at)" class="text-[10px] text-[var(--apple-muted-2)] tabular-nums">
                   ⟳ {{ formatResetTime(row.reset_7d_at) }}
                 </div>
               </div>
@@ -313,24 +332,24 @@
               <button
                 v-if="row.usage_5h > 0 || row.usage_1d > 0 || row.usage_7d > 0"
                 @click.stop="confirmResetRateLimitFromTable(row)"
-                class="mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
+                class="mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-blue)]"
                 :title="t('keys.resetRateLimitUsage')"
               >
                 <Icon name="refresh" size="xs" />
                 {{ t('keys.resetUsage') }}
               </button>
             </div>
-            <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
+            <span v-else class="text-sm text-[var(--apple-muted-2)]">-</span>
           </template>
 
           <template #cell-expires_at="{ value }">
             <span v-if="value" :class="[
               'text-sm',
-              new Date(value) < new Date() ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-dark-400'
+              new Date(value) < new Date() ? 'text-[var(--apple-danger)]' : 'text-[var(--apple-muted)]'
             ]">
               {{ formatDateTime(value) }}
             </span>
-            <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{ t('keys.noExpiration') }}</span>
+            <span v-else class="text-sm text-[var(--apple-muted-2)]">{{ t('keys.noExpiration') }}</span>
           </template>
 
           <template #cell-status="{ value }">
@@ -346,72 +365,72 @@
           </template>
 
           <template #cell-last_used_at="{ value }">
-            <span v-if="value" class="text-sm text-gray-500 dark:text-dark-400">
+            <span v-if="value" class="text-sm text-[var(--apple-muted)]">
               {{ formatDateTime(value) }}
             </span>
-            <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
+            <span v-else class="text-sm text-[var(--apple-muted-2)]">-</span>
           </template>
 
           <template #cell-created_at="{ value }">
-            <span class="text-sm text-gray-500 dark:text-dark-400">{{ formatDateTime(value) }}</span>
+            <span class="text-sm text-[var(--apple-muted)]">{{ formatDateTime(value) }}</span>
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex min-w-0 flex-wrap items-stretch justify-end gap-1 md:flex-nowrap md:items-center">
+            <div class="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
               <!-- Use Key Button -->
               <button
                 @click="openUseKeyModal(row)"
-                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                class="inline-flex min-h-8 min-w-[5.75rem] flex-1 basis-[5.75rem] items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)] md:flex-none md:basis-auto"
               >
                 <Icon name="terminal" size="sm" />
-                <span class="text-center text-xs leading-tight">{{ t('keys.useKey') }}</span>
+                <span class="whitespace-nowrap">{{ t('keys.useKey') }}</span>
               </button>
               <!-- Import to CC Switch Button -->
               <button
                 v-if="!publicSettings?.hide_ccs_import_button"
                 @click="importToCcswitch(row)"
-                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+                class="inline-flex min-h-8 min-w-[5.75rem] flex-1 basis-[5.75rem] items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-blue)] md:flex-none md:basis-auto"
               >
                 <Icon name="upload" size="sm" />
-                <span class="text-center text-xs leading-tight">{{ t('keys.importToCcSwitch') }}</span>
+                <span class="whitespace-nowrap">{{ t('keys.importToCcSwitch') }}</span>
               </button>
               <!-- Toggle Status Button -->
               <button
                 @click="toggleKeyStatus(row)"
                 :class="[
-                  'flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 transition-colors md:min-w-0 md:flex-none md:basis-auto',
+                  'inline-flex min-h-8 min-w-[5.75rem] flex-1 basis-[5.75rem] items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors md:flex-none md:basis-auto',
                   row.status === 'active'
-                    ? 'text-gray-500 hover:bg-yellow-50 hover:text-yellow-600 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-400'
-                    : 'text-gray-500 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400'
+                    ? 'text-[var(--apple-muted)] hover:bg-[color-mix(in_srgb,var(--apple-warning)_9%,var(--apple-surface))] hover:text-[var(--apple-warning)]'
+                    : 'text-[var(--apple-muted)] hover:bg-[color-mix(in_srgb,var(--apple-success)_9%,var(--apple-surface))] hover:text-[var(--apple-success)]'
                 ]"
               >
                 <Icon v-if="row.status === 'active'" name="ban" size="sm" />
                 <Icon v-else name="checkCircle" size="sm" />
-                <span class="text-center text-xs leading-tight">{{ row.status === 'active' ? t('keys.disable') : t('keys.enable') }}</span>
+                <span class="whitespace-nowrap">{{ row.status === 'active' ? t('keys.disable') : t('keys.enable') }}</span>
               </button>
               <!-- Edit Button -->
               <button
                 @click="editKey(row)"
-                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-dark-700 dark:hover:text-primary-400"
+                class="inline-flex min-h-8 min-w-[5.75rem] flex-1 basis-[5.75rem] items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)] md:flex-none md:basis-auto"
               >
                 <Icon name="edit" size="sm" />
-                <span class="text-center text-xs leading-tight">{{ t('common.edit') }}</span>
+                <span class="whitespace-nowrap">{{ t('common.edit') }}</span>
               </button>
               <!-- Support Ticket Button -->
               <button
                 @click="openKeyTicket(row)"
-                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-primary-900/20 dark:hover:text-primary-400"
+                class="inline-flex min-h-8 min-w-[5.75rem] flex-1 basis-[5.75rem] items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-blue)] md:flex-none md:basis-auto"
               >
                 <Icon name="chatBubble" size="sm" />
-                <span class="text-center text-xs leading-tight">{{ t('tickets.createTicket') }}</span>
+                <span class="whitespace-nowrap">{{ t('tickets.createTicket') }}</span>
               </button>
               <!-- Delete Button -->
               <button
                 @click="confirmDelete(row)"
-                class="flex min-w-[4.5rem] flex-1 basis-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 md:min-w-0 md:flex-none md:basis-auto dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                class="inline-flex min-h-8 min-w-[5.75rem] flex-1 basis-[5.75rem] items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--apple-muted)] transition-colors hover:bg-[color-mix(in_srgb,var(--apple-danger)_8%,var(--apple-surface))] hover:text-[var(--apple-danger)] md:flex-none md:basis-auto"
               >
                 <Icon name="trash" size="sm" />
-                <span class="text-center text-xs leading-tight">{{ t('common.delete') }}</span>
+                <span class="whitespace-nowrap">{{ t('common.delete') }}</span>
               </button>
             </div>
           </template>
@@ -455,7 +474,6 @@
             required
             class="input"
             :placeholder="t('keys.namePlaceholder')"
-            data-tour="key-form-name"
           />
         </div>
 
@@ -468,7 +486,6 @@
             :searchable="true"
             :search-placeholder="t('keys.searchGroup')"
             :group-tabs="true"
-            data-tour="key-form-group"
           >
             <template #selected="{ option }">
               <GroupBadge
@@ -490,7 +507,7 @@
                 :discount-daily-end-time="(option as unknown as GroupOption).discountDailyEndTime"
                 :discount-timezone="(option as unknown as GroupOption).discountTimezone"
               />
-              <span v-else class="text-gray-400">{{ t('keys.selectGroup') }}</span>
+              <span v-else class="text-[var(--apple-muted-2)]">{{ t('keys.selectGroup') }}</span>
             </template>
             <template #option="{ option, selected }">
               <GroupOptionItem
@@ -515,48 +532,20 @@
               />
             </template>
           </Select>
-          <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-100">
-            <div class="flex items-start gap-2">
-              <Icon name="chart" size="sm" class="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300" />
-              <p>
-                {{ t('keys.createServiceStatusHint') }}
-                <button
-                  type="button"
-                  class="font-semibold text-amber-950 underline decoration-amber-500/50 underline-offset-4 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200"
-                  @click="router.push('/monitor')"
-                >
-                  {{ t('keys.viewServiceStatus') }}
-                </button>
-              </p>
-            </div>
-          </div>
           <div
             v-if="selectedGroupForForm"
-            class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-100"
+            class="mt-3 rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] px-4 py-3 text-sm leading-6 text-[var(--apple-text)]"
           >
             <div class="flex items-start gap-2">
-              <Icon name="calculator" size="sm" class="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-300" />
+              <Icon name="calculator" size="sm" class="mt-0.5 shrink-0 text-[var(--apple-muted)]" />
               <div>
                 <p class="font-semibold">
                   {{ t('keys.groupCostPreview.title', { group: selectedGroupForForm.label }) }}
                 </p>
-                <p class="mt-1">
+                <p class="mt-1 text-[var(--apple-muted)]">
                   {{ selectedGroupCostPreview }}
                 </p>
-                <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-200">
-                  {{ t('keys.groupCostPreview.note') }}
-                </p>
               </div>
-            </div>
-          </div>
-          <div class="mt-3 grid gap-2 sm:grid-cols-3">
-            <div
-              v-for="tip in groupChoiceTips"
-              :key="tip.title"
-              class="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 dark:border-dark-700 dark:bg-dark-900/45"
-            >
-              <p class="text-xs font-bold text-gray-900 dark:text-white">{{ tip.title }}</p>
-              <p class="mt-1 text-[11px] leading-5 text-gray-500 dark:text-dark-400">{{ tip.description }}</p>
             </div>
           </div>
         </div>
@@ -570,12 +559,12 @@
               @click="formData.use_custom_key = !formData.use_custom_key"
               :class="[
                 'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                formData.use_custom_key ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+                formData.use_custom_key ? 'bg-[var(--apple-blue)]' : 'bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]'
               ]"
             >
               <span
                 :class="[
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-[var(--apple-surface)] shadow ring-0 transition duration-200 ease-in-out',
                   formData.use_custom_key ? 'translate-x-4' : 'translate-x-0'
                 ]"
               />
@@ -587,9 +576,9 @@
               type="text"
               class="input font-mono"
               :placeholder="t('keys.customKeyPlaceholder')"
-              :class="{ 'border-red-500 dark:border-red-500': customKeyError }"
+              :class="{ 'border-[color:var(--apple-danger)]': customKeyError }"
             />
-            <p v-if="customKeyError" class="mt-1 text-sm text-red-500">{{ customKeyError }}</p>
+            <p v-if="customKeyError" class="mt-1 text-sm text-[var(--apple-danger)]">{{ customKeyError }}</p>
             <p v-else class="input-hint">{{ t('keys.customKeyHint') }}</p>
           </div>
         </div>
@@ -612,12 +601,12 @@
               @click="formData.enable_ip_restriction = !formData.enable_ip_restriction"
               :class="[
                 'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                formData.enable_ip_restriction ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+                formData.enable_ip_restriction ? 'bg-[var(--apple-blue)]' : 'bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]'
               ]"
             >
               <span
                 :class="[
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-[var(--apple-surface)] shadow ring-0 transition duration-200 ease-in-out',
                   formData.enable_ip_restriction ? 'translate-x-4' : 'translate-x-0'
                 ]"
               />
@@ -660,12 +649,12 @@
               @click="formData.enable_quota = !formData.enable_quota"
               :class="[
                 'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                formData.enable_quota ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+                formData.enable_quota ? 'bg-[var(--apple-blue)]' : 'bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]'
               ]"
             >
               <span
                 :class="[
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-[var(--apple-surface)] shadow ring-0 transition duration-200 ease-in-out',
                   formData.enable_quota ? 'translate-x-4' : 'translate-x-0'
                 ]"
               />
@@ -676,7 +665,7 @@
           <div class="space-y-4">
             <div>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ settlementAmountPrefix }}</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--apple-muted)]">{{ settlementAmountPrefix }}</span>
                 <input
                   v-model.number="formData.quota"
                   type="number"
@@ -693,12 +682,12 @@
             <div v-if="showEditModal && selectedKey && selectedKey.quota > 0">
               <label class="input-label">{{ t('keys.quotaUsed') }}</label>
               <div class="flex items-center gap-2">
-                <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700">
-                  <span class="font-medium text-gray-900 dark:text-white">
+                <div class="flex-1 rounded-lg bg-[var(--apple-surface-elevated)] px-3 py-2 ring-1 ring-[color:var(--apple-border-soft)]">
+                  <span class="font-medium text-[var(--apple-text)]">
                     {{ formatSettlementAmount(selectedKey.quota_used ?? 0, 4) }}
                   </span>
-                  <span class="mx-2 text-gray-400">/</span>
-                  <span class="text-gray-500 dark:text-gray-400">
+                  <span class="mx-2 text-[var(--apple-muted-2)]">/</span>
+                  <span class="text-[var(--apple-muted)]">
                     {{ formatSettlementAmount(selectedKey.quota ?? 0, 2) }}
                   </span>
                 </div>
@@ -724,12 +713,12 @@
               @click="formData.enable_rate_limit = !formData.enable_rate_limit"
               :class="[
                 'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                formData.enable_rate_limit ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+                formData.enable_rate_limit ? 'bg-[var(--apple-blue)]' : 'bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]'
               ]"
             >
               <span
                 :class="[
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-[var(--apple-surface)] shadow ring-0 transition duration-200 ease-in-out',
                   formData.enable_rate_limit ? 'translate-x-4' : 'translate-x-0'
                 ]"
               />
@@ -742,7 +731,7 @@
             <div>
               <label class="input-label">{{ t('keys.rateLimit5h') }}</label>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ settlementAmountPrefix }}</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--apple-muted)]">{{ settlementAmountPrefix }}</span>
                 <input
                   v-model.number="formData.rate_limit_5h"
                   type="number"
@@ -755,28 +744,28 @@
               <!-- Usage info (edit mode only) -->
               <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_5h > 0" class="mt-2">
                 <div class="flex items-center gap-2">
-                  <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700 text-sm">
+                  <div class="flex-1 rounded-lg bg-[var(--apple-surface-elevated)] px-3 py-2 text-sm ring-1 ring-[color:var(--apple-border-soft)]">
                     <span :class="[
                       'font-medium',
-                      selectedKey.usage_5h >= selectedKey.rate_limit_5h ? 'text-red-500' :
-                      selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8 ? 'text-yellow-500' :
-                      'text-gray-900 dark:text-white'
+                      selectedKey.usage_5h >= selectedKey.rate_limit_5h ? 'text-[var(--apple-danger)]' :
+                      selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8 ? 'text-[var(--apple-warning)]' :
+                      'text-[var(--apple-text)]'
                     ]">
                       {{ formatSettlementAmount(selectedKey.usage_5h ?? 0, 4) }}
                     </span>
-                    <span class="mx-2 text-gray-400">/</span>
-                    <span class="text-gray-500 dark:text-gray-400">
+                    <span class="mx-2 text-[var(--apple-muted-2)]">/</span>
+                    <span class="text-[var(--apple-muted)]">
                       {{ formatSettlementAmount(selectedKey.rate_limit_5h ?? 0, 2) }}
                     </span>
                   </div>
                 </div>
-                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]">
                   <div
                     :class="[
                       'h-full rounded-full transition-all',
-                      selectedKey.usage_5h >= selectedKey.rate_limit_5h ? 'bg-red-500' :
-                      selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8 ? 'bg-yellow-500' :
-                      'bg-green-500'
+                      selectedKey.usage_5h >= selectedKey.rate_limit_5h ? 'bg-[var(--apple-danger)]' :
+                      selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8 ? 'bg-[var(--apple-warning)]' :
+                      'bg-[var(--apple-success)]'
                     ]"
                     :style="{ width: Math.min((selectedKey.usage_5h / selectedKey.rate_limit_5h) * 100, 100) + '%' }"
                   />
@@ -788,7 +777,7 @@
             <div>
               <label class="input-label">{{ t('keys.rateLimit1d') }}</label>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ settlementAmountPrefix }}</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--apple-muted)]">{{ settlementAmountPrefix }}</span>
                 <input
                   v-model.number="formData.rate_limit_1d"
                   type="number"
@@ -801,28 +790,28 @@
               <!-- Usage info (edit mode only) -->
               <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_1d > 0" class="mt-2">
                 <div class="flex items-center gap-2">
-                  <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700 text-sm">
+                  <div class="flex-1 rounded-lg bg-[var(--apple-surface-elevated)] px-3 py-2 text-sm ring-1 ring-[color:var(--apple-border-soft)]">
                     <span :class="[
                       'font-medium',
-                      selectedKey.usage_1d >= selectedKey.rate_limit_1d ? 'text-red-500' :
-                      selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8 ? 'text-yellow-500' :
-                      'text-gray-900 dark:text-white'
+                      selectedKey.usage_1d >= selectedKey.rate_limit_1d ? 'text-[var(--apple-danger)]' :
+                      selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8 ? 'text-[var(--apple-warning)]' :
+                      'text-[var(--apple-text)]'
                     ]">
                       {{ formatSettlementAmount(selectedKey.usage_1d ?? 0, 4) }}
                     </span>
-                    <span class="mx-2 text-gray-400">/</span>
-                    <span class="text-gray-500 dark:text-gray-400">
+                    <span class="mx-2 text-[var(--apple-muted-2)]">/</span>
+                    <span class="text-[var(--apple-muted)]">
                       {{ formatSettlementAmount(selectedKey.rate_limit_1d ?? 0, 2) }}
                     </span>
                   </div>
                 </div>
-                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]">
                   <div
                     :class="[
                       'h-full rounded-full transition-all',
-                      selectedKey.usage_1d >= selectedKey.rate_limit_1d ? 'bg-red-500' :
-                      selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8 ? 'bg-yellow-500' :
-                      'bg-green-500'
+                      selectedKey.usage_1d >= selectedKey.rate_limit_1d ? 'bg-[var(--apple-danger)]' :
+                      selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8 ? 'bg-[var(--apple-warning)]' :
+                      'bg-[var(--apple-success)]'
                     ]"
                     :style="{ width: Math.min((selectedKey.usage_1d / selectedKey.rate_limit_1d) * 100, 100) + '%' }"
                   />
@@ -834,7 +823,7 @@
             <div>
               <label class="input-label">{{ t('keys.rateLimit7d') }}</label>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ settlementAmountPrefix }}</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--apple-muted)]">{{ settlementAmountPrefix }}</span>
                 <input
                   v-model.number="formData.rate_limit_7d"
                   type="number"
@@ -847,28 +836,28 @@
               <!-- Usage info (edit mode only) -->
               <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_7d > 0" class="mt-2">
                 <div class="flex items-center gap-2">
-                  <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700 text-sm">
+                  <div class="flex-1 rounded-lg bg-[var(--apple-surface-elevated)] px-3 py-2 text-sm ring-1 ring-[color:var(--apple-border-soft)]">
                     <span :class="[
                       'font-medium',
-                      selectedKey.usage_7d >= selectedKey.rate_limit_7d ? 'text-red-500' :
-                      selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8 ? 'text-yellow-500' :
-                      'text-gray-900 dark:text-white'
+                      selectedKey.usage_7d >= selectedKey.rate_limit_7d ? 'text-[var(--apple-danger)]' :
+                      selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8 ? 'text-[var(--apple-warning)]' :
+                      'text-[var(--apple-text)]'
                     ]">
                       {{ formatSettlementAmount(selectedKey.usage_7d ?? 0, 4) }}
                     </span>
-                    <span class="mx-2 text-gray-400">/</span>
-                    <span class="text-gray-500 dark:text-gray-400">
+                    <span class="mx-2 text-[var(--apple-muted-2)]">/</span>
+                    <span class="text-[var(--apple-muted)]">
                       {{ formatSettlementAmount(selectedKey.rate_limit_7d ?? 0, 2) }}
                     </span>
                   </div>
                 </div>
-                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]">
                   <div
                     :class="[
                       'h-full rounded-full transition-all',
-                      selectedKey.usage_7d >= selectedKey.rate_limit_7d ? 'bg-red-500' :
-                      selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8 ? 'bg-yellow-500' :
-                      'bg-green-500'
+                      selectedKey.usage_7d >= selectedKey.rate_limit_7d ? 'bg-[var(--apple-danger)]' :
+                      selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8 ? 'bg-[var(--apple-warning)]' :
+                      'bg-[var(--apple-success)]'
                     ]"
                     :style="{ width: Math.min((selectedKey.usage_7d / selectedKey.rate_limit_7d) * 100, 100) + '%' }"
                   />
@@ -898,12 +887,12 @@
               @click="formData.enable_expiration = !formData.enable_expiration"
               :class="[
                 'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                formData.enable_expiration ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+                formData.enable_expiration ? 'bg-[var(--apple-blue)]' : 'bg-[var(--apple-surface-elevated)] ring-1 ring-[color:var(--apple-border-soft)]'
               ]"
             >
               <span
                 :class="[
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-[var(--apple-surface)] shadow ring-0 transition duration-200 ease-in-out',
                   formData.enable_expiration ? 'translate-x-4' : 'translate-x-0'
                 ]"
               />
@@ -921,8 +910,8 @@
                 :class="[
                   'rounded-lg px-3 py-1.5 text-sm transition-colors',
                   formData.expiration_preset === days
-                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600'
+                    ? 'bg-[color-mix(in_srgb,var(--apple-blue)_12%,var(--apple-surface))] text-[var(--apple-blue)]'
+                    : 'bg-[var(--apple-surface-elevated)] text-[var(--apple-muted)] hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)]'
                 ]"
               >
                 {{ showEditModal ? t('keys.extendDays', { days }) : t('keys.expiresInDays', { days }) }}
@@ -933,8 +922,8 @@
                 :class="[
                   'rounded-lg px-3 py-1.5 text-sm transition-colors',
                   formData.expiration_preset === 'custom'
-                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600'
+                    ? 'bg-[color-mix(in_srgb,var(--apple-blue)_12%,var(--apple-surface))] text-[var(--apple-blue)]'
+                    : 'bg-[var(--apple-surface-elevated)] text-[var(--apple-muted)] hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)]'
                 ]"
               >
                 {{ t('keys.customDate') }}
@@ -954,8 +943,8 @@
 
             <!-- Current expiration display (only in edit mode) -->
             <div v-if="showEditModal && selectedKey?.expires_at" class="text-sm">
-              <span class="text-gray-500 dark:text-gray-400">{{ t('keys.currentExpiration') }}: </span>
-              <span class="font-medium text-gray-900 dark:text-white">
+              <span class="text-[var(--apple-muted)]">{{ t('keys.currentExpiration') }}: </span>
+              <span class="font-medium text-[var(--apple-text)]">
                 {{ formatDateTime(selectedKey.expires_at) }}
               </span>
             </div>
@@ -972,7 +961,6 @@
             type="submit"
             :disabled="submitting"
             class="btn btn-primary"
-            data-tour="key-form-submit"
           >
             <svg
               v-if="submitting"
@@ -1062,12 +1050,12 @@
       <div class="space-y-4">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="space-y-2">
-            <p class="text-sm text-gray-600 dark:text-gray-400">
+            <p class="text-sm text-[var(--apple-muted)]">
               {{ t('keys.ccSwitchDialog.description') }}
             </p>
             <div
               v-if="selectedCcsRow?.group"
-              class="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-dark-400"
+              class="flex flex-wrap items-center gap-2 text-xs text-[var(--apple-muted)]"
             >
               <span>{{ t('keys.ccSwitchDialog.currentGroup') }}</span>
               <GroupBadge
@@ -1084,7 +1072,7 @@
             :href="ccSwitchOfficialUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+            class="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-[var(--apple-blue)] transition-colors hover:text-[var(--apple-blue-hover)]"
           >
             <Icon name="externalLink" size="sm" />
             {{ t('keys.ccSwitchDialog.openOfficial') }}
@@ -1093,7 +1081,7 @@
 
         <div
           v-if="ccsImportTargets.length === 0"
-          class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-800/50 dark:bg-yellow-900/20 dark:text-yellow-300"
+          class="rounded-lg border border-[color:color-mix(in_srgb,var(--apple-warning)_28%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-warning)_10%,var(--apple-surface))] p-4 text-sm text-[var(--apple-warning)]"
         >
           {{ t('keys.ccSwitchDialog.noGroup') }}
         </div>
@@ -1102,44 +1090,44 @@
           <div
             v-for="target in ccsImportTargets"
             :key="target.targetId"
-            class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-800"
+            class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">
+                <h4 class="text-sm font-semibold text-[var(--apple-text)]">
                   <span class="inline-flex items-center gap-1.5">
-                    <Icon :name="ccSwitchTargetIcon[target.targetId]" size="sm" class="text-gray-500 dark:text-dark-400" />
+                    <Icon :name="ccSwitchTargetIcon[target.targetId]" size="sm" class="text-[var(--apple-muted)]" />
                     {{ getCcSwitchTargetName(target.targetId) }}
                   </span>
                 </h4>
-                <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-dark-400">
+                <p class="mt-1 text-xs leading-5 text-[var(--apple-muted)]">
                   {{ getCcSwitchTargetDescription(target.targetId) }}
                 </p>
               </div>
-              <span class="rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 dark:bg-dark-700 dark:text-dark-300">
+              <span class="rounded-md bg-[var(--apple-surface-elevated)] px-2 py-1 text-[11px] font-medium text-[var(--apple-muted)] ring-1 ring-[color:var(--apple-border-soft)]">
                 {{ target.app }}
               </span>
             </div>
 
             <dl class="mt-4 space-y-2 text-xs">
               <div class="flex gap-2">
-                <dt class="w-16 shrink-0 text-gray-400 dark:text-dark-500">
+                <dt class="w-16 shrink-0 text-[var(--apple-muted-2)]">
                   {{ t('keys.ccSwitchDialog.endpoint') }}
                 </dt>
-                <dd class="min-w-0 flex-1 break-all font-mono text-gray-700 dark:text-dark-200">
+                <dd class="min-w-0 flex-1 break-all font-mono text-[var(--apple-text)]">
                   {{ target.endpoint }}
                 </dd>
               </div>
               <div v-if="target.model" class="flex gap-2">
-                <dt class="w-16 shrink-0 text-gray-400 dark:text-dark-500">
+                <dt class="w-16 shrink-0 text-[var(--apple-muted-2)]">
                   {{ t('keys.ccSwitchDialog.model') }}
                 </dt>
-                <dd class="min-w-0 flex-1 break-all font-mono text-gray-700 dark:text-dark-200">
+                <dd class="min-w-0 flex-1 break-all font-mono text-[var(--apple-text)]">
                   {{ target.model }}
                 </dd>
               </div>
               <div class="flex gap-2">
-                <dt class="w-16 shrink-0 text-gray-400 dark:text-dark-500">
+                <dt class="w-16 shrink-0 text-[var(--apple-muted-2)]">
                   {{ t('keys.ccSwitchDialog.protocol') }}
                 </dt>
                 <dd class="min-w-0 flex-1">
@@ -1147,8 +1135,8 @@
                     :class="[
                       'inline-flex rounded-md px-2 py-0.5 font-medium',
                       target.protocol.support === 'native'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/25 dark:text-emerald-300'
-                        : 'bg-amber-50 text-amber-700 dark:bg-amber-900/25 dark:text-amber-300'
+                        ? 'bg-[color-mix(in_srgb,var(--apple-success)_10%,var(--apple-surface))] text-[var(--apple-success)]'
+                        : 'bg-[color-mix(in_srgb,var(--apple-warning)_10%,var(--apple-surface))] text-[var(--apple-warning)]'
                     ]"
                   >
                     {{ getCcSwitchProtocolLabel(target.protocol.mode) }}
@@ -1156,10 +1144,10 @@
                 </dd>
               </div>
               <div v-if="target.reasoningEffort" class="flex gap-2">
-                <dt class="w-16 shrink-0 text-gray-400 dark:text-dark-500">
+                <dt class="w-16 shrink-0 text-[var(--apple-muted-2)]">
                   {{ t('keys.ccSwitchDialog.reasoning') }}
                 </dt>
-                <dd class="min-w-0 flex-1 font-mono text-gray-700 dark:text-dark-200">
+                <dd class="min-w-0 flex-1 font-mono text-[var(--apple-text)]">
                   {{ target.reasoningEffort }}
                 </dd>
               </div>
@@ -1184,7 +1172,7 @@
           </div>
         </div>
 
-        <p class="text-xs text-gray-500 dark:text-dark-400">
+        <p class="text-xs text-[var(--apple-muted)]">
           {{ t('keys.ccSwitchDialog.installHint') }}
         </p>
       </div>
@@ -1202,7 +1190,7 @@
       <div
         v-if="groupSelectorKeyId !== null && dropdownPosition"
         ref="dropdownRef"
-        class="animate-in fade-in slide-in-from-top-2 fixed z-[100000020] overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 duration-200 dark:bg-dark-800 dark:ring-white/10"
+        class="animate-in fade-in slide-in-from-top-2 fixed z-[100000020] overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] shadow-[var(--apple-shadow-md)] ring-1 ring-[color:var(--apple-border-soft)] duration-200"
         style="pointer-events: auto !important;"
         :style="{
           top: dropdownPosition.top + 'px',
@@ -1211,22 +1199,22 @@
         }"
       >
         <!-- Search box -->
-        <div class="border-b border-gray-100 p-2 dark:border-dark-700">
+        <div class="border-b border-[color:var(--apple-border-soft)] p-2">
           <div class="relative">
-            <svg class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <svg class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--apple-muted-2)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
               v-model="groupSearchQuery"
               type="text"
-              class="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-primary-300 focus:ring-1 focus:ring-primary-300 dark:border-dark-600 dark:bg-dark-700 dark:text-white dark:placeholder-gray-500 dark:focus:border-primary-600 dark:focus:ring-primary-600"
+              class="w-full rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] py-1.5 pl-8 pr-3 text-sm text-[var(--apple-text)] placeholder-[var(--apple-muted-2)] outline-none focus:border-[color:var(--apple-blue)] focus:ring-1 focus:ring-[color:var(--apple-focus-ring)]"
               :placeholder="t('keys.searchGroup')"
               @click.stop
             />
           </div>
         </div>
         <!-- Group list -->
-        <div class="grid grid-cols-3 gap-2.5 border-b border-gray-100 bg-gradient-to-r from-gray-50 via-white to-gray-50 p-2.5 dark:border-dark-700 dark:from-dark-900 dark:via-dark-800 dark:to-dark-900">
+        <div class="grid grid-cols-3 gap-2.5 border-b border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] p-2.5">
           <button
             v-for="tab in groupPlatformTabs"
             :key="tab.value"
@@ -1244,11 +1232,11 @@
             @click="changeGroup(selectedKeyForGroup!, option.value)"
             :class="[
               'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors',
-              'border-b border-gray-100 last:border-0 dark:border-dark-700',
+              'border-b border-[color:var(--apple-border-soft)] last:border-0',
               selectedKeyForGroup?.group_id === option.value ||
               (!selectedKeyForGroup?.group_id && option.value === null)
-                ? 'bg-primary-50 dark:bg-primary-900/20'
-                : 'hover:bg-gray-100 dark:hover:bg-dark-700'
+                ? 'bg-[color-mix(in_srgb,var(--apple-blue)_10%,var(--apple-surface))]'
+                : 'hover:bg-[var(--apple-hover)]'
             ]"
             :title="option.description || undefined"
           >
@@ -1277,7 +1265,7 @@
             />
           </button>
           <!-- Empty state when search has no results -->
-          <div v-if="filteredGroupOptions.length === 0" class="py-4 text-center text-sm text-gray-400 dark:text-gray-500">
+          <div v-if="filteredGroupOptions.length === 0" class="py-4 text-center text-sm text-[var(--apple-muted-2)]">
             {{ t('keys.noGroupFound') }}
           </div>
         </div>
@@ -1291,7 +1279,6 @@ import { ref, computed, onMounted, onUnmounted, watch, type ComponentPublicInsta
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { useOnboardingStore } from '@/stores/onboarding'
 import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import {
@@ -1373,7 +1360,6 @@ type KeyGroupPlatformTab = 'openai' | 'anthropic' | 'other'
 type KeyGroupSelectOption = GroupOption | GroupTabOption
 
 const appStore = useAppStore()
-const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 const {
   settlementCurrency,
@@ -1472,20 +1458,15 @@ const dropdownPosition = ref<{ top: number; left: number; width: number; listMax
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 let abortController: AbortController | null = null
 
-const groupChoiceTips = computed(() => [
-  {
-    title: t('keys.groupChoiceTips.cost.title'),
-    description: t('keys.groupChoiceTips.cost.description')
-  },
-  {
-    title: t('keys.groupChoiceTips.stability.title'),
-    description: t('keys.groupChoiceTips.stability.description')
-  },
-  {
-    title: t('keys.groupChoiceTips.image.title'),
-    description: t('keys.groupChoiceTips.image.description')
-  }
+const keyTrustSignals = computed(() => [
+  t('keys.hero.signals.official'),
+  t('keys.hero.signals.billing'),
+  t('keys.hero.signals.status'),
 ])
+
+const hasConfiguredEndpoints = computed(() =>
+  Boolean(publicSettings.value?.api_base_url || (publicSettings.value?.custom_endpoints?.length ?? 0) > 0)
+)
 
 // Get the currently selected key for group change
 const selectedKeyForGroup = computed(() => {
@@ -1598,43 +1579,33 @@ const keyGroupPlatformTab = (platform?: GroupPlatform | string | null): KeyGroup
 const groupPlatformTabClasses = (tab: KeyGroupPlatformTab) => {
   const active = activeGroupPlatformTab.value === tab
   const base = [
-    'relative inline-flex min-h-11 items-center justify-center rounded-xl border-2 px-3 py-2 text-center text-sm font-bold shadow-sm transition-all duration-150',
-    'before:mr-1.5 before:inline-block before:h-2.5 before:w-2.5 before:rounded-full before:align-middle before:shadow-sm before:content-[\'\']',
-    'hover:-translate-y-0.5 hover:shadow-md'
+    'relative inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-medium transition-colors duration-150',
+    'before:mr-1.5 before:inline-block before:h-2 before:w-2 before:rounded-full before:align-middle before:content-[\'\']'
   ]
-  const activeState = active
-    ? ['scale-[1.01] shadow-md ring-2 ring-offset-2 ring-offset-white dark:ring-offset-dark-800']
-    : []
 
   if (tab === 'openai') {
     return [
       ...base,
-      'border-emerald-200 bg-emerald-50 text-emerald-700 before:bg-emerald-500 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-300',
       active
-        ? 'border-emerald-400 bg-emerald-100 text-emerald-900 ring-emerald-400 dark:border-emerald-500 dark:bg-emerald-900/50 dark:text-emerald-100'
-        : '',
-      ...activeState
+        ? 'border-[color:color-mix(in_srgb,var(--apple-success)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-success)_10%,var(--apple-surface))] text-[var(--apple-success)] before:bg-[var(--apple-success)]'
+        : 'border-[color:var(--apple-border-soft)] bg-[var(--apple-surface)] text-[var(--apple-muted)] before:bg-[var(--apple-success)] hover:bg-[color-mix(in_srgb,var(--apple-success)_7%,var(--apple-surface))] hover:text-[var(--apple-success)]'
     ]
   }
 
   if (tab === 'anthropic') {
     return [
       ...base,
-      'border-orange-200 bg-orange-50 text-orange-700 before:bg-orange-500 dark:border-orange-800/70 dark:bg-orange-950/40 dark:text-orange-300',
       active
-        ? 'border-orange-400 bg-orange-100 text-orange-900 ring-orange-400 dark:border-orange-500 dark:bg-orange-900/50 dark:text-orange-100'
-        : '',
-      ...activeState
+        ? 'border-[color:color-mix(in_srgb,var(--apple-warning)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-warning)_10%,var(--apple-surface))] text-[var(--apple-warning)] before:bg-[var(--apple-warning)]'
+        : 'border-[color:var(--apple-border-soft)] bg-[var(--apple-surface)] text-[var(--apple-muted)] before:bg-[var(--apple-warning)] hover:bg-[color-mix(in_srgb,var(--apple-warning)_7%,var(--apple-surface))] hover:text-[var(--apple-warning)]'
     ]
   }
 
   return [
     ...base,
-    'border-sky-200 bg-sky-50 text-sky-700 before:bg-sky-500 dark:border-sky-800/70 dark:bg-sky-950/40 dark:text-sky-300',
     active
-      ? 'border-sky-400 bg-sky-100 text-sky-900 ring-sky-400 dark:border-sky-500 dark:bg-sky-900/50 dark:text-sky-100'
-      : '',
-    ...activeState
+      ? 'border-[color:color-mix(in_srgb,var(--apple-blue)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-blue)_10%,var(--apple-surface))] text-[var(--apple-blue)] before:bg-[var(--apple-blue)]'
+      : 'border-[color:var(--apple-border-soft)] bg-[var(--apple-surface)] text-[var(--apple-muted)] before:bg-[var(--apple-blue)] hover:bg-[color-mix(in_srgb,var(--apple-blue)_7%,var(--apple-surface))] hover:text-[var(--apple-blue)]'
   ]
 }
 
@@ -2063,26 +2034,21 @@ const handleSubmit = async () => {
         ...rateLimitData
       })
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
-      // Only advance tour if active, on submit step, and creation succeeded
-      if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {
-        onboardingStore.nextStep(500)
-      }
     }
     closeModals()
     loadApiKeys()
   } catch (error: any) {
     const errorMsg = error.response?.data?.detail || t('keys.failedToSave')
     appStore.showError(errorMsg)
-    // Don't advance tour on error
   } finally {
     submitting.value = false
   }
 }
 
 /**
- * 处理删除 API Key 的操作
- * 优化：错误处理改进，优先显示后端返回的具体错误消息（如权限不足等），
- * 若后端未返回消息则显示默认的国际化文本
+ * 处理删除访问凭证的操作
+ * 优化：问题处理改进，优先显示平台返回的具体提示（如权限不足等），
+ * 若平台未返回消息则显示默认的国际化文本
  */
 const handleDelete = async () => {
   if (!selectedKey.value) return
@@ -2093,7 +2059,7 @@ const handleDelete = async () => {
     showDeleteDialog.value = false
     loadApiKeys()
   } catch (error: any) {
-    // 优先使用后端返回的错误消息，提供更具体的错误信息给用户
+    // 优先使用平台返回的问题提示，提供更具体的信息给用户
     const errorMsg = error?.message || t('keys.failedToDelete')
     appStore.showError(errorMsg)
   }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -292,5 +293,23 @@ func openAISelectionEmptyErrorResponse(decision service.OpenAIAccountScheduleDec
 	if diag.EndpointSupportedCount == 0 && diag.ModelSupportedCount > 0 {
 		return http.StatusServiceUnavailable, "endpoint_not_supported", "No accounts in this group support the requested endpoint"
 	}
+	return http.StatusServiceUnavailable, "api_error", "No available accounts for the requested model and capability"
+}
+
+func openAISelectionUnavailableExhaustedByFailover(err error, decision service.OpenAIAccountScheduleDecision, excludedAccountCount int) bool {
+	if excludedAccountCount <= 0 {
+		return false
+	}
+	if !errors.Is(err, service.ErrNoAvailableAccounts) && !errors.Is(err, service.ErrNoAvailableCompactAccounts) {
+		return false
+	}
+	diag := decision.Diagnostics
+	if !diag.Collected {
+		return true
+	}
+	return diag.FinalCandidateCount == 0 || diag.AfterExcludedCount == 0
+}
+
+func openAISelectionFailoverExhaustedErrorResponse() (int, string, string) {
 	return http.StatusServiceUnavailable, "api_error", "No available accounts for the requested model and capability"
 }

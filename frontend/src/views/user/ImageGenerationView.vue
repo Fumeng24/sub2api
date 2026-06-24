@@ -1,16 +1,28 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 class="text-2xl font-semibold tracking-normal text-gray-900 dark:text-white">
-            {{ t('imageGeneration.title') }}
+    <div class="image-workbench mx-auto max-w-7xl space-y-5">
+      <div class="image-hero flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="min-w-0">
+          <h1 class="image-title">
+            {{ t('imageGeneration.hero.title') }}
           </h1>
-          <p class="mt-1 text-sm text-gray-500 dark:text-dark-300">
-            {{ t('imageGeneration.description') }}
+          <p class="image-description">
+            {{ t('imageGeneration.hero.description') }}
+          </p>
+          <div class="mt-3 flex min-w-0 flex-wrap gap-2">
+            <span
+              v-for="signal in imageTrustSignals"
+              :key="signal"
+              class="image-chip"
+            >
+              {{ signal }}
+            </span>
+          </div>
+          <p class="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--image-muted)]">
+            {{ t('imageGeneration.hero.assurance') }}
           </p>
         </div>
-        <button class="btn btn-secondary" :disabled="loadingPage" @click="loadInitialData">
+        <button class="image-soft-button shrink-0" :disabled="loadingPage" @click="loadInitialData">
           <Icon name="refresh" size="md" :class="loadingPage ? 'animate-spin' : ''" />
           {{ t('common.refresh') }}
         </button>
@@ -20,12 +32,22 @@
         <LoadingSpinner />
       </div>
 
-      <div v-else class="grid gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
-        <aside class="space-y-4">
-          <section class="card p-5">
+      <div v-else class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        <aside class="min-w-0 space-y-4 xl:sticky xl:top-5 xl:self-start">
+          <section class="image-panel p-5">
+            <div class="mb-5 flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h2 class="image-section-title">{{ t('imageGeneration.createImageKey') }}</h2>
+                <p class="image-section-description">{{ selectedGroup ? limitSummary : t('imageGeneration.selectGroup') }}</p>
+              </div>
+              <div class="image-icon-surface">
+                <Icon name="sparkles" size="md" />
+              </div>
+            </div>
+
             <div class="space-y-4">
               <div>
-                <label class="input-label">{{ t('imageGeneration.group') }}</label>
+                <label class="image-label">{{ t('imageGeneration.group') }}</label>
                 <Select
                   :model-value="selectedGroupId"
                   :options="imageGroupOptions"
@@ -46,7 +68,7 @@
               </div>
 
               <div>
-                <label class="input-label">{{ t('imageGeneration.model') }}</label>
+                <label class="image-label">{{ t('imageGeneration.model') }}</label>
                 <Select
                   :model-value="selectedImageModel"
                   :options="imageModelOptions"
@@ -61,17 +83,17 @@
               </div>
 
               <div>
-                <label class="input-label">{{ t('imageGeneration.size') }}</label>
-                <div class="grid grid-cols-2 gap-2">
+                <label class="image-label">{{ t('imageGeneration.size') }}</label>
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-2">
                   <button
                     v-for="option in visibleSizeOptions"
                     :key="option.value"
                     type="button"
                     :class="[
-                      'h-11 rounded-xl border px-3 text-sm font-medium transition',
+                      'image-size-option',
                       size === option.value
-                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-950/30 dark:text-primary-200'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:bg-dark-700'
+                        ? 'image-size-option-active'
+                        : 'image-size-option-idle'
                     ]"
                     @click="size = option.value"
                   >
@@ -83,68 +105,68 @@
                 </p>
               </div>
 
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label class="input-label">{{ t('imageGeneration.quality') }}</label>
+                  <label class="image-label">{{ t('imageGeneration.quality') }}</label>
                   <Select v-model="quality" :options="qualityOptions" />
                 </div>
                 <div>
-                  <label class="input-label">{{ t('imageGeneration.count') }}</label>
+                  <label class="image-label">{{ t('imageGeneration.count') }}</label>
                   <Select v-model="count" :options="countOptions" />
                 </div>
               </div>
             </div>
           </section>
 
-          <section class="card p-5">
+          <section class="image-panel p-5">
             <div class="flex items-center justify-between gap-3">
-              <div>
-                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">
+              <div class="min-w-0">
+                <h2 class="image-section-title">
                   {{ t('imageGeneration.pricing.title') }}
                 </h2>
-                <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+                <p class="mt-1 break-words text-xs leading-5 text-[color:var(--image-muted)]">
                   {{ pricingSummary }}
                 </p>
               </div>
-              <div class="rounded-xl bg-primary-50 p-2 text-primary-600 dark:bg-primary-950/40 dark:text-primary-300">
+              <div class="image-icon-surface">
                 <Icon name="calculator" size="md" />
               </div>
             </div>
 
-            <div class="mt-4 grid grid-cols-2 gap-3">
-              <div class="rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900/60">
-                <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('imageGeneration.pricing.unitCost') }}</div>
-                <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+            <div class="image-price-grid mt-4">
+              <div class="image-price-cell">
+                <div class="image-price-label">{{ t('imageGeneration.pricing.unitCost') }}</div>
+                <div class="image-price-value">
                   {{ priceEstimate ? formatCredit(priceEstimate.unitCost) : t('common.notAvailable') }}
                 </div>
-                <div v-if="priceEstimate" class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
+                <div v-if="priceEstimate" class="image-price-subvalue">
                   {{ formatCny(priceEstimate.unitCost) }}
                 </div>
               </div>
-              <div class="rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900/60">
-                <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('imageGeneration.pricing.batchCost') }}</div>
-                <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+              <div class="image-price-cell">
+                <div class="image-price-label">{{ t('imageGeneration.pricing.batchCost') }}</div>
+                <div class="image-price-value">
                   {{ priceEstimate ? formatCredit(priceEstimate.batchCost) : t('common.notAvailable') }}
                 </div>
-                <div v-if="priceEstimate" class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
+                <div v-if="priceEstimate" class="image-price-subvalue">
                   {{ formatCny(priceEstimate.batchCost) }}
                 </div>
               </div>
-              <div class="rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900/60">
-                <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('imageGeneration.pricing.remainingImages') }}</div>
-                <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+              <div class="image-price-cell">
+                <div class="image-price-label">{{ t('imageGeneration.pricing.remainingImages') }}</div>
+                <div class="image-price-value">
                   {{ priceEstimate ? t('imageGeneration.pricing.imageCountValue', { count: priceEstimate.remainingImages }) : t('common.notAvailable') }}
                 </div>
-                <div class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
+                <div class="image-price-subvalue">
                   {{ limitSummary }}
                 </div>
               </div>
-              <div class="rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900/60">
-                <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('imageGeneration.pricing.balance') }}</div>
-                <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+              <div class="image-price-cell">
+                <div class="image-price-label">{{ t('imageGeneration.pricing.balance') }}</div>
+                <div class="image-price-value">
                   {{ formatCredit(userBalance) }}
                 </div>
-                <div class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
+                <div class="image-price-subvalue">
                   {{ formatCny(userBalance) }}
                 </div>
               </div>
@@ -153,10 +175,10 @@
         </aside>
 
         <main class="min-w-0 space-y-4">
-          <section class="card p-4 sm:p-5">
+          <section class="image-panel p-3 sm:p-4">
             <div
-              class="rounded-2xl border border-gray-200 bg-white transition dark:border-dark-600 dark:bg-dark-900/60"
-              :class="isDragging ? 'border-primary-400 bg-primary-50/50 dark:bg-primary-950/20' : ''"
+              class="image-prompt-frame"
+              :class="isDragging ? 'image-prompt-frame-dragging' : ''"
               @dragenter="handleDragEnter"
               @dragover="handleDragOver"
               @dragleave="handleDragLeave"
@@ -165,23 +187,23 @@
               <textarea
                 v-model="prompt"
                 rows="7"
-                class="min-h-[180px] w-full resize-none rounded-t-2xl border-0 bg-transparent px-4 py-4 text-sm leading-6 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-white dark:placeholder:text-dark-400 sm:px-5"
+                class="image-prompt-input"
                 :placeholder="referenceImages.length > 0 ? t('imageGeneration.editPlaceholder') : t('imageGeneration.promptPlaceholder')"
                 @paste="handlePaste"
                 @keydown.ctrl.enter.prevent="submit"
                 @keydown.meta.enter.prevent="submit"
               />
 
-              <div class="border-t border-gray-100 px-4 py-3 dark:border-dark-700 sm:px-5">
+              <div class="border-t border-[color:var(--image-border-soft)] px-3 py-3 sm:px-4">
                 <input ref="fileInputRef" type="file" accept="image/*" multiple class="hidden" @change="handleFileInput" />
                 <div v-if="referenceImages.length > 0" class="mb-3 flex flex-wrap gap-2">
-                  <div v-for="image in referenceImages" :key="image.id" class="group relative h-16 w-16 overflow-hidden rounded-xl border border-gray-200 dark:border-dark-600">
+                  <div v-for="image in referenceImages" :key="image.id" class="group relative h-16 w-16 overflow-hidden rounded-lg border border-[color:var(--image-border)] bg-[var(--image-surface-muted)]">
                     <button type="button" class="h-full w-full" @click="previewImage = image.previewUrl">
-                      <img :src="image.previewUrl" :alt="image.name" class="h-full w-full bg-gray-50 object-contain dark:bg-dark-900" />
+                      <img :src="image.previewUrl" :alt="image.name" class="h-full w-full object-contain" />
                     </button>
                     <button
                       type="button"
-                      class="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                      class="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100"
                       :title="t('common.remove')"
                       @click="removeReference(image.id)"
                     >
@@ -191,26 +213,26 @@
                 </div>
 
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <button type="button" class="btn btn-secondary btn-sm" @click="openFilePicker">
+                  <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <button type="button" class="image-soft-button image-soft-button-sm" @click="openFilePicker">
                       <Icon name="upload" size="sm" />
                       {{ referenceImages.length > 0 ? t('imageGeneration.addReference') : t('imageGeneration.uploadReference') }}
                     </button>
-                    <span class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs text-gray-600 dark:bg-dark-800 dark:text-dark-300">
+                    <span class="image-chip">
                       {{ modeLabel }}
                     </span>
-                    <span v-if="selectedGroup" class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs text-gray-600 dark:bg-dark-800 dark:text-dark-300">
+                    <span v-if="selectedGroup" class="image-chip max-w-full truncate sm:max-w-[18rem]">
                       {{ selectedGroup.name }}
                     </span>
-                    <span v-if="isDragging" class="rounded-lg bg-primary-100 px-2.5 py-1 text-xs text-primary-700 dark:bg-primary-950/40 dark:text-primary-200">
+                    <span v-if="isDragging" class="image-chip image-chip-active">
                       {{ t('imageGeneration.dropImages') }}
                     </span>
                   </div>
-                  <div class="flex items-center justify-end gap-2">
-                    <button v-if="generating" type="button" class="btn btn-secondary btn-sm" @click="cancelGeneration">
+                  <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+                    <button v-if="generating" type="button" class="image-soft-button image-soft-button-sm justify-center" @click="cancelGeneration">
                       {{ t('common.cancel') }}
                     </button>
-                    <button type="button" class="btn btn-primary" :disabled="!canSubmit" @click="submit">
+                    <button type="button" class="image-primary-button" :disabled="!canSubmit" @click="submit">
                       <Icon v-if="!generating" name="sparkles" size="md" />
                       <Icon v-else name="refresh" size="md" class="animate-spin" />
                       {{ generating ? t('imageGeneration.generating') : submitLabel }}
@@ -221,38 +243,38 @@
             </div>
           </section>
 
-          <section class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+          <section class="image-note">
             <div class="flex items-start gap-3">
-              <div class="rounded-lg bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+              <div class="image-icon-surface shrink-0">
                 <Icon name="infoCircle" size="sm" />
               </div>
-              <p class="pt-0.5 text-sm text-amber-800 dark:text-amber-100">
+              <p class="pt-0.5 text-sm leading-6 text-[color:var(--image-muted)]">
                 {{ t('imageGeneration.localCacheWarning') }}
               </p>
             </div>
           </section>
 
-          <section v-if="runs.length === 0" class="rounded-2xl border border-dashed border-gray-200 p-10 text-center dark:border-dark-700">
-            <Icon name="sparkles" size="xl" class="mx-auto text-gray-300 dark:text-dark-500" />
-            <p class="mt-3 text-sm text-gray-500 dark:text-dark-400">{{ t('imageGeneration.empty') }}</p>
+          <section v-if="runs.length === 0" class="image-empty">
+            <Icon name="sparkles" size="xl" class="mx-auto text-[color:var(--image-muted-soft)]" />
+            <p class="mt-3 text-sm text-[color:var(--image-muted)]">{{ t('imageGeneration.empty') }}</p>
           </section>
 
           <section v-else class="space-y-4">
-            <article v-for="run in runs" :key="run.id" class="card overflow-hidden">
-              <div class="border-b border-gray-100 px-4 py-3 dark:border-dark-700 sm:px-5">
+            <article v-for="run in runs" :key="run.id" class="image-panel overflow-hidden">
+              <div class="border-b border-[color:var(--image-border-soft)] px-4 py-3 sm:px-5">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div class="min-w-0">
-                    <p class="line-clamp-2 text-sm font-medium text-gray-900 dark:text-white">{{ run.prompt }}</p>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+                    <p class="line-clamp-2 break-words text-sm font-medium text-[color:var(--image-text)]">{{ run.prompt }}</p>
+                    <p class="mt-1 break-words text-xs leading-5 text-[color:var(--image-muted)]">
                       {{ run.groupName }} · {{ run.model }} · {{ run.sizeLabel }} · {{ t('imageGeneration.pricing.imageCountValue', { count: run.requestedCount }) }}
                     </p>
                   </div>
                   <span
                     :class="[
-                      'inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-medium',
-                      run.status === 'success' ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300' :
-                      run.status === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300' :
-                      'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                      'image-status-pill',
+                      run.status === 'success' ? 'image-status-success' :
+                      run.status === 'error' ? 'image-status-error' :
+                      'image-status-loading'
                     ]"
                   >
                     {{ statusLabel(run.status) }}
@@ -261,22 +283,27 @@
               </div>
 
               <div class="p-4 sm:p-5">
-                <div v-if="run.status === 'loading'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <div v-for="index in run.requestedCount" :key="index" class="aspect-square animate-pulse rounded-2xl bg-gray-100 dark:bg-dark-700" />
+                <div v-if="run.status === 'loading'" class="image-result-grid">
+                  <div v-for="index in run.requestedCount" :key="index" class="skeleton aspect-square rounded-lg" />
                 </div>
-                <div v-else-if="run.status === 'error'" class="rounded-xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-200">
-                  {{ run.error }}
+                <div v-else-if="run.status === 'error'" class="rounded-lg border border-red-200/70 bg-red-50 p-4 text-sm leading-6 text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200">
+                  <p>{{ run.error }}</p>
+                  <p class="mt-2 text-xs leading-5 text-red-600 dark:text-red-200/80">
+                    {{ t('imageGeneration.errorSupportHint') }}
+                  </p>
                 </div>
-                <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <div v-for="image in run.images" :key="image.id" class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 dark:border-dark-700 dark:bg-dark-900">
+                <div v-else class="image-result-grid">
+                  <div v-for="image in run.images" :key="image.id" class="group relative overflow-hidden rounded-lg border border-[color:var(--image-border-soft)] bg-[var(--image-surface-muted)]">
                     <button type="button" class="block aspect-square w-full" @click="previewImage = image.src">
                       <img :src="image.src" :alt="run.prompt" class="h-full w-full object-contain" />
                     </button>
-                    <div class="absolute inset-x-2 bottom-2 flex justify-end gap-2 opacity-0 transition group-hover:opacity-100">
-                      <button type="button" class="rounded-lg bg-black/70 px-3 py-1.5 text-xs font-medium text-white" @click="continueEditFromResult(image)">
+                    <div class="absolute inset-x-2 bottom-2 flex flex-wrap justify-end gap-2 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                      <button type="button" class="image-overlay-button" @click="continueEditFromResult(image)">
+                        <Icon name="edit" size="xs" />
                         {{ t('imageGeneration.continueEdit') }}
                       </button>
-                      <button type="button" class="rounded-lg bg-black/70 px-3 py-1.5 text-xs font-medium text-white" @click="downloadImage(image, run)">
+                      <button type="button" class="image-overlay-button" @click="downloadImage(image, run)">
+                        <Icon name="download" size="xs" />
                         {{ t('common.download') }}
                       </button>
                     </div>
@@ -392,6 +419,15 @@ let runCachePersistVersion = 0
 let runCachePersistChain: Promise<void> = Promise.resolve()
 let referenceCachePersistVersion = 0
 let referenceCachePersistChain: Promise<void> = Promise.resolve()
+
+const imageTrustSignals = computed(() => [
+  t('imageGeneration.hero.signals.official'),
+  t('imageGeneration.hero.signals.noRetention'),
+  t('imageGeneration.hero.signals.privacy'),
+  t('imageGeneration.hero.signals.enabled'),
+  t('imageGeneration.hero.signals.billing'),
+  t('imageGeneration.hero.signals.stable'),
+])
 
 const openAIImageSizeOptions = [
   { value: '1024x1024', label: '1:1 · 1K', tier: '1K' },
@@ -595,7 +631,7 @@ function resolvePreferredGroupId(groups: Group[], keys: ApiKey[]) {
 }
 
 function buildAutoImageKeyName(group: Group) {
-  return `自动生图 · ${group.name}`
+  return t('imageGeneration.autoAccessName', { group: group.name })
 }
 
 function hasActiveKeyForGroup(keys: ApiKey[], groupId: number) {
@@ -1398,3 +1434,390 @@ onUnmounted(() => {
   activeController?.abort()
 })
 </script>
+
+<style scoped>
+.image-workbench {
+  --image-text: var(--apple-text);
+  --image-muted: var(--apple-muted);
+  --image-muted-soft: var(--apple-muted-2);
+  --image-surface: color-mix(in srgb, var(--apple-surface) 94%, transparent);
+  --image-surface-elevated: var(--apple-surface-elevated);
+  --image-surface-muted: color-mix(in srgb, var(--apple-surface-elevated) 90%, var(--apple-bg));
+  --image-border: var(--apple-border);
+  --image-border-soft: var(--apple-border-soft);
+  --image-accent: var(--apple-blue);
+  --image-accent-soft: color-mix(in srgb, var(--apple-blue) 10%, transparent);
+  --image-shadow: var(--apple-shadow-sm);
+  color: var(--image-text);
+}
+
+:global(.dark) .image-workbench {
+  --image-surface: color-mix(in srgb, var(--apple-surface) 92%, transparent);
+  --image-surface-muted: color-mix(in srgb, var(--apple-surface-elevated) 72%, var(--apple-bg));
+}
+
+.image-hero {
+  border-bottom: 1px solid var(--image-border-soft);
+  padding-bottom: 1rem;
+}
+
+.image-title {
+  color: var(--image-text);
+  font-size: 1.625rem;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.image-description {
+  margin-top: 0.375rem;
+  max-width: 44rem;
+  color: var(--image-muted);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.image-panel {
+  min-width: 0;
+  border: 1px solid var(--image-border);
+  border-radius: 8px;
+  background: var(--image-surface);
+  box-shadow: var(--image-shadow);
+}
+
+.image-section-title {
+  color: var(--image-text);
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.image-section-description {
+  margin-top: 0.25rem;
+  color: var(--image-muted);
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.image-label {
+  margin-bottom: 0.375rem;
+  display: block;
+  color: var(--image-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.image-icon-surface {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--image-border-soft);
+  border-radius: 8px;
+  background: var(--image-surface-elevated);
+  color: var(--image-muted);
+}
+
+.image-soft-button,
+.image-primary-button {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 8px;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.image-soft-button {
+  border: 1px solid var(--image-border);
+  background: var(--image-surface-elevated);
+  color: var(--image-text);
+}
+
+.image-soft-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--image-border) 72%, var(--image-accent));
+  background: var(--image-surface-muted);
+}
+
+.image-soft-button-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.image-primary-button {
+  width: 100%;
+  border: 1px solid transparent;
+  background: var(--apple-blue);
+  color: #fff;
+  box-shadow: none;
+}
+
+:global(.dark) .image-primary-button {
+  background: var(--apple-blue);
+  color: #fff;
+}
+
+.image-primary-button:hover:not(:disabled) {
+  background: var(--apple-blue-hover);
+}
+
+.image-soft-button:disabled,
+.image-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+@media (min-width: 640px) {
+  .image-primary-button {
+    width: auto;
+  }
+}
+
+.image-chip {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  border: 1px solid var(--image-border-soft);
+  border-radius: 8px;
+  background: var(--image-surface-elevated);
+  padding: 0.25rem 0.625rem;
+  color: var(--image-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2rem;
+}
+
+.image-chip-active {
+  border-color: color-mix(in srgb, var(--image-accent) 36%, transparent);
+  background: var(--image-accent-soft);
+  color: var(--image-accent);
+}
+
+.image-status-pill {
+  display: inline-flex;
+  width: fit-content;
+  flex-shrink: 0;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1rem;
+}
+
+.image-status-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.image-status-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.image-status-loading {
+  background: var(--image-accent-soft);
+  color: var(--image-accent);
+}
+
+:global(.dark) .image-status-success {
+  color: #6ee7b7;
+}
+
+:global(.dark) .image-status-error {
+  color: #fca5a5;
+}
+
+.image-size-option {
+  min-width: 0;
+  height: 2.75rem;
+  border-radius: 8px;
+  border: 1px solid;
+  padding: 0 0.625rem;
+  color: var(--image-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.1rem;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.image-size-option-active {
+  border-color: color-mix(in srgb, var(--image-accent) 54%, transparent);
+  background: var(--image-accent-soft);
+  color: var(--image-accent);
+}
+
+.image-size-option-idle {
+  border-color: var(--image-border-soft);
+  background: var(--image-surface-elevated);
+}
+
+.image-size-option-idle:hover {
+  border-color: var(--image-border);
+  background: var(--image-surface-muted);
+}
+
+.image-price-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--image-border-soft);
+  border-radius: 8px;
+}
+
+.image-price-cell {
+  min-width: 0;
+  padding: 0.875rem;
+  border-bottom: 1px solid var(--image-border-soft);
+}
+
+.image-price-cell:last-child {
+  border-bottom: 0;
+}
+
+.image-price-label,
+.image-price-subvalue {
+  color: var(--image-muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.image-price-value {
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+  color: var(--image-text);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.image-price-subvalue {
+  margin-top: 0.125rem;
+}
+
+@media (min-width: 640px) {
+  .image-price-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .image-price-cell:nth-child(odd) {
+    border-right: 1px solid var(--image-border-soft);
+  }
+
+  .image-price-cell:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+}
+
+.image-prompt-frame {
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--image-surface-elevated);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.image-prompt-frame-dragging {
+  border-color: color-mix(in srgb, var(--image-accent) 52%, transparent);
+  background: var(--image-accent-soft);
+}
+
+.image-prompt-input {
+  min-height: 13rem;
+  width: 100%;
+  resize: none;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  padding: 1rem;
+  color: var(--image-text);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.image-prompt-input::placeholder {
+  color: var(--image-muted-soft);
+}
+
+.image-prompt-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+@media (min-width: 640px) {
+  .image-prompt-input {
+    min-height: 15rem;
+    padding: 1.125rem;
+  }
+}
+
+.image-note {
+  border: 1px solid var(--image-border-soft);
+  border-radius: 8px;
+  background: var(--image-surface);
+  padding: 0.875rem 1rem;
+}
+
+.image-empty {
+  border: 1px dashed var(--image-border);
+  border-radius: 8px;
+  background: var(--image-surface);
+  padding: 2.5rem 1rem;
+  text-align: center;
+}
+
+.image-result-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .image-result-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .image-result-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.image-overlay-button {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.72);
+  padding: 0.375rem 0.625rem;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.1rem;
+  backdrop-filter: blur(10px);
+}
+
+@supports not (color: color-mix(in srgb, white, black)) {
+  .image-soft-button:hover:not(:disabled) {
+    border-color: var(--image-accent);
+  }
+
+  .image-chip-active,
+  .image-size-option-active,
+  .image-prompt-frame-dragging {
+    border-color: var(--image-accent);
+  }
+}
+</style>

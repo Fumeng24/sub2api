@@ -1,7 +1,7 @@
 <template>
-  <div class="flex justify-between gap-2">
-    <span class="text-gray-500 dark:text-gray-400">{{ label }}</span>
-    <span class="font-mono">{{ display }}</span>
+  <div class="pricing-row flex justify-between gap-3">
+    <span class="pricing-row-label">{{ label }}</span>
+    <span class="pricing-row-value font-mono tabular-nums">{{ display }}</span>
   </div>
 </template>
 
@@ -23,3 +23,15 @@ const display = computed(() =>
   props.value == null ? '-' : `${formatScaled(props.value, props.scale)} ${props.unit}`
 )
 </script>
+
+<style scoped>
+.pricing-row-label {
+  color: var(--apple-muted);
+}
+
+.pricing-row-value {
+  color: var(--apple-text);
+  font-weight: 600;
+  text-align: right;
+}
+</style>

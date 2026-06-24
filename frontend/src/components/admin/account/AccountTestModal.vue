@@ -9,13 +9,13 @@
       <!-- Account Info Card -->
       <div
         v-if="account"
-        class="flex items-center justify-between rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-3 dark:border-dark-500 dark:from-dark-700 dark:to-dark-600"
+        class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-800"
       >
         <div class="flex items-center gap-3">
           <div
-            class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600"
+            class="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-100"
           >
-            <Icon name="play" size="md" class="text-white" :stroke-width="2" />
+            <Icon name="play" size="md" class="text-white dark:text-gray-900" :stroke-width="2" />
           </div>
           <div>
             <div class="font-semibold text-gray-900 dark:text-gray-100">{{ account.name }}</div>
@@ -49,9 +49,20 @@
           v-model="selectedModelId"
           :options="availableModels"
           :disabled="loadingModels || status === 'connecting'"
-          value-key="id"
-          label-key="display_name"
+          value-key="value"
+          label-key="label"
           :placeholder="loadingModels ? t('common.loading') + '...' : t('admin.accounts.selectTestModel')"
+        />
+      </div>
+
+      <div v-if="isOpenAIAccount" class="space-y-1.5">
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {{ t('admin.accounts.openai.testMode') }}
+        </label>
+        <Select
+          v-model="testMode"
+          :options="openAITestModeOptions"
+          :disabled="status === 'connecting'"
         />
       </div>
 
@@ -70,7 +81,7 @@
       <div class="group relative">
         <div
           ref="terminalRef"
-          class="max-h-[240px] min-h-[120px] overflow-y-auto rounded-xl border border-gray-700 bg-gray-900 p-4 font-mono text-sm dark:border-gray-800 dark:bg-black"
+          class="max-h-[240px] min-h-[120px] overflow-y-auto rounded-lg border border-gray-800 bg-gray-950 p-4 font-mono text-sm dark:border-gray-800 dark:bg-black"
         >
           <!-- Status Line -->
           <div v-if="status === 'idle'" class="flex items-center gap-2 text-gray-500">
@@ -113,7 +124,7 @@
         <button
           v-if="outputLines.length > 0"
           @click="copyOutput"
-          class="absolute right-2 top-2 rounded-lg bg-gray-800/80 p-1.5 text-gray-400 opacity-0 transition-all hover:bg-gray-700 hover:text-white group-hover:opacity-100"
+          class="absolute right-2 top-2 rounded-md bg-gray-800/80 p-1.5 text-gray-400 opacity-0 transition-all hover:bg-gray-700 hover:text-white group-hover:opacity-100"
           :title="t('admin.accounts.copyOutput')"
         >
           <Icon name="link" size="sm" :stroke-width="2" />
@@ -128,7 +139,7 @@
           <div
             v-for="(image, index) in generatedImages"
             :key="`${image.url}-${index}`"
-            class="group/img relative cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:border-primary-300 hover:shadow-md dark:border-dark-500 dark:bg-dark-700"
+            class="group/img relative cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:border-gray-300 dark:border-dark-600 dark:bg-dark-800 dark:hover:border-dark-500"
             @click="previewImageUrl = image.url"
           >
             <img :src="image.url" :alt="`test-image-${index + 1}`" class="max-h-[360px] w-full object-contain" />
@@ -159,7 +170,7 @@
             <img
               :src="previewImageUrl"
               alt="preview"
-              class="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+              class="max-h-[90vh] max-w-[90vw] rounded-lg object-contain ring-1 ring-white/10"
             />
           </div>
         </Transition>
@@ -198,7 +209,7 @@
           :class="[
             'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all',
             status === 'connecting' || !selectedModelId
-              ? 'cursor-not-allowed bg-primary-400 text-white'
+              ? 'cursor-not-allowed bg-gray-200 text-gray-500 dark:bg-dark-600 dark:text-gray-400'
               : status === 'success'
                 ? 'bg-green-500 text-white hover:bg-green-600'
                 : status === 'error'
@@ -254,6 +265,11 @@ interface PreviewImage {
   mimeType?: string
 }
 
+type TestModelOption = ClaudeModel & {
+  value: string
+  label: string
+}
+
 const props = defineProps<{
   show: boolean
   account: Account | null
@@ -268,14 +284,26 @@ const status = ref<'idle' | 'connecting' | 'success' | 'error'>('idle')
 const outputLines = ref<OutputLine[]>([])
 const streamingContent = ref('')
 const errorMessage = ref('')
-const availableModels = ref<ClaudeModel[]>([])
+const availableModels = ref<TestModelOption[]>([])
 const selectedModelId = ref('')
 const testPrompt = ref('')
 const loadingModels = ref(false)
 let abortController: AbortController | null = null
 const generatedImages = ref<PreviewImage[]>([])
+const testMode = ref<'default' | 'compact'>('default')
+const isOpenAIAccount = computed(() => props.account?.platform === 'openai')
+const openAITestModeOptions = computed(() => [
+  { value: 'default', label: t('admin.accounts.openai.testModeDefault') },
+  { value: 'compact', label: t('admin.accounts.openai.testModeCompact') }
+])
 const previewImageUrl = ref('')
 const prioritizedGeminiModels = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview', 'gemini-3-pro-preview', 'gemini-2.0-flash']
+const fallbackTestModelsByPlatform: Record<string, string[]> = {
+  openai: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.2', 'gpt-image-2'],
+  anthropic: ['claude-fable-5', 'claude-sonnet-4-6', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'],
+  gemini: ['gemini-3.1-flash-image', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+  antigravity: ['claude-fable-5', 'claude-sonnet-4-6', 'gemini-3.1-flash-image', 'gemini-3.1-pro-high', 'gemini-3-flash']
+}
 const supportsGeminiImageTest = computed(() => {
   const modelID = selectedModelId.value.toLowerCase()
   if (!modelID.startsWith('gemini-') || !modelID.includes('-image')) return false
@@ -291,7 +319,7 @@ const supportsOpenAIImageTest = computed(() => {
 
 const supportsImageTest = computed(() => supportsGeminiImageTest.value || supportsOpenAIImageTest.value)
 
-const sortTestModels = (models: ClaudeModel[]) => {
+const sortTestModels = (models: TestModelOption[]) => {
   const priorityMap = new Map(prioritizedGeminiModels.map((id, index) => [id, index]))
 
   return [...models].sort((a, b) => {
@@ -302,19 +330,66 @@ const sortTestModels = (models: ClaudeModel[]) => {
   })
 }
 
-// Load available models when modal opens
-watch(
-  () => props.show,
-  async (newVal) => {
-    if (newVal && props.account) {
-      testPrompt.value = ''
-      resetState()
-      await loadAvailableModels()
-    } else {
-      abortStream()
-    }
+const normalizeTestModelOption = (model: ClaudeModel | Record<string, unknown> | string): TestModelOption | null => {
+  const source: Record<string, unknown> = typeof model === 'object' && model !== null ? model as Record<string, unknown> : {}
+  const id = String(
+    typeof model === 'string'
+      ? model
+      : source.id ?? source.value ?? source.name ?? ''
+  ).trim()
+  if (!id) return null
+
+  const label = String(
+    typeof model === 'string'
+      ? model
+      : source.display_name ?? source.label ?? source.name ?? id
+  ).trim() || id
+
+  return {
+    ...(typeof model === 'object' && model !== null ? model : {}),
+    id,
+    value: id,
+    display_name: label,
+    label,
+    type: String(source.type ?? 'model'),
+    created_at: String(source.created_at ?? ''),
+  } as TestModelOption
+}
+
+const extractTestModelItems = (payload: unknown): unknown[] => {
+  if (Array.isArray(payload)) return payload
+  if (!payload || typeof payload !== 'object') return []
+
+  const source = payload as Record<string, unknown>
+  if (Array.isArray(source.models)) return source.models
+  if (Array.isArray(source.data)) return source.data
+  if (source.data && typeof source.data === 'object') {
+    const nested = source.data as Record<string, unknown>
+    if (Array.isArray(nested.models)) return nested.models
   }
-)
+
+  return []
+}
+
+const fallbackTestModels = (): string[] => {
+  const platform = props.account?.platform || 'anthropic'
+  return fallbackTestModelsByPlatform[platform] || fallbackTestModelsByPlatform.anthropic
+}
+
+const normalizeTestModels = (models: unknown): TestModelOption[] => {
+  const modelItems = extractTestModelItems(models)
+  const sourceItems = modelItems.length > 0 ? modelItems : fallbackTestModels()
+
+  const seen = new Set<string>()
+  const normalized: TestModelOption[] = []
+  for (const model of sourceItems) {
+    const option = normalizeTestModelOption(model as ClaudeModel | Record<string, unknown> | string)
+    if (!option || seen.has(option.id)) continue
+    seen.add(option.id)
+    normalized.push(option)
+  }
+  return normalized
+}
 
 watch(selectedModelId, () => {
   if (supportsImageTest.value && !testPrompt.value.trim()) {
@@ -328,7 +403,10 @@ const loadAvailableModels = async () => {
   loadingModels.value = true
   selectedModelId.value = '' // Reset selection before loading
   try {
-    const models = await adminAPI.accounts.getAvailableModels(props.account.id)
+    const models = normalizeTestModels(await adminAPI.accounts.getAvailableModels(props.account.id))
+    if (models.length === 0) {
+      console.warn('No test models available for account:', props.account.id)
+    }
     availableModels.value = props.account.platform === 'gemini' || props.account.platform === 'antigravity'
       ? sortTestModels(models)
       : models
@@ -344,9 +422,11 @@ const loadAvailableModels = async () => {
     }
   } catch (error) {
     console.error('Failed to load available models:', error)
-    // Fallback to empty list
-    availableModels.value = []
-    selectedModelId.value = ''
+    const models = normalizeTestModels([])
+    availableModels.value = props.account.platform === 'gemini' || props.account.platform === 'antigravity'
+      ? sortTestModels(models)
+      : models
+    selectedModelId.value = availableModels.value[0]?.id || ''
   } finally {
     loadingModels.value = false
   }
@@ -372,6 +452,22 @@ const abortStream = () => {
     abortController = null
   }
 }
+
+// Load available models when modal opens, including v-if mounts where show is already true.
+watch(
+  () => [props.show, props.account?.id] as const,
+  async ([isShown]) => {
+    if (isShown && props.account) {
+      testPrompt.value = ''
+      testMode.value = 'default'
+      resetState()
+      await loadAvailableModels()
+    } else {
+      abortStream()
+    }
+  },
+  { immediate: true }
+)
 
 const addLine = (text: string, className: string = 'text-gray-300') => {
   outputLines.value.push({ text, class: className })
@@ -401,6 +497,14 @@ const startTest = async () => {
   try {
     // Create EventSource for SSE
     const url = `/api/v1/admin/accounts/${props.account.id}/test`
+    const payload: Record<string, string> = {
+      model_id: selectedModelId.value,
+      prompt: supportsImageTest.value ? testPrompt.value.trim() : ''
+    }
+
+    if (isOpenAIAccount.value) {
+      payload.mode = testMode.value
+    }
 
     // Use fetch with streaming for SSE since EventSource doesn't support POST
     const response = await fetch(url, {
@@ -409,10 +513,7 @@ const startTest = async () => {
         Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-              model_id: selectedModelId.value,
-              prompt: supportsImageTest.value ? testPrompt.value.trim() : ''
-            }),
+      body: JSON.stringify(payload),
       signal: abortController.signal
     })
 
@@ -494,13 +595,19 @@ const handleEvent = (event: {
       }
       break
 
+    case 'status':
+      if (event.text) {
+        addLine(event.text, 'text-cyan-300')
+      }
+      break
+
     case 'image':
       if (event.image_url) {
         generatedImages.value.push({
           url: event.image_url,
           mimeType: event.mime_type
         })
-        addLine(t('admin.accounts.imageReceived', { count: generatedImages.value.length }), 'text-purple-300')
+        addLine(t('admin.accounts.imageReceived', { count: generatedImages.value.length }), 'text-sky-300')
       }
       break
 

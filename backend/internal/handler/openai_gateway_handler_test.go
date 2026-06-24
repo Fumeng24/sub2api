@@ -595,7 +595,7 @@ func TestShouldFallbackOpenAICompactToModel(t *testing.T) {
 		ResponseBody: []byte(`{"error":{"message":"Your input exceeds the context window."}}`),
 	}
 
-	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.5", false, failoverErr))
+	require.True(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.5", false, failoverErr))
 	require.True(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.3-codex", false, failoverErr))
 	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses"), "gpt-5.5", false, failoverErr))
 	require.False(t, shouldFallbackOpenAICompactToModel(newContext("/v1/responses/compact"), "gpt-5.5", true, failoverErr))

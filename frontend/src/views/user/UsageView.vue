@@ -3,252 +3,274 @@
     <TablePageLayout>
       <template #actions>
         <div class="space-y-4">
-          <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-dark-700 sm:flex-row sm:items-end sm:justify-between">
-            <div class="min-w-0">
-              <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div class="min-w-0 max-w-3xl">
+              <h1 class="usage-page-title text-2xl font-semibold tracking-normal">
                 {{ t('usage.title') }}
               </h1>
-              <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+              <p class="usage-page-description mt-1 max-w-2xl text-sm leading-6">
                 {{ t('usage.description') }}
               </p>
-            </div>
-          </div>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <!-- Total Requests -->
-          <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-blue-50 p-2 ring-1 ring-blue-100 dark:bg-blue-900/20 dark:ring-blue-900/40">
-              <Icon name="document" size="md" class="text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
-                {{ t('usage.totalRequests') }}
-              </p>
-              <p class="text-xl font-semibold text-gray-950 dark:text-white">
-                {{ usageStats?.total_requests?.toLocaleString() || '0' }}
-              </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ t('usage.inSelectedRange') }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Total Tokens -->
-        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-amber-50 p-2 ring-1 ring-amber-100 dark:bg-amber-900/20 dark:ring-amber-900/40">
-              <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" />
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
-                {{ t('usage.totalTokens') }}
-              </p>
-              <p class="text-xl font-semibold text-gray-950 dark:text-white">
-                {{ formatTokens(usageStats?.total_tokens || 0) }}
-              </p>
-              <div class="space-y-1 text-xs">
-                <p class="flex flex-wrap gap-x-2 gap-y-0.5 text-gray-500 dark:text-gray-400">
-                  <span>{{ t('usage.in') }} {{ formatTokens(usageStats?.total_input_tokens || 0) }}</span>
-                  <span>{{ t('usage.out') }} {{ formatTokens(usageStats?.total_output_tokens || 0) }}</span>
-                </p>
-                <p class="flex flex-wrap gap-x-2 gap-y-0.5">
-                  <span class="text-sky-600 dark:text-sky-400">{{ t('usage.cacheHit') }} {{ formatTokens(usageStats?.total_cache_read_tokens || 0) }}</span>
-                  <span class="cursor-help text-amber-600 dark:text-amber-400" :title="t('usage.openaiCacheCreateNote')">{{ t('usage.cacheCreate') }} {{ formatTokens(usageStats?.total_cache_creation_tokens || 0) }}</span>
-                </p>
+              <div class="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                <div
+                  v-for="item in usageTrustNotes"
+                  :key="item.title"
+                  class="usage-trust-card rounded-lg border px-3 py-2.5"
+                >
+                  <div class="usage-trust-title flex items-center gap-2 font-semibold">
+                    <Icon :name="item.icon" size="sm" class="usage-trust-icon" />
+                    <span>{{ item.title }}</span>
+                  </div>
+                  <p class="usage-trust-description mt-1 text-xs leading-5">
+                    {{ item.description }}
+                  </p>
+                </div>
               </div>
-              <p class="mt-1 text-xs font-medium text-sky-600 dark:text-sky-400">
-                {{ t('usage.cacheHitRate') }}:
-                <template v-if="cacheStats.totalInput > 0">
-                  <span>{{ cacheStats.ratePercent }}</span>
-                  <span class="ml-1 text-gray-500 dark:text-gray-400">
-                    ({{ formatTokens(cacheStats.cacheRead) }}/{{ formatTokens(cacheStats.totalInput) }})
-                  </span>
-                </template>
-                <template v-else>-</template>
-              </p>
-              <p class="mt-1 text-[11px] leading-4 text-gray-400 dark:text-dark-400">
-                {{ t('usage.openaiCacheCreateShortNote') }}
-              </p>
             </div>
           </div>
-        </div>
 
-        <!-- Total Cost -->
-        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-emerald-50 p-2 ring-1 ring-emerald-100 dark:bg-emerald-900/20 dark:ring-emerald-900/40">
-              <Icon name="dollar" size="md" class="text-green-600 dark:text-green-400" />
+          <div class="usage-stats-grid grid gap-px overflow-hidden rounded-lg border sm:grid-cols-2 xl:grid-cols-4">
+            <div class="usage-stat-card min-w-0 p-4">
+              <div class="flex items-start gap-3">
+                <div class="rounded-lg bg-blue-50 p-2 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:ring-blue-500/20">
+                  <Icon name="document" size="md" class="text-blue-600 dark:text-blue-400" />
+                </div>
+                <div class="min-w-0">
+                  <p class="usage-stat-label text-xs font-medium">
+                    {{ t('usage.totalRequests') }}
+                  </p>
+                  <p class="usage-stat-value text-xl font-semibold">
+                    {{ usageStats?.total_requests?.toLocaleString() || '0' }}
+                  </p>
+                  <p class="usage-stat-muted text-xs">
+                    {{ t('usage.inSelectedRange') }}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
-                {{ t('usage.totalCost') }}
-              </p>
-              <p class="text-xl font-semibold text-emerald-600 dark:text-emerald-400">
-                {{ formatSettlementAmount(usageStats?.total_actual_cost || 0, 4) }}
-              </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ t('usage.actualCost') }} /
-                <span class="line-through">{{ formatSettlementAmount(usageStats?.total_cost || 0, 4) }}</span>
-                {{ t('usage.standardCost') }}
-              </p>
-            </div>
-          </div>
-        </div>
 
-        <!-- Average Duration -->
-        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-100 dark:bg-slate-900/30 dark:ring-slate-700">
-              <Icon name="clock" size="md" class="text-slate-600 dark:text-slate-300" />
+            <div class="usage-stat-card min-w-0 p-4">
+              <div class="flex items-start gap-3">
+                <div class="rounded-lg bg-amber-50 p-2 ring-1 ring-amber-100 dark:bg-amber-500/10 dark:ring-amber-500/20">
+                  <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="usage-stat-label text-xs font-medium">
+                    {{ t('usage.totalTokens') }}
+                  </p>
+                  <p class="usage-stat-value text-xl font-semibold">
+                    {{ formatTokens(usageStats?.total_tokens || 0) }}
+                  </p>
+                  <div class="mt-1 space-y-1 text-xs">
+                    <p class="usage-stat-muted flex flex-wrap gap-x-2 gap-y-0.5">
+                      <span>{{ t('usage.in') }} {{ formatTokens(usageStats?.total_input_tokens || 0) }}</span>
+                      <span>{{ t('usage.out') }} {{ formatTokens(usageStats?.total_output_tokens || 0) }}</span>
+                    </p>
+                    <p class="flex flex-wrap gap-x-2 gap-y-0.5">
+                      <span class="text-sky-600 dark:text-sky-400">{{ t('usage.cacheHit') }} {{ formatTokens(usageStats?.total_cache_read_tokens || 0) }}</span>
+                      <span class="cursor-help text-amber-600 dark:text-amber-400" :title="t('usage.openaiCacheCreateNote')">{{ t('usage.cacheCreate') }} {{ formatTokens(usageStats?.total_cache_creation_tokens || 0) }}</span>
+                    </p>
+                  </div>
+                  <p class="mt-1 text-xs font-medium text-sky-600 dark:text-sky-400">
+                    {{ t('usage.cacheHitRate') }}:
+                    <template v-if="cacheStats.totalInput > 0">
+                      <span>{{ cacheStats.ratePercent }}</span>
+                      <span class="usage-stat-muted ml-1">
+                        ({{ formatTokens(cacheStats.cacheRead) }}/{{ formatTokens(cacheStats.totalInput) }})
+                      </span>
+                    </template>
+                    <template v-else>-</template>
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
-                {{ t('usage.avgDuration') }}
-              </p>
-              <p class="text-xl font-semibold text-gray-950 dark:text-white">
-                {{ formatDuration(usageStats?.average_duration_ms || 0) }}
-              </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.perRequest') }}</p>
+
+            <div class="usage-stat-card min-w-0 p-4">
+              <div class="flex items-start gap-3">
+                <div class="rounded-lg bg-emerald-50 p-2 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:ring-emerald-500/20">
+                  <Icon name="dollar" size="md" class="text-green-600 dark:text-green-400" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="usage-stat-label text-xs font-medium">
+                    {{ t('usage.totalCost') }}
+                  </p>
+                  <p class="text-xl font-semibold text-emerald-600 dark:text-emerald-400">
+                    {{ formatSettlementAmount(usageStats?.total_actual_cost || 0, 4) }}
+                  </p>
+                  <p class="usage-stat-muted text-xs">
+                    {{ t('usage.actualCost') }} /
+                    <span class="line-through">{{ formatSettlementAmount(usageStats?.total_cost || 0, 4) }}</span>
+                    {{ t('usage.standardCost') }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="usage-stat-card min-w-0 p-4">
+              <div class="flex items-start gap-3">
+                <div class="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-100 dark:bg-slate-500/10 dark:ring-slate-500/20">
+                  <Icon name="clock" size="md" class="text-slate-600 dark:text-slate-300" />
+                </div>
+                <div class="min-w-0">
+                  <p class="usage-stat-label text-xs font-medium">
+                    {{ t('usage.avgDuration') }}
+                  </p>
+                  <p class="usage-stat-value text-xl font-semibold">
+                    {{ formatDuration(usageStats?.average_duration_ms || 0) }}
+                  </p>
+                  <p class="usage-stat-muted text-xs">{{ t('usage.perRequest') }}</p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        </div>
         </div>
       </template>
 
       <template #filters>
-        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <div class="grid gap-4 lg:grid-cols-[minmax(180px,240px)_auto_1fr] lg:items-end">
-            <!-- API Key Filter -->
-            <div class="min-w-0">
-              <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
-              <Select
-                v-model="filters.api_key_id"
-                :options="apiKeyOptions"
-                :placeholder="t('usage.allApiKeys')"
-                @change="applyFilters"
-              />
-            </div>
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,220px)_minmax(0,280px)_minmax(0,1fr)] lg:items-end">
+          <!-- Access credential filter -->
+          <div class="min-w-0">
+            <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
+            <Select
+              v-model="filters.api_key_id"
+              :options="apiKeyOptions"
+              :placeholder="t('usage.allApiKeys')"
+              @change="applyFilters"
+            />
+          </div>
 
-            <!-- Date Range Filter -->
-            <div class="min-w-0">
-              <label class="input-label">{{ t('usage.timeRange') }}</label>
-              <DateRangePicker
-                v-model:start-date="startDate"
-                v-model:end-date="endDate"
-                @change="onDateRangeChange"
-              />
-            </div>
+          <!-- Date Range Filter -->
+          <div class="min-w-0">
+            <label class="input-label">{{ t('usage.timeRange') }}</label>
+            <DateRangePicker
+              v-model:start-date="startDate"
+              v-model:end-date="endDate"
+              @change="onDateRangeChange"
+            />
+          </div>
 
-            <!-- Actions -->
-            <div class="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3 lg:justify-end">
-              <button
-                @click="applyFilters"
-                :disabled="loading"
-                class="btn btn-secondary min-w-0 flex-1 justify-center sm:flex-none"
+          <!-- Actions -->
+          <div class="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:justify-end">
+            <button
+              @click="applyFilters"
+              :disabled="loading"
+              class="btn btn-secondary min-w-0 justify-center sm:flex-none"
+            >
+              <Icon name="refresh" size="sm" :class="loading ? 'animate-spin' : ''" />
+              {{ t('common.refresh') }}
+            </button>
+            <button
+              @click="resetFilters"
+              class="btn btn-secondary min-w-0 justify-center sm:flex-none"
+            >
+              {{ t('common.reset') }}
+            </button>
+            <button
+              @click="exportToCSV"
+              :disabled="exporting"
+              class="btn btn-primary col-span-2 min-w-0 justify-center sm:col-span-1 sm:flex-none"
+            >
+              <Icon v-if="!exporting" name="download" size="sm" />
+              <svg
+                v-else
+                class="-ml-1 h-4 w-4 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
               >
-                {{ t('common.refresh') }}
-              </button>
-              <button
-                @click="resetFilters"
-                class="btn btn-secondary min-w-0 flex-1 justify-center sm:flex-none"
-              >
-                {{ t('common.reset') }}
-              </button>
-              <button
-                @click="exportToCSV"
-                :disabled="exporting"
-                class="btn btn-primary min-w-full justify-center sm:min-w-0 sm:flex-none"
-              >
-                <svg
-                  v-if="exporting"
-                  class="-ml-1 mr-2 h-4 w-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  ></circle>
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
-              </button>
-            </div>
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
+            </button>
           </div>
         </div>
       </template>
 
       <template #table>
         <!-- Tab 切换栏 -->
-        <div v-if="errorViewEnabled" class="mb-0 flex gap-2 border-b border-gray-200 px-4 pt-3 dark:border-dark-700">
-          <button class="tab" :class="{ 'tab-active': activeTab === 'usage' }" @click="activeTab = 'usage'">
-            {{ t('usage.tabs.usage') }}
-          </button>
-          <button class="tab" :class="{ 'tab-active': activeTab === 'errors' }" @click="switchToErrors">
-            {{ t('usage.tabs.errors') }}
-          </button>
+        <div v-if="errorViewEnabled" class="px-3 pt-3">
+          <div class="usage-tabs tabs w-full sm:w-fit">
+            <button class="tab flex-1 sm:flex-none" :class="{ 'tab-active': activeTab === 'usage' }" @click="activeTab = 'usage'">
+              {{ t('usage.tabs.usage') }}
+            </button>
+            <button class="tab flex-1 sm:flex-none" :class="{ 'tab-active': activeTab === 'errors' }" @click="switchToErrors">
+              {{ t('usage.tabs.errors') }}
+            </button>
+          </div>
         </div>
 
         <!-- 用量明细表 -->
         <!-- flex 链让 DataTable 根 .table-wrapper(flex:1)拿到有界高度以启用内部滚动。
              虚拟化器测高 race 导致的概率空白,已在 DataTable 内用「就绪门控 + initialRect 兜底」根治。 -->
-        <div v-show="activeTab === 'usage'" class="flex min-h-0 flex-1 flex-col">
+        <div v-show="activeTab === 'usage'" class="usage-table-panel flex min-h-0 flex-1 flex-col">
           <DataTable
-          :columns="columns"
-          :data="usageLogs"
-          :loading="loading"
-          :server-side-sort="true"
-          :estimate-row-height="88"
-          :overscan="12"
-          default-sort-key="created_at"
-          default-sort-order="desc"
-          @sort="handleSort"
-        >
+            :columns="columns"
+            :data="usageLogs"
+            :loading="loading"
+            :server-side-sort="true"
+            :estimate-row-height="88"
+            :overscan="12"
+            default-sort-key="created_at"
+            default-sort-order="desc"
+            @sort="handleSort"
+          >
           <template #cell-api_key="{ row }">
-            <span class="text-sm text-gray-900 dark:text-white">{{
+            <span class="usage-cell-strong text-sm">{{
               row.api_key?.name || '-'
             }}</span>
           </template>
 
-          <template #cell-model="{ value }">
-            <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
+          <template #cell-model="{ value, row }">
+            <div class="min-w-0">
+              <span class="usage-cell-strong block max-w-[14rem] truncate font-medium" :title="value">{{ value }}</span>
+              <span class="usage-cell-faint mt-0.5 block text-xs">
+                {{ t('usage.reasoningEffort') }}: {{ formatReasoningEffort(row.reasoning_effort) }}
+              </span>
+            </div>
           </template>
 
           <template #cell-reasoning_effort="{ row }">
-            <span class="text-sm text-gray-900 dark:text-white">
+            <span class="usage-cell-strong text-sm">
               {{ formatReasoningEffort(row.reasoning_effort) }}
             </span>
           </template>
 
           <template #cell-endpoint="{ row }">
-            <span class="text-sm text-gray-600 dark:text-gray-300 block max-w-[320px] whitespace-normal break-all">
+            <span class="usage-cell-muted block max-w-[320px] whitespace-normal break-all text-sm">
               {{ formatUsageEndpoints(row) }}
             </span>
           </template>
 
           <template #cell-stream="{ row }">
-            <span
-              class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
-              :class="getRequestTypeBadgeClass(row)"
-            >
-              {{ getRequestTypeLabel(row) }}
-            </span>
+            <div class="flex flex-wrap gap-1.5">
+              <span
+                class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
+                :class="getRequestTypeBadgeClass(row)"
+              >
+                {{ getRequestTypeLabel(row) }}
+              </span>
+              <span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
+                    :class="getUsageBillingModeBadgeClass(getDisplayBillingMode(row))">
+                {{ getBillingModeLabel(getDisplayBillingMode(row), t, 'usage') }}
+              </span>
+            </div>
           </template>
 
           <template #cell-billing_mode="{ row }">
             <span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
-                  :class="getBillingModeBadgeClass(getDisplayBillingMode(row))">
-              {{ getBillingModeLabel(getDisplayBillingMode(row), t) }}
+                  :class="getUsageBillingModeBadgeClass(getDisplayBillingMode(row))">
+              {{ getBillingModeLabel(getDisplayBillingMode(row), t, 'usage') }}
             </span>
           </template>
 
@@ -268,8 +290,8 @@
                   d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                 />
               </svg>
-              <span class="font-medium text-gray-900 dark:text-white">{{ row.image_count }}{{ t('usage.imageUnit') }}</span>
-              <span class="text-gray-400">({{ formatImageBillingSize(row, t) }})</span>
+              <span class="usage-cell-strong font-medium">{{ row.image_count }}{{ t('usage.imageUnit') }}</span>
+              <span class="usage-cell-faint">({{ formatImageBillingSize(row, t) }})</span>
             </div>
             <!-- Token 请求 -->
             <div v-else class="flex items-center gap-1.5">
@@ -279,14 +301,14 @@
                   <!-- Input -->
                   <div class="inline-flex items-center gap-1">
                     <Icon name="arrowDown" size="sm" class="text-emerald-500" />
-                    <span class="font-medium text-gray-900 dark:text-white">{{
+                    <span class="usage-cell-strong font-medium">{{
                       (row.input_tokens ?? 0).toLocaleString()
                     }}</span>
                   </div>
                   <!-- Output -->
                   <div class="inline-flex items-center gap-1">
                     <Icon name="arrowUp" size="sm" class="text-violet-500" />
-                    <span class="font-medium text-gray-900 dark:text-white">{{
+                    <span class="usage-cell-strong font-medium">{{
                       (row.output_tokens ?? 0).toLocaleString()
                     }}</span>
                   </div>
@@ -321,21 +343,26 @@
                 </div>
               </div>
               <!-- Token Detail Tooltip -->
-              <div
-                class="group relative"
+              <button
+                type="button"
+                class="group relative inline-flex"
+                :aria-label="t('usage.tokenDetails')"
+                @click.stop="showTokenTooltip($event, row)"
+                @focus="showTokenTooltip($event, row)"
+                @blur="hideTokenTooltip"
                 @mouseenter="showTokenTooltip($event, row)"
                 @mouseleave="hideTokenTooltip"
               >
                 <div
-                  class="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-100 transition-colors group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900/50"
+                  class="usage-info-dot flex h-4 w-4 cursor-help items-center justify-center rounded-full transition-colors"
                 >
                   <Icon
                     name="infoCircle"
                     size="xs"
-                    class="text-gray-400 group-hover:text-blue-500 dark:text-gray-500 dark:group-hover:text-blue-400"
+                    class="usage-info-icon"
                   />
                 </div>
-              </div>
+              </button>
             </div>
           </template>
 
@@ -345,54 +372,62 @@
                 {{ formatSettlementAmount(row.actual_cost, 6) }}
               </span>
               <!-- Cost Detail Tooltip -->
-              <div
-                class="group relative"
+              <button
+                type="button"
+                class="group relative inline-flex"
+                :aria-label="t('usage.costDetails')"
+                @click.stop="showTooltip($event, row)"
+                @focus="showTooltip($event, row)"
+                @blur="hideTooltip"
                 @mouseenter="showTooltip($event, row)"
                 @mouseleave="hideTooltip"
               >
                 <div
-                  class="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-100 transition-colors group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900/50"
+                  class="usage-info-dot flex h-4 w-4 cursor-help items-center justify-center rounded-full transition-colors"
                 >
                   <Icon
                     name="infoCircle"
                     size="xs"
-                    class="text-gray-400 group-hover:text-blue-500 dark:text-gray-500 dark:group-hover:text-blue-400"
+                    class="usage-info-icon"
                   />
                 </div>
-              </div>
+              </button>
             </div>
           </template>
 
           <template #cell-first_token="{ row }">
             <span
               v-if="row.first_token_ms != null"
-              class="text-sm text-gray-600 dark:text-gray-400"
+              class="usage-cell-muted text-sm"
             >
               {{ formatDuration(row.first_token_ms) }}
             </span>
-            <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
+            <span v-else class="usage-cell-faint text-sm">-</span>
           </template>
 
           <template #cell-duration="{ row }">
-            <span class="text-sm text-gray-600 dark:text-gray-400">{{
-              formatDuration(row.duration_ms)
-            }}</span>
+            <div class="text-sm">
+              <span class="usage-cell-muted block">{{ formatDuration(row.duration_ms) }}</span>
+              <span v-if="row.first_token_ms != null" class="usage-cell-faint mt-0.5 block text-xs">
+                {{ t('usage.firstToken') }} {{ formatDuration(row.first_token_ms) }}
+              </span>
+            </div>
           </template>
 
           <template #cell-created_at="{ value }">
-            <span class="text-sm text-gray-600 dark:text-gray-400">{{
+            <span class="usage-cell-muted text-sm">{{
               formatDateTime(value)
             }}</span>
           </template>
 
           <template #cell-user_agent="{ row }">
-            <span v-if="row.user_agent" class="text-sm text-gray-600 dark:text-gray-400 block max-w-[320px] whitespace-normal break-all" :title="row.user_agent">{{ formatUserAgent(row.user_agent) }}</span>
-            <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
+            <span v-if="row.user_agent" class="usage-cell-muted block max-w-[320px] whitespace-normal break-all text-sm" :title="row.user_agent">{{ formatUserAgent(row.user_agent) }}</span>
+            <span v-else class="usage-cell-faint text-sm">-</span>
           </template>
 
           <template #cell-actions="{ row }">
             <button
-              class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+              class="usage-row-action inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
               @click="openUsageTicket(row)"
             >
               <Icon name="chatBubble" size="sm" />
@@ -401,12 +436,12 @@
           </template>
 
           <template #empty>
-            <EmptyState :message="t('usage.noRecords')" />
+            <EmptyState :title="t('usage.noRecords')" />
           </template>
         </DataTable>
         </div>
 
-        <!-- 错误请求表 -->
+        <!-- 问题记录表 -->
         <div v-if="errorViewEnabled" v-show="activeTab === 'errors'" class="flex min-h-0 flex-1 flex-col">
           <UserErrorRequestsTable
             :rows="errorRows"
@@ -446,41 +481,41 @@
       }"
     >
       <div
-        class="whitespace-nowrap rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
+        class="usage-tooltip max-w-[calc(100vw-1rem)] whitespace-normal rounded-lg border px-3 py-2.5 text-xs shadow-md sm:whitespace-nowrap"
       >
         <div class="space-y-1.5">
           <!-- Token Breakdown -->
           <div>
-            <div class="text-xs font-semibold text-gray-300 mb-1">{{ t('usage.tokenDetails') }}</div>
+            <div class="usage-tooltip-title mb-1 text-xs font-semibold">{{ t('usage.tokenDetails') }}</div>
             <div v-if="tokenTooltipData && tokenTooltipData.input_tokens > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.inputTokens') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.inputTokens') }}</span>
               <span class="font-medium text-white">{{ tokenTooltipData.input_tokens.toLocaleString() }}</span>
             </div>
             <div v-if="tokenTooltipData && tokenTooltipData.output_tokens > 0 && !hasImageOutputTokens(tokenTooltipData)" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.outputTokens') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.outputTokens') }}</span>
               <span class="font-medium text-white">{{ tokenTooltipData.output_tokens.toLocaleString() }}</span>
             </div>
             <div v-if="tokenTooltipData && hasImageOutputTokens(tokenTooltipData) && textOutputTokens(tokenTooltipData) > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.outputTokens') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.outputTokens') }}</span>
               <span class="font-medium text-white">{{ textOutputTokens(tokenTooltipData).toLocaleString() }}</span>
             </div>
             <div v-if="tokenTooltipData && hasImageOutputTokens(tokenTooltipData)" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('usage.imageOutputTokens') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.imageOutputTokens') }}</span>
               <span class="font-medium text-pink-300">{{ tokenTooltipData.image_output_tokens.toLocaleString() }}</span>
             </div>
             <div v-if="tokenTooltipData && tokenTooltipData.cache_creation_tokens > 0">
               <!-- 有 5m/1h 明细时，展开显示 -->
               <template v-if="tokenTooltipData.cache_creation_5m_tokens > 0 || tokenTooltipData.cache_creation_1h_tokens > 0">
                 <div v-if="tokenTooltipData.cache_creation_5m_tokens > 0" class="flex items-center justify-between gap-4">
-                  <span class="text-gray-400 flex items-center gap-1.5">
-                    {{ t('admin.usage.cacheCreation5mTokens') }}
+                  <span class="usage-tooltip-label flex items-center gap-1.5">
+                    {{ t('usage.cacheCreation5mTokens') }}
                     <span class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-amber-500/20 text-amber-400 ring-1 ring-inset ring-amber-500/30">5m</span>
                   </span>
                   <span class="font-medium text-white">{{ tokenTooltipData.cache_creation_5m_tokens.toLocaleString() }}</span>
                 </div>
                 <div v-if="tokenTooltipData.cache_creation_1h_tokens > 0" class="flex items-center justify-between gap-4">
-                  <span class="text-gray-400 flex items-center gap-1.5">
-                    {{ t('admin.usage.cacheCreation1hTokens') }}
+                  <span class="usage-tooltip-label flex items-center gap-1.5">
+                    {{ t('usage.cacheCreation1hTokens') }}
                     <span class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-orange-500/20 text-orange-400 ring-1 ring-inset ring-orange-500/30">1h</span>
                   </span>
                   <span class="font-medium text-white">{{ tokenTooltipData.cache_creation_1h_tokens.toLocaleString() }}</span>
@@ -488,19 +523,19 @@
               </template>
               <!-- 无明细时，只显示聚合值 -->
               <div v-else class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('admin.usage.cacheCreationTokens') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.cacheCreationTokens') }}</span>
                 <span class="font-medium text-white">{{ tokenTooltipData.cache_creation_tokens.toLocaleString() }}</span>
               </div>
             </div>
             <div v-if="tokenTooltipData && tokenTooltipData.cache_ttl_overridden" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400 flex items-center gap-1.5">
+              <span class="usage-tooltip-label flex items-center gap-1.5">
                 {{ t('usage.cacheTtlOverriddenLabel') }}
                 <span class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-rose-500/20 text-rose-400 ring-1 ring-inset ring-rose-500/30">R-{{ tokenTooltipData.cache_creation_1h_tokens > 0 ? '5m' : '1H' }}</span>
               </span>
               <span class="font-medium text-rose-400">{{ tokenTooltipData.cache_creation_1h_tokens > 0 ? t('usage.cacheTtlOverridden1h') : t('usage.cacheTtlOverridden5m') }}</span>
             </div>
             <div v-if="tokenTooltipData && tokenTooltipData.cache_read_tokens > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.cacheReadTokens') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.cacheReadTokens') }}</span>
               <span class="font-medium text-white">{{ tokenTooltipData.cache_read_tokens.toLocaleString() }}</span>
             </div>
             <div
@@ -511,14 +546,14 @@
             </div>
           </div>
           <!-- Total -->
-          <div class="flex items-center justify-between gap-6 border-t border-gray-700 pt-1.5">
-            <span class="text-gray-400">{{ t('usage.totalTokens') }}</span>
+          <div class="usage-tooltip-divider flex items-center justify-between gap-6 border-t pt-1.5">
+            <span class="usage-tooltip-label">{{ t('usage.totalTokens') }}</span>
             <span class="font-semibold text-blue-400">{{ ((tokenTooltipData?.input_tokens || 0) + (tokenTooltipData?.output_tokens || 0) + (tokenTooltipData?.cache_creation_tokens || 0) + (tokenTooltipData?.cache_read_tokens || 0)).toLocaleString() }}</span>
           </div>
         </div>
         <!-- Tooltip Arrow (left side) -->
         <div
-          class="absolute right-full top-1/2 h-0 w-0 -translate-y-1/2 border-b-[6px] border-r-[6px] border-t-[6px] border-b-transparent border-r-gray-900 border-t-transparent dark:border-r-gray-800"
+          class="usage-tooltip-arrow absolute right-full top-1/2 h-0 w-0 -translate-y-1/2 border-b-[6px] border-r-[6px] border-t-[6px] border-b-transparent border-t-transparent"
         ></div>
       </div>
     </div>
@@ -535,104 +570,104 @@
       }"
     >
       <div
-        class="whitespace-nowrap rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
+        class="usage-tooltip max-w-[calc(100vw-1rem)] whitespace-normal rounded-lg border px-3 py-2.5 text-xs shadow-md sm:whitespace-nowrap"
       >
         <div class="space-y-1.5">
           <!-- Cost Breakdown -->
-          <div class="mb-2 border-b border-gray-700 pb-1.5">
-            <div class="text-xs font-semibold text-gray-300 mb-1">{{ t('usage.costDetails') }}</div>
+          <div class="usage-tooltip-section mb-2 border-b pb-1.5">
+            <div class="usage-tooltip-title mb-1 text-xs font-semibold">{{ t('usage.costDetails') }}</div>
             <div v-if="tooltipData && tooltipData.input_cost > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.inputCost') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.inputCost') }}</span>
               <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.input_cost, 6) }}</span>
             </div>
             <div v-if="tooltipData && tooltipData.output_cost > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.outputCost') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.outputCost') }}</span>
               <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.output_cost, 6) }}</span>
             </div>
             <div v-if="tooltipData && hasImageOutputCost(tooltipData)" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('usage.imageOutputCost') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.imageOutputCost') }}</span>
               <span class="font-medium text-pink-300">{{ formatSettlementAmount(tooltipData.image_output_cost, 6) }}</span>
             </div>
             <!-- Token billing: show unit prices per 1M tokens -->
             <template v-if="getDisplayBillingMode(tooltipData) !== BILLING_MODE_IMAGE">
               <div v-if="tooltipData && tooltipData.input_tokens > 0" class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.inputTokenPrice') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.inputTokenPrice') }}</span>
                 <span class="font-medium text-sky-300">{{ formatSettlementTokenPricePerMillion(tooltipData.input_cost, tooltipData.input_tokens) }} {{ t('usage.perMillionTokens') }}</span>
               </div>
               <div v-if="tooltipData && tooltipData.output_cost > 0 && textOutputTokens(tooltipData) > 0" class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.outputTokenPrice') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.outputTokenPrice') }}</span>
                 <span class="font-medium text-violet-300">{{ formatSettlementTokenPricePerMillion(tooltipData.output_cost, textOutputTokens(tooltipData)) }} {{ t('usage.perMillionTokens') }}</span>
               </div>
               <div v-if="tooltipData && hasImageOutputTokens(tooltipData)" class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.imageOutputTokenPrice') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.imageOutputTokenPrice') }}</span>
                 <span class="font-medium text-pink-300">{{ formatSettlementTokenPricePerMillion(tooltipData.image_output_cost ?? 0, tooltipData.image_output_tokens) }} {{ t('usage.perMillionTokens') }}</span>
               </div>
             </template>
             <!-- Per-image billing: show image metadata and unit price -->
             <template v-else-if="tooltipData && isImageUsage(tooltipData)">
               <div class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.imageCount') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.imageCount') }}</span>
                 <span class="font-medium text-white">{{ tooltipData.image_count }}{{ t('usage.imageUnit') }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.imageBillingSize') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.imageBillingSize') }}</span>
                 <span class="font-medium text-white">{{ formatImageBillingSize(tooltipData, t) }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.imageSizeSource') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.imageSizeSource') }}</span>
                 <span class="font-medium text-white">{{ formatImageSizeSource(tooltipData, t) }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.imageInputSize') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.imageInputSize') }}</span>
                 <span class="font-medium text-white">{{ formatImageInputSize(tooltipData, t) }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.imageOutputSize') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.imageOutputSize') }}</span>
                 <span class="font-medium text-white">{{ formatImageOutputSize(tooltipData, t) }}</span>
               </div>
               <div v-if="formatImageSizeBreakdown(tooltipData)" class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.imageSizeBreakdown') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.imageSizeBreakdown') }}</span>
                 <span class="font-medium text-white">{{ formatImageSizeBreakdown(tooltipData) }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.imageUnitPrice') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.imageUnitPrice') }}</span>
                 <span class="font-medium text-sky-300">{{ formatSettlementAmount(imageUnitPrice(tooltipData), 6) }}</span>
               </div>
               <div class="flex items-center justify-between gap-4">
-                <span class="text-gray-400">{{ t('usage.imageTotalPrice') }}</span>
+                <span class="usage-tooltip-label">{{ t('usage.imageTotalPrice') }}</span>
                 <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.total_cost || 0, 6) }}</span>
               </div>
             </template>
             <div v-else class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('usage.unitPrice') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.unitPrice') }}</span>
               <span class="font-medium text-sky-300">{{ formatSettlementAmount(tooltipData?.total_cost || 0, 6) }}</span>
             </div>
             <div v-if="tooltipData && tooltipData.cache_creation_cost > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.cacheCreationCost') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.cacheCreationCost') }}</span>
               <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.cache_creation_cost, 6) }}</span>
             </div>
             <div v-if="tooltipData && tooltipData.cache_read_cost > 0" class="flex items-center justify-between gap-4">
-              <span class="text-gray-400">{{ t('admin.usage.cacheReadCost') }}</span>
+              <span class="usage-tooltip-label">{{ t('usage.cacheReadCost') }}</span>
               <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData.cache_read_cost, 6) }}</span>
             </div>
           </div>
           <!-- Rate and Summary -->
           <div class="flex items-center justify-between gap-6">
-            <span class="text-gray-400">{{ t('usage.serviceTier') }}</span>
+            <span class="usage-tooltip-label">{{ t('usage.serviceTier') }}</span>
             <span class="font-semibold text-cyan-300">{{ getUsageServiceTierLabel(tooltipData?.service_tier, t) }}</span>
           </div>
           <div class="flex items-center justify-between gap-6">
-            <span class="text-gray-400">{{ t('usage.rate') }}</span>
+            <span class="usage-tooltip-label">{{ t('usage.rate') }}</span>
             <span class="font-semibold text-blue-400"
               >{{ formatMultiplier(tooltipData?.rate_multiplier || 1) }}x</span
             >
           </div>
           <div class="flex items-center justify-between gap-6">
-            <span class="text-gray-400">{{ t('usage.original') }}</span>
+            <span class="usage-tooltip-label">{{ t('usage.original') }}</span>
             <span class="font-medium text-white">{{ formatSettlementAmount(tooltipData?.total_cost || 0, 6) }}</span>
           </div>
-          <div class="flex items-center justify-between gap-6 border-t border-gray-700 pt-1.5">
-            <span class="text-gray-400">{{ t('usage.billed') }}</span>
+          <div class="usage-tooltip-divider flex items-center justify-between gap-6 border-t pt-1.5">
+            <span class="usage-tooltip-label">{{ t('usage.billed') }}</span>
             <span class="font-semibold text-green-400"
               >{{ formatSettlementAmount(tooltipData?.actual_cost || 0, 6) }}</span
             >
@@ -640,7 +675,7 @@
         </div>
         <!-- Tooltip Arrow (left side) -->
         <div
-          class="absolute right-full top-1/2 h-0 w-0 -translate-y-1/2 border-b-[6px] border-r-[6px] border-t-[6px] border-b-transparent border-r-gray-900 border-t-transparent dark:border-r-gray-800"
+          class="usage-tooltip-arrow absolute right-full top-1/2 h-0 w-0 -translate-y-1/2 border-b-[6px] border-r-[6px] border-t-[6px] border-b-transparent border-t-transparent"
         ></div>
       </div>
     </div>
@@ -674,7 +709,7 @@ import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { resolveUsageRequestType } from '@/utils/usageRequestType'
 import {
   BILLING_MODE_IMAGE,
-  getBillingModeBadgeClass,
+  BILLING_MODE_PER_REQUEST,
   getBillingModeLabel,
   isImageUsage,
   getDisplayBillingMode,
@@ -714,6 +749,24 @@ const tokenTooltipData = ref<UsageLog | null>(null)
 // Usage stats from API
 const usageStats = ref<UsageStatsResponse | null>(null)
 
+const usageTrustNotes = computed<Array<{ icon: 'document' | 'calculator' | 'shield'; title: string; description: string }>>(() => [
+  {
+    icon: 'document',
+    title: t('usage.trust.transparentUsage'),
+    description: t('usage.trust.transparentUsageDesc')
+  },
+  {
+    icon: 'calculator',
+    title: t('usage.trust.auditableBilling'),
+    description: t('usage.trust.auditableBillingDesc')
+  },
+  {
+    icon: 'shield',
+    title: t('usage.trust.recoverableIssues'),
+    description: t('usage.trust.recoverableIssuesDesc')
+  }
+])
+
 // 缓存命中率 = cache_read / (input + cache_creation + cache_read)
 // 分母为 0（无任何输入）时显示 '-'
 const cacheStats = computed(() => {
@@ -730,16 +783,11 @@ const cacheStats = computed(() => {
 const columns = computed<Column[]>(() => [
   { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false },
   { key: 'model', label: t('usage.model'), sortable: true },
-  { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
-  { key: 'endpoint', label: t('usage.endpoint'), sortable: false },
   { key: 'stream', label: t('usage.type'), sortable: false },
-  { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
   { key: 'cost', label: t('usage.cost'), sortable: false },
-  { key: 'first_token', label: t('usage.firstToken'), sortable: false },
   { key: 'duration', label: t('usage.duration'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
-  { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
   { key: 'actions', label: t('common.actions'), sortable: false }
 ])
 
@@ -851,11 +899,17 @@ function openUsageTicket(row: UsageLog) {
 
 const getRequestTypeBadgeClass = (log: UsageLog): string => {
   const requestType = resolveUsageRequestType(log)
-  if (requestType === 'cyber') return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-  if (requestType === 'ws_v2') return 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200'
-  if (requestType === 'stream') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-  if (requestType === 'sync') return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-  return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+  if (requestType === 'cyber') return 'usage-badge usage-badge-danger'
+  if (requestType === 'ws_v2') return 'usage-badge usage-badge-violet'
+  if (requestType === 'stream') return 'usage-badge usage-badge-blue'
+  if (requestType === 'sync') return 'usage-badge usage-badge-neutral'
+  return 'usage-badge usage-badge-warning'
+}
+
+const getUsageBillingModeBadgeClass = (mode: string | null | undefined): string => {
+  if (mode === BILLING_MODE_PER_REQUEST) return 'usage-badge usage-badge-violet'
+  if (mode === BILLING_MODE_IMAGE) return 'usage-badge usage-badge-pink'
+  return 'usage-badge usage-badge-blue'
 }
 
 
@@ -1046,22 +1100,22 @@ const exportToCSV = async () => {
 
     const costCurrency = settlementCurrency.value
     const headers = [
-      'Time',
-      'API Key Name',
-      'Model',
-      'Reasoning Effort',
-      'Inbound Endpoint',
-      'Type',
-      'Billing Mode',
-      'Input Tokens',
-      'Output Tokens',
-      'Cache Read Tokens',
-      'Cache Creation Tokens',
-      'Rate Multiplier',
-      `Billed Cost (${costCurrency})`,
-      `Original Cost (${costCurrency})`,
-      'First Token (ms)',
-      'Duration (ms)'
+      t('usage.exportHeaders.time'),
+      t('usage.exportHeaders.credentialName'),
+      t('usage.exportHeaders.model'),
+      t('usage.exportHeaders.reasoningEffort'),
+      t('usage.exportHeaders.inboundEndpoint'),
+      t('usage.exportHeaders.type'),
+      t('usage.exportHeaders.billingMode'),
+      t('usage.exportHeaders.inputTokens'),
+      t('usage.exportHeaders.outputTokens'),
+      t('usage.exportHeaders.cacheReadTokens'),
+      t('usage.exportHeaders.cacheCreationTokens'),
+      t('usage.exportHeaders.rateMultiplier'),
+      t('usage.exportHeaders.billedCost', { currency: costCurrency }),
+      t('usage.exportHeaders.originalCost', { currency: costCurrency }),
+      t('usage.exportHeaders.firstTokenMs'),
+      t('usage.exportHeaders.durationMs')
     ]
     const rows = allLogs.map((log) =>
       [
@@ -1071,7 +1125,7 @@ const exportToCSV = async () => {
         formatReasoningEffort(log.reasoning_effort),
         log.inbound_endpoint || '',
         getRequestTypeExportText(log),
-        getBillingModeLabel(getDisplayBillingMode(log), t),
+        getBillingModeLabel(getDisplayBillingMode(log), t, 'usage'),
         log.input_tokens,
         log.output_tokens,
         log.cache_read_tokens,
@@ -1107,13 +1161,18 @@ const exportToCSV = async () => {
 }
 
 // Tooltip functions
-const showTooltip = (event: MouseEvent, row: UsageLog) => {
+const tooltipX = (rect: DOMRect) => {
+  const maxWidth = Math.min(320, window.innerWidth - 16)
+  return Math.max(8, Math.min(rect.right + 8, window.innerWidth - maxWidth - 8))
+}
+
+const showTooltip = (event: MouseEvent | FocusEvent, row: UsageLog) => {
   const target = event.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
 
   tooltipData.value = row
   // Position to the right of the icon, vertically centered
-  tooltipPosition.value.x = rect.right + 8
+  tooltipPosition.value.x = tooltipX(rect)
   tooltipPosition.value.y = rect.top + rect.height / 2
   tooltipVisible.value = true
 }
@@ -1124,12 +1183,12 @@ const hideTooltip = () => {
 }
 
 // Token tooltip functions
-const showTokenTooltip = (event: MouseEvent, row: UsageLog) => {
+const showTokenTooltip = (event: MouseEvent | FocusEvent, row: UsageLog) => {
   const target = event.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
 
   tokenTooltipData.value = row
-  tokenTooltipPosition.value.x = rect.right + 8
+  tokenTooltipPosition.value.x = tooltipX(rect)
   tokenTooltipPosition.value.y = rect.top + rect.height / 2
   tokenTooltipVisible.value = true
 }
@@ -1139,7 +1198,7 @@ const hideTokenTooltip = () => {
   tokenTooltipData.value = null
 }
 
-// ── Error Requests Tab ──────────────────────────────────────────────────────
+// ── Issue Records Tab ───────────────────────────────────────────────────────
 const activeTab = ref<'usage' | 'errors'>('usage')
 const errorViewEnabled = computed(() => appStore.cachedPublicSettings?.allow_user_view_error_requests ?? false)
 
@@ -1191,3 +1250,255 @@ onMounted(() => {
   loadUsageStats()
 })
 </script>
+
+<style scoped>
+.usage-page-title,
+.usage-stat-value,
+.usage-cell-strong,
+.usage-trust-title {
+  color: var(--apple-text);
+}
+
+.usage-page-description,
+.usage-stat-label,
+.usage-stat-muted,
+.usage-cell-muted,
+.usage-trust-description {
+  color: var(--apple-muted);
+}
+
+.usage-cell-faint {
+  color: var(--apple-muted-2);
+}
+
+.usage-trust-card {
+  background: color-mix(in srgb, var(--apple-surface-elevated) 72%, var(--apple-surface));
+  border-color: var(--apple-border-soft);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.usage-trust-icon {
+  color: var(--apple-muted-2);
+}
+
+.usage-stats-grid {
+  background: var(--apple-border-soft);
+  border-color: var(--apple-border);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.usage-stat-card {
+  background: var(--apple-surface);
+}
+
+.usage-tabs {
+  background: var(--apple-surface-elevated);
+  border: 1px solid var(--apple-border-soft);
+}
+
+.usage-tabs :deep(.tab) {
+  color: var(--apple-muted);
+  letter-spacing: 0;
+}
+
+.usage-tabs :deep(.tab:hover) {
+  color: var(--apple-text);
+  background: var(--apple-hover);
+}
+
+.usage-tabs :deep(.tab-active) {
+  color: var(--apple-text);
+  background: var(--apple-surface);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.usage-table-panel :deep(.table-header) {
+  background: var(--apple-surface-elevated);
+}
+
+.usage-table-panel :deep(.sticky-header-cell) {
+  color: var(--apple-muted);
+  border-color: var(--apple-border);
+}
+
+.usage-table-panel :deep(.sticky-header-cell:hover) {
+  background: var(--apple-hover);
+}
+
+.usage-table-panel :deep(.table-body) {
+  border-color: var(--apple-border-soft);
+}
+
+.usage-table-panel :deep(.data-table-row) {
+  background: var(--apple-surface);
+}
+
+.usage-table-panel :deep(.data-table-row:hover) {
+  background: color-mix(in srgb, var(--apple-blue) 5%, var(--apple-surface));
+}
+
+.usage-table-panel :deep(td) {
+  border-color: var(--apple-border-soft);
+}
+
+.usage-table-panel :deep(.data-table-mobile-card) {
+  background: var(--apple-surface);
+  border-color: var(--apple-border);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.usage-table-panel :deep(.data-table-mobile-card > div) {
+  min-width: 0;
+}
+
+.usage-table-panel :deep(.data-table-mobile-actions) {
+  border-color: var(--apple-border-soft);
+}
+
+.usage-info-dot {
+  background: var(--apple-surface-elevated);
+  box-shadow: inset 0 0 0 1px var(--apple-border-soft);
+}
+
+.group:hover .usage-info-dot,
+.group:focus-visible .usage-info-dot {
+  background: color-mix(in srgb, var(--apple-blue) 12%, var(--apple-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--apple-blue) 26%, var(--apple-border));
+}
+
+.usage-info-icon {
+  color: var(--apple-muted-2);
+}
+
+.group:hover .usage-info-icon,
+.group:focus-visible .usage-info-icon {
+  color: var(--apple-blue);
+}
+
+.usage-row-action {
+  color: var(--apple-blue);
+}
+
+.usage-row-action:hover {
+  background: color-mix(in srgb, var(--apple-blue) 9%, var(--apple-surface));
+}
+
+.usage-badge {
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.usage-badge-blue {
+  color: #0066cc;
+  background: color-mix(in srgb, #0071e3 10%, var(--apple-surface));
+}
+
+.usage-badge-violet {
+  color: #6e38b1;
+  background: color-mix(in srgb, #8e44ad 10%, var(--apple-surface));
+}
+
+.usage-badge-pink {
+  color: #c42a65;
+  background: color-mix(in srgb, #ff2d55 10%, var(--apple-surface));
+}
+
+.usage-badge-danger {
+  color: var(--apple-danger);
+  background: color-mix(in srgb, var(--apple-danger) 10%, var(--apple-surface));
+}
+
+.usage-badge-warning {
+  color: var(--apple-warning);
+  background: color-mix(in srgb, var(--apple-warning) 11%, var(--apple-surface));
+}
+
+.usage-badge-neutral {
+  color: var(--apple-muted);
+  background: var(--apple-surface-elevated);
+}
+
+.usage-tooltip {
+  --usage-tooltip-bg: color-mix(in srgb, var(--apple-surface) 94%, var(--apple-text) 6%);
+  --usage-tooltip-border: var(--apple-border);
+  --usage-tooltip-muted: var(--apple-muted);
+  --usage-tooltip-strong: var(--apple-text);
+
+  color: var(--usage-tooltip-strong);
+  background: var(--usage-tooltip-bg);
+  border-color: var(--usage-tooltip-border);
+  box-shadow: var(--apple-shadow-md);
+}
+
+.usage-tooltip-title {
+  color: var(--usage-tooltip-strong);
+}
+
+.usage-tooltip-label {
+  color: var(--usage-tooltip-muted);
+}
+
+.usage-tooltip-section,
+.usage-tooltip-divider {
+  border-color: var(--apple-border-soft);
+}
+
+.usage-tooltip :is(.text-white, .text-blue-400, .text-green-400) {
+  color: var(--usage-tooltip-strong);
+}
+
+.usage-tooltip-arrow {
+  border-right-color: var(--usage-tooltip-bg);
+}
+
+:global(.dark) .usage-trust-card,
+:global(.dark) .usage-stat-card,
+:global(.dark) .usage-table-panel :deep(.data-table-row),
+:global(.dark) .usage-table-panel :deep(.data-table-mobile-card) {
+  background: color-mix(in srgb, var(--apple-surface) 94%, white 6%);
+}
+
+:global(.dark) .usage-badge-blue {
+  color: #8ecbff;
+  background: color-mix(in srgb, var(--apple-blue) 18%, var(--apple-surface));
+}
+
+:global(.dark) .usage-badge-violet {
+  color: #d8b4fe;
+  background: color-mix(in srgb, #a855f7 18%, var(--apple-surface));
+}
+
+:global(.dark) .usage-badge-pink {
+  color: #ffb3c7;
+  background: color-mix(in srgb, #ff2d55 18%, var(--apple-surface));
+}
+
+:global(.dark) .usage-badge-danger {
+  background: color-mix(in srgb, var(--apple-danger) 18%, var(--apple-surface));
+}
+
+:global(.dark) .usage-badge-warning {
+  background: color-mix(in srgb, var(--apple-warning) 18%, var(--apple-surface));
+}
+
+:global(.dark) .usage-tooltip {
+  --usage-tooltip-bg: color-mix(in srgb, var(--apple-surface) 88%, white 12%);
+  --usage-tooltip-border: var(--apple-border);
+  --usage-tooltip-muted: var(--apple-muted);
+  --usage-tooltip-strong: var(--apple-text);
+}
+
+@media (max-width: 639px) {
+  .usage-stats-grid {
+    gap: 0.5rem;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .usage-stat-card {
+    border: 1px solid var(--apple-border-soft);
+    border-radius: var(--apple-radius);
+    box-shadow: var(--apple-shadow-sm);
+  }
+}
+</style>

@@ -4,9 +4,9 @@ import { onMounted, onBeforeUnmount, watch } from 'vue'
 import Toast from '@/components/common/Toast.vue'
 import NavigationProgress from '@/components/common/NavigationProgress.vue'
 import AdminComplianceDialog from '@/components/admin/AdminComplianceDialog.vue'
-import { resolveDocumentTitle } from '@/router/title'
+import { resolveRouteDocumentTitle } from '@/router/title'
 import AnnouncementPopup from '@/components/common/AnnouncementPopup.vue'
-import { useAppStore, useAuthStore, useSubscriptionStore, useAnnouncementStore, useAdminComplianceStore } from '@/stores'
+import { useAppStore, useAuthStore, useSubscriptionStore, useAnnouncementStore, useAdminComplianceStore, useAdminSettingsStore } from '@/stores'
 import { getSetupStatus } from '@/api/setup'
 import { LOCALE_CHANGED_EVENT } from '@/i18n'
 import { applyRouteSeo } from '@/utils/seo'
@@ -18,6 +18,23 @@ const authStore = useAuthStore()
 const subscriptionStore = useSubscriptionStore()
 const announcementStore = useAnnouncementStore()
 const adminComplianceStore = useAdminComplianceStore()
+const adminSettingsStore = useAdminSettingsStore()
+
+function updateDocumentTitle() {
+  const customMenuItems = [
+    ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
+    ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
+  ]
+  document.title = resolveRouteDocumentTitle(route, appStore.siteName, customMenuItems)
+}
+
+function currentRouteTitle() {
+  const customMenuItems = [
+    ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
+    ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
+  ]
+  return resolveRouteDocumentTitle(route, appStore.siteName, customMenuItems)
+}
 
 /**
  * Update favicon dynamically
@@ -46,6 +63,20 @@ watch(
   { immediate: true }
 )
 
+watch(
+  [
+    () => route.fullPath,
+    () => route.meta.title,
+    () => route.meta.titleKey,
+    () => appStore.siteName,
+    () => appStore.cachedPublicSettings?.custom_menu_items,
+    () => authStore.isAdmin,
+    () => adminSettingsStore.customMenuItems,
+  ],
+  updateDocumentTitle,
+  { deep: true }
+)
+
 // Watch for authentication state and manage subscription data + announcements
 function onVisibilityChange() {
   if (document.visibilityState === 'visible' && authStore.isAuthenticated) {
@@ -62,7 +93,7 @@ function onAdminComplianceRequired(event: Event) {
 function refreshCurrentRouteSeo() {
   applyRouteSeo(route, {
     siteName: appStore.siteName,
-    title: resolveDocumentTitle(route.meta.title, appStore.siteName, route.meta.titleKey as string)
+    title: currentRouteTitle()
   })
 }
 
@@ -141,9 +172,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <NavigationProgress />
-  <RouterView />
-  <Toast />
-  <AnnouncementPopup />
-  <AdminComplianceDialog />
+  <div class="apple-runtime min-h-screen bg-[var(--apple-bg)] text-[var(--apple-text)]">
+    <NavigationProgress />
+    <RouterView />
+    <Toast />
+    <AnnouncementPopup />
+    <AdminComplianceDialog />
+  </div>
 </template>

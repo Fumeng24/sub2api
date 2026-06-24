@@ -1,5 +1,6 @@
 <template>
   <AppLayout>
+    <div class="admin-apple-page admin-table-page">
     <TablePageLayout>
       <template #filters>
         <div class="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-start">
@@ -621,6 +622,7 @@
       @confirm="confirmDelete"
       @cancel="showDeleteDialog = false"
     />
+    </div>
   </AppLayout>
 </template>
 
@@ -650,6 +652,7 @@ import Toggle from '@/components/common/Toggle.vue'
 import PricingEntryCard from '@/components/admin/channel/PricingEntryCard.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { useKeyedDebouncedSearch } from '@/composables/useKeyedDebouncedSearch'
+import './adminApple.css'
 
 const { t } = useI18n()
 const appStore = useAppStore()

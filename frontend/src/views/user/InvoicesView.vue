@@ -1,155 +1,257 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-7xl space-y-5">
-      <div class="flex flex-col gap-4 border-b border-gray-200 pb-4 dark:border-dark-700 lg:flex-row lg:items-end lg:justify-between">
+    <div class="mx-auto max-w-7xl space-y-6">
+      <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div class="min-w-0">
-          <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">订单中心</h1>
-          <p class="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-            查看充值订单，筛选可开票订单并提交发票申请。当前系统按可开票额度锁定金额，订单勾选用于汇总本次申请金额。
+          <h1 class="text-2xl font-semibold tracking-normal text-[var(--apple-text)]">
+            {{ t('invoice.page.title') }}
+          </h1>
+          <p class="mt-2 max-w-3xl text-sm leading-6 text-[var(--apple-muted)]">
+            {{ t('invoice.page.description') }}
           </p>
         </div>
         <button class="btn btn-secondary w-full justify-center sm:w-auto" :disabled="loading" @click="reload">
           <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-          刷新
+          {{ t('common.refresh') }}
         </button>
-      </div>
+      </header>
 
-      <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100">
-        可开票订单会高亮显示；不可开票订单无法勾选，并显示具体原因。开票起始范围：系统已完成的余额充值订单。
-      </div>
+      <section class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-4 py-3 text-sm text-[var(--apple-muted)] shadow-sm">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <p class="leading-6">{{ t('invoice.page.notice') }}</p>
+          <div class="flex flex-wrap gap-2 lg:justify-end">
+            <span
+              v-for="item in invoiceTrustItems"
+              :key="item"
+              class="inline-flex items-center gap-1.5 rounded-md bg-[var(--apple-surface-elevated)] px-2.5 py-1 text-xs font-medium text-[var(--apple-muted)] ring-1 ring-[color:var(--apple-border-soft)]"
+            >
+              <Icon name="checkCircle" size="xs" class="text-[var(--apple-success)]" />
+              {{ item }}
+            </span>
+          </div>
+        </div>
+      </section>
 
-      <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <p class="text-xs text-gray-500 dark:text-gray-400">订单总数</p>
-          <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{{ orderPagination.total }}</p>
+      <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm">
+          <p class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.stats.totalOrders') }}</p>
+          <p class="mt-2 text-2xl font-semibold text-[var(--apple-text)]">{{ orderPagination.total }}</p>
         </div>
-        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <p class="text-xs text-gray-500 dark:text-gray-400">当前页可开票</p>
-          <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{{ invoiceableOrderRows.length }}</p>
+        <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm">
+          <p class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.stats.availableOnPage') }}</p>
+          <p class="mt-2 text-2xl font-semibold text-[var(--apple-text)]">{{ invoiceableOrderRows.length }}</p>
         </div>
-        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <p class="text-xs text-gray-500 dark:text-gray-400">可开票金额</p>
-          <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{{ formatMoney(summary?.available_amount) }}</p>
+        <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm">
+          <p class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.stats.availableAmount') }}</p>
+          <p class="mt-2 text-2xl font-semibold text-[var(--apple-text)]">{{ formatMoney(summary?.available_amount) }}</p>
         </div>
-        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <p class="text-xs text-gray-500 dark:text-gray-400">处理中占用</p>
-          <p class="mt-2 text-2xl font-semibold text-amber-600 dark:text-amber-300">{{ formatMoney(lockedInProgress) }}</p>
+        <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm">
+          <p class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.stats.lockedAmount') }}</p>
+          <p class="mt-2 text-2xl font-semibold text-[var(--apple-warning)]">{{ formatMoney(lockedInProgress) }}</p>
         </div>
-        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <p class="text-xs text-gray-500 dark:text-gray-400">当前页不可开票</p>
-          <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{{ unavailableOrderRows.length }}</p>
+        <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm">
+          <p class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.stats.unavailableOnPage') }}</p>
+          <p class="mt-2 text-2xl font-semibold text-[var(--apple-text)]">{{ unavailableOrderRows.length }}</p>
         </div>
-      </div>
+      </section>
 
       <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-800">
-          <div class="border-b border-gray-100 p-4 dark:border-dark-700">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 class="text-base font-semibold text-gray-950 dark:text-white">全部订单</h2>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">处理中和已完成的开票申请会占用可申请额度，已驳回或已取消的申请会释放额度。</p>
+        <section class="overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] shadow-sm">
+          <div class="border-b border-[color:var(--apple-border-soft)] p-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div class="min-w-0">
+                <h2 class="text-base font-semibold text-[var(--apple-text)]">
+                  {{ t('invoice.page.orders.title') }}
+                </h2>
+                <p class="mt-1 text-sm text-[var(--apple-muted)]">
+                  {{ t('invoice.page.orders.description') }}
+                </p>
               </div>
-              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:min-w-[520px] lg:grid-cols-4">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:min-w-[520px] lg:grid-cols-4">
                 <div class="lg:col-span-2">
-                  <label class="input-label">订单号 / 交易单号</label>
-                  <input v-model.trim="orderFilters.keyword" class="input" placeholder="搜索订单号" />
+                  <label class="input-label">{{ t('invoice.page.orders.keywordLabel') }}</label>
+                  <input
+                    v-model.trim="orderFilters.keyword"
+                    class="input"
+                    :placeholder="t('invoice.page.orders.keywordPlaceholder')"
+                  />
                 </div>
                 <div>
-                  <label class="input-label">支付状态</label>
+                  <label class="input-label">{{ t('invoice.page.orders.statusLabel') }}</label>
                   <Select v-model="orderFilters.status" :options="orderStatusOptions" @change="handleOrderServerFilterChange" />
                 </div>
                 <div>
-                  <label class="input-label">开票范围</label>
+                  <label class="input-label">{{ t('invoice.page.orders.invoiceabilityLabel') }}</label>
                   <Select v-model="orderFilters.invoiceability" :options="invoiceabilityOptions" />
                 </div>
               </div>
             </div>
-            <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-end lg:max-w-[520px]">
+
+            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end lg:max-w-[520px]">
               <div>
-                <label class="input-label">开始时间</label>
+                <label class="input-label">{{ t('invoice.page.orders.startDate') }}</label>
                 <input v-model="orderFilters.start_date" class="input" type="date" />
               </div>
-              <span class="hidden pb-2 text-center text-sm text-gray-400 sm:block">~</span>
+              <span class="hidden pb-2 text-center text-sm text-[var(--apple-muted-2)] sm:block">~</span>
               <div>
-                <label class="input-label">结束时间</label>
+                <label class="input-label">{{ t('invoice.page.orders.endDate') }}</label>
                 <input v-model="orderFilters.end_date" class="input" type="date" />
               </div>
+            </div>
+
+            <div class="mt-3 flex items-center justify-between gap-3 text-sm lg:hidden">
+              <label class="inline-flex items-center gap-2 text-[var(--apple-muted)]">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-[color:var(--apple-border)] text-[var(--apple-blue)] focus:ring-[color:var(--apple-focus-ring)]"
+                  :checked="allVisibleInvoiceableSelected"
+                  :disabled="visibleInvoiceableRows.length === 0"
+                  @change="toggleAllVisibleOrders"
+                />
+                <span>{{ t('common.selectAll') }}</span>
+              </label>
+              <span class="text-xs text-[var(--apple-muted)]">
+                {{ visibleInvoiceableRows.length }} {{ t('invoice.page.orders.invoiceability.available') }}
+              </span>
             </div>
           </div>
 
           <div v-if="ordersLoading" class="flex justify-center py-16">
-            <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+            <div class="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--apple-border)] border-t-[color:var(--apple-blue)]"></div>
           </div>
 
           <div v-else-if="visibleOrderRows.length === 0" class="py-16 text-center">
-            <Icon name="inbox" size="xl" class="mx-auto mb-3 text-gray-300 dark:text-dark-600" />
-            <p class="font-medium text-gray-700 dark:text-gray-200">暂无符合条件的订单</p>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">调整筛选条件后再查看。</p>
+            <Icon name="inbox" size="xl" class="mx-auto mb-3 text-[var(--apple-muted-2)]" />
+            <p class="font-medium text-[var(--apple-text)]">{{ t('invoice.page.orders.emptyTitle') }}</p>
+            <p class="mt-1 text-sm text-[var(--apple-muted)]">{{ t('invoice.page.orders.emptyDescription') }}</p>
           </div>
 
-          <div v-else class="overflow-x-auto">
-            <table class="min-w-[980px] w-full text-left text-sm">
-              <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-dark-900 dark:text-gray-400">
-                <tr>
-                  <th class="w-10 px-4 py-3">
+          <template v-else>
+            <div class="hidden lg:block">
+              <div class="overflow-x-auto">
+                <table class="min-w-[1120px] w-full text-left text-sm">
+                  <thead class="bg-[var(--apple-surface-elevated)] text-xs text-[var(--apple-muted)]">
+                    <tr>
+                      <th class="w-10 px-4 py-3">
+                        <label class="inline-flex items-center">
+                          <input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-[color:var(--apple-border)] text-[var(--apple-blue)] focus:ring-[color:var(--apple-focus-ring)]"
+                            :checked="allVisibleInvoiceableSelected"
+                            :disabled="visibleInvoiceableRows.length === 0"
+                            @change="toggleAllVisibleOrders"
+                          />
+                        </label>
+                      </th>
+                      <th class="px-4 py-3">{{ t('invoice.page.orders.columns.orderId') }}</th>
+                      <th class="px-4 py-3">{{ t('invoice.page.orders.columns.tradeNo') }}</th>
+                      <th class="px-4 py-3 text-right">{{ t('invoice.page.orders.columns.amount') }}</th>
+                      <th class="px-4 py-3 text-right">{{ t('invoice.page.orders.columns.fee') }}</th>
+                      <th class="px-4 py-3">{{ t('invoice.page.orders.columns.method') }}</th>
+                      <th class="px-4 py-3">{{ t('invoice.page.orders.columns.status') }}</th>
+                      <th class="px-4 py-3">{{ t('invoice.page.orders.columns.paidAt') }}</th>
+                      <th class="px-4 py-3">{{ t('invoice.page.orders.columns.invoiceability') }}</th>
+                      <th class="px-4 py-3">{{ t('invoice.page.orders.columns.reason') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-[color:var(--apple-border-soft)]">
+                    <tr
+                      v-for="row in visibleOrderRows"
+                      :key="row.order.id"
+                      :class="[
+                        row.invoiceable ? 'bg-[color-mix(in_srgb,var(--apple-blue)_3%,var(--apple-surface))]' : 'bg-[var(--apple-surface)]',
+                        'transition-colors hover:bg-[var(--apple-hover)]'
+                      ]"
+                    >
+                      <td class="px-4 py-3 align-top">
+                        <input
+                          type="checkbox"
+                          class="h-4 w-4 rounded border-[color:var(--apple-border)] text-[var(--apple-blue)] focus:ring-[color:var(--apple-focus-ring)] disabled:cursor-not-allowed disabled:opacity-40"
+                          :checked="isOrderSelected(row)"
+                          :disabled="!row.invoiceable"
+                          @change="toggleOrderSelection(row)"
+                        />
+                      </td>
+                      <td class="px-4 py-3 align-top font-mono text-xs text-[var(--apple-text)]">#{{ row.order.id }}</td>
+                      <td class="max-w-[220px] truncate px-4 py-3 align-top font-mono text-xs text-[var(--apple-muted)]" :title="row.order.out_trade_no">
+                        {{ row.order.out_trade_no || t('common.notAvailable') }}
+                      </td>
+                      <td class="px-4 py-3 text-right align-top font-semibold text-[var(--apple-text)]">{{ formatMoney(row.invoiceAmount) }}</td>
+                      <td class="px-4 py-3 text-right align-top text-[var(--apple-muted)]">{{ formatOrderFee(row.order) }}</td>
+                      <td class="px-4 py-3 align-top text-[var(--apple-muted)]">{{ paymentTypeLabel(row.order.payment_type) }}</td>
+                      <td class="px-4 py-3 align-top">
+                        <span :class="['badge', orderStatusBadgeClass(row.order.status)]">{{ orderStatusLabel(row.order.status) }}</span>
+                      </td>
+                      <td class="whitespace-nowrap px-4 py-3 align-top text-[var(--apple-muted)]">{{ formatDateTime(row.paidAt) }}</td>
+                      <td class="px-4 py-3 align-top">
+                        <span :class="['badge', row.invoiceable ? 'badge-success' : 'badge-gray']">
+                          {{ row.invoiceable ? t('invoice.page.orders.invoiceability.available') : t('invoice.page.orders.invoiceability.unavailable') }}
+                        </span>
+                      </td>
+                      <td class="max-w-[220px] px-4 py-3 align-top text-[var(--apple-muted)]">{{ row.reason || t('common.notAvailable') }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="space-y-3 p-4 lg:hidden">
+              <article
+                v-for="row in visibleOrderRows"
+                :key="row.order.id"
+                class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <label class="flex min-w-0 items-start gap-3">
                     <input
                       type="checkbox"
-                      class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      :checked="allVisibleInvoiceableSelected"
-                      :disabled="visibleInvoiceableRows.length === 0"
-                      @change="toggleAllVisibleOrders"
-                    />
-                  </th>
-                  <th class="px-4 py-3">订单号</th>
-                  <th class="px-4 py-3">交易单号</th>
-                  <th class="px-4 py-3 text-right">开票金额</th>
-                  <th class="px-4 py-3 text-right">手续费</th>
-                  <th class="px-4 py-3">支付方式</th>
-                  <th class="px-4 py-3">支付状态</th>
-                  <th class="px-4 py-3">支付时间</th>
-                  <th class="px-4 py-3">开票状态</th>
-                  <th class="px-4 py-3">不可开票原因</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
-                <tr
-                  v-for="row in visibleOrderRows"
-                  :key="row.order.id"
-                  :class="[
-                    row.invoiceable ? 'bg-emerald-50/40 dark:bg-emerald-500/5' : 'bg-white dark:bg-dark-800',
-                    'transition-colors hover:bg-gray-50 dark:hover:bg-dark-700/50'
-                  ]"
-                >
-                  <td class="px-4 py-3 align-top">
-                    <input
-                      type="checkbox"
-                      class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-40"
+                      class="mt-1 h-4 w-4 rounded border-[color:var(--apple-border)] text-[var(--apple-blue)] focus:ring-[color:var(--apple-focus-ring)] disabled:cursor-not-allowed disabled:opacity-40"
                       :checked="isOrderSelected(row)"
                       :disabled="!row.invoiceable"
                       @change="toggleOrderSelection(row)"
                     />
-                  </td>
-                  <td class="px-4 py-3 align-top font-mono text-xs text-gray-700 dark:text-gray-200">#{{ row.order.id }}</td>
-                  <td class="max-w-[220px] truncate px-4 py-3 align-top font-mono text-xs text-gray-500 dark:text-gray-400" :title="row.order.out_trade_no">
-                    {{ row.order.out_trade_no || '-' }}
-                  </td>
-                  <td class="px-4 py-3 text-right align-top font-semibold text-gray-950 dark:text-white">{{ formatMoney(row.invoiceAmount) }}</td>
-                  <td class="px-4 py-3 text-right align-top text-gray-500 dark:text-gray-400">{{ formatOrderFee(row.order) }}</td>
-                  <td class="px-4 py-3 align-top text-gray-700 dark:text-gray-300">{{ paymentTypeLabel(row.order.payment_type) }}</td>
-                  <td class="px-4 py-3 align-top">
-                    <span :class="['badge', orderStatusBadgeClass(row.order.status)]">{{ orderStatusLabel(row.order.status) }}</span>
-                  </td>
-                  <td class="whitespace-nowrap px-4 py-3 align-top text-gray-500 dark:text-gray-400">{{ formatDateTime(row.paidAt) }}</td>
-                  <td class="px-4 py-3 align-top">
-                    <span :class="['badge', row.invoiceable ? 'badge-success' : 'badge-gray']">{{ row.invoiceable ? '可申请' : '不可开' }}</span>
-                  </td>
-                  <td class="max-w-[220px] px-4 py-3 align-top text-gray-500 dark:text-gray-400">{{ row.reason || '-' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                    <div class="min-w-0">
+                      <p class="font-mono text-xs text-[var(--apple-muted)]">#{{ row.order.id }}</p>
+                      <p class="mt-0.5 truncate text-sm font-medium text-[var(--apple-text)]" :title="row.order.out_trade_no">
+                        {{ row.order.out_trade_no || t('common.notAvailable') }}
+                      </p>
+                    </div>
+                  </label>
+                  <span :class="['badge', row.invoiceable ? 'badge-success' : 'badge-gray']">
+                    {{ row.invoiceable ? t('invoice.page.orders.invoiceability.available') : t('invoice.page.orders.invoiceability.unavailable') }}
+                  </span>
+                </div>
 
-          <div class="border-t border-gray-100 dark:border-dark-700">
+                <dl class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <dt class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.orders.columns.amount') }}</dt>
+                    <dd class="mt-1 font-semibold text-[var(--apple-text)]">{{ formatMoney(row.invoiceAmount) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.orders.columns.fee') }}</dt>
+                    <dd class="mt-1 text-[var(--apple-text)]">{{ formatOrderFee(row.order) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.orders.columns.method') }}</dt>
+                    <dd class="mt-1 text-[var(--apple-text)]">{{ paymentTypeLabel(row.order.payment_type) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.orders.columns.paidAt') }}</dt>
+                    <dd class="mt-1 text-[var(--apple-text)]">{{ formatDateTime(row.paidAt) }}</dd>
+                  </div>
+                </dl>
+
+                <div class="mt-4 flex flex-wrap items-center gap-2">
+                  <span :class="['badge', orderStatusBadgeClass(row.order.status)]">{{ orderStatusLabel(row.order.status) }}</span>
+                  <span class="text-sm text-[var(--apple-muted)]">
+                    {{ row.reason || t('common.notAvailable') }}
+                  </span>
+                </div>
+              </article>
+            </div>
+          </template>
+
+          <div class="border-t border-[color:var(--apple-border-soft)]">
             <Pagination
               v-if="orderPagination.total > 0"
               :page="orderPagination.page"
@@ -162,134 +264,225 @@
         </section>
 
         <aside class="space-y-5">
-          <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800 xl:sticky xl:top-5">
-            <div class="mb-4">
-              <h2 class="text-base font-semibold text-gray-950 dark:text-white">开票信息</h2>
-              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">已选 {{ selectedOrderRows.length }} 笔订单 · {{ formatMoney(selectedInvoiceAmount) }}</p>
+          <section class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-5 shadow-sm xl:sticky xl:top-5">
+            <div class="mb-4 flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h2 class="text-base font-semibold text-[var(--apple-text)]">{{ t('invoice.page.form.title') }}</h2>
+                <p class="mt-1 text-sm text-[var(--apple-muted)]">
+                  {{ t('invoice.page.form.selectedSummary', { count: selectedOrderRows.length, amount: formatMoney(selectedInvoiceAmount) }) }}
+                </p>
+              </div>
             </div>
 
-            <div class="mb-4 rounded-lg bg-gray-50 p-3 text-xs leading-5 text-gray-600 dark:bg-dark-900 dark:text-gray-300">
-              <p>最低开票金额 {{ formatMoney(summary?.min_amount || 500) }}，当前可申请 {{ formatMoney(summary?.available_amount) }}。</p>
-              <p>完成开票时扣除税点 {{ formatMoney(taxFeePreview) }}（{{ summary?.tax_rate_percent || 2 }}%）。</p>
+            <div class="mb-4 rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] p-3 text-xs leading-5 text-[var(--apple-muted)]">
+              <p>{{ t('invoice.page.form.limitHint', { min: formatMoney(summary?.min_amount || 500), available: formatMoney(summary?.available_amount) }) }}</p>
+              <p class="mt-1">{{ t('invoice.page.form.taxHint', { tax: formatMoney(taxFeePreview), rate: summary?.tax_rate_percent || 2 }) }}</p>
             </div>
 
             <form class="space-y-4" @submit.prevent="submit">
               <div>
                 <div class="flex items-center justify-between gap-3">
-                  <label class="input-label">选择模板</label>
-                  <button type="button" class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400" @click="openCreateTemplateDialog">
-                    保存为模板
+                  <label class="input-label">{{ t('invoice.page.form.templateLabel') }}</label>
+                  <button type="button" class="text-xs font-medium text-[var(--apple-blue)] hover:text-[var(--apple-blue-hover)]" @click="openCreateTemplateDialog">
+                    {{ t('invoice.page.form.saveTemplate') }}
                   </button>
                 </div>
                 <Select v-model="selectedTemplateId" :options="templateOptions" @change="applySelectedTemplate" />
                 <div v-if="activeTemplate" class="mt-2 flex flex-wrap items-center gap-2">
-                  <button type="button" class="btn btn-secondary btn-sm" @click="openUpdateTemplateDialog">更新模板</button>
-                  <button v-if="!activeTemplate.is_default" type="button" class="btn btn-secondary btn-sm" :disabled="templateSaving" @click="setDefaultTemplate">设为默认</button>
-                  <button type="button" class="btn btn-danger btn-sm" :disabled="templateSaving" @click="deleteSelectedTemplate">删除</button>
+                  <button type="button" class="btn btn-secondary btn-sm" @click="openUpdateTemplateDialog">
+                    {{ t('invoice.page.form.updateTemplate') }}
+                  </button>
+                  <button
+                    v-if="!activeTemplate.is_default"
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    :disabled="templateSaving"
+                    @click="setDefaultTemplate"
+                  >
+                    {{ t('invoice.page.form.setDefault') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm text-[var(--apple-danger)] hover:text-[var(--apple-danger)]"
+                    :disabled="templateSaving"
+                    @click="deleteSelectedTemplate"
+                  >
+                    {{ t('invoice.page.form.deleteTemplate') }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label class="input-label">{{ t('invoice.page.form.typeLabel') }}</label>
+                  <Select v-model="form.invoice_type" :options="invoiceTypeOptions" />
+                </div>
+                <div>
+                  <label class="input-label">{{ t('invoice.page.form.amountLabel') }}</label>
+                  <input v-model.number="form.amount" class="input" type="number" min="0" step="0.01" required :placeholder="t('invoice.page.form.amountPlaceholder')" />
                 </div>
               </div>
 
               <div>
-                <label class="input-label">发票类型</label>
-                <Select v-model="form.invoice_type" :options="invoiceTypeOptions" />
-              </div>
-
-              <div>
-                <label class="input-label">发票抬头</label>
-                <input v-model.trim="form.title" class="input" maxlength="255" required placeholder="公司全称或个人姓名" />
+                <label class="input-label">{{ t('invoice.page.form.titleLabel') }}</label>
+                <input v-model.trim="form.title" class="input" maxlength="255" required :placeholder="t('invoice.page.form.titlePlaceholder')" />
               </div>
 
               <div v-if="form.invoice_type !== 'personal'">
-                <label class="input-label">税号</label>
-                <input v-model.trim="form.tax_id" class="input uppercase" maxlength="100" required placeholder="纳税人识别号" />
+                <label class="input-label">{{ t('invoice.page.form.taxIdLabel') }}</label>
+                <input v-model.trim="form.tax_id" class="input uppercase" maxlength="100" required :placeholder="t('invoice.page.form.taxIdPlaceholder')" />
               </div>
 
               <div>
-                <label class="input-label">开票项目</label>
-                <input v-model.trim="form.item_name" class="input" maxlength="100" required placeholder="信息技术服务费" />
+                <label class="input-label">{{ t('invoice.page.form.itemNameLabel') }}</label>
+                <input v-model.trim="form.item_name" class="input" maxlength="100" required :placeholder="t('invoice.page.form.itemNamePlaceholder')" />
               </div>
 
               <div>
-                <label class="input-label">开票金额</label>
-                <input v-model.number="form.amount" class="input" type="number" min="0" step="0.01" required placeholder="500.00" />
-              </div>
-
-              <div>
-                <label class="input-label">接收邮箱</label>
-                <input v-model.trim="form.receiver_email" class="input" type="email" maxlength="255" required placeholder="接收电子发票的邮箱" />
+                <label class="input-label">{{ t('invoice.page.form.receiverEmailLabel') }}</label>
+                <input v-model.trim="form.receiver_email" class="input" type="email" maxlength="255" required :placeholder="t('invoice.page.form.receiverEmailPlaceholder')" />
               </div>
 
               <div>
                 <div class="flex items-center justify-between gap-3">
-                  <label class="input-label">备注</label>
-                  <span class="text-xs text-gray-400">{{ form.note.length }}/1000</span>
+                  <label class="input-label">{{ t('invoice.page.form.noteLabel') }}</label>
+                  <span class="text-xs text-[var(--apple-muted-2)]">{{ form.note.length }}/1000</span>
                 </div>
-                <textarea v-model.trim="form.note" class="input" rows="3" maxlength="1000" placeholder="可选"></textarea>
+                <textarea
+                  v-model.trim="form.note"
+                  class="input"
+                  rows="3"
+                  maxlength="1000"
+                  :placeholder="t('invoice.page.form.notePlaceholder')"
+                ></textarea>
               </div>
 
               <button class="btn btn-primary w-full py-3" :disabled="!canSubmit || submitting">
                 <span v-if="submitting" class="inline-flex items-center gap-2">
                   <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                  提交中
+                  {{ t('invoice.page.form.submitting') }}
                 </span>
-                <span v-else>提交开票申请</span>
+                <span v-else>{{ t('invoice.page.form.submit') }}</span>
               </button>
-              <p v-if="!summary?.can_apply" class="text-center text-xs text-amber-600 dark:text-amber-300">当前可开票金额未达到起开金额。</p>
+              <p v-if="!summary?.can_apply" class="text-center text-xs text-[var(--apple-warning)]">
+                {{ t('invoice.page.form.minimumNotMet') }}
+              </p>
             </form>
           </section>
         </aside>
       </div>
 
-      <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-800">
-        <div class="border-b border-gray-100 p-5 dark:border-dark-700">
-          <h2 class="text-base font-semibold text-gray-950 dark:text-white">我的申请记录</h2>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">查看发票申请处理状态。</p>
+      <section class="overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] shadow-sm">
+        <div class="border-b border-[color:var(--apple-border-soft)] p-5">
+          <h2 class="text-base font-semibold text-[var(--apple-text)]">{{ t('invoice.page.records.title') }}</h2>
+          <p class="mt-1 text-sm text-[var(--apple-muted)]">{{ t('invoice.page.records.description') }}</p>
         </div>
 
         <div v-if="loading" class="flex justify-center py-16">
-          <div class="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+          <div class="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--apple-border)] border-t-[color:var(--apple-blue)]"></div>
         </div>
 
         <div v-else-if="invoices.length === 0" class="py-16 text-center">
-          <Icon name="document" size="xl" class="mx-auto mb-3 text-gray-300 dark:text-dark-600" />
-          <p class="font-medium text-gray-700 dark:text-gray-200">暂无申请记录</p>
+          <Icon name="document" size="xl" class="mx-auto mb-3 text-[var(--apple-muted-2)]" />
+          <p class="font-medium text-[var(--apple-text)]">{{ t('invoice.page.records.emptyTitle') }}</p>
+          <p class="mt-1 text-sm text-[var(--apple-muted)]">{{ t('invoice.page.records.emptyDescription') }}</p>
         </div>
 
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-[880px] w-full text-left text-sm">
-            <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-dark-900 dark:text-gray-400">
-              <tr>
-                <th class="px-4 py-3">发票抬头</th>
-                <th class="px-4 py-3">发票类型</th>
-                <th class="px-4 py-3 text-right">开票金额</th>
-                <th class="px-4 py-3">订单数</th>
-                <th class="px-4 py-3">状态</th>
-                <th class="px-4 py-3">发票号码</th>
-                <th class="px-4 py-3">提交时间</th>
-                <th class="px-4 py-3">备注</th>
-                <th class="px-4 py-3 text-right">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
-              <tr v-for="item in invoices" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-dark-700/50">
-                <td class="max-w-[220px] truncate px-4 py-3 font-medium text-gray-950 dark:text-white" :title="item.title">{{ item.title }}</td>
-                <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ invoiceTypeLabel(item.invoice_type) }}</td>
-                <td class="px-4 py-3 text-right font-semibold text-gray-950 dark:text-white">{{ formatMoney(item.amount) }}</td>
-                <td class="px-4 py-3 text-gray-500 dark:text-gray-400">按金额申请</td>
-                <td class="px-4 py-3"><span :class="['badge', statusBadgeClass(item.status)]">{{ statusLabel(item.status) }}</span></td>
-                <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ item.invoice_no || '-' }}</td>
-                <td class="whitespace-nowrap px-4 py-3 text-gray-500 dark:text-gray-400">{{ formatDateTime(item.created_at) }}</td>
-                <td class="max-w-[220px] truncate px-4 py-3 text-gray-500 dark:text-gray-400" :title="item.admin_note || item.note">{{ item.admin_note || item.note || '-' }}</td>
-                <td class="px-4 py-3 text-right">
-                  <button v-if="item.status === 'pending'" class="text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400" @click="cancel(item)">取消</button>
-                  <span v-else class="text-sm text-gray-400">-</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <template v-else>
+          <div class="hidden md:block overflow-x-auto">
+            <table class="min-w-[980px] w-full text-left text-sm">
+              <thead class="bg-[var(--apple-surface-elevated)] text-xs text-[var(--apple-muted)]">
+                <tr>
+                  <th class="px-4 py-3">{{ t('invoice.page.records.columns.title') }}</th>
+                  <th class="px-4 py-3">{{ t('invoice.page.records.columns.type') }}</th>
+                  <th class="px-4 py-3 text-right">{{ t('invoice.page.records.columns.amount') }}</th>
+                  <th class="px-4 py-3">{{ t('invoice.page.records.columns.orderCount') }}</th>
+                  <th class="px-4 py-3">{{ t('invoice.page.records.columns.status') }}</th>
+                  <th class="px-4 py-3">{{ t('invoice.page.records.columns.number') }}</th>
+                  <th class="px-4 py-3">{{ t('invoice.page.records.columns.submittedAt') }}</th>
+                  <th class="px-4 py-3">{{ t('invoice.page.records.columns.note') }}</th>
+                  <th class="px-4 py-3 text-right">{{ t('invoice.page.records.columns.actions') }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[color:var(--apple-border-soft)]">
+                <tr v-for="item in invoices" :key="item.id" class="transition-colors hover:bg-[var(--apple-hover)]">
+                  <td class="max-w-[220px] truncate px-4 py-3 font-medium text-[var(--apple-text)]" :title="item.title">{{ item.title }}</td>
+                  <td class="px-4 py-3 text-[var(--apple-muted)]">{{ invoiceTypeLabel(item.invoice_type) }}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-[var(--apple-text)]">{{ formatMoney(item.amount) }}</td>
+                  <td class="px-4 py-3 text-[var(--apple-muted)]">{{ t('invoice.page.records.amountByTotal') }}</td>
+                  <td class="px-4 py-3">
+                    <span :class="['badge', statusBadgeClass(item.status)]">{{ statusLabel(item.status) }}</span>
+                  </td>
+                  <td class="px-4 py-3 text-[var(--apple-muted)]">{{ item.invoice_no || t('common.notAvailable') }}</td>
+                  <td class="whitespace-nowrap px-4 py-3 text-[var(--apple-muted)]">{{ formatDateTime(item.created_at) }}</td>
+                  <td class="max-w-[220px] truncate px-4 py-3 text-[var(--apple-muted)]" :title="item.admin_note || item.note">{{ item.admin_note || item.note || t('common.notAvailable') }}</td>
+                  <td class="px-4 py-3 text-right">
+                    <button
+                      v-if="item.status === 'pending'"
+                      class="text-sm font-medium text-[var(--apple-muted)] hover:text-[var(--apple-text)]"
+                      @click="cancel(item)"
+                    >
+                      {{ t('invoice.page.records.cancel') }}
+                    </button>
+                    <span v-else class="text-sm text-[var(--apple-muted-2)]">{{ t('common.notAvailable') }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="border-t border-gray-100 dark:border-dark-700">
+          <div class="space-y-3 p-4 md:hidden">
+            <article
+              v-for="item in invoices"
+              :key="item.id"
+              class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="truncate text-base font-medium text-[var(--apple-text)]" :title="item.title">
+                    {{ item.title }}
+                  </p>
+                  <p class="mt-0.5 text-xs text-[var(--apple-muted)]">{{ invoiceTypeLabel(item.invoice_type) }}</p>
+                </div>
+                <span :class="['badge', statusBadgeClass(item.status)]">{{ statusLabel(item.status) }}</span>
+              </div>
+
+              <dl class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.records.columns.amount') }}</dt>
+                  <dd class="mt-1 font-semibold text-[var(--apple-text)]">{{ formatMoney(item.amount) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.records.columns.number') }}</dt>
+                  <dd class="mt-1 text-[var(--apple-text)]">{{ item.invoice_no || t('common.notAvailable') }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.records.columns.submittedAt') }}</dt>
+                  <dd class="mt-1 text-[var(--apple-text)]">{{ formatDateTime(item.created_at) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-[var(--apple-muted)]">{{ t('invoice.page.records.columns.note') }}</dt>
+                  <dd class="mt-1 truncate text-[var(--apple-text)]" :title="item.admin_note || item.note">
+                    {{ item.admin_note || item.note || t('common.notAvailable') }}
+                  </dd>
+                </div>
+              </dl>
+
+              <div class="mt-4 flex items-center justify-between gap-3">
+                <span class="text-sm text-[var(--apple-muted)]">{{ t('invoice.page.records.amountByTotal') }}</span>
+                <button
+                  v-if="item.status === 'pending'"
+                  class="text-sm font-medium text-[var(--apple-muted)] hover:text-[var(--apple-text)]"
+                  @click="cancel(item)"
+                >
+                  {{ t('invoice.page.records.cancel') }}
+                </button>
+              </div>
+            </article>
+          </div>
+        </template>
+
+        <div class="border-t border-[color:var(--apple-border-soft)]">
           <Pagination
             v-if="invoicePagination.total > 0"
             :page="invoicePagination.page"
@@ -302,22 +495,22 @@
       </section>
     </div>
 
-    <BaseDialog :show="templateDialog.open" :title="templateDialog.mode === 'update' ? '更新开票模板' : '保存开票模板'" width="narrow" @close="templateDialog.open = false">
+    <BaseDialog :show="templateDialog.open" :title="templateDialogTitle" width="narrow" @close="templateDialog.open = false">
       <div class="space-y-4">
         <div>
-          <label class="input-label">模板名称</label>
-          <input v-model.trim="templateDialog.name" class="input" maxlength="80" placeholder="默认模板" />
+          <label class="input-label">{{ t('invoice.page.dialog.templateName') }}</label>
+          <input v-model.trim="templateDialog.name" class="input" maxlength="80" :placeholder="t('invoice.page.dialog.templateNamePlaceholder')" />
         </div>
-        <label class="flex items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm dark:border-dark-700">
-          <input v-model="templateDialog.is_default" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-          <span class="text-gray-700 dark:text-gray-300">设为默认模板</span>
+        <label class="flex items-start gap-3 rounded-lg border border-[color:var(--apple-border)] p-3 text-sm">
+          <input v-model="templateDialog.is_default" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-[color:var(--apple-border)] text-[var(--apple-blue)] focus:ring-[color:var(--apple-focus-ring)]" />
+          <span class="text-[var(--apple-muted)]">{{ t('invoice.page.dialog.defaultTemplate') }}</span>
         </label>
       </div>
       <template #footer>
-        <div class="flex justify-end gap-3">
-          <button class="btn btn-secondary" @click="templateDialog.open = false">取消</button>
-          <button class="btn btn-primary" :disabled="!canSaveTemplate || templateSaving" @click="saveTemplate">
-            {{ templateSaving ? '保存中' : '保存' }}
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button class="btn btn-secondary w-full sm:w-auto" @click="templateDialog.open = false">{{ t('common.cancel') }}</button>
+          <button class="btn btn-primary w-full sm:w-auto" :disabled="!canSaveTemplate || templateSaving" @click="saveTemplate">
+            {{ templateSaving ? t('common.saving') : t('common.save') }}
           </button>
         </div>
       </template>
@@ -349,7 +542,7 @@ interface OrderRow {
   invoiceAmount: number
 }
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const appStore = useAppStore()
 
 const loading = ref(false)
@@ -362,6 +555,12 @@ const templates = ref<InvoiceTemplate[]>([])
 const orders = ref<PaymentOrder[]>([])
 const selectedOrderIds = ref<Set<number>>(new Set())
 const selectedTemplateId = ref<number | ''>('')
+const invoiceTrustItems = computed(() => [
+  t('invoice.page.trust.eligibleOrders'),
+  t('invoice.page.trust.amountReserved'),
+  t('invoice.page.trust.requestTrace'),
+  t('invoice.page.trust.privacy'),
+])
 
 const invoicePagination = reactive({ page: 1, page_size: 10, total: 0 })
 const orderPagination = reactive({ page: 1, page_size: 20, total: 0 })
@@ -378,7 +577,7 @@ const form = reactive({
   invoice_type: 'company_vat_general' as InvoiceType,
   title: '',
   tax_id: '',
-  item_name: '信息技术服务费',
+  item_name: t('invoice.page.form.defaultItemName'),
   amount: undefined as number | undefined,
   receiver_email: '',
   note: '',
@@ -392,26 +591,34 @@ const templateDialog = reactive({
   is_default: false,
 })
 
-const invoiceTypeOptions = [
-  { value: 'company_vat_general', label: '普通发票' },
-  { value: 'company_vat_special', label: '专用发票' },
-  { value: 'personal', label: '个人发票' },
-]
+const invoiceTypeOptions = computed(() => [
+  { value: 'company_vat_general', label: t('invoice.page.types.company_vat_general') },
+  { value: 'company_vat_special', label: t('invoice.page.types.company_vat_special') },
+  { value: 'personal', label: t('invoice.page.types.personal') },
+])
 
-const orderStatusOptions = [
-  { value: '', label: '全部状态' },
-  { value: 'PENDING', label: '待支付' },
-  { value: 'COMPLETED', label: '已完成' },
-  { value: 'FAILED', label: '失败' },
-  { value: 'CANCELLED', label: '已取消' },
-  { value: 'REFUNDED', label: '已退款' },
-]
+const orderStatusOptions = computed(() => [
+  { value: '', label: t('common.all') },
+  { value: 'PENDING', label: t('payment.status.pending') },
+  { value: 'COMPLETED', label: t('payment.status.completed') },
+  { value: 'FAILED', label: t('payment.status.failed') },
+  { value: 'CANCELLED', label: t('payment.status.cancelled') },
+  { value: 'REFUNDED', label: t('payment.status.refunded') },
+])
 
-const invoiceabilityOptions = [
-  { value: 'all', label: '全部订单' },
-  { value: 'available', label: '可开票' },
-  { value: 'unavailable', label: '不可开票' },
-]
+const invoiceabilityOptions = computed(() => [
+  { value: 'all', label: t('invoice.page.invoiceability.all') },
+  { value: 'available', label: t('invoice.page.invoiceability.available') },
+  { value: 'unavailable', label: t('invoice.page.invoiceability.unavailable') },
+])
+
+const templateOptions = computed(() => [
+  { value: '', label: templates.value.length > 0 ? t('invoice.page.form.noTemplate') : t('invoice.page.form.noTemplates') },
+  ...templates.value.map((item) => ({
+    value: item.id,
+    label: `${item.name}${item.is_default ? t('invoice.page.form.defaultSuffix') : ''}`,
+  })),
+])
 
 const lockedInProgress = computed(() => Math.max((summary.value?.locked_amount || 0) - (summary.value?.invoiced_amount || 0), 0))
 const taxFeePreview = computed(() => roundMoney((Number(form.amount) || 0) * (summary.value?.tax_rate || 0.02)))
@@ -459,13 +666,11 @@ const activeTemplate = computed(() => {
   return templates.value.find((item) => item.id === id) || null
 })
 
-const templateOptions = computed(() => [
-  { value: '', label: templates.value.length > 0 ? '不使用模板' : '暂无模板' },
-  ...templates.value.map((item) => ({
-    value: item.id,
-    label: `${item.name}${item.is_default ? '（默认）' : ''}`,
-  })),
-])
+const templateDialogTitle = computed(() => (
+  templateDialog.mode === 'update'
+    ? t('invoice.page.dialog.updateTitle')
+    : t('invoice.page.dialog.createTitle')
+))
 
 const canSubmit = computed(() => {
   const amount = Number(form.amount) || 0
@@ -503,7 +708,7 @@ async function loadSummary() {
     const res = await invoicesAPI.getSummary()
     summary.value = res.data
   } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', '加载开票额度失败'))
+    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', t('invoice.page.messages.loadSummaryFailed')))
   }
 }
 
@@ -513,7 +718,7 @@ async function loadInvoices() {
     invoices.value = res.data.items || []
     invoicePagination.total = res.data.total || 0
   } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', '加载开票申请失败'))
+    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', t('invoice.page.messages.loadInvoicesFailed')))
   }
 }
 
@@ -530,7 +735,7 @@ async function loadOrders() {
     selectedOrderIds.value = new Set([...selectedOrderIds.value].filter((id) => orders.value.some((order) => order.id === id)))
     syncAmountFromSelection()
   } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', '加载订单失败'))
+    appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('invoice.page.messages.loadOrdersFailed')))
   } finally {
     ordersLoading.value = false
   }
@@ -548,7 +753,7 @@ async function loadTemplates() {
       }
     }
   } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', '加载开票模板失败'))
+    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', t('invoice.page.messages.loadTemplatesFailed')))
   }
 }
 
@@ -565,13 +770,13 @@ async function submit() {
       receiver_email: form.receiver_email,
       note: form.note,
     })
-    appStore.showSuccess('开票申请已提交')
+    appStore.showSuccess(t('invoice.page.messages.submitSuccess'))
     selectedOrderIds.value = new Set()
     form.amount = undefined
     form.note = ''
     await Promise.all([loadSummary(), loadInvoices()])
   } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', '提交开票申请失败'))
+    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', t('invoice.page.messages.submitFailed')))
   } finally {
     submitting.value = false
   }
@@ -580,10 +785,10 @@ async function submit() {
 async function cancel(item: InvoiceRequest) {
   try {
     await invoicesAPI.cancel(item.id)
-    appStore.showSuccess('已取消开票申请')
+    appStore.showSuccess(t('invoice.page.messages.cancelSuccess'))
     await Promise.all([loadSummary(), loadInvoices()])
   } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', '取消失败'))
+    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', t('invoice.page.messages.cancelFailed')))
   }
 }
 
@@ -657,7 +862,7 @@ function copyTemplateToForm(template: InvoiceTemplate) {
   form.invoice_type = template.invoice_type
   form.title = template.title
   form.tax_id = template.tax_id || ''
-  form.item_name = template.item_name || '信息技术服务费'
+  form.item_name = template.item_name || t('invoice.page.form.defaultItemName')
   form.receiver_email = template.receiver_email || ''
   form.note = template.note || ''
 }
@@ -665,7 +870,7 @@ function copyTemplateToForm(template: InvoiceTemplate) {
 function openCreateTemplateDialog() {
   templateDialog.mode = 'create'
   templateDialog.id = 0
-  templateDialog.name = form.title.trim() || '默认模板'
+  templateDialog.name = form.title.trim() || t('invoice.page.dialog.defaultTemplateName')
   templateDialog.is_default = templates.value.length === 0
   templateDialog.open = true
 }
@@ -696,12 +901,15 @@ async function saveTemplate() {
     const res = templateDialog.mode === 'update' && templateDialog.id > 0
       ? await invoicesAPI.updateTemplate(templateDialog.id, payload)
       : await invoicesAPI.createTemplate(payload)
+    const successMessage = templateDialog.mode === 'update'
+      ? t('invoice.page.messages.templateUpdated')
+      : t('invoice.page.messages.templateSaved')
     templateDialog.open = false
-    appStore.showSuccess(templateDialog.mode === 'update' ? '开票模板已更新' : '开票模板已保存')
+    appStore.showSuccess(successMessage)
     await loadTemplates()
     selectedTemplateId.value = res.data.id
   } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', '保存开票模板失败'))
+    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', t('invoice.page.messages.saveTemplateFailed')))
   } finally {
     templateSaving.value = false
   }
@@ -712,11 +920,11 @@ async function setDefaultTemplate() {
   templateSaving.value = true
   try {
     const res = await invoicesAPI.setDefaultTemplate(activeTemplate.value.id)
-    appStore.showSuccess('默认模板已更新')
+    appStore.showSuccess(t('invoice.page.messages.defaultTemplateUpdated'))
     await loadTemplates()
     selectedTemplateId.value = res.data.id
   } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', '设置默认模板失败'))
+    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', t('invoice.page.messages.defaultTemplateFailed')))
   } finally {
     templateSaving.value = false
   }
@@ -724,24 +932,24 @@ async function setDefaultTemplate() {
 
 async function deleteSelectedTemplate() {
   if (!activeTemplate.value || templateSaving.value) return
-  if (!window.confirm('删除这个开票模板？')) return
+  if (!window.confirm(t('invoice.page.messages.deleteTemplateConfirm'))) return
   templateSaving.value = true
   try {
     await invoicesAPI.deleteTemplate(activeTemplate.value.id)
-    appStore.showSuccess('开票模板已删除')
+    appStore.showSuccess(t('invoice.page.messages.templateDeleted'))
     selectedTemplateId.value = ''
     await loadTemplates()
   } catch (err: unknown) {
-    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', '删除开票模板失败'))
+    appStore.showError(extractI18nErrorMessage(err, t, 'invoice.errors', t('invoice.page.messages.deleteTemplateFailed')))
   } finally {
     templateSaving.value = false
   }
 }
 
 function getUnavailableReason(order: PaymentOrder, amount: number) {
-  if (order.order_type !== 'balance') return '非余额充值订单'
-  if (order.status !== 'COMPLETED') return '订单未完成'
-  if (amount <= 0) return '订单金额为 0'
+  if (order.order_type !== 'balance') return t('invoice.page.reasons.notBalance')
+  if (order.status !== 'COMPLETED') return t('invoice.page.reasons.notCompleted')
+  if (amount <= 0) return t('invoice.page.reasons.zeroAmount')
   return ''
 }
 
@@ -760,6 +968,15 @@ function isWithinDateRange(value?: string | null) {
   return true
 }
 
+function localeCode(): string | undefined {
+  const raw = locale.value as unknown
+  if (typeof raw === 'string') return raw
+  if (raw && typeof raw === 'object' && 'value' in raw) {
+    return String((raw as { value?: string }).value || '')
+  }
+  return undefined
+}
+
 function formatMoney(value?: number | null) {
   return `¥${(Number(value) || 0).toFixed(2)}`
 }
@@ -769,7 +986,7 @@ function formatOrderFee(order: PaymentOrder) {
   const amount = Number(order.amount) || 0
   if (payAmount > amount) return formatMoney(roundMoney(payAmount - amount))
   if (Number(order.fee_rate) > 0) return `${order.fee_rate}%`
-  return '-'
+  return t('common.notAvailable')
 }
 
 function roundMoney(value: number) {
@@ -777,30 +994,18 @@ function roundMoney(value: number) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return '-'
+  if (!value) return t('common.notAvailable')
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleString()
+  if (Number.isNaN(date.getTime())) return t('common.notAvailable')
+  return date.toLocaleString(localeCode())
 }
 
 function invoiceTypeLabel(type: InvoiceType | string) {
-  const map: Record<string, string> = {
-    company_vat_general: '普通发票',
-    company_vat_special: '专用发票',
-    personal: '个人发票',
-  }
-  return map[type] || type
+  return t(`invoice.page.types.${type}`, type)
 }
 
 function statusLabel(status: string) {
-  const map: Record<string, string> = {
-    pending: '待确认',
-    approved: '已确认',
-    rejected: '已驳回',
-    completed: '已完成',
-    cancelled: '已取消',
-  }
-  return map[status] || status
+  return t(`invoice.page.status.${status}`, status)
 }
 
 function statusBadgeClass(status: string) {
@@ -815,21 +1020,7 @@ function statusBadgeClass(status: string) {
 }
 
 function orderStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    PENDING: '待支付',
-    PAID: '已支付',
-    RECHARGING: '充值中',
-    COMPLETED: '已完成',
-    EXPIRED: '已过期',
-    CANCELLED: '已取消',
-    FAILED: '失败',
-    REFUND_REQUESTED: '退款申请中',
-    REFUNDING: '退款中',
-    PARTIALLY_REFUNDED: '部分退款',
-    REFUNDED: '已退款',
-    REFUND_FAILED: '退款失败',
-  }
-  return map[status] || status
+  return t(`payment.status.${status.toLowerCase()}`, status)
 }
 
 function orderStatusBadgeClass(status: string) {
@@ -851,18 +1042,7 @@ function orderStatusBadgeClass(status: string) {
 }
 
 function paymentTypeLabel(type: string) {
-  const map: Record<string, string> = {
-    alipay: '支付宝',
-    alipay_direct: '支付宝',
-    wxpay: '微信支付',
-    wxpay_direct: '微信支付',
-    stripe: '银行卡',
-    easypay: '易支付',
-    airwallex: 'Airwallex',
-    gmpay: 'GMPay',
-    usdt: 'USDT',
-  }
-  return map[type] || type || '-'
+  return t(`payment.methods.${type}`, type || t('common.notAvailable'))
 }
 
 onMounted(reload)

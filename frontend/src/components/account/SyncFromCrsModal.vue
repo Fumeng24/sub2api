@@ -162,7 +162,7 @@
     <!-- Step 3: Result -->
     <div v-else-if="currentStep === 'result' && result" class="space-y-4">
       <div
-        class="space-y-2 rounded-xl border border-gray-200 p-4 dark:border-dark-700"
+        class="space-y-2 rounded-lg border border-gray-200 p-4 dark:border-dark-700"
       >
         <div class="text-sm font-medium text-gray-900 dark:text-white">
           {{ t('admin.accounts.syncResult') }}

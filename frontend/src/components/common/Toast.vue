@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div
-      class="pointer-events-none fixed right-4 top-4 z-[9999] space-y-3"
+      class="pointer-events-none fixed left-4 right-4 top-4 z-[9999] space-y-3 sm:left-auto sm:w-[min(28rem,calc(100vw-2rem))]"
       aria-live="polite"
       aria-atomic="true"
     >
@@ -17,9 +17,7 @@
           v-for="toast in toasts"
           :key="toast.id"
           :class="[
-            'pointer-events-auto min-w-[320px] max-w-md overflow-hidden rounded-lg shadow-lg',
-            'bg-white dark:bg-dark-800',
-            'border-l-4',
+            'toast-card pointer-events-auto w-full overflow-hidden rounded-lg border border-l-4',
             getBorderColor(toast.type)
           ]"
         >
@@ -37,15 +35,15 @@
 
               <!-- Content -->
               <div class="min-w-0 flex-1">
-                <p v-if="toast.title" class="text-sm font-semibold text-gray-900 dark:text-white">
+                <p v-if="toast.title" class="truncate text-sm font-semibold text-[color:var(--apple-text)]">
                   {{ toast.title }}
                 </p>
                 <p
                   :class="[
-                    'text-sm leading-relaxed',
+                    'break-words text-sm leading-relaxed',
                     toast.title
-                      ? 'mt-1 text-gray-600 dark:text-gray-300'
-                      : 'text-gray-900 dark:text-white'
+                      ? 'mt-1 text-[color:var(--apple-muted)]'
+                      : 'text-[color:var(--apple-text)]'
                   ]"
                 >
                   {{ toast.message }}
@@ -55,7 +53,7 @@
               <!-- Close button -->
               <button
                 @click="removeToast(toast.id)"
-                class="-m-1 flex-shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-dark-700 dark:hover:text-gray-300"
+                class="-m-1 flex-shrink-0 rounded-lg p-1 text-[color:var(--apple-muted-2)] transition-colors hover:bg-[color:var(--apple-hover)] hover:text-[color:var(--apple-text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--apple-focus-ring)]"
                 aria-label="Close notification"
               >
                 <Icon name="x" size="sm" />
@@ -64,7 +62,7 @@
           </div>
 
           <!-- Progress bar -->
-          <div v-if="toast.duration" class="h-1 bg-gray-100 dark:bg-dark-700">
+          <div v-if="toast.duration" class="h-1 bg-[color:var(--apple-border-soft)]">
             <div
               :class="['h-full toast-progress', getProgressBarColor(toast.type)]"
               :style="{ animationDuration: `${toast.duration}ms` }"
@@ -111,10 +109,10 @@ const getIconColor = (type: string): string => {
 
 const getBorderColor = (type: string): string => {
   const colors: Record<string, string> = {
-    success: 'border-green-500',
-    error: 'border-red-500',
-    warning: 'border-yellow-500',
-    info: 'border-blue-500'
+    success: 'border-l-green-500',
+    error: 'border-l-red-500',
+    warning: 'border-l-yellow-500',
+    info: 'border-l-blue-500'
   }
   return colors[type] || colors.info
 }
@@ -135,6 +133,13 @@ const removeToast = (id: string) => {
 </script>
 
 <style scoped>
+.toast-card {
+  max-width: min(28rem, calc(100vw - 2rem));
+  background: var(--apple-surface);
+  border-color: var(--apple-border);
+  box-shadow: var(--apple-shadow-md);
+}
+
 .toast-progress {
   width: 100%;
   animation-name: toast-progress-shrink;

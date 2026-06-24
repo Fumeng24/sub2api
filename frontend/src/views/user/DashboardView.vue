@@ -7,17 +7,17 @@
 
       <div
         v-else-if="loadError"
-        class="rounded-lg border border-red-100 bg-white p-8 text-center shadow-sm dark:border-red-900/40 dark:bg-dark-800"
+        class="card empty-state border-[color:var(--apple-border)]"
       >
         <div
-          class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300"
+          class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[var(--apple-radius)] bg-[var(--apple-surface-elevated)] text-[var(--apple-danger)] ring-1 ring-[color:var(--apple-border)]"
         >
           <Icon name="exclamationTriangle" size="lg" :stroke-width="2" />
         </div>
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+        <h2 class="empty-state-title">
           {{ t('dashboard.loadFailed') }}
         </h2>
-        <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500 dark:text-gray-400">
+        <p class="empty-state-description">
           {{ loadError }}
         </p>
         <button type="button" class="btn btn-primary mt-5" @click="refreshAll">
@@ -27,20 +27,33 @@
       </div>
 
       <template v-else-if="stats">
-        <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-dark-700 sm:flex-row sm:items-end sm:justify-between">
-          <div class="min-w-0">
-            <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+        <div class="page-header mb-0 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0 space-y-2">
+            <h1 class="page-title">
               {{ t('dashboard.title') }}
             </h1>
-            <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-              {{ t('dashboard.welcomeMessage') }}
+            <p class="page-description max-w-3xl leading-6">
+              {{ t('dashboard.hero.description') }}
+            </p>
+            <div class="flex flex-wrap gap-2 text-xs text-[var(--apple-muted)]">
+              <span
+                v-for="item in dashboardHighlights"
+                :key="item.label"
+                class="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-[var(--apple-surface-elevated)] px-2.5 py-1 ring-1 ring-[color:var(--apple-border-soft)]"
+              >
+                <Icon :name="item.icon" size="xs" class="text-[var(--apple-blue)]" />
+                <span class="min-w-0 truncate">{{ item.label }}</span>
+              </span>
+            </div>
+            <p class="text-xs leading-5 text-[var(--apple-muted-2)]">
+              {{ t('dashboard.hero.note') }}
             </p>
           </div>
-          <button type="button" class="btn btn-secondary shrink-0" :disabled="loading || loadingCharts || loadingUsage" @click="refreshAll">
+          <button type="button" class="btn btn-secondary w-full shrink-0 rounded-[var(--apple-radius)] sm:w-auto" :disabled="isRefreshing" @click="refreshAll">
             <Icon
               name="refresh"
               size="sm"
-              :class="loading || loadingCharts || loadingUsage ? 'animate-spin' : ''"
+              :class="isRefreshing ? 'animate-spin' : ''"
             />
             {{ t('common.refresh') }}
           </button>
@@ -99,6 +112,8 @@ import { useAppStore } from '@/stores/app'
 import type { Group } from '@/types'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
+type IconName = InstanceType<typeof Icon>['$props']['name']
+
 const { t } = useI18n()
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -115,11 +130,20 @@ const platformQuotas = ref<PlatformQuotaItem[] | null>(null)
 const balanceCnyPerCredit = ref(6.8)
 const balanceGroups = ref<Group[]>([])
 const userGroupRates = ref<Record<number, number>>({})
-
 const formatLD = (d: Date) => d.toISOString().split('T')[0]
 const startDate = ref(formatLD(new Date(Date.now() - 6 * 86400000)))
 const endDate = ref(formatLD(new Date()))
 const granularity = ref('day')
+const isRefreshing = computed(() => loading.value || loadingCharts.value || loadingUsage.value)
+
+const dashboardHighlights = computed<Array<{ icon: IconName; label: string }>>(() => {
+  return [
+    { icon: 'badge', label: t('dashboard.assurance.official') },
+    { icon: 'shield', label: t('dashboard.assurance.noRetention') },
+    { icon: 'calculator', label: t('dashboard.assurance.billingCover') },
+    { icon: 'bolt', label: t('dashboard.assurance.stability') },
+  ]
+})
 
 const loadStats = async () => {
   loading.value = true

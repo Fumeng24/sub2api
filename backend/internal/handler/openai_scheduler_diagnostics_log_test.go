@@ -122,3 +122,26 @@ func TestOpenAISelectionEmptyErrorResponse_ImageGenerationBridgeUnsupported(t *t
 	require.Equal(t, "image_generation_bridge_not_available", errType)
 	require.Contains(t, message, "image_generation")
 }
+
+func TestOpenAISelectionUnavailableExhaustedByFailover(t *testing.T) {
+	decision := service.OpenAIAccountScheduleDecision{
+		Diagnostics: service.OpenAIAccountSelectionDiagnostics{
+			Collected:           true,
+			AfterExcludedCount:  0,
+			FinalCandidateCount: 0,
+			ExcludedAccountIDs:  []int64{1},
+		},
+	}
+
+	require.True(t, openAISelectionUnavailableExhaustedByFailover(service.ErrNoAvailableAccounts, decision, 1))
+	require.False(t, openAISelectionUnavailableExhaustedByFailover(service.ErrNoAvailableAccounts, decision, 0))
+	require.False(t, openAISelectionUnavailableExhaustedByFailover(errors.New("scheduler unavailable"), decision, 1))
+}
+
+func TestOpenAISelectionFailoverExhaustedErrorResponseAlways503(t *testing.T) {
+	status, errType, message := openAISelectionFailoverExhaustedErrorResponse()
+
+	require.Equal(t, http.StatusServiceUnavailable, status)
+	require.Equal(t, "api_error", errType)
+	require.Contains(t, message, "No available accounts")
+}

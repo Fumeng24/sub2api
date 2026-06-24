@@ -373,10 +373,7 @@
       </transition>
     </template>
 
-    <!-- Non-admin: Simple static version text -->
-    <span v-else-if="version" class="text-xs text-gray-500 dark:text-dark-400">
-      v{{ version }}
-    </span>
+    <!-- Non-admin users do not need deployment metadata in the product chrome. -->
   </div>
 </template>
 

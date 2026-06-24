@@ -3,7 +3,7 @@
     <div class="space-y-6">
       <!-- Title -->
       <div class="text-center">
-        <h2 class="text-xl font-semibold tracking-tight text-gray-950 dark:text-white">
+        <h2 class="text-xl font-semibold tracking-normal text-gray-950 dark:text-white">
           {{ t('auth.forgotPasswordTitle') }}
         </h2>
         <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-dark-400">
@@ -13,10 +13,10 @@
 
       <!-- Success State -->
       <div v-if="isSubmitted" class="space-y-6">
-        <div class="rounded-md border border-green-200 bg-green-50 p-5 dark:border-green-800/50 dark:bg-green-900/20">
+        <div class="rounded-lg border border-green-200 bg-green-50 p-5 dark:border-green-500/30 dark:bg-green-500/10">
           <div class="flex flex-col items-center gap-4 text-center">
-            <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-green-100 dark:bg-green-800/50">
-              <Icon name="checkCircle" size="lg" class="text-green-600 dark:text-green-400" />
+            <div class="flex h-11 w-11 items-center justify-center rounded-lg border border-green-200 bg-white dark:border-green-500/30 dark:bg-dark-900">
+              <Icon name="checkCircle" size="lg" class="text-green-600 dark:text-green-300" />
             </div>
             <div>
               <h3 class="text-base font-semibold text-green-800 dark:text-green-200">

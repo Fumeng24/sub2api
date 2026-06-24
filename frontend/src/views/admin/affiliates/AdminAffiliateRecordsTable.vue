@@ -1,5 +1,6 @@
 <template>
   <AppLayout>
+    <div class="admin-apple-page admin-table-page">
     <TablePageLayout>
       <template #filters>
         <div class="flex flex-wrap items-center gap-3">
@@ -138,6 +139,7 @@
         </div>
       </div>
     </BaseDialog>
+    </div>
   </AppLayout>
 </template>
 
@@ -157,6 +159,7 @@ import { affiliatesAPI, type AffiliateInviteRecord, type AffiliateRebateRecord, 
 import type { PaginatedResponse } from '@/types'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { formatDateTime as formatDisplayDateTime } from '@/utils/format'
+import '../adminApple.css'
 
 type RecordType = 'invites' | 'rebates' | 'transfers'
 type AffiliateRecord = AffiliateInviteRecord | AffiliateRebateRecord | AffiliateTransferRecord

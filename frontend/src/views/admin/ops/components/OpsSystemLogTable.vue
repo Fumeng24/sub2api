@@ -357,7 +357,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-900/60">
+  <section class="admin-ops-panel p-4">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h3 class="text-sm font-bold text-gray-900 dark:text-white">系统日志</h3>
@@ -371,7 +371,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-800/70">
+    <div class="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-800/70">
       <div class="mb-2 flex items-center justify-between">
         <div class="text-xs font-semibold text-gray-700 dark:text-gray-200">运行时日志配置（实时生效）</div>
         <span v-if="runtimeLoading" class="text-xs text-gray-500">加载中...</span>
@@ -481,7 +481,7 @@ onMounted(async () => {
       <button type="button" class="btn btn-secondary btn-sm" @click="fetchHealth">刷新健康指标</button>
     </div>
 
-    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-700">
+    <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700">
       <div v-if="loading" class="px-4 py-8 text-center text-sm text-gray-500">加载中...</div>
       <div v-else-if="!hasData" class="px-4 py-8 text-center text-sm text-gray-500">暂无系统日志</div>
       <div v-else class="overflow-auto">

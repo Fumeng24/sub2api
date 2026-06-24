@@ -3,75 +3,59 @@
     <Transition name="popup-fade">
       <div
         v-if="announcementStore.currentPopup"
-        class="fixed bottom-4 left-1/2 z-[120] w-[calc(100vw-2rem)] max-w-[560px] -translate-x-1/2 sm:bottom-6 lg:left-auto lg:right-6 lg:max-w-[520px] lg:translate-x-0"
+        class="announcement-popup-shell fixed inset-0 z-[120] bg-black/45 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
       >
         <div
-          class="flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10 sm:max-h-[calc(100vh-3rem)]"
+          class="announcement-popup-card flex w-full max-w-[560px] flex-col overflow-hidden rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] shadow-sm"
           @click.stop
         >
-          <!-- Header with warm gradient -->
-          <div class="relative shrink-0 overflow-hidden border-b border-amber-100/80 bg-gradient-to-br from-amber-50/80 via-orange-50/50 to-yellow-50/30 px-4 py-5 dark:border-dark-700/50 dark:from-amber-900/20 dark:via-orange-900/10 dark:to-yellow-900/5 sm:px-8 sm:py-6">
-            <!-- Decorative background -->
-            <div class="absolute right-0 top-0 h-full w-64 bg-gradient-to-l from-orange-100/30 to-transparent dark:from-orange-900/20"></div>
-            <div class="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br from-amber-400/20 to-orange-500/20 blur-3xl"></div>
-            <div class="absolute -left-4 -bottom-4 h-24 w-24 rounded-full bg-gradient-to-tr from-yellow-400/20 to-amber-500/20 blur-2xl"></div>
+          <div class="relative shrink-0 overflow-hidden border-b border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] px-5 py-6 text-center sm:px-8 sm:py-7">
 
             <div class="relative z-10">
               <!-- Icon and badge -->
-              <div class="mb-3 flex items-center gap-2">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/30">
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
+              <div class="mb-4 flex items-center justify-center gap-2">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] text-[var(--apple-blue)]">
+                  <Icon name="bell" size="md" />
                 </div>
-                <span class="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1 text-xs font-medium text-white shadow-lg shadow-amber-500/30">
-                  <span class="relative flex h-2 w-2">
-                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"></span>
-                    <span class="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
-                  </span>
+                <span class="announcement-popup-soft-badge inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium">
                   {{ t('announcements.unread') }}
                 </span>
               </div>
 
               <!-- Title -->
-              <h2 class="mb-2 text-lg font-bold leading-tight text-gray-900 dark:text-white sm:text-xl">
+              <h2 class="mx-auto mb-2 max-w-[22rem] text-lg font-semibold leading-tight text-[var(--apple-text)] sm:text-xl">
                 {{ announcementStore.currentPopup.title }}
               </h2>
 
               <!-- Time -->
-              <div class="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              <div class="flex items-center justify-center gap-1.5 text-sm text-[var(--apple-muted)]">
+                <Icon name="clock" size="sm" />
                 <time>{{ formatRelativeWithDateTime(announcementStore.currentPopup.created_at) }}</time>
               </div>
             </div>
           </div>
 
           <!-- Body -->
-          <div class="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-6 dark:bg-dark-800 sm:px-8 sm:py-8">
-            <div class="relative">
-              <div class="absolute left-0 top-0 bottom-0 w-1 rounded-full bg-gradient-to-b from-amber-500 via-orange-500 to-yellow-500"></div>
-              <div class="pl-6">
-                <div
-                  class="markdown-body prose prose-sm max-w-none dark:prose-invert"
-                  v-html="renderedContent"
-                ></div>
-              </div>
+          <div class="announcement-popup-body announcement-scroll min-h-0 flex-1 overflow-y-auto bg-[var(--apple-surface)] px-5 py-6 sm:px-8 sm:py-8">
+            <div class="mx-auto max-w-[44ch]">
+              <div
+                class="announcement-popup-markdown announcement-markdown markdown-body prose prose-sm max-w-none dark:prose-invert"
+                v-html="renderedContent"
+              ></div>
             </div>
           </div>
 
           <!-- Footer -->
-          <div class="shrink-0 border-t border-gray-100 bg-gray-50/50 px-4 py-4 dark:border-dark-700 dark:bg-dark-900/30 sm:px-8 sm:py-5">
-            <div class="flex items-center justify-end">
+          <div class="shrink-0 border-t border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] px-4 py-4 sm:px-8 sm:py-5">
+            <div class="flex items-center justify-center">
               <button
                 @click="handleDismiss"
-                class="rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-2.5 text-sm font-medium text-white shadow-lg shadow-amber-500/30 transition-all hover:shadow-xl hover:scale-105"
+                class="w-full rounded-lg bg-[var(--apple-blue)] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--apple-blue-hover)] sm:w-auto"
               >
-                <span class="flex items-center gap-2">
-                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
+                <span class="flex items-center justify-center gap-2">
+                  <Icon name="check" size="sm" />
                   {{ t('announcements.markRead') }}
                 </span>
               </button>
@@ -84,15 +68,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useAnnouncementStore } from '@/stores/announcements'
 import { formatRelativeWithDateTime } from '@/utils/format'
+import { releaseBodyModalLock, setBodyModalLock } from '@/utils/modalLock'
+import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 const announcementStore = useAnnouncementStore()
+const modalLockToken = Symbol('announcement-popup')
 
 marked.setOptions({
   breaks: true,
@@ -109,15 +96,121 @@ const renderedContent = computed(() => {
 function handleDismiss() {
   announcementStore.dismissPopup()
 }
+
+watch(
+  () => Boolean(announcementStore.currentPopup),
+  (isOpen) => {
+    setBodyModalLock(modalLockToken, isOpen)
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  releaseBodyModalLock(modalLockToken)
+})
 </script>
 
 <style scoped>
+.announcement-popup-shell {
+  --announcement-popup-inset-top: max(1rem, env(safe-area-inset-top, 0px));
+  --announcement-popup-inset-right: max(1rem, env(safe-area-inset-right, 0px));
+  --announcement-popup-inset-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  --announcement-popup-inset-left: max(1rem, env(safe-area-inset-left, 0px));
+  --announcement-popup-inline-margin: max(var(--announcement-popup-inset-left), var(--announcement-popup-inset-right));
+  --announcement-popup-block-margin: max(var(--announcement-popup-inset-top), var(--announcement-popup-inset-bottom));
+  --announcement-popup-scrollbar-offset: calc((100vw - 100%) / 2);
+
+  height: 100vh;
+  height: 100svh;
+  height: 100dvh;
+  overflow: hidden;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+}
+
+.announcement-popup-card {
+  position: absolute;
+  left: calc(50% + var(--announcement-popup-scrollbar-offset));
+  top: 50%;
+  width: min(560px, calc(100% - var(--announcement-popup-inline-margin) - var(--announcement-popup-inline-margin)));
+  max-height: calc(100% - var(--announcement-popup-block-margin) - var(--announcement-popup-block-margin));
+  max-height: min(760px, calc(100dvh - var(--announcement-popup-block-margin) - var(--announcement-popup-block-margin)));
+  margin: 0;
+  box-shadow: var(--apple-shadow-md);
+  transform-origin: center center;
+  transform: translate3d(-50%, -50%, 0) scale(1);
+}
+
+.announcement-popup-markdown {
+  color: var(--apple-text);
+  text-align: center;
+}
+
+.announcement-popup-soft-badge {
+  background: color-mix(in srgb, var(--apple-blue) 12%, var(--apple-surface));
+  color: var(--apple-blue);
+}
+
+.announcement-popup-markdown :deep(:first-child) {
+  margin-top: 0;
+}
+
+.announcement-popup-markdown :deep(:last-child) {
+  margin-bottom: 0;
+}
+
+.announcement-popup-markdown :deep(:is(ul, ol, pre, blockquote, table)) {
+  text-align: left;
+}
+
+.announcement-popup-markdown :deep(:is(ul, ol)) {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.announcement-popup-body {
+  scrollbar-gutter: stable both-edges;
+}
+
+.announcement-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.announcement-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.announcement-scroll::-webkit-scrollbar-thumb {
+  background: var(--apple-border);
+  border-radius: 999px;
+}
+
+.announcement-markdown {
+  overflow-wrap: anywhere;
+}
+
+.announcement-markdown :deep(pre),
+.announcement-markdown :deep(table) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.announcement-markdown :deep(table) {
+  display: block;
+  border-collapse: collapse;
+}
+
+.announcement-markdown :deep(img) {
+  height: auto;
+  max-width: 100%;
+}
+
 .popup-fade-enter-active {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .popup-fade-leave-active {
-  transition: all 0.2s cubic-bezier(0.4, 0, 1, 1);
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 1, 1);
 }
 
 .popup-fade-enter-from,
@@ -125,31 +218,39 @@ function handleDismiss() {
   opacity: 0;
 }
 
-.popup-fade-enter-from > div {
-  transform: scale(0.94) translateY(-12px);
+.popup-fade-enter-active .announcement-popup-card,
+.popup-fade-leave-active .announcement-popup-card {
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.popup-fade-enter-from .announcement-popup-card {
+  transform: translate3d(-50%, -50%, 0) scale(0.96);
   opacity: 0;
 }
 
-.popup-fade-leave-to > div {
-  transform: scale(0.96) translateY(-8px);
+.popup-fade-leave-to .announcement-popup-card {
+  transform: translate3d(-50%, -50%, 0) scale(0.98);
   opacity: 0;
 }
 
-/* Scrollbar Styling */
-.overflow-y-auto::-webkit-scrollbar {
-  width: 8px;
+.popup-fade-enter-to .announcement-popup-card,
+.popup-fade-leave-from .announcement-popup-card {
+  transform: translate3d(-50%, -50%, 0) scale(1);
+  opacity: 1;
 }
 
-.overflow-y-auto::-webkit-scrollbar-track {
-  background: transparent;
+@media (prefers-reduced-motion: reduce) {
+  .popup-fade-enter-active,
+  .popup-fade-leave-active,
+  .popup-fade-enter-active .announcement-popup-card,
+  .popup-fade-leave-active .announcement-popup-card {
+    transition-duration: 1ms;
+  }
+
+  .popup-fade-enter-from .announcement-popup-card,
+  .popup-fade-leave-to .announcement-popup-card {
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
 }
 
-.overflow-y-auto::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #cbd5e1, #94a3b8);
-  border-radius: 4px;
-}
-
-.dark .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #4b5563, #374151);
-}
 </style>

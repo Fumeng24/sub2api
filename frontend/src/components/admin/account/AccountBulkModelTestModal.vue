@@ -6,7 +6,7 @@
     @close="handleClose"
   >
     <div class="space-y-5">
-      <div class="rounded-2xl border border-blue-100 bg-blue-50/80 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+      <div class="rounded-lg border border-blue-100 bg-blue-50/80 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div class="text-sm font-semibold text-blue-900 dark:text-blue-100">
@@ -38,7 +38,7 @@
             </span>
           </div>
 
-          <div class="rounded-xl border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-800">
+          <div class="rounded-lg border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-800">
             <div class="mb-3 flex gap-2">
               <input
                 v-model="modelSearch"
@@ -138,7 +138,7 @@
         </div>
       </div>
 
-      <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-dark-600 dark:bg-dark-800/80">
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-dark-600 dark:bg-dark-800/80">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {{ t('admin.accounts.bulkModelTest.resultSummary', { total: summary.total, success: summary.success, failed: summary.failed }) }}
@@ -247,6 +247,12 @@ const mode = ref<'default' | 'compact'>('default')
 const concurrency = ref(6)
 const results = ref<BulkTestModelResult[]>([])
 const summary = ref({ total: 0, success: 0, failed: 0 })
+const fallbackTestModelsByPlatform: Record<string, string[]> = {
+  openai: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.2', 'gpt-image-2'],
+  anthropic: ['claude-fable-5', 'claude-sonnet-4-6', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'],
+  gemini: ['gemini-3.1-flash-image', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+  antigravity: ['claude-fable-5', 'claude-sonnet-4-6', 'gemini-3.1-flash-image', 'gemini-3.1-pro-high', 'gemini-3-flash']
+}
 
 const accountNameByID = computed(() => new Map(props.accounts.map(account => [account.id, account.name])))
 const accountSummary = computed(() => props.accounts.map(account => `#${account.id} ${account.name}`).join('，'))
@@ -309,7 +315,12 @@ const resetForm = () => {
   summary.value = { total: 0, success: 0, failed: 0 }
 }
 
-const normalizeModelOptions = (models: ClaudeModel[]) => {
+const fallbackModelOptions = (platform: string): ModelOption[] => {
+  const models = fallbackTestModelsByPlatform[platform] || fallbackTestModelsByPlatform.anthropic
+  return models.map(id => ({ id, displayName: id }))
+}
+
+const normalizeModelOptions = (models: ClaudeModel[], platform: string) => {
   const seen = new Set<string>()
   const options: ModelOption[] = []
   for (const model of models) {
@@ -321,7 +332,7 @@ const normalizeModelOptions = (models: ClaudeModel[]) => {
       displayName: model.display_name || id
     })
   }
-  return options
+  return options.length > 0 ? options : fallbackModelOptions(platform)
 }
 
 const loadModels = async () => {
@@ -335,7 +346,7 @@ const loadModels = async () => {
         const account = queue.shift()
         if (!account) continue
         try {
-          const models = normalizeModelOptions(await adminAPI.accounts.getAvailableModels(account.id))
+          const models = normalizeModelOptions(await adminAPI.accounts.getAvailableModels(account.id), account.platform)
           for (const model of models) {
             if (!collected.has(model.id)) {
               collected.set(model.id, model)
@@ -343,6 +354,11 @@ const loadModels = async () => {
           }
         } catch (error) {
           console.warn('Failed to load account models:', account.id, error)
+          for (const model of fallbackModelOptions(account.platform)) {
+            if (!collected.has(model.id)) {
+              collected.set(model.id, model)
+            }
+          }
         }
       }
     })

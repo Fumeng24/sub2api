@@ -3,120 +3,110 @@
     <div
       v-for="idx in 6"
       :key="idx"
-      class="h-64 animate-pulse rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800"
+      class="h-56 animate-pulse rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-5"
     >
-      <div class="h-4 w-1/3 rounded bg-gray-200 dark:bg-dark-700" />
-      <div class="mt-4 h-8 w-2/3 rounded bg-gray-200 dark:bg-dark-700" />
+      <div class="h-4 w-1/3 rounded bg-[var(--apple-surface-elevated)]" />
+      <div class="mt-4 h-8 w-2/3 rounded bg-[var(--apple-surface-elevated)]" />
       <div class="mt-6 grid gap-3">
-        <div class="h-16 rounded-lg bg-gray-100 dark:bg-dark-700/70" />
-        <div class="h-16 rounded-lg bg-gray-100 dark:bg-dark-700/70" />
+        <div class="h-16 rounded-lg bg-[var(--apple-surface-elevated)]" />
+        <div class="h-16 rounded-lg bg-[var(--apple-surface-elevated)]" />
       </div>
     </div>
   </div>
 
-  <div v-else-if="rows.length === 0" class="rounded-lg border border-gray-200 bg-white py-16 text-center shadow-sm dark:border-dark-700 dark:bg-dark-800">
-    <Icon name="inbox" size="xl" class="mx-auto mb-3 h-12 w-12 text-gray-400" />
-    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ emptyLabel }}</p>
+  <div v-else-if="rows.length === 0" class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] py-16 text-center">
+    <Icon name="inbox" size="xl" class="mx-auto mb-3 h-12 w-12 text-[var(--apple-muted)]" />
+    <p class="text-sm font-medium text-[var(--apple-muted)]">{{ emptyLabel }}</p>
   </div>
 
-  <div v-else class="space-y-5">
+  <div v-else class="space-y-4">
     <article
       v-for="(channel, chIdx) in rows"
       :key="`${channel.name}-${chIdx}`"
-      class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-800"
+      class="space-y-3 border-t border-[color:var(--apple-border-soft)] pt-5 first:border-t-0 first:pt-0"
     >
-      <div class="border-b border-gray-100 bg-white p-4 dark:border-dark-700 dark:bg-dark-800 sm:p-5">
+      <div>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0">
-            <div class="mb-2 flex flex-wrap items-center gap-2">
-              <span class="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2.5 py-1 text-[11px] font-semibold text-gray-600 ring-1 ring-gray-200 dark:bg-dark-900 dark:text-gray-300 dark:ring-dark-700">
-                <Icon name="server" size="xs" />
-                {{ t('availableChannels.channel') }}
-              </span>
-              <span class="rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-800/60">
-                {{ t('availableChannels.visible') }}
-              </span>
-            </div>
-            <h2 class="break-words text-xl font-semibold tracking-normal text-gray-950 dark:text-white">
+            <p class="mb-2 text-xs font-semibold text-[var(--apple-muted)]">
+              {{ t('availableChannels.channel') }}
+            </p>
+            <h2 class="break-words text-xl font-semibold tracking-normal text-[var(--apple-text)]">
               {{ channel.name }}
             </h2>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-[var(--apple-muted)]">
               <template v-if="channel.description">{{ channel.description }}</template>
-              <span v-else>-</span>
+              <span v-else>{{ t('availableChannels.defaultServiceDescription') }}</span>
             </p>
           </div>
 
-          <div class="grid grid-cols-3 gap-2 lg:min-w-[300px]">
+          <div class="grid grid-cols-3 gap-2 lg:min-w-[300px]" :aria-label="t('availableChannels.serviceSummary')">
             <div
               v-for="item in channelStats(channel)"
               :key="item.label"
-              class="rounded-lg bg-gray-50 px-3 py-2 ring-1 ring-gray-200 dark:bg-dark-900 dark:ring-dark-700"
+              class="min-w-0 rounded-lg bg-[var(--apple-surface-elevated)] px-3 py-2 ring-1 ring-[color:var(--apple-border-soft)]"
             >
-              <p class="text-[10px] font-medium text-gray-500 dark:text-gray-400">{{ item.label }}</p>
-              <p class="mt-1 text-lg font-semibold text-gray-950 dark:text-white">{{ item.value }}</p>
+              <p class="truncate text-[10px] font-medium text-[var(--apple-muted)]">{{ item.label }}</p>
+              <p class="mt-1 text-lg font-semibold text-[var(--apple-text)]">{{ item.value }}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="space-y-4 p-3 sm:p-4">
+      <div class="space-y-4">
         <section
           v-for="section in channel.platforms"
           :key="sectionKey(channel, section)"
-          class="overflow-hidden rounded-lg border bg-white dark:bg-dark-900/40"
-          :class="platformBorderClass(section.platform)"
+          class="space-y-3 rounded-lg bg-[var(--apple-surface-elevated)] p-3 ring-1 ring-[color:var(--apple-border-soft)] sm:p-4"
         >
-          <div class="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-dark-700 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex min-w-0 items-center gap-3">
               <span
                 :class="[
-                  'inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border',
-                  platformBadgeLightClass(section.platform),
-                  platformBorderClass(section.platform),
+                  'inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg',
+                  platformTileClass(section.platform),
                 ]"
               >
                 <PlatformIcon :platform="section.platform as GroupPlatform" size="sm" />
               </span>
               <div class="min-w-0">
-                <p class="text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                <p class="text-[11px] font-medium text-[var(--apple-muted)]">
                   {{ section.platform }}
                 </p>
-                <h3 class="truncate text-base font-semibold text-gray-900 dark:text-white">
+                <h3 class="truncate text-base font-semibold text-[var(--apple-text)]">
                   {{ t('availableChannels.platformSectionTitle') }}
                 </h3>
               </div>
             </div>
 
-            <div class="flex flex-wrap gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-              <span class="rounded-md bg-white px-3 py-1 ring-1 ring-gray-100 dark:bg-dark-800 dark:ring-dark-700">
+            <div class="flex flex-wrap gap-2 text-xs font-medium text-[var(--apple-muted)]">
+              <span class="rounded-md bg-[var(--apple-surface)] px-3 py-1 ring-1 ring-[color:var(--apple-border-soft)]">
                 {{ section.groups.length }} {{ t('availableChannels.stats.groups') }}
               </span>
-              <span class="rounded-md bg-white px-3 py-1 ring-1 ring-gray-100 dark:bg-dark-800 dark:ring-dark-700">
+              <span class="rounded-md bg-[var(--apple-surface)] px-3 py-1 ring-1 ring-[color:var(--apple-border-soft)]">
                 {{ sectionModelCount(section) }} {{ t('availableChannels.stats.models') }}
               </span>
             </div>
           </div>
 
-          <div class="grid gap-3 p-3 sm:p-4 lg:grid-cols-2 2xl:grid-cols-3">
+          <div class="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
             <div
               v-for="group in section.groups"
               :key="group.id"
-              class="group relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-200 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-900/50 dark:hover:border-blue-900/50"
+              class="available-channel-group-card group relative overflow-hidden rounded-lg p-4 transition-colors"
             >
               <div
-                class="absolute inset-x-0 top-0 h-1"
-                :class="group.is_exclusive ? 'bg-gradient-to-r from-amber-400 to-orange-500' : platformAccentBarClass(section.platform)"
+                class="available-channel-group-accent absolute inset-y-4 left-0 w-1 rounded-r-full"
+                :class="group.is_exclusive ? 'available-channel-group-accent--exclusive' : 'available-channel-group-accent--standard'"
               />
 
               <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
+                <div class="min-w-0 pl-2">
                   <div class="mb-2 flex flex-wrap items-center gap-1.5">
                     <span
                       :class="[
-                        'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1',
-                        group.is_exclusive
-                          ? 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-800/60'
-                          : 'bg-slate-50 text-slate-600 ring-slate-200 dark:bg-dark-800 dark:text-gray-300 dark:ring-dark-700',
+                        'available-channel-chip inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold',
+                        group.is_exclusive ? 'available-channel-chip--exclusive' : 'available-channel-chip--public',
                       ]"
                       :title="group.is_exclusive ? t('availableChannels.exclusiveTooltip') : t('availableChannels.publicTooltip')"
                     >
@@ -125,13 +115,13 @@
                     </span>
                     <span
                       v-if="group.subscription_type === 'subscription'"
-                      class="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-800/60"
+                      class="available-channel-chip available-channel-chip--subscription rounded-md px-2 py-0.5 text-[10px] font-semibold"
                     >
                       {{ t('availableChannels.subscription') }}
                     </span>
                   </div>
 
-                  <h4 class="break-words text-base font-semibold leading-snug text-gray-950 dark:text-white">
+                  <h4 class="break-words text-base font-semibold leading-snug text-[var(--apple-text)]">
                     {{ group.name }}
                   </h4>
                 </div>
@@ -159,17 +149,17 @@
 
               <div class="mt-4">
                 <div class="mb-2 flex items-center justify-between gap-2">
-                  <p class="text-xs font-semibold text-gray-800 dark:text-gray-100">
+                  <p class="text-xs font-semibold text-[var(--apple-text)]">
                     {{ t('availableChannels.groupModelsTitle') }}
                   </p>
-                  <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-dark-800 dark:text-gray-400">
+                  <span class="rounded-md border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface)] px-2 py-0.5 text-[11px] font-medium text-[var(--apple-muted)]">
                     {{ groupModels(group).length }}
                   </span>
                 </div>
 
                 <div
                   v-if="groupModels(group).length > 0"
-                  class="max-h-48 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50/80 p-2 dark:border-dark-700 dark:bg-dark-800/50"
+                  class="max-h-48 overflow-y-auto rounded-lg border border-[color:var(--apple-border-soft)] bg-[var(--apple-surface)] p-2"
                 >
                   <div class="flex flex-wrap gap-1.5">
                     <SupportedModelChip
@@ -186,7 +176,7 @@
 
                 <div
                   v-else
-                  class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-xs font-medium text-gray-400 dark:border-dark-700 dark:bg-dark-800/40"
+                  class="rounded-lg border border-dashed border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-3 py-4 text-center text-xs font-medium text-[var(--apple-muted)]"
                 >
                   {{ noModelsLabel }}
                 </div>
@@ -212,11 +202,6 @@ import type {
   UserSupportedModel,
 } from '@/api/channels'
 import type { GroupPlatform, SubscriptionType } from '@/types'
-import {
-  platformAccentBarClass,
-  platformBadgeLightClass,
-  platformBorderClass,
-} from '@/utils/platformColors'
 
 defineProps<{
   rows: UserAvailableChannel[]
@@ -274,4 +259,80 @@ function channelStats(channel: UserAvailableChannel) {
     { label: t('availableChannels.stats.models'), value: channelModelCount(channel) },
   ]
 }
+
+function platformTileClass(platform: string): string {
+  switch (platform) {
+    case 'openai':
+      return 'available-platform-tile--success'
+    case 'anthropic':
+      return 'available-platform-tile--warning'
+    case 'gemini':
+    case 'antigravity':
+      return 'available-platform-tile--blue'
+    default:
+      return 'available-platform-tile--neutral'
+  }
+}
 </script>
+
+<style scoped>
+.available-platform-tile--success {
+  background: color-mix(in srgb, var(--apple-success) 10%, var(--apple-surface));
+  color: var(--apple-success);
+}
+
+.available-platform-tile--warning {
+  background: color-mix(in srgb, var(--apple-warning) 11%, var(--apple-surface));
+  color: var(--apple-warning);
+}
+
+.available-platform-tile--blue {
+  background: color-mix(in srgb, var(--apple-blue) 10%, var(--apple-surface));
+  color: var(--apple-blue);
+}
+
+.available-platform-tile--neutral {
+  background: var(--apple-surface);
+  color: var(--apple-muted);
+}
+
+.available-channel-group-card {
+  border: 1px solid var(--apple-border-soft);
+  background: var(--apple-surface);
+}
+
+.available-channel-group-card:hover {
+  border-color: var(--apple-border);
+  background: color-mix(in srgb, var(--apple-surface) 95%, var(--apple-hover));
+}
+
+.available-channel-group-accent--exclusive {
+  background: var(--apple-warning);
+}
+
+.available-channel-group-accent--standard {
+  background: color-mix(in srgb, var(--apple-muted) 34%, transparent);
+}
+
+.available-channel-chip {
+  border: 1px solid transparent;
+}
+
+.available-channel-chip--exclusive {
+  background: color-mix(in srgb, var(--apple-warning) 11%, transparent);
+  border-color: color-mix(in srgb, var(--apple-warning) 22%, transparent);
+  color: var(--apple-warning);
+}
+
+.available-channel-chip--public {
+  background: var(--apple-surface-elevated);
+  border-color: var(--apple-border-soft);
+  color: var(--apple-muted);
+}
+
+.available-channel-chip--subscription {
+  background: color-mix(in srgb, var(--apple-blue) 10%, transparent);
+  border-color: color-mix(in srgb, var(--apple-blue) 20%, transparent);
+  color: var(--apple-blue);
+}
+</style>

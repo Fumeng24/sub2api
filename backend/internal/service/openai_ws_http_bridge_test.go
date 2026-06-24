@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -45,6 +46,26 @@ func TestOpenAIWSHTTPBridgeDecisionKeepsSmallFramesOnWS(t *testing.T) {
 
 	svc.cfg.Gateway.OpenAIWS.HTTPBridgeEnabled = false
 	require.False(t, svc.shouldBridgeOpenAIWSHTTP(1000, ""))
+}
+
+func TestOpenAIWSHTTPBridgeDecisionCanForceSmallFirstFrame(t *testing.T) {
+	svc := &OpenAIGatewayService{
+		cfg: &config.Config{
+			Gateway: config.GatewayConfig{
+				OpenAIWS: config.GatewayOpenAIWSConfig{
+					HTTPBridgeEnabled:        true,
+					HTTPBridgeThresholdBytes: 100,
+				},
+			},
+		},
+	}
+
+	ctx := WithOpenAIWSForceHTTPBridge(context.Background())
+	require.True(t, svc.shouldBridgeOpenAIWSHTTPWithContext(ctx, 1, ""))
+	require.False(t, svc.shouldBridgeOpenAIWSHTTPWithContext(ctx, 1000, "resp_existing"))
+
+	svc.cfg.Gateway.OpenAIWS.HTTPBridgeEnabled = false
+	require.False(t, svc.shouldBridgeOpenAIWSHTTPWithContext(ctx, 1, ""))
 }
 
 func TestOpenAIWSHTTPBridgeRelaysSSEFramesAsWebSocketMessages(t *testing.T) {
@@ -171,6 +192,155 @@ func TestOpenAIWSHTTPBridgeRelaysSSEFramesAsWebSocketMessages(t *testing.T) {
 	require.False(t, gjson.GetBytes(upstream.lastBody, "type").Exists())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "generate").Exists())
 	require.True(t, gjson.GetBytes(upstream.lastBody, "stream").Bool())
+}
+
+func TestOpenAIWSHTTPBridgeFailover429BeforeClientWrite(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusTooManyRequests,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+			"X-Request-Id": []string{"rid_bridge_429"},
+		},
+		Body: io.NopCloser(strings.NewReader(`{"error":{"type":"rate_limit_error","message":"rate limited"}}`)),
+	}}
+	svc := &OpenAIGatewayService{
+		cfg:          upstreamModelSyncTestConfig(),
+		httpUpstream: upstream,
+	}
+	account := &Account{
+		ID:          77,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Status:      StatusActive,
+	}
+	payload := []byte(`{"type":"response.create","generate":true,"model":"gpt-5","stream":true,"input":"hi"}`)
+	writes := 0
+
+	result, err := svc.proxyOpenAIWSHTTPBridgeTurn(
+		context.Background(),
+		nil,
+		account,
+		"sk-test",
+		payload,
+		len(payload),
+		"gpt-5",
+		"",
+		"",
+		"",
+		1,
+		func(message []byte) error {
+			writes++
+			return nil
+		},
+	)
+
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.True(t, errors.As(err, &failoverErr))
+	require.Equal(t, http.StatusTooManyRequests, failoverErr.StatusCode)
+	require.Equal(t, "rid_bridge_429", failoverErr.ResponseHeaders.Get("x-request-id"))
+	require.Equal(t, 0, writes, "failoverable bridge errors must not be sent before account switching")
+}
+
+func TestOpenAIWSHTTPBridgeFailoverRequestErrorBeforeClientWrite(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{err: errors.New("connection reset by peer")}
+	svc := &OpenAIGatewayService{
+		cfg:          upstreamModelSyncTestConfig(),
+		httpUpstream: upstream,
+	}
+	account := &Account{
+		ID:          79,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Status:      StatusActive,
+	}
+	payload := []byte(`{"type":"response.create","generate":true,"model":"gpt-5","stream":true,"input":"hi"}`)
+	writes := 0
+
+	result, err := svc.proxyOpenAIWSHTTPBridgeTurn(
+		context.Background(),
+		nil,
+		account,
+		"sk-test",
+		payload,
+		len(payload),
+		"gpt-5",
+		"",
+		"",
+		"",
+		1,
+		func(message []byte) error {
+			writes++
+			return nil
+		},
+	)
+
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.True(t, errors.As(err, &failoverErr))
+	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.Equal(t, 0, writes, "transport errors should be failovered before any client frame is written")
+}
+
+func TestOpenAIWSHTTPBridgeFailoverRateLimitEventBeforeClientWrite(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	sseBody := strings.Join([]string{
+		`data: {"type":"error","error":{"type":"rate_limit_error","message":"rate limited"}}`,
+		"",
+	}, "\n")
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header: http.Header{
+			"Content-Type": []string{"text/event-stream"},
+			"X-Request-Id": []string{"rid_bridge_event_429"},
+		},
+		Body: io.NopCloser(strings.NewReader(sseBody)),
+	}}
+	svc := &OpenAIGatewayService{
+		cfg:          upstreamModelSyncTestConfig(),
+		httpUpstream: upstream,
+	}
+	account := &Account{
+		ID:          78,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Status:      StatusActive,
+	}
+	payload := []byte(`{"type":"response.create","generate":true,"model":"gpt-5","stream":true,"input":"hi"}`)
+	writes := 0
+
+	result, err := svc.proxyOpenAIWSHTTPBridgeTurn(
+		context.Background(),
+		nil,
+		account,
+		"sk-test",
+		payload,
+		len(payload),
+		"gpt-5",
+		"",
+		"",
+		"",
+		1,
+		func(message []byte) error {
+			writes++
+			return nil
+		},
+	)
+
+	require.NotNil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.True(t, errors.As(err, &failoverErr))
+	require.Equal(t, http.StatusTooManyRequests, failoverErr.StatusCode)
+	require.Equal(t, "rid_bridge_event_429", failoverErr.ResponseHeaders.Get("x-request-id"))
+	require.Equal(t, 0, writes, "rate-limit events should be failovered before any client frame is written")
 }
 
 func TestOpenAIWSHTTPBridgeAcceptsFirstFrameAboveLegacy16MiB(t *testing.T) {

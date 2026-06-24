@@ -1,7 +1,7 @@
 <template>
   <div class="group/usage relative text-sm">
     <div class="flex items-center gap-1.5">
-      <span class="text-gray-500 dark:text-gray-400">{{ t('admin.users.today') }}:</span>
+      <span class="text-gray-500 dark:text-gray-400">{{ t('platformUsage.today') }}:</span>
       <span class="font-medium text-gray-900 dark:text-white">{{ formatSettlementAmount(today, 4) }}</span>
       <Icon
         v-if="hasBreakdown"
@@ -11,17 +11,17 @@
       />
     </div>
     <div class="mt-0.5 flex items-center gap-1.5">
-      <span class="text-gray-500 dark:text-gray-400">{{ t('admin.users.total') }}:</span>
+      <span class="text-gray-500 dark:text-gray-400">{{ t('platformUsage.total') }}:</span>
       <span class="font-medium text-gray-900 dark:text-white">{{ formatSettlementAmount(total, 4) }}</span>
     </div>
 
     <div
       v-if="hasBreakdown"
-      class="pointer-events-none absolute left-full top-0 z-50 ml-2 min-w-[220px] whitespace-nowrap rounded-md bg-gray-900 px-3 py-2 text-xs text-white opacity-0 shadow-xl transition-opacity duration-100 group-hover/usage:opacity-100 dark:bg-dark-600"
+      class="pointer-events-none absolute left-full top-0 z-50 ml-2 min-w-[220px] whitespace-nowrap rounded-md bg-gray-900 px-3 py-2 text-xs text-white opacity-0 shadow-sm transition-opacity duration-100 group-hover/usage:opacity-100 dark:bg-dark-600"
     >
       <div class="mb-1.5 flex items-center justify-between gap-3 border-b border-white/10 pb-1 text-[11px] opacity-80">
-        <span>{{ t('admin.users.platformBreakdown') }}</span>
-        <span class="font-mono">{{ t('admin.users.today') }} / {{ t('admin.users.total') }}</span>
+        <span>{{ t('platformUsage.breakdown') }}</span>
+        <span class="font-mono">{{ t('platformUsage.today') }} / {{ t('platformUsage.total') }}</span>
       </div>
       <div
         v-for="item in sortedBreakdown"
@@ -30,7 +30,7 @@
         :class="{ 'opacity-70 italic': item.isOther }"
       >
         <span class="capitalize">
-          {{ item.isOther ? t('admin.users.platformOther') : platformLabel(item.platform) }}
+          {{ item.isOther ? t('platformUsage.other') : platformLabel(item.platform) }}
         </span>
         <span class="font-mono">
           {{ formatSettlementAmount(item.today_actual_cost, 4) }}

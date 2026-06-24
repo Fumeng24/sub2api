@@ -1,13 +1,13 @@
 <template>
   <div v-if="!isDesktopViewport" class="space-y-2.5">
     <template v-if="loading">
-      <div v-for="i in 5" :key="i" class="rounded-lg border border-gray-200 bg-white p-3.5 shadow-sm dark:border-dark-700 dark:bg-dark-900">
+      <div v-for="i in 5" :key="i" class="data-table-mobile-card rounded-lg border p-3.5">
         <div class="space-y-3">
           <div v-for="column in dataColumns" :key="column.key" class="flex justify-between">
             <div class="h-4 w-20 animate-pulse rounded bg-gray-200 dark:bg-dark-700"></div>
             <div class="h-4 w-32 animate-pulse rounded bg-gray-200 dark:bg-dark-700"></div>
           </div>
-          <div v-if="hasActionsColumn" class="border-t border-gray-200 pt-3 dark:border-dark-700">
+          <div v-if="hasActionsColumn" class="data-table-mobile-actions border-t pt-3">
             <div class="h-8 w-full animate-pulse rounded bg-gray-200 dark:bg-dark-700"></div>
           </div>
         </div>
@@ -15,7 +15,7 @@
     </template>
 
     <template v-else-if="!data || data.length === 0">
-      <div class="rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-dark-700 dark:bg-dark-900">
+      <div class="data-table-mobile-card rounded-lg border p-8 text-center">
         <slot name="empty">
           <div class="flex flex-col items-center">
             <Icon
@@ -35,24 +35,24 @@
       <div
         v-for="(row, index) in sortedData"
         :key="resolveRowKey(row, index)"
-        class="rounded-lg border border-gray-200 bg-white p-3.5 shadow-sm dark:border-dark-700 dark:bg-dark-900"
+        class="data-table-mobile-card rounded-lg border p-3.5"
       >
         <div class="space-y-2.5">
           <div
             v-for="column in dataColumns"
             :key="column.key"
-            class="grid grid-cols-[minmax(0,0.42fr)_minmax(0,0.58fr)] items-start gap-3"
+            class="grid grid-cols-[minmax(5.75rem,0.42fr)_minmax(0,0.58fr)] items-start gap-3"
           >
-            <span class="min-w-0 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-dark-400">
+            <span class="min-w-0 truncate text-xs font-medium text-gray-500 dark:text-dark-400">
               {{ column.label }}
             </span>
-            <div class="min-w-0 break-words text-right text-sm text-gray-900 dark:text-gray-100">
+            <div class="min-w-0 overflow-hidden break-words text-right text-sm text-gray-900 dark:text-gray-100 [&_*]:max-w-full [&_code]:break-all [&_code]:whitespace-normal">
               <slot :name="`cell-${column.key}`" :row="row" :value="row[column.key]" :expanded="actionsExpanded">
                 {{ column.formatter ? column.formatter(row[column.key], row) : row[column.key] }}
               </slot>
             </div>
           </div>
-          <div v-if="hasActionsColumn" class="border-t border-gray-200 pt-3 dark:border-dark-700">
+          <div v-if="hasActionsColumn" class="data-table-mobile-actions border-t pt-3">
             <slot name="cell-actions" :row="row" :value="row['actions']" :expanded="actionsExpanded"></slot>
           </div>
         </div>
@@ -70,14 +70,14 @@
     }"
   >
     <table class="w-full min-w-max divide-y divide-gray-200 dark:divide-dark-700">
-      <thead class="table-header bg-gray-50/95 dark:bg-dark-800/95">
+      <thead class="table-header">
         <tr>
           <th
             v-for="(column, index) in columns"
             :key="column.key"
             scope="col"
             :class="[
-              'sticky-header-cell py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400',
+              'sticky-header-cell py-3 text-left text-xs font-semibold text-gray-500 dark:text-dark-400',
               getAdaptivePaddingClass(),
               { 'cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-700': column.sortable },
               getStickyColumnClass(column, index),
@@ -91,8 +91,8 @@
               :sort-key="sortKey"
               :sort-order="sortOrder"
             >
-              <div class="flex items-center space-x-1">
-                <span>{{ column.label }}</span>
+              <div class="flex min-w-0 items-center gap-1">
+                <span class="min-w-0 truncate">{{ column.label }}</span>
                 <span v-if="column.sortable" class="text-gray-400 dark:text-dark-500">
                   <svg
                     v-if="sortKey === column.key"
@@ -118,7 +118,7 @@
           </th>
         </tr>
       </thead>
-      <tbody class="table-body divide-y divide-gray-100 bg-white dark:divide-dark-800 dark:bg-dark-900">
+      <tbody class="table-body divide-y">
         <!-- Loading skeleton -->
         <tr v-if="loading" v-for="i in 5" :key="i">
           <td v-for="column in columns" :key="column.key" :class="['whitespace-nowrap py-4', getAdaptivePaddingClass()]">
@@ -162,7 +162,7 @@
             :data-row-id="resolveRowKey(sortedData[virtualRow.index], virtualRow.index)"
             :data-index="virtualRow.index"
             :ref="measureElement"
-            class="transition-colors hover:bg-gray-50/80 dark:hover:bg-dark-800/70"
+            class="data-table-row transition-colors"
           >
             <td
               v-for="(column, colIndex) in columns"
@@ -204,7 +204,7 @@ import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 
-const desktopViewportQuery = '(min-width: 768px)'
+const desktopViewportQuery = '(min-width: 1024px)'
 const isDesktopViewport = ref(
   typeof window === 'undefined' ? true : window.matchMedia(desktopViewportQuery).matches
 )
@@ -741,6 +741,22 @@ defineExpose({
   flex: 1;
   min-height: 0;
   isolation: isolate;
+  background: var(--apple-surface);
+  border-radius: var(--apple-radius);
+}
+
+.data-table-mobile-card {
+  background: var(--apple-surface);
+  border-color: var(--apple-border);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.dark .data-table-mobile-card {
+  background: color-mix(in srgb, var(--apple-surface) 92%, white 8%);
+}
+
+.data-table-mobile-actions {
+  border-color: var(--apple-border-soft);
 }
 
 /* 表头容器，确保在滚动时覆盖表体内容 */
@@ -748,17 +764,22 @@ defineExpose({
   position: sticky;
   top: 0;
   z-index: 200;
-  background-color: rgb(249 250 251);
+  background: var(--apple-surface-elevated);
 }
 
 .dark .table-wrapper .table-header {
-  background-color: rgb(31 41 55);
+  background: var(--apple-surface-elevated);
 }
 
 /* 表体保持在表头下方 */
 .table-body {
   position: relative;
   z-index: 0;
+  background: var(--apple-surface);
+}
+
+.table-body > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--apple-border-soft);
 }
 
 /* 所有表头单元格固定在顶部 */
@@ -766,11 +787,14 @@ defineExpose({
   position: sticky;
   top: 0;
   z-index: 210; /* 必须高于所有表体内容 */
-  background-color: rgb(249 250 251);
+  background: var(--apple-surface-elevated);
+  border-color: var(--apple-border);
+  color: var(--apple-muted);
+  letter-spacing: 0;
 }
 
 .dark .sticky-header-cell {
-  background-color: rgb(31 41 55);
+  background: var(--apple-surface-elevated);
 }
 
 /* Sticky 列基础样式 */
@@ -806,20 +830,25 @@ defineExpose({
 
 /* 表体 sticky 列背景 */
 tbody .sticky-col {
-  background-color: white;
+  background: var(--apple-surface);
 }
 
 .dark tbody .sticky-col {
-  background-color: rgb(17 24 39);
+  background: var(--apple-surface);
 }
 
 /* hover 状态保持 */
+tbody tr:hover,
+.data-table-row:hover {
+  background: color-mix(in srgb, var(--apple-blue) 5%, var(--apple-surface));
+}
+
 tbody tr:hover .sticky-col {
-  background-color: rgb(249 250 251);
+  background: color-mix(in srgb, var(--apple-blue) 5%, var(--apple-surface));
 }
 
 .dark tbody tr:hover .sticky-col {
-  background-color: rgb(31 41 55);
+  background: color-mix(in srgb, var(--apple-blue) 8%, var(--apple-surface));
 }
 
 /* 阴影只在可滚动时显示 */
@@ -830,9 +859,9 @@ tbody tr:hover .sticky-col {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 10px;
+  width: 1px;
   transform: translateX(100%);
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent);
+  background: var(--apple-border-soft);
   pointer-events: none;
 }
 
@@ -843,9 +872,9 @@ tbody tr:hover .sticky-col {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 10px;
+  width: 1px;
   transform: translateX(100%);
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.08), transparent);
+  background: var(--apple-border-soft);
   pointer-events: none;
 }
 
@@ -856,78 +885,73 @@ tbody tr:hover .sticky-col {
   top: 0;
   left: 0;
   bottom: 0;
-  width: 10px;
+  width: 1px;
   transform: translateX(-100%);
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.08), transparent);
+  background: var(--apple-border-soft);
   pointer-events: none;
 }
 
 /* 暗色模式阴影 */
 .dark .is-scrollable .sticky-col-left::after,
 .dark .is-scrollable .sticky-col-left-second::after {
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.2), transparent);
+  background: var(--apple-border-soft);
 }
 
 .dark .is-scrollable .sticky-col-right::before {
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.2), transparent);
+  background: var(--apple-border-soft);
 }
 </style>
 
 <style>
-/* ==========================================================================
-   终极悬浮滚动条防丢器 (Sledgehammer Override)
-   绕过 style.css 中 `* { scrollbar-color: transparent }` 的全局悬停隐身诅咒！
-   ========================================================================== */
-
-/* 1. 废除全局针对所有元素的 scrollbar-width 设定，拿回 Chrome/Safari 下 Webkit 滚动条规则的控制权！ */
 .table-wrapper {
-  scrollbar-width: auto !important; /* 阻止 Chrome 121 退化到原生 Mac 闪隐滚动条 */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--apple-muted) 34%, transparent) transparent;
 }
 
-/* 2. 重写 Webkit 滚动层，全部加上 !important 强制覆盖透明悬停陷阱 */
 .table-wrapper::-webkit-scrollbar {
-  height: 12px !important;
-  width: 12px !important;
-  display: block !important;
-  background-color: transparent !important;
+  height: 10px;
+  width: 10px;
+  display: block;
+  background-color: transparent;
 }
 
 .table-wrapper::-webkit-scrollbar-track {
-  background-color: rgba(0, 0, 0, 0.03) !important;
-  border-radius: 6px !important;
-  margin: 0 4px !important;
-}
-.dark .table-wrapper::-webkit-scrollbar-track {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+  background-color: transparent;
+  border-radius: 9999px;
 }
 
-/* 常驻、不透明的滑块，无视鼠标是否 hover 都在那！ */
-.table-wrapper::-webkit-scrollbar-thumb {
-  background-color: rgba(107, 114, 128, 0.75) !important; 
-  border-radius: 6px !important;
-  border: 2px solid transparent !important;
-  background-clip: padding-box !important;
-  -webkit-appearance: none !important;
+.dark .table-wrapper::-webkit-scrollbar-track {
+  background-color: transparent;
 }
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--apple-muted) 34%, transparent);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+  -webkit-appearance: none;
+}
+
 .table-wrapper::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(75, 85, 99, 0.9) !important;
+  background-color: color-mix(in srgb, var(--apple-muted) 54%, transparent);
 }
 
 .dark .table-wrapper::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.75) !important;
-}
-.dark .table-wrapper::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(209, 213, 219, 0.9) !important;
+  background-color: color-mix(in srgb, var(--apple-muted) 38%, transparent);
 }
 
-/* 3. 仅给真正的 Firefox 留的后路 */
+.dark .table-wrapper::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--apple-muted) 58%, transparent);
+}
+
 @supports (-moz-appearance:none) {
   .table-wrapper {
-    scrollbar-width: thin !important;
-    scrollbar-color: rgba(156, 163, 175, 0.5) rgba(0, 0, 0, 0.03) !important;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--apple-muted) 42%, transparent) transparent;
   }
+
   .dark .table-wrapper {
-    scrollbar-color: rgba(75, 85, 99, 0.5) rgba(255, 255, 255, 0.05) !important;
+    scrollbar-color: color-mix(in srgb, var(--apple-muted) 48%, transparent) transparent;
   }
 }
 </style>

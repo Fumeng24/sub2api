@@ -1,25 +1,43 @@
 <template>
   <AppLayout>
-    <div class="mx-auto flex max-w-md flex-col items-center space-y-6 py-8">
-      <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-        {{ qrUrl ? scanTitle : t('payment.qr.payInNewWindow') }}
-      </h2>
-      <div v-if="qrUrl" class="rounded-2xl bg-white p-6 shadow-lg dark:bg-dark-800">
-        <canvas ref="qrCanvas" class="mx-auto"></canvas>
+    <div class="mx-auto flex max-w-md flex-col items-center space-y-5 py-8">
+      <div class="w-full rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-6 text-center shadow-sm">
+        <h2 class="text-xl font-semibold text-[var(--apple-text)]">
+          {{ qrUrl ? scanTitle : t('payment.qr.payInNewWindow') }}
+        </h2>
+        <p class="mt-2 text-sm leading-6 text-[var(--apple-muted)]">
+          {{ qrUrl && !expired && scanHint ? scanHint : t('payment.qr.payInNewWindowHint') }}
+        </p>
+        <div v-if="qrUrl" class="mt-5 rounded-lg border border-[color:var(--apple-border-soft)] bg-white p-5 shadow-sm">
+          <canvas ref="qrCanvas" class="mx-auto"></canvas>
+        </div>
       </div>
-      <!-- Scan prompt for QR code -->
-      <p v-if="qrUrl && !expired && scanHint" class="text-center text-sm text-gray-500 dark:text-gray-400">
-        {{ scanHint }}
-      </p>
-      <div v-if="expired" class="text-center">
-        <p class="text-lg font-medium text-red-500">{{ t('payment.qr.expired') }}</p>
-        <button class="btn btn-primary mt-4" @click="router.push('/purchase')">{{ t('payment.result.backToRecharge') }}</button>
+      <div v-if="expired" class="w-full rounded-lg border border-[color:color-mix(in_srgb,var(--apple-warning)_30%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-warning)_10%,var(--apple-surface))] p-5 text-center shadow-sm">
+        <p class="text-lg font-medium text-[var(--apple-text)]">{{ t('payment.qr.expired') }}</p>
+        <p class="mt-1 text-sm leading-6 text-[var(--apple-muted)]">{{ t('payment.qr.expiredDesc') }}</p>
+        <button class="btn btn-primary mt-4 w-full" @click="router.push('/purchase')">{{ t('payment.result.backToRecharge') }}</button>
       </div>
-      <div v-else class="text-center">
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ qrUrl ? t('payment.qr.expiresIn') : t('payment.qr.payInNewWindowHint') }}</p>
-        <p class="mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{{ countdownDisplay }}</p>
-        <p class="mt-2 text-sm text-gray-400 dark:text-gray-500">{{ t('payment.qr.waitingPayment') }}</p>
+      <div v-else class="w-full rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 text-center shadow-sm">
+        <p class="text-sm text-[var(--apple-muted)]">{{ qrUrl ? t('payment.qr.expiresIn') : t('payment.qr.payInNewWindowHint') }}</p>
+        <p class="mt-1 text-2xl font-semibold tabular-nums text-[var(--apple-text)]">{{ countdownDisplay }}</p>
+        <p class="mt-2 text-sm text-[var(--apple-muted-2)]">{{ t('payment.qr.waitingPayment') }}</p>
+        <p v-if="orderId" class="mt-2 text-xs text-[var(--apple-muted-2)]">
+          {{ t('payment.orders.orderId') }} #{{ orderId }}
+        </p>
       </div>
+      <section class="w-full rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm">
+        <p class="text-sm font-semibold text-[var(--apple-text)]">{{ t('payment.qr.assuranceTitle') }}</p>
+        <div class="mt-3 space-y-2">
+          <div
+            v-for="item in qrAssuranceItems"
+            :key="item"
+            class="flex items-start gap-2 text-sm leading-6 text-[var(--apple-muted)]"
+          >
+            <Icon name="checkCircle" size="sm" class="mt-0.5 shrink-0 text-[var(--apple-success)]" />
+            <span>{{ item }}</span>
+          </div>
+        </div>
+      </section>
       <a v-if="payUrl && !qrUrl && !expired" :href="payUrl" target="_blank" rel="noopener noreferrer"
         class="btn btn-primary w-full py-3">
         {{ t('payment.qr.openPayWindow') }}
@@ -41,6 +59,7 @@ import { usePaymentStore } from '@/stores/payment'
 import { paymentAPI } from '@/api/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { useAppStore } from '@/stores'
+import Icon from '@/components/icons/Icon.vue'
 import QRCode from 'qrcode'
 import alipayIcon from '@/assets/icons/alipay.svg'
 import wxpayIcon from '@/assets/icons/wxpay.svg'
@@ -71,6 +90,12 @@ const countdownDisplay = computed(() => {
 
 const isAlipay = computed(() => paymentType.value.includes('alipay'))
 const isWxpay = computed(() => paymentType.value.includes('wxpay'))
+const qrAssuranceItems = computed(() => [
+  t('payment.qr.officialAssurance'),
+  t('payment.qr.orderRecordAssurance'),
+  t('payment.qr.privacyAssurance'),
+  t('payment.qr.billingProtectionAssurance'),
+])
 
 const scanTitle = computed(() => {
   if (isAlipay.value) return t('payment.qr.scanAlipay')

@@ -1,6 +1,6 @@
 <template>
   <span
-    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+    class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium"
     :class="statusClass"
   >
     {{ statusLabel }}
@@ -19,18 +19,18 @@ const props = defineProps<{
 const { t } = useI18n()
 
 const statusMap: Record<OrderStatus, { key: string; class: string }> = {
-  PENDING: { key: 'payment.status.pending', class: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  PAID: { key: 'payment.status.paid', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  RECHARGING: { key: 'payment.status.recharging', class: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  COMPLETED: { key: 'payment.status.completed', class: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
-  EXPIRED: { key: 'payment.status.expired', class: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' },
-  CANCELLED: { key: 'payment.status.cancelled', class: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' },
-  FAILED: { key: 'payment.status.failed', class: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
-  REFUND_REQUESTED: { key: 'payment.status.refund_requested', class: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
-  REFUNDING: { key: 'payment.status.refunding', class: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
-  REFUNDED: { key: 'payment.status.refunded', class: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
-  PARTIALLY_REFUNDED: { key: 'payment.status.partially_refunded', class: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
-  REFUND_FAILED: { key: 'payment.status.refund_failed', class: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
+  PENDING: { key: 'payment.status.pending', class: 'border-[color:color-mix(in_srgb,var(--apple-warning)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-warning)_9%,var(--apple-surface))] text-[var(--apple-warning)]' },
+  PAID: { key: 'payment.status.paid', class: 'border-[color:color-mix(in_srgb,var(--apple-blue)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-blue)_9%,var(--apple-surface))] text-[var(--apple-blue)]' },
+  RECHARGING: { key: 'payment.status.recharging', class: 'border-[color:color-mix(in_srgb,var(--apple-blue)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-blue)_9%,var(--apple-surface))] text-[var(--apple-blue)]' },
+  COMPLETED: { key: 'payment.status.completed', class: 'border-[color:color-mix(in_srgb,var(--apple-success)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-success)_9%,var(--apple-surface))] text-[var(--apple-success)]' },
+  EXPIRED: { key: 'payment.status.expired', class: 'border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] text-[var(--apple-muted)]' },
+  CANCELLED: { key: 'payment.status.cancelled', class: 'border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] text-[var(--apple-muted)]' },
+  FAILED: { key: 'payment.status.failed', class: 'border-[color:color-mix(in_srgb,var(--apple-danger)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-danger)_9%,var(--apple-surface))] text-[var(--apple-danger)]' },
+  REFUND_REQUESTED: { key: 'payment.status.refund_requested', class: 'border-[color:color-mix(in_srgb,var(--apple-warning)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-warning)_9%,var(--apple-surface))] text-[var(--apple-warning)]' },
+  REFUNDING: { key: 'payment.status.refunding', class: 'border-[color:color-mix(in_srgb,var(--apple-warning)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-warning)_9%,var(--apple-surface))] text-[var(--apple-warning)]' },
+  REFUNDED: { key: 'payment.status.refunded', class: 'border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] text-[var(--apple-muted)]' },
+  PARTIALLY_REFUNDED: { key: 'payment.status.partially_refunded', class: 'border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] text-[var(--apple-muted)]' },
+  REFUND_FAILED: { key: 'payment.status.refund_failed', class: 'border-[color:color-mix(in_srgb,var(--apple-danger)_34%,var(--apple-border))] bg-[color-mix(in_srgb,var(--apple-danger)_9%,var(--apple-surface))] text-[var(--apple-danger)]' },
 }
 
 const statusLabel = computed(() => {
@@ -40,6 +40,6 @@ const statusLabel = computed(() => {
 
 const statusClass = computed(() => {
   const entry = statusMap[props.status]
-  return entry?.class ?? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
+  return entry?.class ?? 'border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] text-[var(--apple-muted)]'
 })
 </script>
