@@ -123,7 +123,7 @@ watch([model, endpoint], () => loadData())
 </script>
 
 <template>
-  <div class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5 dark:bg-dark-800 dark:ring-dark-700">
+  <div class="admin-ops-panel p-6">
     <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div class="min-w-0">
         <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ t('admin.ops.openAIScheduler.title') }}</h3>
@@ -162,40 +162,40 @@ watch([model, endpoint], () => loadData())
     </div>
 
     <div v-if="summary" class="mb-4 grid grid-cols-2 gap-2 md:grid-cols-6">
-      <div class="rounded-xl bg-gray-50 p-3 dark:bg-dark-900">
+      <div class="rounded-lg bg-gray-50 p-3 dark:bg-dark-900">
         <div class="text-[10px] font-semibold uppercase text-gray-400">{{ t('admin.ops.openAIScheduler.accounts') }}</div>
         <div class="mt-1 font-mono text-lg font-bold text-gray-900 dark:text-white">{{ summary.account_count }}</div>
       </div>
-      <div class="rounded-xl bg-green-50 p-3 dark:bg-green-900/20">
+      <div class="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
         <div class="text-[10px] font-semibold uppercase text-green-600 dark:text-green-400">{{ t('admin.ops.openAIScheduler.available') }}</div>
         <div class="mt-1 font-mono text-lg font-bold text-green-700 dark:text-green-300">{{ summary.available_count }}</div>
       </div>
-      <div class="rounded-xl bg-amber-50 p-3 dark:bg-amber-900/20">
+      <div class="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
         <div class="text-[10px] font-semibold uppercase text-amber-600 dark:text-amber-400">{{ t('admin.ops.openAIScheduler.blocked') }}</div>
         <div class="mt-1 font-mono text-lg font-bold text-amber-700 dark:text-amber-300">{{ summary.blocked_count }}</div>
       </div>
-      <div class="rounded-xl bg-red-50 p-3 dark:bg-red-900/20">
+      <div class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
         <div class="text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">{{ t('admin.ops.openAIScheduler.circuit') }}</div>
         <div class="mt-1 font-mono text-lg font-bold text-red-700 dark:text-red-300">{{ summary.circuit_open_count }}</div>
       </div>
-      <div class="rounded-xl bg-blue-50 p-3 dark:bg-blue-900/20">
+      <div class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
         <div class="text-[10px] font-semibold uppercase text-blue-600 dark:text-blue-400">{{ t('admin.ops.openAIScheduler.halfOpen') }}</div>
         <div class="mt-1 font-mono text-lg font-bold text-blue-700 dark:text-blue-300">{{ summary.half_open_count }}</div>
       </div>
-      <div class="rounded-xl bg-purple-50 p-3 dark:bg-purple-900/20">
+      <div class="rounded-lg bg-purple-50 p-3 dark:bg-purple-900/20">
         <div class="text-[10px] font-semibold uppercase text-purple-600 dark:text-purple-400">{{ t('admin.ops.openAIScheduler.full') }}</div>
         <div class="mt-1 font-mono text-lg font-bold text-purple-700 dark:text-purple-300">{{ summary.concurrency_full_count }}</div>
       </div>
     </div>
 
-    <div v-if="!status?.enabled" class="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400">
+    <div v-if="!status?.enabled" class="rounded-lg border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400">
       {{ t('admin.ops.openAIScheduler.disabled') }}
     </div>
-    <div v-else-if="groups.length === 0" class="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400">
+    <div v-else-if="groups.length === 0" class="rounded-lg border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400">
       {{ t('admin.ops.openAIScheduler.empty') }}
     </div>
     <div v-else class="space-y-3">
-      <div v-for="group in groups" :key="group.group_id" class="overflow-hidden rounded-xl border border-gray-200 dark:border-dark-700">
+      <div v-for="group in groups" :key="group.group_id" class="overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-dark-700 dark:bg-dark-900">
           <div class="min-w-0">
             <div class="truncate text-xs font-bold text-gray-900 dark:text-white" :title="group.group_name">{{ group.group_name }}</div>

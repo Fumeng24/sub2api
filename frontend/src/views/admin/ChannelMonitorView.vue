@@ -1,5 +1,6 @@
 <template>
   <AppLayout>
+    <div class="admin-apple-page admin-table-page">
     <TablePageLayout>
       <template #filters>
         <MonitorFiltersBar
@@ -195,6 +196,7 @@
         </div>
       </template>
     </BaseDialog>
+    </div>
   </AppLayout>
 </template>
 
@@ -230,6 +232,7 @@ import MonitorPrimaryModelCell from '@/components/admin/monitor/MonitorPrimaryMo
 import MonitorActionsCell from '@/components/admin/monitor/MonitorActionsCell.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { useChannelMonitorFormat } from '@/composables/useChannelMonitorFormat'
+import './adminApple.css'
 
 const { t } = useI18n()
 const appStore = useAppStore()

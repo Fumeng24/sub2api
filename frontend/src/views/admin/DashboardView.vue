@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="admin-apple-page space-y-6">
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center py-12">
         <LoadingSpinner />
@@ -12,7 +12,7 @@
           <!-- Total API Keys -->
           <div class="card min-w-0 p-4">
             <div class="flex items-center gap-3">
-              <div class="shrink-0 rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+              <div class="admin-apple-stat-icon">
                 <Icon name="key" size="md" class="text-blue-600 dark:text-blue-400" :stroke-width="2" />
               </div>
               <div class="min-w-0">
@@ -32,7 +32,7 @@
           <!-- Service Accounts -->
           <div class="card min-w-0 p-4">
             <div class="flex items-center gap-3">
-              <div class="shrink-0 rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
+              <div class="admin-apple-stat-icon">
                 <Icon name="server" size="md" class="text-purple-600 dark:text-purple-400" :stroke-width="2" />
               </div>
               <div class="min-w-0">
@@ -57,7 +57,7 @@
           <!-- Today Requests -->
           <div class="card min-w-0 p-4">
             <div class="flex items-center gap-3">
-              <div class="shrink-0 rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
+              <div class="admin-apple-stat-icon">
                 <Icon name="chart" size="md" class="text-green-600 dark:text-green-400" :stroke-width="2" />
               </div>
               <div class="min-w-0">
@@ -77,7 +77,7 @@
           <!-- New Users Today -->
           <div class="card min-w-0 p-4">
             <div class="flex items-center gap-3">
-              <div class="shrink-0 rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
+              <div class="admin-apple-stat-icon">
                 <Icon name="userPlus" size="md" class="text-emerald-600 dark:text-emerald-400" :stroke-width="2" />
               </div>
               <div class="min-w-0">
@@ -100,7 +100,7 @@
           <!-- Today Tokens -->
           <div class="card min-w-0 p-4">
             <div class="flex items-center gap-3">
-              <div class="shrink-0 rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
+              <div class="admin-apple-stat-icon">
                 <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" :stroke-width="2" />
               </div>
               <div class="min-w-0">
@@ -136,7 +136,7 @@
           <!-- Total Tokens -->
           <div class="card min-w-0 p-4">
             <div class="flex items-center gap-3">
-              <div class="shrink-0 rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
+              <div class="admin-apple-stat-icon">
                 <Icon name="database" size="md" class="text-indigo-600 dark:text-indigo-400" :stroke-width="2" />
               </div>
               <div class="min-w-0">
@@ -172,7 +172,7 @@
           <!-- Performance (RPM/TPM) -->
           <div class="card min-w-0 p-4">
             <div class="flex items-center gap-3">
-              <div class="shrink-0 rounded-lg bg-violet-100 p-2 dark:bg-violet-900/30">
+              <div class="admin-apple-stat-icon">
                 <Icon name="bolt" size="md" class="text-violet-600 dark:text-violet-400" :stroke-width="2" />
               </div>
               <div class="min-w-0 flex-1">
@@ -198,7 +198,7 @@
           <!-- Avg Response Time -->
           <div class="card min-w-0 p-4">
             <div class="flex items-center gap-3">
-              <div class="shrink-0 rounded-lg bg-rose-100 p-2 dark:bg-rose-900/30">
+              <div class="admin-apple-stat-icon">
                 <Icon name="clock" size="md" class="text-rose-600 dark:text-rose-400" :stroke-width="2" />
               </div>
               <div class="min-w-0">
@@ -314,6 +314,7 @@ import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
+import './adminApple.css'
 
 import {
   Chart as ChartJS,

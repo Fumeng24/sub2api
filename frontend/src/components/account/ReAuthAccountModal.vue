@@ -13,17 +13,17 @@
         <div class="flex items-center gap-3">
           <div
             :class="[
-              'flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br',
+              'flex h-10 w-10 items-center justify-center rounded-lg border bg-white dark:bg-dark-800',
               isOpenAILike
-                ? 'from-green-500 to-green-600'
+                ? 'border-emerald-200 text-emerald-600 dark:border-emerald-800/50 dark:text-emerald-300'
                 : isGemini
-                  ? 'from-blue-500 to-blue-600'
+                  ? 'border-blue-200 text-blue-600 dark:border-blue-800/50 dark:text-blue-300'
                   : isAntigravity
-                    ? 'from-purple-500 to-purple-600'
-                    : 'from-orange-500 to-orange-600'
+                    ? 'border-slate-200 text-slate-600 dark:border-slate-600 dark:text-slate-300'
+                    : 'border-orange-200 text-orange-600 dark:border-orange-800/50 dark:text-orange-300'
             ]"
           >
-            <Icon name="sparkles" size="md" class="text-white" />
+            <Icon name="sparkles" size="md" class="text-current" />
           </div>
           <div>
             <span class="block font-semibold text-gray-900 dark:text-white">{{
@@ -81,12 +81,12 @@
         <div class="flex items-center gap-3">
           <div
             :class="[
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
               geminiOAuthType === 'google_one'
-                ? 'bg-purple-500 text-white'
+                ? 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-dark-800 dark:text-slate-300'
                 : geminiOAuthType === 'code_assist'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-amber-500 text-white'
+                  ? 'border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300'
+                  : 'border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300'
             ]"
           >
             <Icon v-if="geminiOAuthType === 'google_one'" name="user" size="sm" />
