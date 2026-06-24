@@ -15,13 +15,13 @@
   <!-- Default Home Page -->
   <div
     v-else
-    class="min-h-screen bg-gray-50 text-gray-950 dark:bg-dark-950 dark:text-white"
+    class="home-default-shell relative flex min-h-screen w-full max-w-full flex-col overflow-x-hidden bg-gray-50 text-gray-950 dark:bg-dark-950 dark:text-white"
   >
     <header
-      class="sticky top-0 z-20 border-b border-gray-200/70 bg-white/90 px-4 py-4 backdrop-blur dark:border-dark-800/70 dark:bg-dark-950/85 sm:px-6"
+      class="sticky top-0 z-20 w-full max-w-full border-b border-gray-200/70 bg-white/90 px-3 py-4 backdrop-blur dark:border-dark-800/70 dark:bg-dark-950/85 sm:px-6"
     >
-      <nav class="mx-auto flex max-w-6xl items-center justify-between">
-        <div class="flex items-center gap-3">
+      <nav class="mx-auto flex min-w-0 max-w-6xl items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-3">
           <div
             class="h-9 w-9 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200 dark:bg-dark-900 dark:ring-dark-800"
           >
@@ -32,7 +32,7 @@
           </span>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <LocaleSwitcher />
 
           <a
@@ -81,13 +81,13 @@
 
     <main>
       <section
-        class="mx-auto flex min-h-[calc(100vh-73px)] max-w-6xl flex-col items-center justify-center px-4 py-16 text-center sm:px-6 lg:py-20"
+        class="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-6xl flex-col items-center justify-center px-4 py-14 text-center sm:px-6 sm:py-16 lg:py-20"
       >
         <p class="mb-5 text-sm font-semibold text-gray-500 dark:text-dark-300">
           {{ t('home.heroKicker') }}
         </p>
         <h1
-          class="max-w-5xl break-words text-5xl font-semibold leading-[1.05] text-gray-950 dark:text-white md:text-7xl"
+          class="max-w-5xl break-words text-4xl font-semibold leading-[1.08] text-gray-950 dark:text-white sm:text-5xl md:text-7xl md:leading-[1.05]"
         >
           {{ t('home.heroTitle') }}
         </h1>
@@ -588,6 +588,30 @@ onMounted(() => {
 </style>
 
 <style scoped>
+.home-default-shell,
+.home-default-shell :deep(header),
+.home-default-shell :deep(main),
+.home-default-shell :deep(section),
+.home-default-shell :deep(footer) {
+  max-width: 100%;
+}
+
+.home-default-shell {
+  overflow-x: hidden;
+}
+
+.home-default-shell :deep(*) {
+  min-width: 0;
+}
+
+.home-default-shell :deep(h1),
+.home-default-shell :deep(h2),
+.home-default-shell :deep(p),
+.home-default-shell :deep(dt),
+.home-default-shell :deep(dd) {
+  overflow-wrap: anywhere;
+}
+
 .custom-home-content {
   width: 100%;
   max-width: 100vw;
