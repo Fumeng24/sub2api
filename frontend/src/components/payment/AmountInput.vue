@@ -2,10 +2,10 @@
   <div class="space-y-4">
     <!-- Quick Amount Buttons -->
     <div>
-      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+      <label class="mb-2 block text-sm font-medium text-[var(--apple-text)]">
         {{ t('payment.quickAmounts') }}
       </label>
-      <div class="grid grid-cols-[repeat(auto-fit,minmax(92px,1fr))] gap-2 sm:grid-cols-3">
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2 sm:grid-cols-3">
         <button
           v-for="amt in displayAmounts"
           :key="amt"
@@ -13,12 +13,12 @@
           :disabled="isAmountDisabled(amt)"
           :title="isAmountDisabled(amt) ? disabledReasonText(amt) : undefined"
           :class="[
-            'flex h-[72px] min-w-0 flex-col items-center justify-center overflow-hidden rounded-lg border-2 px-1.5 py-2 text-center font-medium transition-colors sm:px-3',
+            'flex h-[76px] min-w-0 flex-col items-center justify-center overflow-hidden rounded-lg border px-2 py-2 text-center font-medium transition-colors sm:px-3',
             isAmountDisabled(amt)
-              ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300 dark:border-dark-700 dark:bg-dark-800/50 dark:text-dark-500'
+              ? 'cursor-not-allowed border-[color:var(--apple-border-soft)] bg-[var(--apple-surface-elevated)] text-[var(--apple-muted-2)] opacity-55'
               : modelValue === amt
-              ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/40 dark:text-primary-300'
-              : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:border-dark-500',
+              ? 'border-[color:var(--apple-blue)] bg-[color-mix(in_srgb,var(--apple-blue)_9%,var(--apple-surface))] text-[var(--apple-blue)] shadow-sm'
+              : 'border-[color:var(--apple-border)] bg-[var(--apple-surface)] text-[var(--apple-text)] hover:bg-[var(--apple-hover)]',
           ]"
           @click="selectAmount(amt)"
         >
@@ -26,7 +26,7 @@
           <span
             v-if="amountDescription || isAmountDisabled(amt)"
             class="mt-0.5 block max-w-full whitespace-nowrap text-[11px] leading-4"
-            :class="isAmountDisabled(amt) ? 'text-gray-300 dark:text-dark-500' : 'text-gray-500 dark:text-gray-400'"
+            :class="isAmountDisabled(amt) ? 'text-[var(--apple-muted-2)]' : 'text-[var(--apple-muted)]'"
           >
             {{ isAmountDisabled(amt) ? disabledReasonText(amt) : amountDescriptionText(amt) }}
           </span>
@@ -36,11 +36,11 @@
 
     <!-- Custom Amount Input -->
     <div>
-      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-        {{ t('payment.customAmount') }}
+      <label class="mb-2 block text-sm font-medium text-[var(--apple-text)]">
+        {{ t('payment.customBalanceCredit') }}
       </label>
       <div class="relative">
-        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-dark-500">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--apple-muted-2)]">
           {{ prefix }}
         </span>
         <input
@@ -48,7 +48,7 @@
           inputmode="decimal"
           :value="customText"
           :placeholder="placeholderText"
-          class="input w-full py-3 pl-8 pr-4"
+          class="input w-full min-h-[48px] py-3 pl-8 pr-4 text-base sm:text-sm"
           @input="handleInput"
         />
       </div>

@@ -1,40 +1,89 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-7xl space-y-5">
-      <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 dark:border-dark-700 sm:flex-row sm:items-end sm:justify-between">
+    <div class="mx-auto max-w-7xl space-y-6">
+      <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div class="min-w-0">
-          <h1 class="text-2xl font-semibold tracking-normal text-gray-950 dark:text-white">
+          <h1 class="text-2xl font-semibold tracking-normal text-[var(--apple-text)]">
             {{ t('nav.myOrders') }}
           </h1>
+          <p class="mt-2 max-w-3xl text-sm leading-6 text-[var(--apple-muted)]">
+            {{ t('userOrders.description') }}
+          </p>
         </div>
-        <button class="btn btn-primary w-full justify-center sm:w-auto" @click="router.push('/purchase')">{{ t('payment.result.backToRecharge') }}</button>
-      </div>
+        <button class="btn btn-primary w-full justify-center sm:w-auto" @click="router.push('/purchase')">
+          {{ t('userOrders.newOrder') }}
+        </button>
+      </header>
+
+      <section class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] px-4 py-3 shadow-sm">
+        <div class="grid gap-2 sm:flex sm:flex-wrap">
+          <span
+            v-for="item in orderTrustItems"
+            :key="item"
+            class="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-[var(--apple-surface-elevated)] px-2.5 py-1 text-xs font-medium text-[var(--apple-muted)] ring-1 ring-[color:var(--apple-border-soft)]"
+          >
+            <Icon name="checkCircle" size="xs" class="text-[var(--apple-success)]" />
+            <span class="min-w-0 truncate">{{ item }}</span>
+          </span>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-1 gap-3 md:grid-cols-3" :aria-label="t('userOrders.summary.label')">
+        <article
+          v-for="item in orderSummaryItems"
+          :key="item.key"
+          class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm"
+        >
+          <p class="text-xs font-medium text-[var(--apple-muted)]">{{ item.label }}</p>
+          <p class="mt-2 text-2xl font-semibold tracking-normal text-[var(--apple-text)]">{{ item.value }}</p>
+          <p class="mt-1 text-xs leading-5 text-[var(--apple-muted)]">{{ item.hint }}</p>
+        </article>
+      </section>
 
       <!-- Filters -->
-      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Select v-model="currentFilter" :options="statusFilters" class="w-full sm:w-40" @change="fetchOrders" />
-          <div class="flex items-center justify-end gap-2">
-            <button @click="fetchOrders" :disabled="loading" class="btn btn-secondary" :title="t('common.refresh')">
+      <section class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface)] p-4 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div class="w-full sm:max-w-xs">
+            <label class="input-label">{{ t('userOrders.statusFilter') }}</label>
+            <Select v-model="currentFilter" :options="statusFilters" @change="fetchOrders" />
+          </div>
+          <div class="flex items-center justify-end">
+            <button
+              class="btn btn-secondary btn-icon"
+              :disabled="loading"
+              :title="t('common.refresh')"
+              @click="fetchOrders"
+            >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- Table -->
       <OrderTable :orders="orders" :loading="loading">
         <template #actions="{ row }">
-          <div class="flex items-center gap-2">
-            <button v-if="row.status === 'PENDING'" @click="handleCancel(row.id)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20">
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-if="row.status === 'PENDING'"
+              class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)]"
+              @click="handleCancel(row.id)"
+            >
               <Icon name="x" size="sm" />
               <span>{{ t('payment.orders.cancel') }}</span>
             </button>
-            <button v-if="canRequestRefund(row)" @click="openRefundDialog(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20">
+            <button
+              v-if="canRequestRefund(row)"
+              class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--apple-muted)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-text)]"
+              @click="openRefundDialog(row)"
+            >
               <Icon name="dollar" size="sm" />
               <span>{{ t('payment.orders.requestRefund') }}</span>
             </button>
-            <button @click="openOrderTicket(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20">
+            <button
+              class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--apple-blue)] transition-colors hover:bg-[var(--apple-hover)] hover:text-[var(--apple-blue-hover)]"
+              @click="openOrderTicket(row)"
+            >
               <Icon name="chatBubble" size="sm" />
               <span>{{ t('tickets.createTicket') }}</span>
             </button>
@@ -55,11 +104,17 @@
 
     <!-- Cancel Confirm Dialog -->
     <BaseDialog :show="!!cancelTargetId" :title="t('payment.orders.cancel')" width="narrow" @close="cancelTargetId = null">
-      <p class="text-sm text-gray-600 dark:text-gray-300">{{ t('payment.confirmCancel') }}</p>
+      <p class="text-sm leading-6 text-[var(--apple-muted)]">{{ t('userOrders.cancelDescription') }}</p>
       <template #footer>
-        <div class="flex justify-end gap-3">
-          <button class="btn btn-secondary" @click="cancelTargetId = null">{{ t('common.cancel') }}</button>
-          <button class="btn btn-danger" :disabled="actionLoading" @click="confirmCancel">{{ actionLoading ? t('common.processing') : t('payment.orders.cancel') }}</button>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button class="btn btn-secondary w-full sm:w-auto" @click="cancelTargetId = null">{{ t('common.cancel') }}</button>
+          <button
+            class="btn w-full bg-[var(--apple-danger)] text-white hover:opacity-90 sm:w-auto"
+            :disabled="actionLoading"
+            @click="confirmCancel"
+          >
+            {{ actionLoading ? t('common.processing') : t('payment.orders.cancel') }}
+          </button>
         </div>
       </template>
     </BaseDialog>
@@ -67,25 +122,31 @@
     <!-- Refund Dialog -->
     <BaseDialog :show="!!refundTarget" :title="t('payment.orders.requestRefund')" @close="refundTarget = null">
       <div v-if="refundTarget" class="space-y-4">
-        <div class="rounded-lg bg-gray-50 p-4 dark:bg-dark-800">
+        <div class="rounded-lg border border-[color:var(--apple-border)] bg-[var(--apple-surface-elevated)] p-4">
           <div class="flex justify-between text-sm">
-            <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.orderId') }}</span>
-            <span class="font-mono text-gray-900 dark:text-white">#{{ refundTarget.id }}</span>
+            <span class="text-[var(--apple-muted)]">{{ t('payment.orders.orderId') }}</span>
+            <span class="font-mono text-[var(--apple-text)]">#{{ refundTarget.id }}</span>
           </div>
           <div class="mt-2 flex justify-between text-sm">
-            <span class="text-gray-500 dark:text-gray-400">{{ refundTarget.order_type === 'balance' ? t('payment.orders.creditedBalance') : t('payment.orders.amount') }}</span>
-            <span class="text-gray-900 dark:text-white">{{ formatRefundTargetAmount(refundTarget) }}</span>
+            <span class="text-[var(--apple-muted)]">{{ refundTarget.order_type === 'balance' ? t('payment.orders.creditedBalance') : t('payment.orders.amount') }}</span>
+            <span class="text-[var(--apple-text)]">{{ formatRefundTargetAmount(refundTarget) }}</span>
           </div>
         </div>
         <div>
-          <label class="input-label">{{ t('payment.refundReason') }}</label>
-          <textarea v-model="refundReason" rows="3" class="input mt-1 w-full" :placeholder="t('payment.refundReasonPlaceholder')" />
+          <label class="input-label">{{ t('userOrders.refundNote') }}</label>
+          <textarea v-model="refundReason" rows="3" class="input mt-1 w-full" :placeholder="t('userOrders.refundNotePlaceholder')" />
         </div>
       </div>
       <template #footer>
-        <div class="flex justify-end gap-3">
-          <button class="btn btn-secondary" @click="refundTarget = null">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" :disabled="actionLoading || !refundReason.trim()" @click="confirmRefund">{{ actionLoading ? t('common.processing') : t('payment.orders.requestRefund') }}</button>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button class="btn btn-secondary w-full sm:w-auto" @click="refundTarget = null">{{ t('common.cancel') }}</button>
+          <button
+            class="btn btn-primary w-full sm:w-auto"
+            :disabled="actionLoading || !refundReason.trim()"
+            @click="confirmRefund"
+          >
+            {{ actionLoading ? t('common.processing') : t('payment.orders.requestRefund') }}
+          </button>
         </div>
       </template>
     </BaseDialog>
@@ -122,6 +183,32 @@ const cancelTargetId = ref<number | null>(null)
 const refundTarget = ref<PaymentOrder | null>(null)
 const refundReason = ref('')
 const pagination = reactive({ page: 1, page_size: 20, total: 0 })
+const orderTrustItems = computed(() => [
+  t('userOrders.trust.amount'),
+  t('userOrders.trust.status'),
+  t('userOrders.trust.privacy'),
+  t('userOrders.trust.support'),
+])
+const orderSummaryItems = computed(() => [
+  {
+    key: 'total',
+    label: t('userOrders.summary.total'),
+    value: pagination.total,
+    hint: t('userOrders.summary.totalHint'),
+  },
+  {
+    key: 'currentPage',
+    label: t('userOrders.summary.currentPage'),
+    value: orders.value.length,
+    hint: t('userOrders.summary.currentPageHint'),
+  },
+  {
+    key: 'completed',
+    label: t('userOrders.summary.completedOnPage'),
+    value: orders.value.filter((order) => order.status === 'COMPLETED').length,
+    hint: t('userOrders.summary.completedOnPageHint'),
+  },
+])
 
 const statusFilters = computed(() => [
   { value: '', label: t('common.all') },
