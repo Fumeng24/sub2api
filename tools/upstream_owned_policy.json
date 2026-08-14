@@ -1,0 +1,1822 @@
+{
+  "version": 1,
+  "modified": [
+    {
+      "path": ".github/workflows/release.yml",
+      "upstream_blob": "2ba01833c112a2653155953314fc7b8a3fbf3def",
+      "local_blob": "4945284c171e9546b9ee1f06b955269b4d544fe3"
+    },
+    {
+      "path": ".gitignore",
+      "upstream_blob": "8c7e67f7e2592a5a42b45964c8ab6574d4cd6256",
+      "local_blob": "30cf56fcbe7511ec02e8d2082ec96a69a96b3be1"
+    },
+    {
+      "path": "DEV_GUIDE.md",
+      "upstream_blob": "d0d362e052656d3146d563c6d3d86a8ff5029810",
+      "local_blob": "02ef6410a3a0bbf55d2e5cffed6d3289e90f197a"
+    },
+    {
+      "path": "Makefile",
+      "upstream_blob": "a2a49abb2edbe50980ba8f0204ed75c875188fe3",
+      "local_blob": "54b07ee41e3fa2726105217bc7a049126e50e15d"
+    },
+    {
+      "path": "README.md",
+      "upstream_blob": "b6a8548fc7737c0eed5d3441cbc3dcf9df402f47",
+      "local_blob": "61b9ceea5cfd8a47466093b864d58f8e357b92d0"
+    },
+    {
+      "path": "README_CN.md",
+      "upstream_blob": "6276e911d812fe0cbc132b285efe0e073d60cf0b",
+      "local_blob": "14110c9fd1d10f7a8395cb1e80fe6d2c5163285c"
+    },
+    {
+      "path": "backend/Makefile",
+      "upstream_blob": "1e21f48ea590f8012817a6d73900ad722d98faf2",
+      "local_blob": "69c0583b04d5b787c78fa29736aa9e1550aab932"
+    },
+    {
+      "path": "backend/cmd/server/wire.go",
+      "upstream_blob": "47d3b9ec3389dccd3e69e5e8808ac08a2fed2a59",
+      "local_blob": "e3f1ac8f75bb92414a68698df93c1a4dbb58dd5e"
+    },
+    {
+      "path": "backend/cmd/server/wire_gen.go",
+      "upstream_blob": "92300337bec4c506500d2e91ad0bf137dc90f838",
+      "local_blob": "184c162ed2c7796024c46df34a1e4cce5c6f9ec1"
+    },
+    {
+      "path": "backend/cmd/server/wire_gen_test.go",
+      "upstream_blob": "592177be07bb2a1e923480aa21ec088ee41432b6",
+      "local_blob": "f7ec8d5e99e30d438c29f89cf09b54b3b1e7fbf8"
+    },
+    {
+      "path": "backend/ent/account.go",
+      "upstream_blob": "a1cd1a73b6c83949e10355eacf0f7e436301ec0a",
+      "local_blob": "995bb7f2973793ba85812940552a1ecf59626bad"
+    },
+    {
+      "path": "backend/ent/account/account.go",
+      "upstream_blob": "61a8a8213282f32802bacb789ce968f0f2c51751",
+      "local_blob": "b906d03720ec9917ec58538e5fca994fc8ba386c"
+    },
+    {
+      "path": "backend/ent/account/where.go",
+      "upstream_blob": "6b7c375be7ca846d05b28baebf997101d8a69d21",
+      "local_blob": "c8c3d2dd993b46c459b291640649dae1afba08dc"
+    },
+    {
+      "path": "backend/ent/account_create.go",
+      "upstream_blob": "d74b10eba7770307a26de1517c891301e9d8db92",
+      "local_blob": "2600720856197cdf40d4b29f90f58b62552dbfef"
+    },
+    {
+      "path": "backend/ent/account_query.go",
+      "upstream_blob": "f774d5bd95f14eb60c5bd644049b8cfc73c221d8",
+      "local_blob": "7bf34f7d989ebc861586afd7345674b6676fcb45"
+    },
+    {
+      "path": "backend/ent/account_update.go",
+      "upstream_blob": "4584a826a0434110a757988a0c99c38b9dc0f4b2",
+      "local_blob": "2dc385586ce07f7f47cc9381f046301753ea0fa3"
+    },
+    {
+      "path": "backend/ent/accountgroup.go",
+      "upstream_blob": "71d8a1f983a13107192f0eb6f58bcb49e564fd0f",
+      "local_blob": "91dc50c5cce04c35758e34ec8688f3257d7b37bd"
+    },
+    {
+      "path": "backend/ent/accountgroup/accountgroup.go",
+      "upstream_blob": "5db485b6bd1589cd9cd485bc8f1003219fababea",
+      "local_blob": "aae661962f930b5d53271faf61f44d6300f82d7f"
+    },
+    {
+      "path": "backend/ent/accountgroup/where.go",
+      "upstream_blob": "8226856b09b89f546b0c61ab0115650473af8dda",
+      "local_blob": "0afec3260c331077b1a2eb80a9902529d76714ed"
+    },
+    {
+      "path": "backend/ent/accountgroup_create.go",
+      "upstream_blob": "6a1840a1bbfa5bc33fae800d9e3fa826bb1ca82c",
+      "local_blob": "0472cf830a21e9eba85dcbe9bc225b90f6e6d5b3"
+    },
+    {
+      "path": "backend/ent/accountgroup_update.go",
+      "upstream_blob": "fd7b5430b8128f39349e836bbe693133563cd56e",
+      "local_blob": "06319d02bcf0d1ad344a5756cff0d7d1c0f03d16"
+    },
+    {
+      "path": "backend/ent/apikey.go",
+      "upstream_blob": "9ee660c2da6937c75908c66812d564fb9b9d1868",
+      "local_blob": "a419cd837a59c34734e0f2ac5ba8e3361da3bba7"
+    },
+    {
+      "path": "backend/ent/apikey/apikey.go",
+      "upstream_blob": "d398a027b867e7303c839d6dd1c910e6acd30afd",
+      "local_blob": "9afe878124dd44a191dd51103510b43a5fd80829"
+    },
+    {
+      "path": "backend/ent/apikey/where.go",
+      "upstream_blob": "edd2652baaedd10d168e316a0e75542ffb3012e0",
+      "local_blob": "24b136099ee8205a0de7c93c14bcc82be4bf1753"
+    },
+    {
+      "path": "backend/ent/apikey_create.go",
+      "upstream_blob": "4ec8aeaae4e38f9aaef18675d717b90368598e6e",
+      "local_blob": "e77eb338f8951b0e58174955048f79337b63a890"
+    },
+    {
+      "path": "backend/ent/apikey_update.go",
+      "upstream_blob": "db341e4c9d5361b07b6bd43c2d6906c0392a905a",
+      "local_blob": "24f52f4be1d1830afcf0ae53d83fc2eb9f80785f"
+    },
+    {
+      "path": "backend/ent/batchimagejob.go",
+      "upstream_blob": "29f09bb289cd6fc422cd6d76d93cd6448e8bea46",
+      "local_blob": "f33bdfb7ae6fd284178709b1fa3fa565d403965b"
+    },
+    {
+      "path": "backend/ent/batchimagejob/batchimagejob.go",
+      "upstream_blob": "be819183da4185887cf99ad21297a29abca3d957",
+      "local_blob": "bc1dd54fac96bca0793fb6c74b1587604d112f9c"
+    },
+    {
+      "path": "backend/ent/batchimagejob/where.go",
+      "upstream_blob": "b94722e41d0ae0929bcb07a9da4c65586563a982",
+      "local_blob": "df181f7a01f9ef429dfb66660fb48e99541c5db8"
+    },
+    {
+      "path": "backend/ent/batchimagejob_create.go",
+      "upstream_blob": "88c1197b154ee13b1735ed4ad41bd4c647c0c7b3",
+      "local_blob": "c54e24c880aab16478852f123fef4d2dddc0815d"
+    },
+    {
+      "path": "backend/ent/batchimagejob_update.go",
+      "upstream_blob": "8df73025007dd20558733df992c18cdf2852e127",
+      "local_blob": "91ac26b3a6883519a5dc14414419f34efdaa7b3b"
+    },
+    {
+      "path": "backend/ent/channelmonitor.go",
+      "upstream_blob": "e5697863f0d1e252d4032580bb67a668cda10c77",
+      "local_blob": "944282c8e52cec6b78f681362a19c3f6a33ab80b"
+    },
+    {
+      "path": "backend/ent/channelmonitor/channelmonitor.go",
+      "upstream_blob": "711e6217e2ffea8670b84451d07d7fdd9a791c59",
+      "local_blob": "cf2af0c15a05111ed754046f9d4ab4365e57f78d"
+    },
+    {
+      "path": "backend/ent/channelmonitor/where.go",
+      "upstream_blob": "6575aa5df6ad3226d6cb70a3bb865d229aa408b4",
+      "local_blob": "ff50acde2101d0b1b156a09e37cb5adc483d988c"
+    },
+    {
+      "path": "backend/ent/channelmonitor_create.go",
+      "upstream_blob": "6c7e65491722ee715610a48220f1fcd271275917",
+      "local_blob": "32548ae3c3d40ab6f85c94d79199fb3686240725"
+    },
+    {
+      "path": "backend/ent/channelmonitor_query.go",
+      "upstream_blob": "b6722e7801bdf88407342d3099f870892741d11a",
+      "local_blob": "223f405a6ad2c98ab84988e0e8b3ffe01731353e"
+    },
+    {
+      "path": "backend/ent/channelmonitor_update.go",
+      "upstream_blob": "ccc6fa8cc2d8923dd3dcd2871e7a7602d4439ae0",
+      "local_blob": "7bd144fd3ef4bde83fadc3d2822635ca3a97c783"
+    },
+    {
+      "path": "backend/ent/client.go",
+      "upstream_blob": "7cdb7394fd67914df75296daaecc988ca0cec6f9",
+      "local_blob": "b14cb71c7daa4fb2fae0e6026ad27261a687c6d7"
+    },
+    {
+      "path": "backend/ent/ent.go",
+      "upstream_blob": "29f3f0d68fb4f58cb2487cf43419e5679d1a23e2",
+      "local_blob": "85df319d4ca771b5c4588efd94a4bed2ee251f51"
+    },
+    {
+      "path": "backend/ent/group.go",
+      "upstream_blob": "81a3e349c09fb1034358d0b4d95668a1d4fd5076",
+      "local_blob": "9c27792e08318bc0a4dbd721fe91e91474c3ac33"
+    },
+    {
+      "path": "backend/ent/group/group.go",
+      "upstream_blob": "35d6de133684b863411e3f5d07c1189794bf9899",
+      "local_blob": "9ae0cb42f5a96dff966df3fb3808e14cb6bcbbab"
+    },
+    {
+      "path": "backend/ent/group/where.go",
+      "upstream_blob": "64e52ba80a784586555264bc7ee7c8b7bb217b75",
+      "local_blob": "4ae688b1e7dafbd740b4a77b5eb580613bb65d0d"
+    },
+    {
+      "path": "backend/ent/group_create.go",
+      "upstream_blob": "54e34a32f6454b4cd409ebf02cefa16dec35ff2f",
+      "local_blob": "2c82b41d1ab643454c1ae1096b7128b311d7475f"
+    },
+    {
+      "path": "backend/ent/group_update.go",
+      "upstream_blob": "c2fdea3f51b4219e4a90b1d48e293b9789d8a43a",
+      "local_blob": "0229756f75cd4f566db16c357bc39c70fa505a25"
+    },
+    {
+      "path": "backend/ent/hook/hook.go",
+      "upstream_blob": "f3beb5b644cddc5e4c5a938fbfd3e95838e908d2",
+      "local_blob": "24f50ee3e5e17052f57ead9eab4f528fd3419c95"
+    },
+    {
+      "path": "backend/ent/intercept/intercept.go",
+      "upstream_blob": "5a6bd40cfe5ba01f24c80dad2a75e4524fdf0962",
+      "local_blob": "4c2ee76ad8b8de5025e1e02761e781a139a4a937"
+    },
+    {
+      "path": "backend/ent/migrate/schema.go",
+      "upstream_blob": "0475bca3bf5ce223677093bd9a2a4d61dbd6f1b2",
+      "local_blob": "51039206928a2453da85a3c5feddecc173a50dc8"
+    },
+    {
+      "path": "backend/ent/mutation.go",
+      "upstream_blob": "61ff4f9e6d342468971b3f4335e5a1b023ab4072",
+      "local_blob": "669424a6c718d31ad4e87aff4705b23461b457a2"
+    },
+    {
+      "path": "backend/ent/predicate/predicate.go",
+      "upstream_blob": "f8b33fe366ebb24decb26e403bb9e3cbb6994bf6",
+      "local_blob": "fcbeddd350b36eaf7ba457031d771dbe37acbcae"
+    },
+    {
+      "path": "backend/ent/redeemcode.go",
+      "upstream_blob": "34b55f6be0089e1c3ea4a18174b23312da566a70",
+      "local_blob": "4c636053bbcde4f934981ada2388026ffeced5dd"
+    },
+    {
+      "path": "backend/ent/redeemcode/redeemcode.go",
+      "upstream_blob": "c7b30c15d196c1944d4911a0b275603ea136792c",
+      "local_blob": "03c62212afc57e7950acbc5051bba7ee88d7bdc2"
+    },
+    {
+      "path": "backend/ent/redeemcode/where.go",
+      "upstream_blob": "8325b9fc140be2dd5f11053071705e9d326d3035",
+      "local_blob": "12c758d553b9296dc222deef165042e228e592e9"
+    },
+    {
+      "path": "backend/ent/redeemcode_create.go",
+      "upstream_blob": "1bba027ba82cc4b72e129d8d726e92337bb5fe84",
+      "local_blob": "9ba021116f57687840e40df4a629ee6c1a7abe77"
+    },
+    {
+      "path": "backend/ent/redeemcode_update.go",
+      "upstream_blob": "1e0ec1e681f2a724339787efad49eaa1c07c1008",
+      "local_blob": "dbc36278aa3bcd55fd309d344d4b678bd07adc60"
+    },
+    {
+      "path": "backend/ent/runtime/runtime.go",
+      "upstream_blob": "e85660dcc1028f73af3ae02e9fc06e656179ef32",
+      "local_blob": "8e8b103c2b42f074bc165af769d5722fbe5a6cbf"
+    },
+    {
+      "path": "backend/ent/schema/account.go",
+      "upstream_blob": "9d771d29034dcc66e977afb67af8860b676f4a2a",
+      "local_blob": "1f9ed3a22cfb776955ec7fa59425aec2aec5bbfd"
+    },
+    {
+      "path": "backend/ent/schema/account_group.go",
+      "upstream_blob": "aa270f081dd44bc97fabc1bb64dec395e3b6de39",
+      "local_blob": "a3ea15b7ca16ec7edb7ff8ccbb51579f2c6dfcbe"
+    },
+    {
+      "path": "backend/ent/schema/api_key.go",
+      "upstream_blob": "5db51270b1bfc9db2814b143da0f332570f5b06d",
+      "local_blob": "530d3a0ff7dbe86c098f0049c7df56dc7928ccd7"
+    },
+    {
+      "path": "backend/ent/schema/batch_image_job.go",
+      "upstream_blob": "a65156eaeadae2865da549b1dd00d489e188c494",
+      "local_blob": "37397d6181d7453433709a58d043add1a8266b3f"
+    },
+    {
+      "path": "backend/ent/schema/channel_monitor.go",
+      "upstream_blob": "cb62079316e97c3672c96ce4033901ec9165d4e8",
+      "local_blob": "9d180909ccd20cfe6adb44afce5c4ecde993e359"
+    },
+    {
+      "path": "backend/ent/schema/group.go",
+      "upstream_blob": "8a9fc12ded729db9ec7eb0d0743b91716b900583",
+      "local_blob": "7d9cf0830036d97b14a96245ab4fdd5ca55ead43"
+    },
+    {
+      "path": "backend/ent/schema/redeem_code.go",
+      "upstream_blob": "fdaf08083044be66e5c964dd2cec7e7680046710",
+      "local_blob": "da97402b80674019ff8a5e5ac59d67f0a6a4a36c"
+    },
+    {
+      "path": "backend/ent/schema/user_subscription.go",
+      "upstream_blob": "a81850b120bc98b8cc5aa55feb4222b6f9451edf",
+      "local_blob": "23956630bd6156f5696ec6c9110a3f23f59cfedd"
+    },
+    {
+      "path": "backend/ent/tx.go",
+      "upstream_blob": "f0288403400c38d9df1808015521df7b3b969a4a",
+      "local_blob": "73ff8758e03c18bc840e86b28adb0cd575959b02"
+    },
+    {
+      "path": "backend/ent/usersubscription.go",
+      "upstream_blob": "01beb2fcc9b240fea683eb80ac1a7388c1b2762e",
+      "local_blob": "cbca7903d21df2564f566ee64ff3a4dd8ed44541"
+    },
+    {
+      "path": "backend/ent/usersubscription/usersubscription.go",
+      "upstream_blob": "064416461f818fa4aa6d835ec88cd52c49d6aa54",
+      "local_blob": "55d1276238a9badf7239a02fa5caa1cac0d22e06"
+    },
+    {
+      "path": "backend/ent/usersubscription/where.go",
+      "upstream_blob": "250e5ed56919a9e1f60e1692687dd14e23bf2dfc",
+      "local_blob": "dbb341773ebf62865a4132052dadba4f8fa6e020"
+    },
+    {
+      "path": "backend/ent/usersubscription_create.go",
+      "upstream_blob": "dd03115bb20b4189545fab889df5c97c70ab05b6",
+      "local_blob": "658b6fdbb5bbc38eef35ebb1b1482d7285ebaf80"
+    },
+    {
+      "path": "backend/ent/usersubscription_update.go",
+      "upstream_blob": "811dae7ede5074144c9e5dfd0bc0f4f902eaacd9",
+      "local_blob": "18bb99cb85c19d3c728153dae74c183b855a20a1"
+    },
+    {
+      "path": "backend/go.mod",
+      "upstream_blob": "e57756f77aa6015bbf4aa1fc3b463bcd5d97e156",
+      "local_blob": "c4cd4215b6985d7db4149f153e5c4b3f6643fd85"
+    },
+    {
+      "path": "backend/go.sum",
+      "upstream_blob": "896cfa3be60b8f90cba4add48c7d4a570eb26c9d",
+      "local_blob": "5dd6d3227876af2fae76a6f3d1503d82f385d312"
+    },
+    {
+      "path": "backend/internal/config/config.go",
+      "upstream_blob": "ce99a302b8158382e0aef925e983b388bfce01e4",
+      "local_blob": "a53df65eb9f7b4f5ceaa2ea34c9e617993a9150b"
+    },
+    {
+      "path": "backend/internal/config/config_test.go",
+      "upstream_blob": "b6ade9c4b23d398191a9493f0cb853308db21a2c",
+      "local_blob": "a8ec316d7c3b1d6442b18a12b339fd6106c8051b"
+    },
+    {
+      "path": "backend/internal/config/env_reachability_test.go",
+      "upstream_blob": "8141a2ec3d1ff9148de9533a333016ee7ef8600a",
+      "local_blob": "d9f81b549387cd0ed4b237ff6cfcefa9b8405708"
+    },
+    {
+      "path": "backend/internal/domain/announcement.go",
+      "upstream_blob": "0e68fb0f5ce34e583e183afe4f29fc197f8a7879",
+      "local_blob": "21414ea78a9775acd32c193d6cfb6146f344d509"
+    },
+    {
+      "path": "backend/internal/handler/admin/account_data.go",
+      "upstream_blob": "e44d726fd6d7141709b668668a3c09f75ea8b92b",
+      "local_blob": "88a76065636123a29299fd2d0c9715d89053487d"
+    },
+    {
+      "path": "backend/internal/handler/admin/account_handler.go",
+      "upstream_blob": "9b80dd05d1fd8695c324155b02472a9bbe7dd57c",
+      "local_blob": "f62feeb17fe951a420a8eb4bd3dff9c8df6bee70"
+    },
+    {
+      "path": "backend/internal/handler/admin/account_handler_available_models_test.go",
+      "upstream_blob": "880cb8c3ea6cddc84a9384fb610a9e3c51080d3c",
+      "local_blob": "c7f6a3d162440f1655156c17b1022d642e09feb3"
+    },
+    {
+      "path": "backend/internal/handler/admin/admin_service_stub_test.go",
+      "upstream_blob": "4c3beb9b8a64e19eba9d2e1081d171fe891b3d7f",
+      "local_blob": "fb38bfedcb99403162e9850c1bd609791ed76f8b"
+    },
+    {
+      "path": "backend/internal/handler/admin/channel_monitor_handler.go",
+      "upstream_blob": "ec5735f0ca35f4b9257b1b9dd656b2b7a42b31a9",
+      "local_blob": "efa114b7426908ec1703d793812adf0f6d4cc819"
+    },
+    {
+      "path": "backend/internal/handler/admin/group_handler.go",
+      "upstream_blob": "e99ba7b75597bd30b523a06d927948a89b6ae1ec",
+      "local_blob": "2d53c49ef6f2c6a4796e989762db5f0c95df247b"
+    },
+    {
+      "path": "backend/internal/handler/admin/payment_handler.go",
+      "upstream_blob": "1749d196705ac52a317157a4c53b6a63e96f3d96",
+      "local_blob": "d6348d312d1d389555ba22c4c7ad6a4f7b47ac42"
+    },
+    {
+      "path": "backend/internal/handler/admin/redeem_handler.go",
+      "upstream_blob": "5dca01d5eceac599fb8ffa7773773513546b85c8",
+      "local_blob": "0e98f3d6a097e2f0a9e7efe4ac0e550e2645c543"
+    },
+    {
+      "path": "backend/internal/handler/admin/setting_handler.go",
+      "upstream_blob": "8ad27e122ae6af25911ad6c33c696281df0d076e",
+      "local_blob": "19a36e1292b14cf4a3c798bbfef2ba302cb25464"
+    },
+    {
+      "path": "backend/internal/handler/admin/user_handler.go",
+      "upstream_blob": "651dfa714f481d77aa9c246ef42e91e6ad02f974",
+      "local_blob": "72117bf00cab6663aa45ffeb9e0fb1c74f24cb7d"
+    },
+    {
+      "path": "backend/internal/handler/api_key_handler.go",
+      "upstream_blob": "3363230815ffa812c5faa23bcce305ddaaed56e9",
+      "local_blob": "91850a7fbce31c295397df86df8e611db9eb7254"
+    },
+    {
+      "path": "backend/internal/handler/auth_current_user_test.go",
+      "upstream_blob": "cb3e4ba596ab9b41314900b967e11ffadfec6673",
+      "local_blob": "457aba31444273474a8d217e68a186ddebf3a8cc"
+    },
+    {
+      "path": "backend/internal/handler/auth_email_oauth_test.go",
+      "upstream_blob": "493b5099893dad1475251a0e4fa5190d33f572a0",
+      "local_blob": "ae204166571c2dfb2242f4dd0febf4fe183e13b1"
+    },
+    {
+      "path": "backend/internal/handler/auth_handler.go",
+      "upstream_blob": "7b38ee130e217ab505838085fd8200f006ead1e4",
+      "local_blob": "f43b66e73e043b27e8fae7c25f19065f0668956a"
+    },
+    {
+      "path": "backend/internal/handler/auth_linuxdo_oauth_test.go",
+      "upstream_blob": "2f1e73c4a8d39cd417aea73d45a04733429013c4",
+      "local_blob": "bee0714ff30ab51cb05097af0939a9c8caa00ed1"
+    },
+    {
+      "path": "backend/internal/handler/auth_oauth_pending_flow_test.go",
+      "upstream_blob": "4da8db2ab6783d4fcdba572af286e3c664f2c760",
+      "local_blob": "3a649aec3c63a221ac6fa7c4122747d367306e2e"
+    },
+    {
+      "path": "backend/internal/handler/available_channel_handler.go",
+      "upstream_blob": "300eb1b1a7421db1332be28cd2263cc589100e13",
+      "local_blob": "34a26052721c4a4552d7ea449172101c409f2a0a"
+    },
+    {
+      "path": "backend/internal/handler/channel_monitor_user_handler.go",
+      "upstream_blob": "cc36b3346118bc6a35b4ae726b1038264bb53c31",
+      "local_blob": "c979093cb6da273209853ddf49163af7a342c6d9"
+    },
+    {
+      "path": "backend/internal/handler/concurrency_error_response.go",
+      "upstream_blob": "911f5a54d7f225b7cd35f4714418a85d34cd67ad",
+      "local_blob": "ca9176da99f7349cbb9b8deaa55525576ae4c25b"
+    },
+    {
+      "path": "backend/internal/handler/concurrency_error_response_test.go",
+      "upstream_blob": "a2e6b9ab93a749dd9ada81e21cb85ba9d02361f8",
+      "local_blob": "0f6d92dbe0dbadae7bbb2e07cc5455b18556fe59"
+    },
+    {
+      "path": "backend/internal/handler/dto/mappers.go",
+      "upstream_blob": "c6f6cf25e204f893341902bf820c13a3347b1064",
+      "local_blob": "eb669b48bf26f87c26db128c022f40a64c74d02a"
+    },
+    {
+      "path": "backend/internal/handler/dto/settings.go",
+      "upstream_blob": "da4c6abc10457ccbeda23ffb709a5de09451c2e1",
+      "local_blob": "a4bc339e82ffdc090f33f4360f393b7818366e44"
+    },
+    {
+      "path": "backend/internal/handler/dto/types.go",
+      "upstream_blob": "37927c2b48e246373d7cae5ff623959d6d046094",
+      "local_blob": "20643d1fc7354230904e510a7c70b92608cba053"
+    },
+    {
+      "path": "backend/internal/handler/failover_loop.go",
+      "upstream_blob": "951a2f6b3582aa8952725da11b06fb5e49d2e3d9",
+      "local_blob": "a02b9863d8fc8ed9a4f621b852c211fd639b2966"
+    },
+    {
+      "path": "backend/internal/handler/gateway_handler.go",
+      "upstream_blob": "287d59fd9f3a617e3f22aabdd779eb1c59a469ec",
+      "local_blob": "d0507ea1c533132f090ba27165db23741ea69c5e"
+    },
+    {
+      "path": "backend/internal/handler/gateway_handler_chat_completions.go",
+      "upstream_blob": "ea4e839636985e6fcfa724ba4748fc2e6a8cbe69",
+      "local_blob": "9e8a98cf063b5dfae07199ad6189643d8f506bdb"
+    },
+    {
+      "path": "backend/internal/handler/gateway_handler_error_fallback_test.go",
+      "upstream_blob": "a38580dfc6dba07d92168f72ac8f6310c605dabf",
+      "local_blob": "8c0322b7d2855d768753d4c58c232cde2f27e9aa"
+    },
+    {
+      "path": "backend/internal/handler/gateway_handler_responses.go",
+      "upstream_blob": "7f49f39a3ee3849704f8e2496b2e73903a81df90",
+      "local_blob": "f5bff4631830b947bcb0d85d3e1d62657fe2dd72"
+    },
+    {
+      "path": "backend/internal/handler/gateway_models_test.go",
+      "upstream_blob": "58f019029791f73e3c5cb30ba9cb90b7236feb5e",
+      "local_blob": "b6a60ce43ab11073567afaad1b76129c77901988"
+    },
+    {
+      "path": "backend/internal/handler/gemini_v1beta_handler.go",
+      "upstream_blob": "2a270d3a0af5817bc0b6d3c65acb5d312b14732e",
+      "local_blob": "85c83479fa374cc742f7fd7a910e9aec3f975d7a"
+    },
+    {
+      "path": "backend/internal/handler/grok_media.go",
+      "upstream_blob": "e11bf7f08ce9f526f20a360026de3886e688cde3",
+      "local_blob": "471e3806d88208df085564d76be758fdea60091d"
+    },
+    {
+      "path": "backend/internal/handler/grok_media_test.go",
+      "upstream_blob": "fbd2af820e5aa98a546a5908a7d21d8bd3030914",
+      "local_blob": "2398954867897d89951ed8e4e74effde52769b9d"
+    },
+    {
+      "path": "backend/internal/handler/image_concurrency_limiter_test.go",
+      "upstream_blob": "723c26d0921f3643af9927d423f9ed6ce37cfbb8",
+      "local_blob": "2a961baf6e4a8fd2a482cb9eb7914f7c70219b99"
+    },
+    {
+      "path": "backend/internal/handler/no_account_error.go",
+      "upstream_blob": "8982c25b4060f23d25d4b7b777fadc1cb13f102c",
+      "local_blob": "1de9bc5ecca735f902ce22b42a41add78ce4f832"
+    },
+    {
+      "path": "backend/internal/handler/no_account_error_test.go",
+      "upstream_blob": "8c6784e84df37599e0716acd7cb9180a45269a51",
+      "local_blob": "42a908f51da4c3a4ee6a169c541a8a44dc57558c"
+    },
+    {
+      "path": "backend/internal/handler/openai_chat_completions.go",
+      "upstream_blob": "9715d7917e71a2e4326b18f47c0027b67098e9ca",
+      "local_blob": "a294ac102c7c85c6b8dbb5faae4856c6688ea7c0"
+    },
+    {
+      "path": "backend/internal/handler/openai_codex_models_handler.go",
+      "upstream_blob": "690cba9ce6d1316041997dde09fddeeed8d33ec9",
+      "local_blob": "d9156a9ba3a0b695959a0ff968aa3894b8cd381e"
+    },
+    {
+      "path": "backend/internal/handler/openai_codex_models_handler_test.go",
+      "upstream_blob": "7636fa5fd4114f1a7f45b727aa3cd190da9a8f9f",
+      "local_blob": "889f39b60e875a208da6d78ef13b99de60c6d0e5"
+    },
+    {
+      "path": "backend/internal/handler/openai_embeddings.go",
+      "upstream_blob": "92008c59c2402e7d10d950b9ecb6098f599542bb",
+      "local_blob": "f6a8ad592977f0942c38801a81b5fb88e38ee459"
+    },
+    {
+      "path": "backend/internal/handler/openai_gateway_compact_body_signal_test.go",
+      "upstream_blob": "a44d47c8568256fb54f99475004b979fe0b28294",
+      "local_blob": "c78863e984c22739a5bd4ffd13c8c876e91e0688"
+    },
+    {
+      "path": "backend/internal/handler/openai_gateway_handler.go",
+      "upstream_blob": "a02f5efa4c801aabd79a1fc69c3486f4e4295294",
+      "local_blob": "dc28ab0cc75f2d30f0483a04dd0a5c8d631074df"
+    },
+    {
+      "path": "backend/internal/handler/openai_gateway_handler_test.go",
+      "upstream_blob": "543cda1e55dbb37e0ed72105ba8b395c7e0b3b3d",
+      "local_blob": "8c64e643e675cabff537154fecd01753239c814a"
+    },
+    {
+      "path": "backend/internal/handler/openai_images.go",
+      "upstream_blob": "d5d16d1e714bf59cd0a7b494f8d587334b805fd9",
+      "local_blob": "ba8415cd1b702128e826f7394670f523b4b05550"
+    },
+    {
+      "path": "backend/internal/handler/openai_images_failover_test.go",
+      "upstream_blob": "8b07cb9a52a4478b3e9ef703807a4cc96abbc528",
+      "local_blob": "f020ff4e6fc6d384929ae2d46f3ba96972abe7db"
+    },
+    {
+      "path": "backend/internal/handler/payment_handler.go",
+      "upstream_blob": "9aab3255044e602cff1a82200f1825e3448fdd5d",
+      "local_blob": "acbf8cb87017e67485dd4957f8ba6b54a447cae8"
+    },
+    {
+      "path": "backend/internal/handler/payment_webhook_handler.go",
+      "upstream_blob": "dc70f120e76e67c437b6416f2227fc1c2f969146",
+      "local_blob": "6461598d1958efd0949580e8dd1327b28fab2e2b"
+    },
+    {
+      "path": "backend/internal/handler/setting_handler.go",
+      "upstream_blob": "d825d7ef631ca5737dffcf63aab8865669cc555c",
+      "local_blob": "66ec7dad7325b31c11bada42caeda7041872a59b"
+    },
+    {
+      "path": "backend/internal/handler/stream_error_event_test.go",
+      "upstream_blob": "f24cf97fff857478eda9edd8069f5d0cd496fa2f",
+      "local_blob": "d26a5503783564a7e6dc1f67eac5123b26dbd364"
+    },
+    {
+      "path": "backend/internal/payment/load_balancer.go",
+      "upstream_blob": "41fd2c50cf52a59f8e04ffad6bb33d2e1936b4a4",
+      "local_blob": "eb7be00e969dce233bc1a25aba3f8d8dd5c38063"
+    },
+    {
+      "path": "backend/internal/pkg/openai/constants.go",
+      "upstream_blob": "a863a19f8192471fbd54f88376a5324186009de7",
+      "local_blob": "f12ffdabcfdc67dbd704e486c5370a78f374a7f1"
+    },
+    {
+      "path": "backend/internal/pkg/openai/constants_test.go",
+      "upstream_blob": "c8f69efb6671f953644f4456d1a6f5de0f9547c2",
+      "local_blob": "bb28502f88a344ed8204b6e93794860a0dca8cca"
+    },
+    {
+      "path": "backend/internal/pkg/openai/instructions_gpt5_2.txt",
+      "upstream_blob": "7dd684bf061e2c0709fea6354e768c6b3d64251f",
+      "local_blob": "1dd679819ae9249ed406d70aec3cfc979b29bfcb"
+    },
+    {
+      "path": "backend/internal/repository/account_repo.go",
+      "upstream_blob": "92f098768c2131f44d2cfee69441b734eb8b2c12",
+      "local_blob": "b586d31787dafb273f6bba2664f8222e714ec79f"
+    },
+    {
+      "path": "backend/internal/repository/account_repo_temp_unsched_test.go",
+      "upstream_blob": "b7604e6c3ff1941fdcf75055bf430053d1abc030",
+      "local_blob": "4deef27b35694cb3a1b4a408b39fe788d66420b9"
+    },
+    {
+      "path": "backend/internal/repository/account_repo_upstream_billing_probe_update_test.go",
+      "upstream_blob": "46d78ac5b72395335ccd2e77ad45c7263ee49659",
+      "local_blob": "3321c0870aafcd84b22d4f93fe964100b736dc5d"
+    },
+    {
+      "path": "backend/internal/repository/affiliate_repo.go",
+      "upstream_blob": "61da539e253c9f0423434a29eff6603a04071c02",
+      "local_blob": "e0a98a551bbe05f76830d44da0ba241f00523c05"
+    },
+    {
+      "path": "backend/internal/repository/channel_monitor_repo.go",
+      "upstream_blob": "aa8b12ff8bea6bf2fb9d63f753b84a7375513988",
+      "local_blob": "5532be35e0cc515c504d579e5cf31b19d39f6801"
+    },
+    {
+      "path": "backend/internal/repository/channel_repo_account_stats_pricing.go",
+      "upstream_blob": "9e00fed8228d3020531d3d15692d52a04fc2d2c6",
+      "local_blob": "e2e5a6587dcde6396bfbf44deb77918b60cff771"
+    },
+    {
+      "path": "backend/internal/repository/channel_repo_pricing.go",
+      "upstream_blob": "995621139e9df4dc194ec3caa8220d0e0f24013f",
+      "local_blob": "c3ece4fc43808a97fd26249d9302cb14f5c8ec3e"
+    },
+    {
+      "path": "backend/internal/repository/concurrency_cache.go",
+      "upstream_blob": "37e839f28707955366951b7129490b52b1c25bc0",
+      "local_blob": "13c68aacb839520ef0c9d38c704e38568b4ac9c5"
+    },
+    {
+      "path": "backend/internal/repository/concurrency_cache_integration_test.go",
+      "upstream_blob": "4ec795c2987b7cc8d6c59df110ccb7e03234193c",
+      "local_blob": "977c89e637bc9a2c8f17aefa1260c0b1d70729fe"
+    },
+    {
+      "path": "backend/internal/repository/dashboard_aggregation_repo.go",
+      "upstream_blob": "5e09e75d406c021ad4a0c747dbf4200bd60dcf09",
+      "local_blob": "1c1ac19abf67a01aacc18b2dc05c029b63f0509b"
+    },
+    {
+      "path": "backend/internal/repository/fixtures_integration_test.go",
+      "upstream_blob": "ca927be2651832117f7559fd27b13a87fab222d6",
+      "local_blob": "14ea871e87252115eb557c191719ba790fd234e1"
+    },
+    {
+      "path": "backend/internal/repository/group_repo.go",
+      "upstream_blob": "31724f7c55756b3c52dbe2ff8581c1d45e805aaa",
+      "local_blob": "946f81cdd455c9df566746dba9e0f40559422f99"
+    },
+    {
+      "path": "backend/internal/repository/group_repo_integration_test.go",
+      "upstream_blob": "8c1450477601ba4f4f27a9a68a73a5cefd703f44",
+      "local_blob": "c67bfb9e07789b4122fab29f6c458644b4a543a3"
+    },
+    {
+      "path": "backend/internal/repository/http_upstream.go",
+      "upstream_blob": "ec42e189f5072f3df9e8f0b07b9b7e8ba0d3ddbe",
+      "local_blob": "67d708a06bc38155beaf45eaccc65776f7a8b1ca"
+    },
+    {
+      "path": "backend/internal/repository/http_upstream_test.go",
+      "upstream_blob": "35df747992819565a3308db1d9cb14e448b8e6eb",
+      "local_blob": "8a30275dc6a4d4841629305434f955696155a52c"
+    },
+    {
+      "path": "backend/internal/repository/redeem_code_repo.go",
+      "upstream_blob": "2bdb34b42fa65e5d639eb0a77659a49f93de7e27",
+      "local_blob": "b20f4f4baae2d4437c10dee86288038ef17a5461"
+    },
+    {
+      "path": "backend/internal/repository/scheduler_cache.go",
+      "upstream_blob": "b03e4e663718c38f0ac468daa77bbdf636d00db3",
+      "local_blob": "f86ca81a966cc71720100761735960e4acb85ea2"
+    },
+    {
+      "path": "backend/internal/repository/scheduler_outbox_repo.go",
+      "upstream_blob": "500f6e850d820d18e05e2dc465e5710365edd1a4",
+      "local_blob": "986069aed053a9fade107f5b3ed6b97799d1ab1d"
+    },
+    {
+      "path": "backend/internal/repository/usage_billing_repo.go",
+      "upstream_blob": "ce0adc2772d5cb465ab4e241c2dbba8507206174",
+      "local_blob": "9dee2d5977c897c97c33015476ee1204b5162e97"
+    },
+    {
+      "path": "backend/internal/repository/usage_log_repo_integration_test.go",
+      "upstream_blob": "b43c6d56ef12c100924a70d61d4f71ba372d9d37",
+      "local_blob": "64d0246f430ab8bbe69aa32e89afcb1c8bcefce3"
+    },
+    {
+      "path": "backend/internal/repository/user_group_rate_repo.go",
+      "upstream_blob": "74d25cb0b6f98357eacf178ab6b9b8aa0a57b7f3",
+      "local_blob": "bce88231d54303f8165aaba0cf24c6760850d283"
+    },
+    {
+      "path": "backend/internal/repository/user_repo.go",
+      "upstream_blob": "6bd164d8298a742eb1df87ea678062406f44f7ee",
+      "local_blob": "9c1a0993c5f779ef8529cfa211a8e08c6c9eb053"
+    },
+    {
+      "path": "backend/internal/repository/user_subscription_repo.go",
+      "upstream_blob": "671f847e8605c0a50ca902c67cd36c6effd8c6d8",
+      "local_blob": "05c9aa0f8a67d0e9fdf9b3325c80ebe8b6daf825"
+    },
+    {
+      "path": "backend/internal/server/api_contract_test.go",
+      "upstream_blob": "f0ad8dcdb3b15cef9ddc19775e5e95a53c212531",
+      "local_blob": "5e8912945f5c3bfe15ef6fee6a4523e75eb2a026"
+    },
+    {
+      "path": "backend/internal/server/middleware/api_key_auth_google.go",
+      "upstream_blob": "9efbbcb2cc99853c7affa25da81b00ff6290691d",
+      "local_blob": "ba88acaa205e31c5e070dff266a4aea7d4ae34db"
+    },
+    {
+      "path": "backend/internal/server/middleware/api_key_auth_google_test.go",
+      "upstream_blob": "69c226660b7cddbc5e60aa2e95a18b3f611ff50e",
+      "local_blob": "2b1573be0d61921a50dea58d6fc6a93c02002eb1"
+    },
+    {
+      "path": "backend/internal/server/middleware/backend_mode_guard.go",
+      "upstream_blob": "53334b68ac6faab8a2018fcb74a012007f609f8b",
+      "local_blob": "f4abe7f7759aa7b8355d0fbf486d49e7d5bd317b"
+    },
+    {
+      "path": "backend/internal/server/middleware/backend_mode_guard_test.go",
+      "upstream_blob": "fbe405199edc1cd402a53aa92a3f126ff96ff83c",
+      "local_blob": "f3b371b820cce64c8da359e0c617bade23fae9ce"
+    },
+    {
+      "path": "backend/internal/server/middleware/logger.go",
+      "upstream_blob": "a9189bb0539b39742e92f96fc8940d96e459b339",
+      "local_blob": "208f61717aef683a14345a6aa21b1c94a251c0a7"
+    },
+    {
+      "path": "backend/internal/service/account.go",
+      "upstream_blob": "ab54d3c80589ed1660e426a4bdc45fb2fd473d9f",
+      "local_blob": "e3cfa4c90b1c7df7025122ffdd881ded7b61705b"
+    },
+    {
+      "path": "backend/internal/service/account_credentials_redact.go",
+      "upstream_blob": "8eb70513ba2d01c475960bbe16ee8f22f799fb09",
+      "local_blob": "c48dc14f90291f3cab1a1fd24d6141f38208009f"
+    },
+    {
+      "path": "backend/internal/service/account_credentials_redact_test.go",
+      "upstream_blob": "05f37da9da2343f82ee8f8b5dcb9c4bafd9e40dc",
+      "local_blob": "5f3db8b512326f8895ce34b5d15907ed23e8a82a"
+    },
+    {
+      "path": "backend/internal/service/account_group.go",
+      "upstream_blob": "ab702a087f5aca09c61c77b1b64fa45c80fe82ef",
+      "local_blob": "969139cb021537fc90e203dd58f4c263449a1764"
+    },
+    {
+      "path": "backend/internal/service/account_quota_reset_test.go",
+      "upstream_blob": "233bdbe1ea62fae68ee1e5a5dad21804e95f60b5",
+      "local_blob": "347f78414f1865a87a9e8fe885037bf2712b083e"
+    },
+    {
+      "path": "backend/internal/service/account_service.go",
+      "upstream_blob": "d6905d73293072bdf43b91f7eacd705f2a37c6ae",
+      "local_blob": "dc872ca4ff38720e1f438b38e803e4d168671059"
+    },
+    {
+      "path": "backend/internal/service/account_test_service.go",
+      "upstream_blob": "134abe3819a23bb453756403caa454861ba3862e",
+      "local_blob": "89cfcabb8c6824f8df75054638e6d04b0291ec52"
+    },
+    {
+      "path": "backend/internal/service/account_test_service_grok_test.go",
+      "upstream_blob": "fcfe1257b6da6baef81e10691f8098a54c8f3207",
+      "local_blob": "a2eeabfad5168118e6d05ac328e12077df8ee474"
+    },
+    {
+      "path": "backend/internal/service/account_test_service_openai_compact_test.go",
+      "upstream_blob": "5b973285a8bbc05a6dc3a42c87eb4ae9fc836210",
+      "local_blob": "09a1e445d9b175f7ac123b64c0ca45b9a9abba74"
+    },
+    {
+      "path": "backend/internal/service/account_test_service_openai_image_test.go",
+      "upstream_blob": "9c24070c2e03c9583652534635e22425cddc0215",
+      "local_blob": "f17079ba8484a24cd4aa06430334b6d12d8a5ab1"
+    },
+    {
+      "path": "backend/internal/service/admin_account.go",
+      "upstream_blob": "044a7ae87bbe53c520e5fb55d38e70b89783f2d3",
+      "local_blob": "2edbab43acd04906fb86bfce89b142e1673bd25b"
+    },
+    {
+      "path": "backend/internal/service/admin_group.go",
+      "upstream_blob": "910f668438b3cd617c5f97808a32bcf4b7ce158b",
+      "local_blob": "8439d4e1cfb75765bce4a6cddf7498bb71534a1f"
+    },
+    {
+      "path": "backend/internal/service/admin_service.go",
+      "upstream_blob": "a620f86f14f29d34d72cb82f61dc9ffdeb71e25d",
+      "local_blob": "c586aeedd79eee78df332aefe2b805bd11ef2915"
+    },
+    {
+      "path": "backend/internal/service/admin_service_group_rate_test.go",
+      "upstream_blob": "d2efb6441949c13ff59d63a717b14a37e8bc3ed7",
+      "local_blob": "b5b5808e8f1174330819077f5ea0b591dbf35adc"
+    },
+    {
+      "path": "backend/internal/service/admin_service_group_test.go",
+      "upstream_blob": "c0b4faef5232f874b6ba6be3849d00394b4f1b3d",
+      "local_blob": "71f8240aec01c080e8188b4c58b73950d4abef3f"
+    },
+    {
+      "path": "backend/internal/service/admin_service_list_users_test.go",
+      "upstream_blob": "ff3f65a89d92bbe153f483538f88d52484536820",
+      "local_blob": "ec35930f7b2653f3b2617c8347fe10f203436132"
+    },
+    {
+      "path": "backend/internal/service/affiliate_service.go",
+      "upstream_blob": "91cca5e216dab7c7483b92991f35843cc62b7340",
+      "local_blob": "0ea201bb99cb7c62f6dc4f5ff9de359569e56f0f"
+    },
+    {
+      "path": "backend/internal/service/announcement.go",
+      "upstream_blob": "02741d37ba8a960edc8b1e36bea893e99595beea",
+      "local_blob": "1e651fcaf5f09e244fe16fbd64495515a1a5b950"
+    },
+    {
+      "path": "backend/internal/service/announcement_service.go",
+      "upstream_blob": "124790419b88ea55b3f4efef9041ec71f78b4938",
+      "local_blob": "bcb9b117564351ba3107c3e8523a785422a0dbbc"
+    },
+    {
+      "path": "backend/internal/service/announcement_targeting_test.go",
+      "upstream_blob": "4d904c7df8fcd368d20f2d97f8451984cca3d46c",
+      "local_blob": "1c5d6d4c49034d6c60b520154042be90bb31d87a"
+    },
+    {
+      "path": "backend/internal/service/antigravity_quota_scope.go",
+      "upstream_blob": "758626331b336b4b72f5a695904f4aa9dc1387cf",
+      "local_blob": "989756bb4727172531e50299fcb7f3b82db66a80"
+    },
+    {
+      "path": "backend/internal/service/api_key.go",
+      "upstream_blob": "b92a8481844b38dfeacf86af69fbd8333f9a8e41",
+      "local_blob": "82143697187b2de1574d771ec2ec5c2fe5646a13"
+    },
+    {
+      "path": "backend/internal/service/api_key_auth_cache.go",
+      "upstream_blob": "a665cdad3c54381e7886c8e92a15efe9b15c0693",
+      "local_blob": "60614ea2b90bd6e863ea787264a9f6c16fc29c1c"
+    },
+    {
+      "path": "backend/internal/service/api_key_auth_cache_impl.go",
+      "upstream_blob": "e834ce62de37e2b8c4df0e60b3f9c6faa854c53a",
+      "local_blob": "1b3a16b2c120ea19efc591a08767b943993272d0"
+    },
+    {
+      "path": "backend/internal/service/api_key_service.go",
+      "upstream_blob": "2197912c9acccc301c6061b46adcd3c9d66df5c0",
+      "local_blob": "7c42f13b52aa2c61ed5849b77f067242ae8f50c9"
+    },
+    {
+      "path": "backend/internal/service/batch_image_public.go",
+      "upstream_blob": "580d1f4934d17f1fb40008f124141b9103cce195",
+      "local_blob": "d7deae6dd4b616f4cc0ab772947c54972370d8c1"
+    },
+    {
+      "path": "backend/internal/service/batch_image_public_test.go",
+      "upstream_blob": "a69468f84645b0f181a778510e98a57d40d089b7",
+      "local_blob": "0c0107a3b41873edf13bf6318defadbacff65525"
+    },
+    {
+      "path": "backend/internal/service/billing_service.go",
+      "upstream_blob": "a43f26a8ada62694e53ef8c289516d1aa3e2b797",
+      "local_blob": "345f1af36357b56d2d53d00bd983610d99f05e94"
+    },
+    {
+      "path": "backend/internal/service/billing_service_test.go",
+      "upstream_blob": "8f322b54e998d731c7fc9258c008b5d30b3f4fe1",
+      "local_blob": "29946b3496f80d5f1e2bcb6a016f91c65ac2aa65"
+    },
+    {
+      "path": "backend/internal/service/channel.go",
+      "upstream_blob": "4a3bdf304d8730dffc14fa5599577961a5ab0dc8",
+      "local_blob": "dac6cb156154c29ae0dc3392fefe6ed91d939f92"
+    },
+    {
+      "path": "backend/internal/service/channel_available.go",
+      "upstream_blob": "eeaf7dac2e258368e44997b082afe48ddefc2574",
+      "local_blob": "49440b700d0039919ec5d1f8911728523dcdfa47"
+    },
+    {
+      "path": "backend/internal/service/channel_monitor_challenge.go",
+      "upstream_blob": "e81a9e2a30f2b2fc3063005e7812d83c090ae767",
+      "local_blob": "7255a04cc3a55502617fac269f4684f3103354a4"
+    },
+    {
+      "path": "backend/internal/service/channel_monitor_checker.go",
+      "upstream_blob": "910a6e80d99bad876941adde9c50785f33b5e796",
+      "local_blob": "c783eff1a07c318db65518dddc508fd3fc2cb78f"
+    },
+    {
+      "path": "backend/internal/service/channel_monitor_checker_body_test.go",
+      "upstream_blob": "3375ee6ac99851cf16750426dd4affa12f192672",
+      "local_blob": "47a6d40cf20e82dcab12641cac9523744688a069"
+    },
+    {
+      "path": "backend/internal/service/channel_monitor_const.go",
+      "upstream_blob": "2ee8eabde80006c4a2c2de61531bb9f6b157e8a5",
+      "local_blob": "90af73071fbba72d68e03f87e3184a5d65b328ae"
+    },
+    {
+      "path": "backend/internal/service/channel_monitor_service.go",
+      "upstream_blob": "9cc793b43b5929fc528cd1f0937683f2b8d23af5",
+      "local_blob": "0bfa5cec164c3afc13d1b84e40a652d71622f935"
+    },
+    {
+      "path": "backend/internal/service/channel_monitor_types.go",
+      "upstream_blob": "20ab1da935a89392fe74b85efd537d730d2eb1e8",
+      "local_blob": "5e821cb59b9a03f6c96d1478f12a0545788b4f9e"
+    },
+    {
+      "path": "backend/internal/service/error_passthrough_runtime.go",
+      "upstream_blob": "011c3ce4d5499fdb211a81c09c689e12370c9c32",
+      "local_blob": "66a48936136aabc6ffb6b90e95b54e71d7527812"
+    },
+    {
+      "path": "backend/internal/service/error_passthrough_runtime_test.go",
+      "upstream_blob": "b0eff6c8c066d506a4e0fd35f5b3a76bf9580112",
+      "local_blob": "2f6a2a24e8eb7c3d85dbf681c41eb8f096eff42c"
+    },
+    {
+      "path": "backend/internal/service/gateway_anthropic_apikey_passthrough_test.go",
+      "upstream_blob": "4fa52cc9ce80613061255c1251c3002a355fba0b",
+      "local_blob": "ea231ae31c1745e30f47fd06da7d4ee32ffcaf5b"
+    },
+    {
+      "path": "backend/internal/service/gateway_anthropic_passthrough.go",
+      "upstream_blob": "e46977f37dca32edc98f9bf015ed13152ef5d98e",
+      "local_blob": "b4046ce4f4cfb102a3fa71c07b135d34ef6451ae"
+    },
+    {
+      "path": "backend/internal/service/gateway_count_tokens.go",
+      "upstream_blob": "7b66ac9596e46c6195b06db147deec7870f81cde",
+      "local_blob": "e6543793003b9c1dbd6c1f6028baae991ddd534e"
+    },
+    {
+      "path": "backend/internal/service/gateway_forward_as_chat_completions.go",
+      "upstream_blob": "93da85a7b203573f1121c171ae9a25e13cbf6c40",
+      "local_blob": "dbe6628cf8074aefa401cda94662b1369ebf4309"
+    },
+    {
+      "path": "backend/internal/service/gateway_forward_as_responses.go",
+      "upstream_blob": "2aa5255c291c80372ec807085fbfc33f504769f7",
+      "local_blob": "249e45b7e37e2f4137158ea38bbd07de577c50ac"
+    },
+    {
+      "path": "backend/internal/service/gateway_forward_partial_usage_test.go",
+      "upstream_blob": "f6701ca8b008a3c7e103d0b0c17681549fd176d3",
+      "local_blob": "491a56fdcc3ba7a61ffdd81caf6e54fdc03e6d87"
+    },
+    {
+      "path": "backend/internal/service/gateway_hotpath_optimization_test.go",
+      "upstream_blob": "13fc32165f7163f5aff49e80e90e5bd260977033",
+      "local_blob": "e1f0542a99b06a51f461caa150db0866b97368e1"
+    },
+    {
+      "path": "backend/internal/service/gateway_model_availability.go",
+      "upstream_blob": "bc78a7859c1c83ef4bb48872691212c7ceac5948",
+      "local_blob": "c96d6b2eb27bbc5d472176f99ee8237dbd19a055"
+    },
+    {
+      "path": "backend/internal/service/gateway_multiplatform_test.go",
+      "upstream_blob": "7b5d967cf5846ccf1159131792fe5fb1c6877f08",
+      "local_blob": "204766bc051d5088c22b0d23d8c205112097369f"
+    },
+    {
+      "path": "backend/internal/service/gateway_request.go",
+      "upstream_blob": "4ffd5ee8e9de44b65e0bda2a6e321078e7a0c05e",
+      "local_blob": "efefdf092c2fb2e822468f64966554162cf5ea10"
+    },
+    {
+      "path": "backend/internal/service/gateway_scheduling.go",
+      "upstream_blob": "9660abdd6f0b00317ec084b18aa7c90d8ef3f7d4",
+      "local_blob": "21886e0f062e8dee4e8cd93b1f3600305549fd24"
+    },
+    {
+      "path": "backend/internal/service/gateway_service.go",
+      "upstream_blob": "9795425346b5f300ccfb4fbadccc92eb710ce154",
+      "local_blob": "34beae7e75bc71665521ed4515d984cce383865e"
+    },
+    {
+      "path": "backend/internal/service/gateway_upstream_response.go",
+      "upstream_blob": "2ddc831992dff8c512e109c1c402832e1b96542f",
+      "local_blob": "438287db653ea982395383df38463a7a04dfefc1"
+    },
+    {
+      "path": "backend/internal/service/gateway_usage_billing.go",
+      "upstream_blob": "0d07b355c636a305232f742f1f8ed99a3619bbf4",
+      "local_blob": "70a3b391cfadda304ec31dd56213ce1d2a9777ba"
+    },
+    {
+      "path": "backend/internal/service/gemini_chat_completions_compat_service.go",
+      "upstream_blob": "228f0153ec529e5eefb985d380512ac16fc4aa79",
+      "local_blob": "8b08589bb5908914f2600b4bec0962c33858a0c3"
+    },
+    {
+      "path": "backend/internal/service/gemini_messages_compat_service.go",
+      "upstream_blob": "e4df8982d3ba11d53be4fb9bde1aeacf37f0d8c2",
+      "local_blob": "3ef9544a5b6c5f297d6114bdba97edec4ce52e7b"
+    },
+    {
+      "path": "backend/internal/service/grok_media.go",
+      "upstream_blob": "6a1ddf0615fe5e95abebeef063e9cd531dd27a7a",
+      "local_blob": "6427856dcf127706b4a89317e96172b23aa54abc"
+    },
+    {
+      "path": "backend/internal/service/group.go",
+      "upstream_blob": "2fea013aff47e642ae3a81854855df52165de98c",
+      "local_blob": "0a692b9b14430d5f7e602557ce33f5e8065e8d9f"
+    },
+    {
+      "path": "backend/internal/service/http_upstream_profile.go",
+      "upstream_blob": "83bd6e70fc4291c276543cdef2e96f628d25b9c3",
+      "local_blob": "23454528a1f96062a2365c0ab6588aff6b269ffb"
+    },
+    {
+      "path": "backend/internal/service/image_billing_multiplier.go",
+      "upstream_blob": "6b7172c2a077c471b42dcc02d6dd40076383fb7a",
+      "local_blob": "324b90de7b3c2ff33bab9607bb17aefa2627ca84"
+    },
+    {
+      "path": "backend/internal/service/image_generation_intent.go",
+      "upstream_blob": "30da6ab6ba1a50484bdff59e02e6c64d6dc7444c",
+      "local_blob": "4b7b8c3132f7156ab99d304de3d64ba8988b8f4f"
+    },
+    {
+      "path": "backend/internal/service/image_generation_intent_test.go",
+      "upstream_blob": "c7c7f9db4ed4f73c178f09866f154f929c011603",
+      "local_blob": "653ae3ffbee74e596db7bb8fb24af709a124e7c2"
+    },
+    {
+      "path": "backend/internal/service/image_output_accounting.go",
+      "upstream_blob": "4ae6c5d7ca9eea19fcec8df2f88b9c6bcdf963e7",
+      "local_blob": "c3d8986a44397da6b3f6fccdb43aae63dc0f7d21"
+    },
+    {
+      "path": "backend/internal/service/leader_lock.go",
+      "upstream_blob": "a0c774a65396c9a67d85d47efb1fddfebe329fda",
+      "local_blob": "dd1c468eac8a2c2be34093d3032f081436aeb31f"
+    },
+    {
+      "path": "backend/internal/service/model_not_found_error.go",
+      "upstream_blob": "de4a004d1e4f2ce50a13d509c959b7f15251715c",
+      "local_blob": "126831489c681cb6d37b64716690712767faa985"
+    },
+    {
+      "path": "backend/internal/service/model_not_found_error_test.go",
+      "upstream_blob": "2f8c83466f5048884e8f14b1877e6fdc44998c1c",
+      "local_blob": "14c881b862f7882b39535912acd09e71f18aee61"
+    },
+    {
+      "path": "backend/internal/service/model_pricing_resolver.go",
+      "upstream_blob": "ea5f4a29d1190532b59fc591f00863b8d3bf4db8",
+      "local_blob": "c37428e8d5cf617470ce8a40f6aa4583082909a4"
+    },
+    {
+      "path": "backend/internal/service/notification_email_service.go",
+      "upstream_blob": "76d8dbd7e6e66516848cf42e921deddaa5037585",
+      "local_blob": "a146553238758ee6e00e2740140e16f120ececfa"
+    },
+    {
+      "path": "backend/internal/service/ollama_cloud_usage_test.go",
+      "upstream_blob": "4b4a5aadb6e4bce1aeb29c183dead08e80bbe67f",
+      "local_blob": "1d664903aecaa114bcc62249108bcd2a292f1cc6"
+    },
+    {
+      "path": "backend/internal/service/openai_account_scheduler.go",
+      "upstream_blob": "497c183eb9ba74edd1420615843716a633cee596",
+      "local_blob": "e8e3d3c24028d1e01b96f3f819debdcac691a870"
+    },
+    {
+      "path": "backend/internal/service/openai_account_scheduler_test.go",
+      "upstream_blob": "03f30c5b319090d9fc573c0e8bdedf0c709742e9",
+      "local_blob": "91de9b4823161edb71b6b9c0fcc33be2b1b32be5"
+    },
+    {
+      "path": "backend/internal/service/openai_codex_transform.go",
+      "upstream_blob": "c89fd038d0a421f3dcf56a3ffb30351164df77ae",
+      "local_blob": "a53e13a1d5168871b5dc122f8876037754bdeae3"
+    },
+    {
+      "path": "backend/internal/service/openai_codex_transform_test.go",
+      "upstream_blob": "9489ab60df67364e564b91ada7950f485e414583",
+      "local_blob": "1542f8156bebc9439f7631048be85b780ffd7942"
+    },
+    {
+      "path": "backend/internal/service/openai_compact_model_mapping_test.go",
+      "upstream_blob": "fc408e64af51294bf0c2f70517fc1dd2eb86fbfd",
+      "local_blob": "50a4162fde62d5e614a2160bd222c8612d277190"
+    },
+    {
+      "path": "backend/internal/service/openai_embeddings.go",
+      "upstream_blob": "c0c59002977dc37e179eed0fe1e95c8da985ea6d",
+      "local_blob": "4374ab6f4bfdad547f301895ea2cffde5a16b808"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_chat_completions.go",
+      "upstream_blob": "171a6c880532a0f83d1e18977ab6b5c07d205662",
+      "local_blob": "04f688bd5ef7d7fb0df2f9f6468f3ce65287f5e7"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_chat_completions_raw.go",
+      "upstream_blob": "49cd59182962c8257d9b7baca29d9da6fc090b89",
+      "local_blob": "9b7fb987e6a27d67e7fb303b56b5c5b8f8ee2f7b"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_chat_completions_test.go",
+      "upstream_blob": "ededa9f32229ba016319afb9df7c0bec6166f888",
+      "local_blob": "e62ffea55e7926c46a15d77066534cf5fc09b07c"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_count_tokens.go",
+      "upstream_blob": "eccd1c4146e24aea76b54664c6502bceb864c586",
+      "local_blob": "f0686a42b74817c884bd0842739615fafc5d05ef"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_forward.go",
+      "upstream_blob": "c4f54c0301e7655e42348c6bac26fe485758dad0",
+      "local_blob": "d3a5e49b2b1c2514afb298acba9157476814d75e"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_grok_test.go",
+      "upstream_blob": "d087bd5184fb8c9fe5e8814bed68a3a8ed780240",
+      "local_blob": "5d5d9b99e2882b34cf7dd6285ff2625294b95252"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_messages.go",
+      "upstream_blob": "066fc82cec98b4c7cf4ac797d64e706fc670df02",
+      "local_blob": "7af8b5d4e1beaf0b175e2b1ea5367f4e1b034bfb"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_model_availability.go",
+      "upstream_blob": "a665052e602ef3fc7ec3df536539117c657a58a6",
+      "local_blob": "f472fe681b7dbe1e09aa485805dd322d83388159"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_passthrough.go",
+      "upstream_blob": "04990dc7615fcd9e40e1e2ae08b516821372494c",
+      "local_blob": "d8a984f32a65151bde7cec8bc341153228abfaa6"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_record_usage_test.go",
+      "upstream_blob": "beb674474ee0f2d0870f93d79ed4498f21c67771",
+      "local_blob": "7a5389d45ef3746d151e15f45d9f753b1402dec2"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_response_failed_passthrough_test.go",
+      "upstream_blob": "f9439c05510de50a24bcc6d7483c670df1c405be",
+      "local_blob": "8c632a07f72cca3826991b79fe3fb71bf501811a"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_response_flush_test.go",
+      "upstream_blob": "2c35374596c4d174bbbca1d1c67b5d60b5b4466b",
+      "local_blob": "2e07651ca3d3b5b376f0c4a4867cccdc2239c486"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_response_handling.go",
+      "upstream_blob": "2a1993c463e399278753eb4c0f212d2471f0842c",
+      "local_blob": "7b5b3a493270a0ca3cde0e4bede1397ca7a041af"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_service.go",
+      "upstream_blob": "8f7911f002a2a078944af329680a37c75d6ea17f",
+      "local_blob": "0a6bb664dcab8199098a4db01ecc1c2988fd4fe6"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_service_codex_cli_only_test.go",
+      "upstream_blob": "7eb133c125ae59d1d1aa219daee6f48ade02f801",
+      "local_blob": "7195ab083bb16d51b9c3a47f53f41d3ca2db09c2"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_service_hotpath_test.go",
+      "upstream_blob": "a51f58bf56e8e9f4dbf0b3d0d2098592bd75237e",
+      "local_blob": "5a4f4f7d69adf6e302e36092872a5535f487c3e1"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_service_test.go",
+      "upstream_blob": "d03d48e00f3262095b7d4e72a0cd0018072f3dc6",
+      "local_blob": "de83bf554dc96ee11c49a86ad4360189c27fcff5"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_upstream_errors.go",
+      "upstream_blob": "f56246e12007565f507cad73b19e1508c4b27f08",
+      "local_blob": "77791d86521d586cea4562d494b4d1d017b55377"
+    },
+    {
+      "path": "backend/internal/service/openai_gateway_usage.go",
+      "upstream_blob": "0725c34cf7010faec624e60ea237f12fcb62aabf",
+      "local_blob": "32bdbb6e81f11b0df935e4085e5aebbdfcdd9947"
+    },
+    {
+      "path": "backend/internal/service/openai_gpt56_max_test.go",
+      "upstream_blob": "cbca2ff3ee6a6fe450710f940dff0382751c92f4",
+      "local_blob": "1f2bf655f33d9ad14803fbb34b478c1305d071e3"
+    },
+    {
+      "path": "backend/internal/service/openai_image_generation_controls_test.go",
+      "upstream_blob": "300bea37639d1ed70aac84d763e244200fc4068e",
+      "local_blob": "9416afba0e441250aed0d09736fb2ab8badc3db4"
+    },
+    {
+      "path": "backend/internal/service/openai_image_intent_hint.go",
+      "upstream_blob": "f8f966e5fca5a12c5b8122c8d1e266afc6b38ca0",
+      "local_blob": "66984a7908e10c753028fd7e3836766c582c0c4a"
+    },
+    {
+      "path": "backend/internal/service/openai_image_intent_hint_test.go",
+      "upstream_blob": "be5c61d0919e1407ab52738cd778f063ae36e628",
+      "local_blob": "dd0603263ce7ce358f451dc44130054f986538c5"
+    },
+    {
+      "path": "backend/internal/service/openai_images.go",
+      "upstream_blob": "f32fc56159bb5969270db887cfe0c77bd23bb5ac",
+      "local_blob": "032d76fbc3ad12209d14ecc9d0850c45f336fcc9"
+    },
+    {
+      "path": "backend/internal/service/openai_images_responses.go",
+      "upstream_blob": "7924de4fc3f862761906ad34516fa31a34d622b0",
+      "local_blob": "9d7aa2c94eaddb9f5bed5adb4d7606a823436f57"
+    },
+    {
+      "path": "backend/internal/service/openai_images_test.go",
+      "upstream_blob": "82f9c3addcd45d05f5a896753c0ddf1c9abafc05",
+      "local_blob": "98201f48aea89d2512f56b4899b7d66146711f66"
+    },
+    {
+      "path": "backend/internal/service/openai_model_alias.go",
+      "upstream_blob": "4ddf8110c33732908c23e3f85815a91bf846a40a",
+      "local_blob": "0eb3de33879138be17c6ca84817cc259f0168ae4"
+    },
+    {
+      "path": "backend/internal/service/openai_model_mapping_test.go",
+      "upstream_blob": "7107a706add8e358be410e827c47739a2c1fe196",
+      "local_blob": "ab9b1a8769941134dd325f958638b179faeebef9"
+    },
+    {
+      "path": "backend/internal/service/openai_oauth_passthrough_test.go",
+      "upstream_blob": "66fe9db33770641882ab746732ed4dc949c5ff5a",
+      "local_blob": "9d0a2235b9d0d94375fb7c86f8580c3b249eac75"
+    },
+    {
+      "path": "backend/internal/service/openai_responses_namespace_forward_test.go",
+      "upstream_blob": "e99d0199fddcdc38bbc1f3f6f88b6cdad0c9b78e",
+      "local_blob": "1d40750b2551497a83f0d426e677ade9c2ec5f59"
+    },
+    {
+      "path": "backend/internal/service/openai_responses_rejected_field_retry_test.go",
+      "upstream_blob": "724fd90c372f1f984af07ae3f530bd871c0ccbc7",
+      "local_blob": "3dddd0edcd67067972b00941435ec21e50acdf3c"
+    },
+    {
+      "path": "backend/internal/service/openai_upstream_transport_error.go",
+      "upstream_blob": "4093ca0b64cda80bc6c0b62c48d35973dbb3363e",
+      "local_blob": "23b06adb9178383a4e7ebaa305099cf32654ad63"
+    },
+    {
+      "path": "backend/internal/service/openai_ws_http_bridge.go",
+      "upstream_blob": "b2c7c67f64cbe6283b2b668e5d75514c8029320a",
+      "local_blob": "2dc248c8175c6bf016e2fdf9e978a44a4020ff02"
+    },
+    {
+      "path": "backend/internal/service/openai_ws_protocol_forward_test.go",
+      "upstream_blob": "32779a23f3b4bb8d02f1e6a0a13a7d2e2fe8c644",
+      "local_blob": "8cd90f1b29904ec91e8ef44732c1ddf987958abd"
+    },
+    {
+      "path": "backend/internal/service/openai_ws_v2/passthrough_relay.go",
+      "upstream_blob": "b6936fe99419d55436520cd1a51379bd69b1f60b",
+      "local_blob": "99f427a9c683a9eb5f2696e18a15632d011010e2"
+    },
+    {
+      "path": "backend/internal/service/openai_ws_v2_passthrough_adapter.go",
+      "upstream_blob": "ae74027bca1c99b6998c084228df712fd1e40982",
+      "local_blob": "ff82830fdfec5d3b08d9dd28dd7d0ccde1101c83"
+    },
+    {
+      "path": "backend/internal/service/ops_account_availability.go",
+      "upstream_blob": "3c874aae4de21de2007e95dcc39938ef1170e546",
+      "local_blob": "dc6dbd47c855674750107bfcb306b38460a59219"
+    },
+    {
+      "path": "backend/internal/service/ops_alert_evaluator_service.go",
+      "upstream_blob": "5ee54601cab7f1dae1ad572668c16c370a85ae8b",
+      "local_blob": "e6caa390941c525c2769c7639e2058ce06f73337"
+    },
+    {
+      "path": "backend/internal/service/ops_alert_evaluator_service_test.go",
+      "upstream_blob": "6ae0f1d105072b5b9d49a6859d82113cef89907d",
+      "local_blob": "39d45901bc1ea3c45285bbb11406a5f920147fef"
+    },
+    {
+      "path": "backend/internal/service/ops_cleanup_executor.go",
+      "upstream_blob": "a5da61e1de0efc6aff456907a470b22ae1664d01",
+      "local_blob": "b6627a95eeaedea26d3fda4922b25eafd88125fe"
+    },
+    {
+      "path": "backend/internal/service/ops_cleanup_service.go",
+      "upstream_blob": "38e94fb17a8ad94f0982de0f9c7de879a2875336",
+      "local_blob": "a012ab1067dd8ca58b9c276da4dc4114bde81b85"
+    },
+    {
+      "path": "backend/internal/service/ops_realtime_models.go",
+      "upstream_blob": "a19ab355dfd0370c65d119897cda97be8f593973",
+      "local_blob": "3801c76299ef5d44ef76dfb3a00f4afde8cfbfef"
+    },
+    {
+      "path": "backend/internal/service/ops_service.go",
+      "upstream_blob": "b1d9b9f57c926635b840a33948ea096c35c27f9b",
+      "local_blob": "68bfb91f2dab02aad152e577683e54974a5a7b7b"
+    },
+    {
+      "path": "backend/internal/service/ops_system_log_sink.go",
+      "upstream_blob": "1cbac237c42921351d7ac233fae77318b315535b",
+      "local_blob": "e7a0bebd6479973d85eda3f7d4700361e8da02ce"
+    },
+    {
+      "path": "backend/internal/service/ops_system_log_sink_test.go",
+      "upstream_blob": "fbe61d38676e4e5f3807093708f6b73fb757728b",
+      "local_blob": "47ba4d66a5069ae09865fe2521ff23846d446e2b"
+    },
+    {
+      "path": "backend/internal/service/ops_upstream_context.go",
+      "upstream_blob": "35a97cc2f51d83c788327bf59e6f0b001549227c",
+      "local_blob": "7db9b4fa88367b93a0088e517647f1c8e6cf00b4"
+    },
+    {
+      "path": "backend/internal/service/payment_amounts.go",
+      "upstream_blob": "2fd00c5957d27ef16c8b1894153ebd303988e4a7",
+      "local_blob": "3b101ef8a968ad40b64821f3a6195726c3a15f4b"
+    },
+    {
+      "path": "backend/internal/service/payment_config_service.go",
+      "upstream_blob": "aac1cc8e263bb65510d373f2c0df26e1a6995e18",
+      "local_blob": "323fb4190262255938b29dc266fdbbee8667eee5"
+    },
+    {
+      "path": "backend/internal/service/payment_currency.go",
+      "upstream_blob": "64fe94dd1690620167b31b780924a298b75610a8",
+      "local_blob": "a3dfcab7318ce9a8e2ab0048b87669b644cdbce2"
+    },
+    {
+      "path": "backend/internal/service/payment_fulfillment.go",
+      "upstream_blob": "4d442f3d1e33307ffe2d7dc918430c23baf63ade",
+      "local_blob": "939297a5c33f2cae2dc415a28ead8a9b0c8e3950"
+    },
+    {
+      "path": "backend/internal/service/payment_fulfillment_test.go",
+      "upstream_blob": "50ccd485ed3f95d11a80504730cd7582a77efb28",
+      "local_blob": "08fa20b9601cd7bf6f7beb7602cd935aec42993b"
+    },
+    {
+      "path": "backend/internal/service/payment_order.go",
+      "upstream_blob": "da7178dd7fee4729b2625801fa56bd141d2c10bf",
+      "local_blob": "03640f76d50c2ee09f189e28d1e93bdeb729a05b"
+    },
+    {
+      "path": "backend/internal/service/payment_order_expiry_service.go",
+      "upstream_blob": "b292ef89aec585c6a5e6cdca04c07df47b76c2c7",
+      "local_blob": "7b5cf94c25adf7eed1251c3c4ccdd6648d661c37"
+    },
+    {
+      "path": "backend/internal/service/payment_order_lifecycle.go",
+      "upstream_blob": "46a2e00605d9a9414c25c4726813520c3ea1da7f",
+      "local_blob": "ecca460e756d66942fbc2356528a4da5362ee742"
+    },
+    {
+      "path": "backend/internal/service/payment_order_lifecycle_test.go",
+      "upstream_blob": "658a1806c6260d1c581cd8a5465f6efd878587a1",
+      "local_blob": "d9cb21382d7117c11730d2f9ff63b460af9dcd51"
+    },
+    {
+      "path": "backend/internal/service/payment_service.go",
+      "upstream_blob": "792a842a23484bc4596d446dfcec4d016fc7c441",
+      "local_blob": "d11864a74c60c5664f1f85c2cac1bcd4f29b684e"
+    },
+    {
+      "path": "backend/internal/service/payment_stats.go",
+      "upstream_blob": "9dc48e012570c1d89b8dd48bb971622651f6aa9b",
+      "local_blob": "4ff1af0db9838911d4021d1cbcbf3f7459dd25bf"
+    },
+    {
+      "path": "backend/internal/service/ratelimit_service.go",
+      "upstream_blob": "266f806e83c5d381e694ebbf8929d9d79956337d",
+      "local_blob": "0f0ac686cdd2e3cd948f5a00180e4f3b2cadc64e"
+    },
+    {
+      "path": "backend/internal/service/ratelimit_service_401_test.go",
+      "upstream_blob": "48e6a41def0772f684a723a39e19a52547713cb0",
+      "local_blob": "d3193c68bbe5719b2ee700c62e6c792f692ffbd0"
+    },
+    {
+      "path": "backend/internal/service/ratelimit_service_403_test.go",
+      "upstream_blob": "9d4b2714d3e138cb1da4ed0589ecf21c8fc4e444",
+      "local_blob": "3a527ecc35ea3dfe92cdeac9081f0bad17fd8453"
+    },
+    {
+      "path": "backend/internal/service/ratelimit_service_clear_test.go",
+      "upstream_blob": "e8d312f9b98e3d7ceb64c9237c0bdfbb5a02ae0c",
+      "local_blob": "b9d70c1f7cee9295f3ba270793b7b9d42124add7"
+    },
+    {
+      "path": "backend/internal/service/redeem_code.go",
+      "upstream_blob": "55abcfb3e1df2380f340862addedca0761c9cd40",
+      "local_blob": "5f685df1c9109a9a85a7245ea2655d6de4399e40"
+    },
+    {
+      "path": "backend/internal/service/redeem_service.go",
+      "upstream_blob": "8794872e3d1db1f1bf571e30f1671a7597c0c80d",
+      "local_blob": "aeeb9844148fb730d2d0c4cf4fb752b5f8cdd543"
+    },
+    {
+      "path": "backend/internal/service/scheduler_snapshot_service.go",
+      "upstream_blob": "542fc18b9764a7a0dc9d57e81bd78a6e8adbe585",
+      "local_blob": "8acc0fd7640a0659d62100a4d9af6bb27bb8fbcb"
+    },
+    {
+      "path": "backend/internal/service/setting_parse.go",
+      "upstream_blob": "d5075038b1d6490c1f8ce2193bb7df97eefa48bf",
+      "local_blob": "89e26226d5ceadf3951aa9c3ba94273656983e14"
+    },
+    {
+      "path": "backend/internal/service/setting_public.go",
+      "upstream_blob": "bb2213a11879ecd5dcb3d5f9fc42eeeafa93fbd7",
+      "local_blob": "e0cf4111f516ea80b001ac9c1408d46e3beae519"
+    },
+    {
+      "path": "backend/internal/service/setting_service.go",
+      "upstream_blob": "35bcccb823ba680753d12b92f15695894aabf319",
+      "local_blob": "9e4bb07bab338429b4b61aabea2d0eeb199f9743"
+    },
+    {
+      "path": "backend/internal/service/setting_service_public_test.go",
+      "upstream_blob": "54bdda77f7fad753f6afccb2194db9e66430d48d",
+      "local_blob": "d7dbd999906c8dfdb1713c021a1dbc2a2da8ab57"
+    },
+    {
+      "path": "backend/internal/service/setting_update.go",
+      "upstream_blob": "e242c46d2cfcada844973b2ecde665d921382236",
+      "local_blob": "4e861c3d6bbd1111b33625dbc4cc2b56bbc463a9"
+    },
+    {
+      "path": "backend/internal/service/settings_view.go",
+      "upstream_blob": "a8ddb4908a2d45936ef933637afc7561c664b730",
+      "local_blob": "d626a098a08146ce67c60ca810cee0464d98e8f5"
+    },
+    {
+      "path": "backend/internal/service/shadow_routing.go",
+      "upstream_blob": "7493be82b2eba037f68991faa1351490f24b0a51",
+      "local_blob": "235dd6f0179057f13c4f376cebabaa993c6c7ddb"
+    },
+    {
+      "path": "backend/internal/service/sticky_session_test.go",
+      "upstream_blob": "11ace7bd8e0e2f1315e7d42ffbed875fb1b6157f",
+      "local_blob": "0a7f62f6b0d34a4ce1e6b496773b9ba27d4b6d0a"
+    },
+    {
+      "path": "backend/internal/service/update_service.go",
+      "upstream_blob": "82df3bb024605360f36e75daa3891b1483995d27",
+      "local_blob": "8ce0f2a58223ecc6677e38dbc598911af29ff359"
+    },
+    {
+      "path": "backend/internal/service/upstream_billing_probe.go",
+      "upstream_blob": "d66cd905dc5984edb4fe337fdfc5a5297dbd1860",
+      "local_blob": "5b8d01115b27aae637d932eed7d3eb4c0f2ec749"
+    },
+    {
+      "path": "backend/internal/service/upstream_billing_probe_test.go",
+      "upstream_blob": "e032e9aa16ef8d09fb61fdf9cbb7c85aaca78ed9",
+      "local_blob": "fb73507ad195d1e6e08990c0db7a997e61f3cc49"
+    },
+    {
+      "path": "backend/internal/service/upstream_models.go",
+      "upstream_blob": "393d57870c31c2b51fe60096d1beaf31db6aac91",
+      "local_blob": "1eb5f067d93cf7916370401af9775ae859418997"
+    },
+    {
+      "path": "backend/internal/service/upstream_response_limit.go",
+      "upstream_blob": "ddf0e8185241ddf5597dd348cf64bf1a0d275980",
+      "local_blob": "2de7681c3846cf37bbd21f1aa418cb6df3aa01e5"
+    },
+    {
+      "path": "backend/internal/service/usage_log.go",
+      "upstream_blob": "b35d149ea8eb61952f6551f376e49a52851878df",
+      "local_blob": "f4436a972e86309c33891de2ed349eb0419c4747"
+    },
+    {
+      "path": "backend/internal/service/usage_record_worker_pool.go",
+      "upstream_blob": "babcc2599e0292831056f5eff59bfb44ef07594b",
+      "local_blob": "bc25ecdcd469810df73bbf0e7ba2439b78195ef7"
+    },
+    {
+      "path": "backend/internal/service/user.go",
+      "upstream_blob": "22a21a4634a0ee0ed155b819137b941f22714302",
+      "local_blob": "f11252f0349578dec1be270dfb46da593edcb567"
+    },
+    {
+      "path": "backend/internal/service/user_group_rate.go",
+      "upstream_blob": "f069eb7e41504580894ec0246bcf490f5b7a0fa1",
+      "local_blob": "77442b46bdabde7c6dfa882a214129d62fc3dff5"
+    },
+    {
+      "path": "backend/internal/service/user_group_rate_resolver.go",
+      "upstream_blob": "7f0ffb0f0b977266d61c435407a14e80ba5116e1",
+      "local_blob": "f0d1a73af6c6abab13d12ffb9c0e770752165fbc"
+    },
+    {
+      "path": "backend/internal/service/user_group_rate_resolver_test.go",
+      "upstream_blob": "064ef7ba27f3c6db2cf7b095e4c9b0909e3a218a",
+      "local_blob": "10b3c5c1a4473edd2f6d0072aaa1883503491037"
+    },
+    {
+      "path": "backend/internal/service/user_service.go",
+      "upstream_blob": "b590673126f3a45d66d33524af23a4670ecd3f81",
+      "local_blob": "6304c2cafd3ac80b0e5ced8b40174989ed14fae3"
+    },
+    {
+      "path": "backend/internal/service/user_subscription.go",
+      "upstream_blob": "3a73554a4bd52f5d828792c842ff50b31f0f063d",
+      "local_blob": "57f12db001ae9657ea7d470bbdd59d66f149f357"
+    },
+    {
+      "path": "backend/internal/util/httputil/httputil.go",
+      "upstream_blob": "372c1f5f70034e58f9bfbd6a9e4e2a7673c8d770",
+      "local_blob": "9cf03e9837351c4ef9abe198c02177aaa3222440"
+    },
+    {
+      "path": "backend/internal/util/logredact/redact.go",
+      "upstream_blob": "9249b761c791daf2e9d93423edfae31751ea4885",
+      "local_blob": "08786c3abf24a38403cd869126931769baa2f7c0"
+    },
+    {
+      "path": "backend/internal/web/embed_off.go",
+      "upstream_blob": "346c31e92f15ae63b0480e7b38082dcd4f733608",
+      "local_blob": "cadcd54683c9614f62c26f6cdccbc4947426000f"
+    },
+    {
+      "path": "backend/internal/web/embed_on.go",
+      "upstream_blob": "516ac88dc08124762229d40dee4e6d5d46b1b95f",
+      "local_blob": "34a73864fc79973b5b3b0ac6f559b5880b63bbb7"
+    },
+    {
+      "path": "backend/internal/web/embed_test.go",
+      "upstream_blob": "3a9bc1151a9f7be11a40c3cb85d7633ffade7bc6",
+      "local_blob": "6f88236447fd6431a7aad26d8a2ac87e583801dd"
+    },
+    {
+      "path": "backend/migrations/auth_identity_payment_migrations_regression_test.go",
+      "upstream_blob": "68538cdd072447a64699e12ae81c184e5ae9190d",
+      "local_blob": "81e1b4077b0be6603ba312ea28de6c0a222a2605"
+    },
+    {
+      "path": "deploy/.env.example",
+      "upstream_blob": "6beca88308572880c2ffdad0ff051c571ac223ff",
+      "local_blob": "68f1c3431f335cfb9e0b07a8d2324b33b9d6d625"
+    },
+    {
+      "path": "deploy/Makefile",
+      "upstream_blob": "05f3c7957cc8588f8a623bcc5b080de3538d4a4e",
+      "local_blob": "636775aa59c7783b39b0bfc5aa85108615e6f53c"
+    },
+    {
+      "path": "deploy/README.md",
+      "upstream_blob": "e87f33fa252c01ea95ee864f5b95cde3b9a2adae",
+      "local_blob": "e4d549d8dd3c3a0376c1db8391a4b4f121dbb63d"
+    },
+    {
+      "path": "deploy/config.example.yaml",
+      "upstream_blob": "4e730b4fe0ea8c5667151bac5419defaa3074984",
+      "local_blob": "6f010d35715a8b1934ca04eb114a4b8157c99be7"
+    },
+    {
+      "path": "deploy/docker-compose.dev.yml",
+      "upstream_blob": "8603f121db2fe6edb8476135a11f40e9e84dace8",
+      "local_blob": "bb7645ee42e1416deae012f89b0ddc0bd1b33558"
+    },
+    {
+      "path": "deploy/docker-compose.local.yml",
+      "upstream_blob": "588862e2f25f1383693171b9493e481f8ba865e2",
+      "local_blob": "b1cc2943d535dd0cfb3d4d06f346e1b2619ac2b9"
+    },
+    {
+      "path": "deploy/docker-compose.standalone.yml",
+      "upstream_blob": "cd0a008871ca302207797904d8911546550a3375",
+      "local_blob": "273c6506e8dec4764b8119ce614113ddc3f429b5"
+    },
+    {
+      "path": "deploy/docker-compose.yml",
+      "upstream_blob": "68a51e78dda0624a5c127106ce31bae92887f1d6",
+      "local_blob": "f88721c83fd9e77db2881bf59af9e8d81f1b4d0d"
+    },
+    {
+      "path": "deploy/install.sh",
+      "upstream_blob": "246347c624a452f68d6108a944663885f07b4419",
+      "local_blob": "178f1f93499a7b6b02752857eb230b2a4fe52720"
+    },
+    {
+      "path": "deploy/sub2api.service",
+      "upstream_blob": "1a59ad032ce8f8fee9e1fc34f6b41d14091a16f2",
+      "local_blob": "6ba2887be891ae10532be6a42344eda188a4a648"
+    },
+    {
+      "path": "docs/PAYMENT.md",
+      "upstream_blob": "4c760166104dd3548d71aa002fac77738365ba7e",
+      "local_blob": "cf5eaf9b0387992c8ffba0e88b4e36bfe02b3f04"
+    },
+    {
+      "path": "docs/PAYMENT_CN.md",
+      "upstream_blob": "935176958ef1c130ae33bd02ddf4cefd90c881ce",
+      "local_blob": "1049e3d29059206c5c4aea8c178e90f40ce97102"
+    },
+    {
+      "path": "frontend/pnpm-lock.yaml",
+      "upstream_blob": "afd53708fa0c8d3d32966a698e1d385436872075",
+      "local_blob": "dfb1f88efe092d9dd089efd090486912c3eafd7b"
+    },
+    {
+      "path": "frontend/src/api/__tests__/admin.system.rollback.spec.ts",
+      "upstream_blob": "15d0989ffbbe3bb4fbc2a1fc10b9d27ca0f56012",
+      "local_blob": "5523a555b90c2909b46b4a90fad190326cd7186c"
+    },
+    {
+      "path": "frontend/src/api/client.ts",
+      "upstream_blob": "1f4e4d6134460c1d8723fc7778c732b5b1855d40",
+      "local_blob": "56f8298ac12fd0d934a21647e1ced27ecd54cdb5"
+    },
+    {
+      "path": "frontend/src/components/account/__tests__/credentialsBuilder.spec.ts",
+      "upstream_blob": "6d4b59e2a745d72f723160dda85b79833f016c28",
+      "local_blob": "828dbded42a74ae6e0ba5306c58bac17a4a1740f"
+    },
+    {
+      "path": "frontend/src/components/account/credentialsBuilder.ts",
+      "upstream_blob": "32214152506bb4fd77af69e5ab4cf558b1af0a2c",
+      "local_blob": "a58cc14109f5f365ac837895a63e54b381c2ac0f"
+    },
+    {
+      "path": "frontend/src/components/common/__tests__/AnnouncementPopup.spec.ts",
+      "upstream_blob": "0770971c73000bc8b6d5601c942b1d120a68b54b",
+      "local_blob": "bf70fdea940e750655facd0b18fb412677a0070e"
+    },
+    {
+      "path": "frontend/src/composables/useAutoRefresh.ts",
+      "upstream_blob": "37e9abad28beed50b7e3f529f436c48822850ec9",
+      "local_blob": "0b2e8ededf7325b68a8d4b6722b3391b38379f3b"
+    },
+    {
+      "path": "frontend/src/stores/payment.ts",
+      "upstream_blob": "fc21c1f9fce2d071a0666e3e2949cafd68922f76",
+      "local_blob": "63db51fb46c7308894be4a912aa8f75893c531fa"
+    },
+    {
+      "path": "frontend/src/utils/__tests__/ccswitchImport.spec.ts",
+      "upstream_blob": "50789b50035766ee6e8217ad326b64c1bef65744",
+      "local_blob": "1d65badf310de00abbb7e61285d7f656d74c171c"
+    },
+    {
+      "path": "frontend/src/utils/ccswitchImport.ts",
+      "upstream_blob": "d7858eab4d6cc303a2880c0e53549fcecb633731",
+      "local_blob": "a149db55848b78e5ab52dc7eaa8af73f88f5a13f"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/AccountsView.selectAllResults.spec.ts",
+      "upstream_blob": "e3fe2252240eae730f786a97a564891c08df3fda",
+      "local_blob": "108659542706de32b07f13da7b2ffb62e92930a2"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/GroupsView.columnSettings.spec.ts",
+      "upstream_blob": "3faa22898c258ac648fb7382121a4cc5febd894d",
+      "local_blob": "7e0f11207b6b5233740a86ff415e85711b1472a1"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/GroupsView.duplicate.spec.ts",
+      "upstream_blob": "9f099a7ded759082475076f32779f19c02bc78d7",
+      "local_blob": "32da8dc0fece7b2360354dc767bea506c0fc70cb"
+    },
+    {
+      "path": "frontend/tailwind.config.js",
+      "upstream_blob": "70e3a7edd1919eb783ef69b8234c846cbf61f426",
+      "local_blob": "53f8327b08bfa62e530ab0a8d3b67bdda50947b1"
+    },
+    {
+      "path": "frontend/tsconfig.json",
+      "upstream_blob": "82ae3f9f10d315b4056a1329233ff7ca87e3eb98",
+      "local_blob": "724a9fb5e2f1f53229b9c1890f251ca033a48409"
+    },
+    {
+      "path": "frontend/tsconfig.node.json",
+      "upstream_blob": "42872c59f5b01c9155864572bc2fbd5833a7406c",
+      "local_blob": "51891aee656d88a7fe8e51c8cfc31892c6a91c58"
+    },
+    {
+      "path": "frontend/vite.config.ts",
+      "upstream_blob": "5df99b8faa7e1b5ed0337982306d02516ea26c97",
+      "local_blob": "3114904fe2b04c816d676eb0fb82ebbd09494edc"
+    },
+    {
+      "path": "frontend/vitest.config.ts",
+      "upstream_blob": "8c45a9ff39acf089a3e70b6d641a9bb6f84e192d",
+      "local_blob": "d9c2dc8611f058d3628a51915809f52b9e68e736"
+    }
+  ],
+  "renamed": [
+    {
+      "upstream_path": "backend/migrations/125_add_channel_monitors.sql",
+      "local_path": "backend/migrations/130_add_channel_monitors.sql",
+      "upstream_blob": "5ec327da819aff6ebb33a54128e4434a77e9bee8",
+      "local_blob": "8a5feea464986183237970ab386b3b69ce8430d4"
+    },
+    {
+      "upstream_path": "backend/migrations/126_add_channel_monitor_aggregation.sql",
+      "local_path": "backend/migrations/131_add_channel_monitor_aggregation.sql",
+      "upstream_blob": "e643763cd3e737ed6c710c945e981593d774480b",
+      "local_blob": "d92d8407c7bfbe060caa35d2d357f387f12ae680"
+    },
+    {
+      "upstream_path": "backend/migrations/127_drop_channel_monitor_deleted_at.sql",
+      "local_path": "backend/migrations/132_drop_channel_monitor_deleted_at.sql",
+      "upstream_blob": "2260f06b419db3e184180430c703ef215ccc2ade",
+      "local_blob": "98347ce1a4a4a6428788a168945b998593d6c617"
+    },
+    {
+      "upstream_path": "backend/migrations/128_add_channel_monitor_request_templates.sql",
+      "local_path": "backend/migrations/133_add_channel_monitor_request_templates.sql",
+      "upstream_blob": "2db8fef69b062958d8d4a90d7efde704acb579f9",
+      "local_blob": "26287a12db2d7fee43b30346b911984bd6193b1d"
+    },
+    {
+      "upstream_path": "backend/migrations/129_seed_claude_code_template.sql",
+      "local_path": "backend/migrations/134_seed_claude_code_template.sql",
+      "upstream_blob": "d9b062c907edd736746e83506d43fc7add5dc6be",
+      "local_blob": "04d8c9089c9706d2f1a04c2558b1b252843ed42d"
+    },
+    {
+      "upstream_path": "backend/migrations/130_add_user_affiliates.sql",
+      "local_path": "backend/migrations/135_add_user_affiliates.sql",
+      "upstream_blob": "d8c001e0bc2b532173df7e46f74f22492afee858",
+      "local_blob": "d8c001e0bc2b532173df7e46f74f22492afee858"
+    },
+    {
+      "upstream_path": "backend/migrations/131_affiliate_rebate_hardening.sql",
+      "local_path": "backend/migrations/136_affiliate_rebate_hardening.sql",
+      "upstream_blob": "81e37a9e8937da04360e32b9d036890cad95702a",
+      "local_blob": "443aac2f26cb1acb63ec35a5832398f26de3c34b"
+    },
+    {
+      "upstream_path": "backend/migrations/132_affiliate_custom_settings.sql",
+      "local_path": "backend/migrations/137_affiliate_custom_settings.sql",
+      "upstream_blob": "840fe8e0664d30cbda3706fc63673efcdbfb9175",
+      "local_blob": "840fe8e0664d30cbda3706fc63673efcdbfb9175"
+    },
+    {
+      "upstream_path": "backend/migrations/133_affiliate_rebate_freeze.sql",
+      "local_path": "backend/migrations/138_affiliate_rebate_freeze.sql",
+      "upstream_blob": "b87d59b74ac5bc40f42429a598cc0dff5ec051ed",
+      "local_blob": "b87d59b74ac5bc40f42429a598cc0dff5ec051ed"
+    },
+    {
+      "upstream_path": "backend/migrations/134_affiliate_ledger_audit_snapshots.sql",
+      "local_path": "backend/migrations/139_affiliate_ledger_audit_snapshots.sql",
+      "upstream_blob": "8a87ed1f0e0af89eada8a525f239a039bee36a63",
+      "local_blob": "8a87ed1f0e0af89eada8a525f239a039bee36a63"
+    }
+  ]
+}

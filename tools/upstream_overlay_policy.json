@@ -1,0 +1,1298 @@
+{
+  "version": 2,
+  "forks": [
+    {
+      "custom_path": "frontend/src/custom/home/WegooHomeView.vue",
+      "upstream_path": "frontend/src/views/HomeView.vue",
+      "reviewed_blob": "ddb3e87e1d638f7c1f31116ab28bb0747ccbd399",
+      "reviewed_local_blob": "e0c05220d9393879434e490ef6c2886080df00be"
+    },
+    {
+      "custom_path": "frontend/src/custom/channels/WegooAvailableChannelsTable.vue",
+      "upstream_path": "frontend/src/components/channels/AvailableChannelsTable.vue",
+      "reviewed_blob": "23130d3fd3ee4d5a8440a2ddab785980d0f8ec20",
+      "reviewed_local_blob": "8ed1ac43ff3c0cfb98a138c97e7ad54a0dab31d0"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooAnnouncementBell.vue",
+      "upstream_path": "frontend/src/components/common/AnnouncementBell.vue",
+      "reviewed_blob": "e80e449f28c47667353d8522138dd36ca5a1f6bd",
+      "reviewed_local_blob": "c94d1abede06601ad1cca159a09b413dcf9e165d"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooAnnouncementPopup.vue",
+      "upstream_path": "frontend/src/components/common/AnnouncementPopup.vue",
+      "reviewed_blob": "99e10ed46181b6890b615fedf08e1d3b415fe207",
+      "reviewed_local_blob": "d5baec55424adbc18eb5f1816828e1bbb1c73ffa"
+    },
+    {
+      "custom_path": "frontend/src/custom/keys/WegooUseKeyModal.vue",
+      "upstream_path": "frontend/src/components/keys/UseKeyModal.vue",
+      "reviewed_blob": "67bb3f980153d9667863b06d1d96555c2a5c246f",
+      "reviewed_local_blob": "f012b68a8d80f88f0ba43b1f7bd558573ef75c14"
+    },
+    {
+      "custom_path": "frontend/src/custom/keys/ccswitchImport.ts",
+      "upstream_path": "frontend/src/utils/ccswitchImport.ts",
+      "reviewed_blob": "d7858eab4d6cc303a2880c0e53549fcecb633731",
+      "reviewed_local_blob": "197d161d0f85397a0099df9fef28b341284a0cda"
+    },
+    {
+      "custom_path": "frontend/src/custom/layout/WegooAppHeader.vue",
+      "upstream_path": "frontend/src/components/layout/AppHeader.vue",
+      "reviewed_blob": "3c33ac700c6219e71dbd82a5a62e651b1113bee0",
+      "reviewed_local_blob": "ace7589681fb4ed03ba33529e59c3b9c129638a7"
+    },
+    {
+      "custom_path": "frontend/src/custom/layout/WegooAppSidebar.vue",
+      "upstream_path": "frontend/src/components/layout/AppSidebar.vue",
+      "reviewed_blob": "2b519e37c9dc1f6518d7e2599838d87fe8bcdc20",
+      "reviewed_local_blob": "f73bc2a75cd8390096793bcad883e5cec7578c6c"
+    },
+    {
+      "custom_path": "frontend/src/custom/layout/WegooAuthLayout.vue",
+      "upstream_path": "frontend/src/components/layout/AuthLayout.vue",
+      "reviewed_blob": "c39cf3d9388289c96d4e81dddf02df46e67a4362",
+      "reviewed_local_blob": "6fccd131b82ae71dfc2ba3580ff3967998433aee"
+    },
+    {
+      "custom_path": "frontend/src/custom/public/WegooKeyUsageView.vue",
+      "upstream_path": "frontend/src/views/KeyUsageView.vue",
+      "reviewed_blob": "49a205fc4b3663e645ee6eb3a233ad378b91f838",
+      "reviewed_local_blob": "2355e49d142b990a7f8ca681046954fd3bef3818"
+    },
+    {
+      "custom_path": "frontend/src/custom/public/WegooLegalDocumentView.vue",
+      "upstream_path": "frontend/src/views/public/LegalDocumentView.vue",
+      "reviewed_blob": "ebf9fbc1ab19cc056e16146602678ca8f60ee1e1",
+      "reviewed_local_blob": "51f5d89f09c060a6f60b42ae259d5dbe241ecf51"
+    },
+    {
+      "custom_path": "frontend/src/custom/public/WegooNotFoundView.vue",
+      "upstream_path": "frontend/src/views/NotFoundView.vue",
+      "reviewed_blob": "beb29e4495b2c7426de7ae02eed918e847339b4e",
+      "reviewed_local_blob": "9d8115067e432f89ca277b91983252d02e390546"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooAirwallexPaymentView.vue",
+      "upstream_path": "frontend/src/views/user/AirwallexPaymentView.vue",
+      "reviewed_blob": "db0d69031fc55c7372fccfcd4d6fb0749284eebf",
+      "reviewed_local_blob": "9f94b9289ca875b746f6fb6cb26fb5712d36e8d1"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooAffiliateView.vue",
+      "upstream_path": "frontend/src/views/user/AffiliateView.vue",
+      "reviewed_blob": "fdf0a35d66ad23e7c6d8934b436db028648aa803",
+      "reviewed_local_blob": "1a0e9db087ff9caa642e76d13f93a716055f8950"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooAvailableChannelsView.vue",
+      "upstream_path": "frontend/src/views/user/AvailableChannelsView.vue",
+      "reviewed_blob": "a6c9ebc89b9acab616c1a66efa51c5f07a2fd999",
+      "reviewed_local_blob": "555313978e8407730ac261ede5251d7c42b45968"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooChannelStatusView.vue",
+      "upstream_path": "frontend/src/views/user/ChannelStatusView.vue",
+      "reviewed_blob": "61b4da97db9768df5f89c13bca48d7b90b4c13d5",
+      "reviewed_local_blob": "6aba4555f9fc4fac7bf359f34a870a04ae799848"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooCustomPageView.vue",
+      "upstream_path": "frontend/src/views/user/CustomPageView.vue",
+      "reviewed_blob": "8006695dda1e762d80ebc586e66c377cf9033c3a",
+      "reviewed_local_blob": "fa418ceba8d8c6a002a0ed1097421dea2b163926"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooDashboardView.vue",
+      "upstream_path": "frontend/src/views/user/DashboardView.vue",
+      "reviewed_blob": "815e9051821c344abf6d8c5832bd3cf967f3f0a4",
+      "reviewed_local_blob": "85148424463037dca11b7b1810ee56f80fa4ff1a"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooKeysView.vue",
+      "upstream_path": "frontend/src/views/user/KeysView.vue",
+      "reviewed_blob": "023757650ad1801cdb84bf95368ee681e8aa16a4",
+      "reviewed_local_blob": "d7bace4d361eefa9026780f575634c0b9d5c2770"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooPaymentQRCodeView.vue",
+      "upstream_path": "frontend/src/views/user/PaymentQRCodeView.vue",
+      "reviewed_blob": "0569bf69077364f32d0c38643859a772df79fcbb",
+      "reviewed_local_blob": "0e130a27dfc216d9802a789f6dfa554cb7db17db"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooPaymentResultView.vue",
+      "upstream_path": "frontend/src/views/user/PaymentResultView.vue",
+      "reviewed_blob": "a5f32f0a8deedde3d10b0624f55ab9d1dee04bdb",
+      "reviewed_local_blob": "3c672106c6955ff5e9b6ea94195cfba625887308"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooPaymentView.vue",
+      "upstream_path": "frontend/src/views/user/PaymentView.vue",
+      "reviewed_blob": "c5df5981f7e760e812438cdb44c8a47c965282d8",
+      "reviewed_local_blob": "24fa2cff954a3efe87a70ed774d7d1758328a381"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooProfileView.vue",
+      "upstream_path": "frontend/src/views/user/ProfileView.vue",
+      "reviewed_blob": "e26b354e114f68d713f349ed691967eed332ad7f",
+      "reviewed_local_blob": "82e3115615836a2cd38b89040afdf3f9de1cb6f1"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooRedeemView.vue",
+      "upstream_path": "frontend/src/views/user/RedeemView.vue",
+      "reviewed_blob": "5850c084a9443f07607bdc70fc8126813b57e7b4",
+      "reviewed_local_blob": "b3d5eee8c4418e5e0575916fe2cfe45b70b13621"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooStripePaymentView.vue",
+      "upstream_path": "frontend/src/views/user/StripePaymentView.vue",
+      "reviewed_blob": "840eea912ac1628940ffd855f09a01f9289840ed",
+      "reviewed_local_blob": "e81222212014025df42eee1aa36f4101e26059d7"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooStripePopupView.vue",
+      "upstream_path": "frontend/src/views/user/StripePopupView.vue",
+      "reviewed_blob": "0c3629c54642404b7aaedb50e43d7c1427df39e8",
+      "reviewed_local_blob": "fff60bd3ec81b411a1a75634c12f6087a5126ae3"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooSubscriptionsView.vue",
+      "upstream_path": "frontend/src/views/user/SubscriptionsView.vue",
+      "reviewed_blob": "7b7a71d3cb913777c403d595691c44c17140446b",
+      "reviewed_local_blob": "443d762035e74fa3d9fe5a7e95dd8f4b5450cae7"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooUsageView.vue",
+      "upstream_path": "frontend/src/views/user/UsageView.vue",
+      "reviewed_blob": "aa788a2b04970e3689536374ad838016dd169913",
+      "reviewed_local_blob": "e1b8f168699e9ce7d066a99087e71f7938e5cc40"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooUserOrdersView.vue",
+      "upstream_path": "frontend/src/views/user/UserOrdersView.vue",
+      "reviewed_blob": "c3ed80eb59ef79ac9ff122915a4b3b09fe539c08",
+      "reviewed_local_blob": "d6d8ebabdb83a6c209ce8da757172494275e23e6"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/dashboard/WegooUserDashboardCharts.vue",
+      "upstream_path": "frontend/src/components/user/dashboard/UserDashboardCharts.vue",
+      "reviewed_blob": "0aa17d1e75e3165c10b5f597371596ba83f270a8",
+      "reviewed_local_blob": "a4b590312ea4273e4761fe83fdc4ee66dc09018c"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/dashboard/WegooUserDashboardRecentUsage.vue",
+      "upstream_path": "frontend/src/components/user/dashboard/UserDashboardRecentUsage.vue",
+      "reviewed_blob": "a0605c7671528ab558681da7059a0c393bb32222",
+      "reviewed_local_blob": "554dec0bb3ab6a4ab5379e1b510af96c232706fa"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/dashboard/WegooUserDashboardStats.vue",
+      "upstream_path": "frontend/src/components/user/dashboard/UserDashboardStats.vue",
+      "reviewed_blob": "7a0fcc202e1649c9fc72b7d51ac454644be694b6",
+      "reviewed_local_blob": "db7050a38534831cde06e26cdb32b49ad9f041c5"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/monitor/WegooMonitorAvailabilityRow.vue",
+      "upstream_path": "frontend/src/components/user/monitor/MonitorAvailabilityRow.vue",
+      "reviewed_blob": "34420c9d2c9274168c9b6e0f9725e489f2fa1c31",
+      "reviewed_local_blob": "29c0aa186c29b359f31d01b863a15ddd6371a084"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/monitor/WegooMonitorCard.vue",
+      "upstream_path": "frontend/src/components/user/monitor/MonitorCard.vue",
+      "reviewed_blob": "1b66b1caedcd54b45d880fd8916589b7d1f82a33",
+      "reviewed_local_blob": "6de8f6543010d6a16fd0da0506c8788bb77d8fd0"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/monitor/WegooMonitorCardGrid.vue",
+      "upstream_path": "frontend/src/components/user/monitor/MonitorCardGrid.vue",
+      "reviewed_blob": "c7d24c012396e68fbc86b75a456130303267aa69",
+      "reviewed_local_blob": "f3f3af60c1b6c1f3773262b2487eb8c13baee84d"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/monitor/WegooMonitorDetailDialog.vue",
+      "upstream_path": "frontend/src/components/user/MonitorDetailDialog.vue",
+      "reviewed_blob": "564f461bf0f826031606f26b932760bda7b646de",
+      "reviewed_local_blob": "d827ab552d3f5885261a7718f5757e424b08e886"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/monitor/WegooMonitorHero.vue",
+      "upstream_path": "frontend/src/components/user/monitor/MonitorHero.vue",
+      "reviewed_blob": "bc2b5f6f8780536dee3b418b91175d9850dd8a7e",
+      "reviewed_local_blob": "51105617b85ed9402b88a632afe83367f2514ded"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/monitor/WegooMonitorTimeline.vue",
+      "upstream_path": "frontend/src/components/user/monitor/MonitorTimeline.vue",
+      "reviewed_blob": "548e2c084c4d5f198fe1576a228582fcde6d38a6",
+      "reviewed_local_blob": "d82b1b4832707c9942f58fb4beb4287786c2269f"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/profile/WegooProfileAvatarCard.vue",
+      "upstream_path": "frontend/src/components/user/profile/ProfileAvatarCard.vue",
+      "reviewed_blob": "9ff26853a9e4f2e005226e152e7fc955328f2090",
+      "reviewed_local_blob": "d454d2825e095e46c66ff9293d27fad61b1d485f"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/profile/WegooProfileBalanceNotifyCard.vue",
+      "upstream_path": "frontend/src/components/user/profile/ProfileBalanceNotifyCard.vue",
+      "reviewed_blob": "c4d04153749363eed58e5f55df58490caba5e5d6",
+      "reviewed_local_blob": "eb898ca76fc9143c745f000c4b10ae38046c6b76"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/profile/WegooProfileEditForm.vue",
+      "upstream_path": "frontend/src/components/user/profile/ProfileEditForm.vue",
+      "reviewed_blob": "e1441921f26258bceafaaf7c8b993b45a5784df0",
+      "reviewed_local_blob": "885fcc3d018cefdac5b8789af2ecef317e000600"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/profile/WegooProfileIdentityBindingsSection.vue",
+      "upstream_path": "frontend/src/components/user/profile/ProfileIdentityBindingsSection.vue",
+      "reviewed_blob": "8764c07e3aed2ae77b9be9b0918d749629d821ef",
+      "reviewed_local_blob": "68e03d570fd9c1f67a63a4640dd86df8c2456992"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/profile/WegooProfileInfoCard.vue",
+      "upstream_path": "frontend/src/components/user/profile/ProfileInfoCard.vue",
+      "reviewed_blob": "fc5691a86fd8ff37414ec01fab692331fd90a39e",
+      "reviewed_local_blob": "9a9c8049ff2b7bd468941fe69ad8315cf1ac4ee9"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/profile/WegooProfilePasswordForm.vue",
+      "upstream_path": "frontend/src/components/user/profile/ProfilePasswordForm.vue",
+      "reviewed_blob": "46595c1d3450fa4077a7d7c36fc4f7527f52aabb",
+      "reviewed_local_blob": "8c89a1e676004e946b26a1cd0f1f4f227c2c85b1"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/profile/WegooProfileTotpCard.vue",
+      "upstream_path": "frontend/src/components/user/profile/ProfileTotpCard.vue",
+      "reviewed_blob": "77413e5279168e27551445f1f7b1d2db783f2821",
+      "reviewed_local_blob": "27be85ce54130a6fd9bf8c50cdd2a537a4dd75cd"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/profile/WegooTotpDisableDialog.vue",
+      "upstream_path": "frontend/src/components/user/profile/TotpDisableDialog.vue",
+      "reviewed_blob": "c5e9afe7a2fda16e64e161698fa6317f8ab6501d",
+      "reviewed_local_blob": "87dc515b6d82c949f47adab42a74bd26defaf248"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/profile/WegooTotpSetupModal.vue",
+      "upstream_path": "frontend/src/components/user/profile/TotpSetupModal.vue",
+      "reviewed_blob": "312ecf7f4b3b49999581422bf721ec9e8be71f7e",
+      "reviewed_local_blob": "3f5af83ce170886ce85056f9f452ee1dc5fa0e42"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/announcements/WegooAnnouncementTargetingEditor.vue",
+      "upstream_path": "frontend/src/components/admin/announcements/AnnouncementTargetingEditor.vue",
+      "reviewed_blob": "355f539968ed461a93757b13912c2b894df2670b",
+      "reviewed_local_blob": "0717372312282a3c435d787bed0e396dd96150c2"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsDashboardSkeleton.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsDashboardSkeleton.vue",
+      "reviewed_blob": "9b520e757288a784edabb4c7e33c1e9223651fb4",
+      "reviewed_local_blob": "dbfee3d83494dc98c716fe0ef6e3d7a7a57c3d0f"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsLatencyChart.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsLatencyChart.vue",
+      "reviewed_blob": "c62b3aa973655bd7f4faa4fbea9c003c2940149e",
+      "reviewed_local_blob": "bc30d0cb2df1966a217d4b4cb3ecb854a987297b"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsErrorDistributionChart.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsErrorDistributionChart.vue",
+      "reviewed_blob": "ad7ce074ee201e0fb1c299d44302a1d6af8e922e",
+      "reviewed_local_blob": "084483b635d23e717aa83f0d78f5f9fdd1b9dc39"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsErrorTrendChart.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsErrorTrendChart.vue",
+      "reviewed_blob": "6e07926f69204176103c092b7f04922f643428cf",
+      "reviewed_local_blob": "d73cfd62d5fc554c5718e6e3b5b3682e244b648c"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsSwitchRateTrendChart.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsSwitchRateTrendChart.vue",
+      "reviewed_blob": "391ab8e12c4a014f6feb42c835cb54e4481ac6d3",
+      "reviewed_local_blob": "796826553a1c7ec87e7b98c6e9d68d940f5a631b"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsThroughputTrendChart.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsThroughputTrendChart.vue",
+      "reviewed_blob": "a5fba1a401fe576a943cd02731583aa00b155432",
+      "reviewed_local_blob": "dae70eb874086360c703d29cc5cdff719459e864"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/payment/WegooOrderStatsCards.vue",
+      "upstream_path": "frontend/src/components/admin/payment/OrderStatsCards.vue",
+      "reviewed_blob": "1fece5fb56436894bca1b2d1e09808cc550e92ba",
+      "reviewed_local_blob": "d238cb5cc95bc76f4986ee9dfcf308c9ee09eec3"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/user/WegooUserAttributesConfigModal.vue",
+      "upstream_path": "frontend/src/components/user/UserAttributesConfigModal.vue",
+      "reviewed_blob": "9aa41a47a25660298f139e9df45f2bebd38365f6",
+      "reviewed_local_blob": "58f48fe02efcd1b7d620507f194caf45476c68fb"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/user/WegooPlatformCostCell.vue",
+      "upstream_path": "frontend/src/components/user/PlatformCostCell.vue",
+      "reviewed_blob": "dd5de1115085ebcc0f1062b67c4eb2f330a59ec8",
+      "reviewed_local_blob": "62bfef7a057907a96615a2ca365c02f1cbda303c"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/user/WegooPlatformUsageBreakdown.vue",
+      "upstream_path": "frontend/src/components/user/PlatformUsageBreakdown.vue",
+      "reviewed_blob": "e995bc01a3d17d891abeeccf7236cacfec03a212",
+      "reviewed_local_blob": "432980dfc24718c3c29f76c0d001a68399efdee5"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/user/WegooUserPlatformQuotaCell.vue",
+      "upstream_path": "frontend/src/components/user/UserPlatformQuotaCell.vue",
+      "reviewed_blob": "cf3b4d0eda6c5a69ff56c8c32ccdd3d451d2ccb1",
+      "reviewed_local_blob": "286c96973bcf79d38e2abba5013d2c1684892694"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/usage/WegooUsageStatsCards.vue",
+      "upstream_path": "frontend/src/components/admin/usage/UsageStatsCards.vue",
+      "reviewed_blob": "c8c9b287fe30e27b7c75af1bbf693168c3910592",
+      "reviewed_local_blob": "a813fcbc5ce28eee7bf211a57c850552c28587c3"
+    },
+    {
+      "custom_path": "frontend/src/custom/styles/style.css",
+      "upstream_path": "frontend/src/style.css",
+      "reviewed_blob": "654586dd0700252fd56cae4bb666fe4d41496ec4",
+      "reviewed_local_blob": "c666c2beaf7cf680ccb49db67f7a82ca4b267bd3"
+    },
+    {
+      "custom_path": "frontend/src/custom/main.ts",
+      "upstream_path": "frontend/src/main.ts",
+      "reviewed_blob": "8d29b4c662c5f5529757aea707f69180b98fde98",
+      "reviewed_local_blob": "7dee942da8124018eb470101afb60bfd85f96333"
+    },
+    {
+      "custom_path": "frontend/src/custom/App.vue",
+      "upstream_path": "frontend/src/App.vue",
+      "reviewed_blob": "1a4f7437d55ce204b798a1c38a7b892088927687",
+      "reviewed_local_blob": "830b1a8949a9d1b08f6b05998bc782c32a7935fe"
+    },
+    {
+      "custom_path": "frontend/src/custom/router/index.ts",
+      "upstream_path": "frontend/src/router/index.ts",
+      "reviewed_blob": "1221a53f6de0e83eda145d1101842d1a5f9a9b8b",
+      "reviewed_local_blob": "dfd97455a05260f1b85828dbe52f6fd8f1899039"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooImportDataModal.vue",
+      "upstream_path": "frontend/src/components/admin/account/ImportDataModal.vue",
+      "reviewed_blob": "a0bfe294f6ae3397a9bb740f96e28a356ba1c07a",
+      "reviewed_local_blob": "ac3299b996aa8816e5dd1ac5011ebd78522bfbb6"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooTotpLoginModal.vue",
+      "upstream_path": "frontend/src/components/auth/TotpLoginModal.vue",
+      "reviewed_blob": "5f68b9a796bab1fbc1aa2a49160ff5a6a5a2fc36",
+      "reviewed_local_blob": "f8a1d16ed75c812ebc80d6a85a23e8c9f8fb1298"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooGroupSelector.vue",
+      "upstream_path": "frontend/src/components/common/GroupSelector.vue",
+      "reviewed_blob": "3a067ac676beca18849dc79f947c268e6dad2066",
+      "reviewed_local_blob": "0b3b675c86008b5576717b7910837f96256b7705"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/monitor/WegooMonitorKeyPickerDialog.vue",
+      "upstream_path": "frontend/src/components/admin/monitor/MonitorKeyPickerDialog.vue",
+      "reviewed_blob": "8df8d5864b281101796f4b44f2ac43dd19011dc1",
+      "reviewed_local_blob": "84f9fa51c392f4363875e97980540cd5a9255964"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooSubscriptionsView.vue",
+      "upstream_path": "frontend/src/views/admin/SubscriptionsView.vue",
+      "reviewed_blob": "b23fa2fdc7711a2cb650796faeac8d39bb1202bf",
+      "reviewed_local_blob": "7b76850f70e4a283e078307b322da58e4929065a"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooSettingsView.vue",
+      "upstream_path": "frontend/src/views/admin/SettingsView.vue",
+      "reviewed_blob": "fb7e81acd31e4b3e5f4800bd2212b479a19f029c",
+      "reviewed_local_blob": "08919368711a184a64890e148228bd4683bc5a9b"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooGroupsView.vue",
+      "upstream_path": "frontend/src/views/admin/GroupsView.vue",
+      "reviewed_blob": "89eee0e9f876d49ad7b79c92d670ff32db886b70",
+      "reviewed_local_blob": "66f7ef9713e00bafc51d15474cdd3b22219b9ea2"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooAccountsView.vue",
+      "upstream_path": "frontend/src/views/admin/AccountsView.vue",
+      "reviewed_blob": "d8377a846b6045885779d7929f284bce3cc395d7",
+      "reviewed_local_blob": "34232edf64c228ec1cca44a1eb76995eeef5fa91"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/WegooPaymentMethodSelector.vue",
+      "upstream_path": "frontend/src/components/payment/PaymentMethodSelector.vue",
+      "reviewed_blob": "25e99f06be5edcadd59556177de68ea0f5b68874",
+      "reviewed_local_blob": "1dc3dce14f8b541b157d7a799257b0bff15359eb"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooUsersView.vue",
+      "upstream_path": "frontend/src/views/admin/UsersView.vue",
+      "reviewed_blob": "794a281b08999381f189baf3be4f0e82023627a7",
+      "reviewed_local_blob": "401423268b3f4526c3c3a033d2d2b804800e3e60"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/user/WegooUserAllowedGroupsModal.vue",
+      "upstream_path": "frontend/src/components/admin/user/UserAllowedGroupsModal.vue",
+      "reviewed_blob": "ac822d4132e5716d96563b2c2aea28618b2bfc65",
+      "reviewed_local_blob": "db1a80baa5ff282d00ab54e0414a9f3ddb06c408"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooRiskControlView.vue",
+      "upstream_path": "frontend/src/views/admin/RiskControlView.vue",
+      "reviewed_blob": "770adcc812e1c8c8f7517d6c0699272d87399ba1",
+      "reviewed_local_blob": "42f959b81589f09d941773745d3da5e4fb46b5c9"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooChannelMonitorView.vue",
+      "upstream_path": "frontend/src/views/admin/ChannelMonitorView.vue",
+      "reviewed_blob": "d58a842d7eabb2cc8ee91b2ed1d5acd778a330f1",
+      "reviewed_local_blob": "e3bc6f0f10a39e9aa0586f6b96172c5627897705"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/orders/WegooAdminOrdersView.vue",
+      "upstream_path": "frontend/src/views/admin/orders/AdminOrdersView.vue",
+      "reviewed_blob": "c467f086af0e6a11b83a5031f6b92c4e52d3f1cc",
+      "reviewed_local_blob": "c80e0cd6b3e171ece0a24f973fbf50ffe28e46f6"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooDashboardView.vue",
+      "upstream_path": "frontend/src/views/admin/DashboardView.vue",
+      "reviewed_blob": "210d17ea46a4c4434508e7c24ecab060770d0873",
+      "reviewed_local_blob": "613a9ef47ae0be56b0ea76e2672647e461c27891"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooChannelsView.vue",
+      "upstream_path": "frontend/src/views/admin/ChannelsView.vue",
+      "reviewed_blob": "befc356f2b2126ec0306b557237380f2bde955dc",
+      "reviewed_local_blob": "5c5e968b35157c2efa4113d06d5a7f0e26c2622e"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooProxiesView.vue",
+      "upstream_path": "frontend/src/views/admin/ProxiesView.vue",
+      "reviewed_blob": "0572cc254b9ddefc711bb504d1fcc00943b86836",
+      "reviewed_local_blob": "92503b6ec3518bb008f7ce9ee5ec2f3a9a307fef"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooRedeemView.vue",
+      "upstream_path": "frontend/src/views/admin/RedeemView.vue",
+      "reviewed_blob": "faae7439104c575817ab2e45c076bc80d77a95af",
+      "reviewed_local_blob": "ce726c8481722f5f03dce2976c1f359300ddc6a7"
+    },
+    {
+      "custom_path": "frontend/src/custom/setup/WegooSetupWizardView.vue",
+      "upstream_path": "frontend/src/views/setup/SetupWizardView.vue",
+      "reviewed_blob": "d883c1b835ee17cb1e70e40efaf50e7f730d7db6",
+      "reviewed_local_blob": "ff5983ad0d814c5661e61578ebbc81a2b70f6b77"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooLinuxDoCallbackView.vue",
+      "upstream_path": "frontend/src/views/auth/LinuxDoCallbackView.vue",
+      "reviewed_blob": "fef5b90d068ae2bb03f7f4bc08351eb92497adb7",
+      "reviewed_local_blob": "40d81db4c9dec04f5078520a4fc438c81ebbabfa"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooWechatCallbackView.vue",
+      "upstream_path": "frontend/src/views/auth/WechatCallbackView.vue",
+      "reviewed_blob": "afa5c5ab1ec3fdc6229f7d6d59020cc73ef2778f",
+      "reviewed_local_blob": "565feebc8740445b25a6586a65bd09f4d84412df"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooDingTalkCallbackView.vue",
+      "upstream_path": "frontend/src/views/auth/DingTalkCallbackView.vue",
+      "reviewed_blob": "b90d4977a9738bd194eb97c12862a922c49ec68f",
+      "reviewed_local_blob": "845cf1bf64c97d4a69b012b4edab54b8da65ec07"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooDingTalkEmailCompletionView.vue",
+      "upstream_path": "frontend/src/views/auth/DingTalkEmailCompletionView.vue",
+      "reviewed_blob": "11e631cdfe8cfcede05b5c649e3595f168a33487",
+      "reviewed_local_blob": "a29072712c6bae9d236465847b5a658c24ce3734"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooOidcCallbackView.vue",
+      "upstream_path": "frontend/src/views/auth/OidcCallbackView.vue",
+      "reviewed_blob": "e17f05e91d00176b96a9d976dca6cfb7a9fe4ff3",
+      "reviewed_local_blob": "be86d619ac0e4139ad0f1c47d7410608e36a9ab4"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooOAuthCallbackView.vue",
+      "upstream_path": "frontend/src/views/auth/OAuthCallbackView.vue",
+      "reviewed_blob": "7306b9ac62810a0d37b96252febdf2b0bfd32d9b",
+      "reviewed_local_blob": "13c672c7ccb242996183732bd1657616630971fa"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooLoginView.vue",
+      "upstream_path": "frontend/src/views/auth/LoginView.vue",
+      "reviewed_blob": "75168dfcd5b76c69d0dd1e39d86ed6ed639bc37f",
+      "reviewed_local_blob": "acb77f6331f98b3b14a133c4d8321c687a61bd33"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooRegisterView.vue",
+      "upstream_path": "frontend/src/views/auth/RegisterView.vue",
+      "reviewed_blob": "4b89779142b22f8740a5e5e2bd64bda10b66de88",
+      "reviewed_local_blob": "7f2083951d7937d64381d03943878ff48c0f7b4a"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooEmailVerifyView.vue",
+      "upstream_path": "frontend/src/views/auth/EmailVerifyView.vue",
+      "reviewed_blob": "7363e20a2808542c028fc3dfc4805727c022b5c3",
+      "reviewed_local_blob": "585fb20a726dd0163f33b4b18ba1cdfb0215c6d6"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooForgotPasswordView.vue",
+      "upstream_path": "frontend/src/views/auth/ForgotPasswordView.vue",
+      "reviewed_blob": "ce05898fcc9dfd29697bed00808943fdc03a8cb4",
+      "reviewed_local_blob": "da86ffa3772cb55e4c3bdfe16ad177dd170f9532"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooResetPasswordView.vue",
+      "upstream_path": "frontend/src/views/auth/ResetPasswordView.vue",
+      "reviewed_blob": "77b81c8f3a6aa142a663508caf10931f2ca264ba",
+      "reviewed_local_blob": "02c5c3c28a65242f08db45e0207eb7140760d969"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooWechatPaymentCallbackView.vue",
+      "upstream_path": "frontend/src/views/auth/WechatPaymentCallbackView.vue",
+      "reviewed_blob": "225c84e13a6afa87453f145827186c1e07028666",
+      "reviewed_local_blob": "675e72d2811170b816368491043e508ee4455707"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsDashboard.vue",
+      "upstream_path": "frontend/src/views/admin/ops/OpsDashboard.vue",
+      "reviewed_blob": "8bb42f3b62e032804f2758c15a5a3093f607cb58",
+      "reviewed_local_blob": "bf5fca2935b0aba4e84f45b992aea15a69fb7937"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooAnnouncementsView.vue",
+      "upstream_path": "frontend/src/views/admin/AnnouncementsView.vue",
+      "reviewed_blob": "3d1593e8fa10ad5eff2f444a111cff56c2523242",
+      "reviewed_local_blob": "47e45e92d7024701297a90ae034e1c9e347a440f"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooPromoCodesView.vue",
+      "upstream_path": "frontend/src/views/admin/PromoCodesView.vue",
+      "reviewed_blob": "34cc9ef94b88208efb67e763973490903acffb15",
+      "reviewed_local_blob": "cf47b251428ef0ba44f1300df2dea87fbae17892"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooUsageView.vue",
+      "upstream_path": "frontend/src/views/admin/UsageView.vue",
+      "reviewed_blob": "2d64c92f0a4d1adcf0398cd607e424a282abcd37",
+      "reviewed_local_blob": "d63320e87f43941134be48b563cf96e2af4e112d"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/orders/WegooAdminPaymentDashboardView.vue",
+      "upstream_path": "frontend/src/views/admin/orders/AdminPaymentDashboardView.vue",
+      "reviewed_blob": "70fe95962aeb86efec446df0bf84277199764bb8",
+      "reviewed_local_blob": "5cb817d981e66b5b09ea6196affa250a808f740a"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/orders/WegooAdminPaymentPlansView.vue",
+      "upstream_path": "frontend/src/views/admin/orders/AdminPaymentPlansView.vue",
+      "reviewed_blob": "93a5303a76218e6f34fec8f185fd5ccc17d7d35d",
+      "reviewed_local_blob": "477bcde0694532cd5f157c44a169eed1d9c9066f"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/WegooBackupView.vue",
+      "upstream_path": "frontend/src/views/admin/BackupView.vue",
+      "reviewed_blob": "f0c3e5b72fb666251ac413376cc2fa102621c909",
+      "reviewed_local_blob": "7cee61b8aca2545f2cd35affae3d20e5c1041d8a"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/settings/WegooEmailTemplateEditor.vue",
+      "upstream_path": "frontend/src/views/admin/settings/EmailTemplateEditor.vue",
+      "reviewed_blob": "3e28ede484d6ef10f71dc611899c03ab1e949c83",
+      "reviewed_local_blob": "3b6efd93f00e585db13104699cdc904e0182502a"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/affiliates/WegooAdminAffiliateRecordsTable.vue",
+      "upstream_path": "frontend/src/views/admin/affiliates/AdminAffiliateRecordsTable.vue",
+      "reviewed_blob": "789df41a0dd530e8a45a1490a2ac782708cc4ca4",
+      "reviewed_local_blob": "ad6a21f9743cd3d3a43f54ab9a1a2be5e5f94e02"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/affiliates/WegooAdminAffiliateInvitesView.vue",
+      "upstream_path": "frontend/src/views/admin/affiliates/AdminAffiliateInvitesView.vue",
+      "reviewed_blob": "62c96ff855fe1ebc88d3ad477e2905529997e6e8",
+      "reviewed_local_blob": "1fb4dcfb688c6861676e1b6a1015059fb0e525c0"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/affiliates/WegooAdminAffiliateRebatesView.vue",
+      "upstream_path": "frontend/src/views/admin/affiliates/AdminAffiliateRebatesView.vue",
+      "reviewed_blob": "1acd7b1b900e19a91d1aa11b377db73b9a17d820",
+      "reviewed_local_blob": "c86ccdf352ba872e071d6bdc8bbb2243ed7deea5"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/affiliates/WegooAdminAffiliateTransfersView.vue",
+      "upstream_path": "frontend/src/views/admin/affiliates/AdminAffiliateTransfersView.vue",
+      "reviewed_blob": "5a56f179b2bc8e124c2cb1407387acc6be249599",
+      "reviewed_local_blob": "0b40e4b8fb8882916c3b0242c3610367edcdb1ab"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/groups/groupsModelsList.ts",
+      "upstream_path": "frontend/src/views/admin/groupsModelsList.ts",
+      "reviewed_blob": "790268fe950bc6ee4265f6de0615bd65eae0a970",
+      "reviewed_local_blob": "b08e8cae7ced12154814a7d82627cea54d2f4c5c"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/orders/WegooPlanEditDialog.vue",
+      "upstream_path": "frontend/src/views/admin/orders/PlanEditDialog.vue",
+      "reviewed_blob": "7535ebc56097cb24e95057490216ebf8ed336567",
+      "reviewed_local_blob": "ebad2006e8832bc6711117475a6b79e174e4d7c0"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsAlertEventsCard.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsAlertEventsCard.vue",
+      "reviewed_blob": "a72f93527c3dcd5cb8532fa5c07ddd103741d6bb",
+      "reviewed_local_blob": "9aed7e1d2c7a1dc19baba65e91a882b45612e155"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsAlertRulesCard.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsAlertRulesCard.vue",
+      "reviewed_blob": "91a7d1c462aeee252d57c955cf05a51658d30242",
+      "reviewed_local_blob": "68c9ef155c47ef2945cfb6effa0ba367d1d8a5c0"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsConcurrencyCard.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsConcurrencyCard.vue",
+      "reviewed_blob": "c7370ab5100983d8399e7ac0329007c303dfa791",
+      "reviewed_local_blob": "3f2249bca1946e14af0373895736ee92918d610a"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsDashboardHeader.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsDashboardHeader.vue",
+      "reviewed_blob": "8e5c9e8379b41113b9ad8f3c4f766260a37ec9f5",
+      "reviewed_local_blob": "f8097941a2e1e2f49473fdeeb505726f14bb73da"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsErrorDetailModal.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsErrorDetailModal.vue",
+      "reviewed_blob": "348eba29796f4c2eaab4bb561d19caa9c8bae569",
+      "reviewed_local_blob": "24820167b1d71f8c0aad1abab7ef3817258e80e0"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsRequestDetailsModal.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsRequestDetailsModal.vue",
+      "reviewed_blob": "33ce05814939e8775b254199edd384cd294d55cf",
+      "reviewed_local_blob": "38a5471ce9eccc85ee6b61dde975d12b2b250e3b"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/ops/WegooOpsSettingsDialog.vue",
+      "upstream_path": "frontend/src/views/admin/ops/components/OpsSettingsDialog.vue",
+      "reviewed_blob": "105ea560aee29243cc20462b8baaaf9dd0a1fdea",
+      "reviewed_local_blob": "9c139f8e95a0ee40a372e74c515db2c69911e534"
+    },
+    {
+      "custom_path": "frontend/src/custom/charts/WegooEndpointDistributionChart.vue",
+      "upstream_path": "frontend/src/components/charts/EndpointDistributionChart.vue",
+      "reviewed_blob": "a813df19b5c6e9f35c7b7dcf08d5bb288c67ef60",
+      "reviewed_local_blob": "0f858e7de51428c7e38791263cc0a2f29eb969fa"
+    },
+    {
+      "custom_path": "frontend/src/custom/charts/WegooGroupDistributionChart.vue",
+      "upstream_path": "frontend/src/components/charts/GroupDistributionChart.vue",
+      "reviewed_blob": "02f7b66d7ad8c16d4022d51985f800e948b821fe",
+      "reviewed_local_blob": "85e83b8e815e25824f5c9e5a147b382e839accfe"
+    },
+    {
+      "custom_path": "frontend/src/custom/charts/WegooModelDistributionChart.vue",
+      "upstream_path": "frontend/src/components/charts/ModelDistributionChart.vue",
+      "reviewed_blob": "5467b6d5aa1c79da202312bbd6d64b18887d5e5e",
+      "reviewed_local_blob": "2e373d4a305dfe29122cde709f8f999ba859fad3"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooAccountStatsModal.vue",
+      "upstream_path": "frontend/src/components/admin/account/AccountStatsModal.vue",
+      "reviewed_blob": "4dc84d5e93ede4d2aee9f4358e49ac8529d8991e",
+      "reviewed_local_blob": "cca92931fa6b32c828066cfeed68d48d69b8afbe"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooSyncFromCrsModal.vue",
+      "upstream_path": "frontend/src/components/account/SyncFromCrsModal.vue",
+      "reviewed_blob": "5191b7cca200181c09fffa6c8719cf73f705b282",
+      "reviewed_local_blob": "404c8132451707785bd1b1c96fb90cc329b58ae5"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/user/WegooUserApiKeysModal.vue",
+      "upstream_path": "frontend/src/components/admin/user/UserApiKeysModal.vue",
+      "reviewed_blob": "ef24fe7eb01dc179dec1b27a1b1de216aa269603",
+      "reviewed_local_blob": "54f896a7ba52af79637db5c1505b08ae4c07b0ed"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/WegooPaymentProviderList.vue",
+      "upstream_path": "frontend/src/components/payment/PaymentProviderList.vue",
+      "reviewed_blob": "49ebc726ed337214cd842898d65b16fedc424019",
+      "reviewed_local_blob": "f7c2352ad681107fe35797d59558c2ac052d7a42"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/WegooProviderCard.vue",
+      "upstream_path": "frontend/src/components/payment/ProviderCard.vue",
+      "reviewed_blob": "5cf52c28cad3d1f93378924428ac807fc9344988",
+      "reviewed_local_blob": "a68e35ad611e636ff1c94e78d9cd08d6044599a2"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooBulkEditAccountModal.vue",
+      "upstream_path": "frontend/src/components/account/BulkEditAccountModal.vue",
+      "reviewed_blob": "ad9998695d21b8403fd64498b8a73d53dbc266ba",
+      "reviewed_local_blob": "cdfc0010c6e5771c8d8202dac866650cbcd52365"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooTempUnschedStatusModal.vue",
+      "upstream_path": "frontend/src/components/account/TempUnschedStatusModal.vue",
+      "reviewed_blob": "a3e64c487e6b22c0c21a0719bc073e58e8566db1",
+      "reviewed_local_blob": "97acabf85dba2ad724d66cb41f704a101f6be018"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooAccountActionMenu.vue",
+      "upstream_path": "frontend/src/components/admin/account/AccountActionMenu.vue",
+      "reviewed_blob": "14922a37b7aa870cd967daa06d70a9348a355ab2",
+      "reviewed_local_blob": "b1b44ed94155014a5135e3956f23c1ece13f9a63"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooAccountBulkActionsBar.vue",
+      "upstream_path": "frontend/src/components/admin/account/AccountBulkActionsBar.vue",
+      "reviewed_blob": "64844e0955fa32b3ac375d7ecba84ac3454b525c",
+      "reviewed_local_blob": "1a51e065623e40c4a106ca795ca8383db740052c"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooAccountTableActions.vue",
+      "upstream_path": "frontend/src/components/admin/account/AccountTableActions.vue",
+      "reviewed_blob": "6874625b369c0ca220894e821e1b1e72d58256de",
+      "reviewed_local_blob": "789014d3ef1072e5230e7b59673215c90b3b93b2"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooAccountTableFilters.vue",
+      "upstream_path": "frontend/src/components/admin/account/AccountTableFilters.vue",
+      "reviewed_blob": "a0587f27f859e53d4a45af329fd931d028ed422e",
+      "reviewed_local_blob": "3fc487400f533412a0685c6f534a0ba1ed5e8f49"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooReAuthAccountModal.vue",
+      "upstream_path": "frontend/src/components/admin/account/ReAuthAccountModal.vue",
+      "reviewed_blob": "e767ad89dc7a70bd776691f19f3cdb0b815f0ae2",
+      "reviewed_local_blob": "b61d61224a0c3b505db22f6f8af7221ab2b191e4"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooScheduledTestsPanel.vue",
+      "upstream_path": "frontend/src/components/admin/account/ScheduledTestsPanel.vue",
+      "reviewed_blob": "1cdc47d283f41b28e4e4a1f59b28276f2291dea3",
+      "reviewed_local_blob": "f6a111f13ab3c3ae06a3daad9487315ae4933366"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooAccountQuotaInfo.vue",
+      "upstream_path": "frontend/src/components/account/AccountQuotaInfo.vue",
+      "reviewed_blob": "2f7f80de0d3ac8c430927fa52f7dcce571b473c1",
+      "reviewed_local_blob": "b4a75445428bcded1105d307d648dbff65c67a8c"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooUsageProgressBar.vue",
+      "upstream_path": "frontend/src/components/account/UsageProgressBar.vue",
+      "reviewed_blob": "2f8b9a88a7ade8fb57871dacd5aa8d1f3e0490df",
+      "reviewed_local_blob": "4e8d9826947bb0acef409c3d99d27a9603243764"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooAccountStatusIndicator.vue",
+      "upstream_path": "frontend/src/components/account/AccountStatusIndicator.vue",
+      "reviewed_blob": "9c1d25f635fd0e5f4c8812b98cca1561f5f42d24",
+      "reviewed_local_blob": "a28af89e3644302516e4f048baa159d092435334"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooAccountUsageCell.vue",
+      "upstream_path": "frontend/src/components/account/AccountUsageCell.vue",
+      "reviewed_blob": "b83e0308cd1c480df2e7c171eb4b01fd438ec119",
+      "reviewed_local_blob": "6f497d0cb297f521306bb9cbc392c73a78d45db9"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/monitor/WegooMonitorAdvancedRequestConfig.vue",
+      "upstream_path": "frontend/src/components/admin/monitor/MonitorAdvancedRequestConfig.vue",
+      "reviewed_blob": "c4ccdfa3ac54fba8b60f35aeef69d077d617c744",
+      "reviewed_local_blob": "138dec7a90e6ff89ae2dced0f801217c914f24d2"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/monitor/WegooMonitorFiltersBar.vue",
+      "upstream_path": "frontend/src/components/admin/monitor/MonitorFiltersBar.vue",
+      "reviewed_blob": "544238f49ce2cf5fbaf2935a4d2a58431e88a7a5",
+      "reviewed_local_blob": "f2d9c0ca55f0b5b9d9a10466f9e41015d3ecf3d9"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/monitor/WegooMonitorFormDialog.vue",
+      "upstream_path": "frontend/src/components/admin/monitor/MonitorFormDialog.vue",
+      "reviewed_blob": "14a9e2dd151f024ed5396e98060a64e1e5f79f21",
+      "reviewed_local_blob": "09eed7f4731fa8b0c364db3f357c73f193d7af99"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooUserErrorDetailModal.vue",
+      "upstream_path": "frontend/src/components/user/UserErrorDetailModal.vue",
+      "reviewed_blob": "3ed62dcb43e7516e6e54df9bc45899e66dad25b8",
+      "reviewed_local_blob": "09582b1b4afcf1e9ebd382156a139274b6a49d08"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooUserErrorRequestsTable.vue",
+      "upstream_path": "frontend/src/components/user/UserErrorRequestsTable.vue",
+      "reviewed_blob": "2465fe2f6668d8f9f24ebf8fdf2e1c7b1bd765b9",
+      "reviewed_local_blob": "2312e3bbdd29e6dcd5f39337787331b41f9770a4"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/user/WegooUserCreateModal.vue",
+      "upstream_path": "frontend/src/components/admin/user/UserCreateModal.vue",
+      "reviewed_blob": "1397a4c855ded48fcee0e6d5ba736420e27c54e0",
+      "reviewed_local_blob": "0939f207e2b9e1f0d0f15feabf58931e99f78423"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/user/WegooUserEditModal.vue",
+      "upstream_path": "frontend/src/components/admin/user/UserEditModal.vue",
+      "reviewed_blob": "ea9bf21e698e894e85735b041222df968225a6a5",
+      "reviewed_local_blob": "504b6c5d259c498cf651eead47710b6df0a3b94b"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/user/WegooUserBalanceModal.vue",
+      "upstream_path": "frontend/src/components/admin/user/UserBalanceModal.vue",
+      "reviewed_blob": "e8474cff02199f3117e136d2b4e9930f5755daf1",
+      "reviewed_local_blob": "9ce0afb14048c352cac8da29800a022311ad8cb9"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/groups/WegooGroupRateMultipliersModal.vue",
+      "upstream_path": "frontend/src/components/admin/group/GroupRateMultipliersModal.vue",
+      "reviewed_blob": "11d9ce720629ba9e872f6ddba08cd7e3ab79fc41",
+      "reviewed_local_blob": "fb70421f980e77dccaef44de8b01db907a23e888"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooPendingOAuthCreateAccountForm.vue",
+      "upstream_path": "frontend/src/components/auth/PendingOAuthCreateAccountForm.vue",
+      "reviewed_blob": "112a25cec03af4591efc75d82bfc14242e67a758",
+      "reviewed_local_blob": "dd50d6caed70e757a81e290c586575e5d1420ece"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooWechatOAuthSection.vue",
+      "upstream_path": "frontend/src/components/auth/WechatOAuthSection.vue",
+      "reviewed_blob": "c1b5be2e23dc4bdfcc4bf493bf7a022d7e6e0e2b",
+      "reviewed_local_blob": "38949afc7beed43a9cc9e20075409cea4dad33a2"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/payment/WegooAdminRefundDialog.vue",
+      "upstream_path": "frontend/src/components/admin/payment/AdminRefundDialog.vue",
+      "reviewed_blob": "f58b81038848f8256561db450ea6f47571907984",
+      "reviewed_local_blob": "0bd2db90c8b9a1f0a3ecca06cccb07e6f36e34ac"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/WegooAmountInput.vue",
+      "upstream_path": "frontend/src/components/payment/AmountInput.vue",
+      "reviewed_blob": "c3d9aa85e79255bd18809afcdcbf065d6abf85ff",
+      "reviewed_local_blob": "37bc5b26d5235537f515cdcf8ef0a0004d798343"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/WegooOrderStatusBadge.vue",
+      "upstream_path": "frontend/src/components/payment/OrderStatusBadge.vue",
+      "reviewed_blob": "87975ef5eb2186c27c43453a9686df894ad1ebcb",
+      "reviewed_local_blob": "0dfc9a817fe4390a3800bbcac72afe3689a59df4"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/WegooOrderTable.vue",
+      "upstream_path": "frontend/src/components/payment/OrderTable.vue",
+      "reviewed_blob": "1ef31e6cb44e21972a1f250459fd1a318e5c7c48",
+      "reviewed_local_blob": "8d31c9a57f1a05fa5f18976fbb7788c4375d3542"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/WegooPaymentStatusPanel.vue",
+      "upstream_path": "frontend/src/components/payment/PaymentStatusPanel.vue",
+      "reviewed_blob": "9b2b78e800cd60f2ee1db41ec84206539e22985b",
+      "reviewed_local_blob": "97b8cf7e7ee68cb6cf1cf826fdef42731d89ca15"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/WegooSubscriptionPlanCard.vue",
+      "upstream_path": "frontend/src/components/payment/SubscriptionPlanCard.vue",
+      "reviewed_blob": "0d60f67791a3d332bc216d6f8215e445b733b890",
+      "reviewed_local_blob": "f703759cb2970034c5ba438f66c60bae857f2a9f"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/orderUtils.ts",
+      "upstream_path": "frontend/src/components/payment/orderUtils.ts",
+      "reviewed_blob": "974a4c41997f6894db098880797d6514bd3f64f3",
+      "reviewed_local_blob": "96f15c69605b0dbe542f6255e9a04b4f2d315c47"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/paymentFlow.ts",
+      "upstream_path": "frontend/src/components/payment/paymentFlow.ts",
+      "reviewed_blob": "cd9ccfd38f17f7dcfe0059d05ae1afd8b5b47a10",
+      "reviewed_local_blob": "60e8fc485e50157d3cc2b3357a5b58b8f82d7fa3"
+    },
+    {
+      "custom_path": "frontend/src/custom/payment/providerConfig.ts",
+      "upstream_path": "frontend/src/components/payment/providerConfig.ts",
+      "reviewed_blob": "395c32725fa41e040665cab337de274957486a2b",
+      "reviewed_local_blob": "c2b10c15ea4fc4877271526e6e7f431aaa64c1fb"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooCreateAccountModal.vue",
+      "upstream_path": "frontend/src/components/account/CreateAccountModal.vue",
+      "reviewed_blob": "22a499ee65fbd98a82c754c13b7c046249e9db6e",
+      "reviewed_local_blob": "131287e698bbf40d6d47837d06ac5a71936dcf4e"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooEditAccountModal.vue",
+      "upstream_path": "frontend/src/components/account/EditAccountModal.vue",
+      "reviewed_blob": "51e0af9289aaee76065fd0863a25e1b5e5ea3b78",
+      "reviewed_local_blob": "3d6db5acea1d0f0fe7ed60439bc93026358049ab"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooAccountTestModal.vue",
+      "upstream_path": "frontend/src/components/admin/account/AccountTestModal.vue",
+      "reviewed_blob": "0a8f853ebb17beed174545408606716e65d38128",
+      "reviewed_local_blob": "63e8216dc2988789fd2f5e25a13d95a63015feff"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/usage/WegooUsageFilters.vue",
+      "upstream_path": "frontend/src/components/admin/usage/UsageFilters.vue",
+      "reviewed_blob": "0965567cec764345586ec5ed3eee49fe5bd7cf87",
+      "reviewed_local_blob": "0f102cefd24acf83573031637a67e4ba8182f5ee"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/usage/WegooUsageTable.vue",
+      "upstream_path": "frontend/src/components/admin/usage/UsageTable.vue",
+      "reviewed_blob": "032ecc0bd2e0e96ac972d86b6e1c4f7e8178d054",
+      "reviewed_local_blob": "455dd864eaecfeb220f5dc8efbb273865632201b"
+    },
+    {
+      "custom_path": "frontend/src/custom/auth/WegooLoginAgreementPrompt.vue",
+      "upstream_path": "frontend/src/components/auth/LoginAgreementPrompt.vue",
+      "reviewed_blob": "f73a3b1c4c363ce315ba336b91b4fb3e400664c8",
+      "reviewed_local_blob": "c185489548dc91ea1a8b99f6cf85f769c454d1d8"
+    },
+    {
+      "custom_path": "frontend/src/custom/keys/WegooEndpointPopover.vue",
+      "upstream_path": "frontend/src/components/keys/EndpointPopover.vue",
+      "reviewed_blob": "49db50b0e52b12d9c102ac6cac25cfb7dd990691",
+      "reviewed_local_blob": "0a4843b357a479445ddd7c533ad7d78252bd99f4"
+    },
+    {
+      "custom_path": "frontend/src/custom/api/keys.ts",
+      "upstream_path": "frontend/src/api/keys.ts",
+      "reviewed_blob": "34dd5b4b76ae0bd5db636ca4cbcb2f8152173f69",
+      "reviewed_local_blob": "c92656c3c5eedab0a9967f59f9463475f8dc1e33"
+    },
+    {
+      "custom_path": "frontend/src/custom/api/usage.ts",
+      "upstream_path": "frontend/src/api/usage.ts",
+      "reviewed_blob": "5e43157c65a2ca313d45a63756d646d55e6414c7",
+      "reviewed_local_blob": "864ba54e81c5aec44a091c090e1c01400116723f"
+    },
+    {
+      "custom_path": "frontend/src/custom/api/payment.ts",
+      "upstream_path": "frontend/src/api/payment.ts",
+      "reviewed_blob": "e18508c535316dc9d0f0832bae2b0612b98751e2",
+      "reviewed_local_blob": "fbc399664b4537b395a594bbc6d8e101c8ff6fda"
+    },
+    {
+      "custom_path": "frontend/src/custom/api/admin/channelMonitor.ts",
+      "upstream_path": "frontend/src/api/admin/channelMonitor.ts",
+      "reviewed_blob": "5eb78b798fb0867d2e3ebd901d1b5a34f4102fbb",
+      "reviewed_local_blob": "80aa85c1f98e9a6ae538334747a12b430f1f0a3f"
+    },
+    {
+      "custom_path": "frontend/src/custom/api/admin/index.ts",
+      "upstream_path": "frontend/src/api/admin/index.ts",
+      "reviewed_blob": "80a7073decbd6f658e9885acdd504f837cb365d4",
+      "reviewed_local_blob": "24603d65fded000f3df5e1ff5556cdd0cb49a113"
+    },
+    {
+      "custom_path": "frontend/src/custom/api/admin/accounts.ts",
+      "upstream_path": "frontend/src/api/admin/accounts.ts",
+      "reviewed_blob": "ea9b59b20cc3707a27b5fe5006289748121cc734",
+      "reviewed_local_blob": "2b66833181d2892b29dd012afcf8e1e319bc8fa6"
+    },
+    {
+      "custom_path": "frontend/src/custom/api/admin/settings.ts",
+      "upstream_path": "frontend/src/api/admin/settings.ts",
+      "reviewed_blob": "b018b925b4e7f8786f073815a8d3755f6a7074be",
+      "reviewed_local_blob": "c20fad32127078f2046a86b091f67a00f75922ab"
+    },
+    {
+      "custom_path": "frontend/src/custom/api/admin/users.ts",
+      "upstream_path": "frontend/src/api/admin/users.ts",
+      "reviewed_blob": "738e0531c19987a6e794b5ff83e5b1b157533100",
+      "reviewed_local_blob": "a3aefed54483a841b2ecb0e4c39da1213b4ac76f"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooBaseDialog.vue",
+      "upstream_path": "frontend/src/components/common/BaseDialog.vue",
+      "reviewed_blob": "2a0f25870b85c5b76ef357eea76b2f4464dd43de",
+      "reviewed_local_blob": "42999977526c021b2fd83311273a7594c20ece85"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooDataTable.vue",
+      "upstream_path": "frontend/src/components/common/DataTable.vue",
+      "reviewed_blob": "72c0716b9e6beabbd177b03c0552f9041247e8b7",
+      "reviewed_local_blob": "1cb1353e42f77857f7395cdfee355b83e3d10f49"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooDateRangePicker.vue",
+      "upstream_path": "frontend/src/components/common/DateRangePicker.vue",
+      "reviewed_blob": "b00334a67a1bafd0dff6f338564a45be84f38beb",
+      "reviewed_local_blob": "2b80101715214812af07d7f26f189d08a8afe5ba"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooEmptyState.vue",
+      "upstream_path": "frontend/src/components/common/EmptyState.vue",
+      "reviewed_blob": "132a85c0d51f66a5bc0d01c6d969b5cf169fc236",
+      "reviewed_local_blob": "2ac0ffaf17463ff94e8d5cc0c2993e635cf8189c"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooGroupBadge.vue",
+      "upstream_path": "frontend/src/components/common/GroupBadge.vue",
+      "reviewed_blob": "ee4b4b91540f5829787305fbecec280111c327e9",
+      "reviewed_local_blob": "3f356d520ebf58db0ceee00a85f1246d0383125f"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooGroupOptionItem.vue",
+      "upstream_path": "frontend/src/components/common/GroupOptionItem.vue",
+      "reviewed_blob": "1bf44471f4486136bb6fdc6e22296cad97a63e24",
+      "reviewed_local_blob": "7fdb1b3fe5c325de4f1a281cc26f5b60d107aef4"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooHelpTooltip.vue",
+      "upstream_path": "frontend/src/components/common/HelpTooltip.vue",
+      "reviewed_blob": "d2a2e48f56f0b4c70affefcb1a1b7587c8b8aa70",
+      "reviewed_local_blob": "4314a1ffd2452c7abef74ecfe6b2958261c229fa"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooInput.vue",
+      "upstream_path": "frontend/src/components/common/Input.vue",
+      "reviewed_blob": "a6c531cf0e31eed59ed450f42d541ee6a2af5300",
+      "reviewed_local_blob": "117f447fad4d1e75fb047b59f028358b6f1a50f7"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooPagination.vue",
+      "upstream_path": "frontend/src/components/common/Pagination.vue",
+      "reviewed_blob": "9b4ac200e210c53b9c1fc30d480d5bd709b13fbe",
+      "reviewed_local_blob": "fd39739c7c378b24725724b0c5bb6522779567c4"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooSelect.vue",
+      "upstream_path": "frontend/src/components/common/Select.vue",
+      "reviewed_blob": "606e6300bf9f19825b9d7f33d43d9b694ba53198",
+      "reviewed_local_blob": "d3ca013307d83c75c1476e085f940505c4d0847b"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooSubscriptionProgressMini.vue",
+      "upstream_path": "frontend/src/components/common/SubscriptionProgressMini.vue",
+      "reviewed_blob": "bba7aaf79fae42c69762c942ead59054c90351f2",
+      "reviewed_local_blob": "adf4cb729c735c1e013e4528ff28efb8ba8ed743"
+    },
+    {
+      "custom_path": "frontend/src/custom/common/WegooToast.vue",
+      "upstream_path": "frontend/src/components/common/Toast.vue",
+      "reviewed_blob": "65c791aeab8de38e07fe258a7eaf37a52150a754",
+      "reviewed_local_blob": "b28693a03020a7ee2807a0732d6a722944292532"
+    },
+    {
+      "custom_path": "frontend/src/custom/layout/WegooAppLayout.vue",
+      "upstream_path": "frontend/src/components/layout/AppLayout.vue",
+      "reviewed_blob": "4c5b0c5de0e03d48662eca3dc376dacb16647ba3",
+      "reviewed_local_blob": "7042fd6e3502a252c462af465b30c06b7370cab3"
+    },
+    {
+      "custom_path": "frontend/src/custom/layout/WegooTablePageLayout.vue",
+      "upstream_path": "frontend/src/components/layout/TablePageLayout.vue",
+      "reviewed_blob": "3620697add3649aa48b21affd096f66f54368c2c",
+      "reviewed_local_blob": "c1c9b07bc645a569b2d82de60bddb61a9475cd2d"
+    },
+    {
+      "custom_path": "frontend/src/custom/composables/useOnboardingTour.ts",
+      "upstream_path": "frontend/src/composables/useOnboardingTour.ts",
+      "reviewed_blob": "40d841cda973beddd2a76bacf1b0efa0266d34f1",
+      "reviewed_local_blob": "3f4ec211c1824d56840dc29ba60b9d407979883e"
+    },
+    {
+      "custom_path": "frontend/src/custom/utils/billingMode.ts",
+      "upstream_path": "frontend/src/utils/billingMode.ts",
+      "reviewed_blob": "1ba03ed377a7a924b44c01086c5c2465ba0c97fc",
+      "reviewed_local_blob": "a7e8cad4441c84991d953b89fb6c55fa5ac50c46"
+    },
+    {
+      "custom_path": "frontend/src/custom/utils/embedded-url.ts",
+      "upstream_path": "frontend/src/utils/embedded-url.ts",
+      "reviewed_blob": "e70d30b4dd111418086a38277cfee64b6ec841cf",
+      "reviewed_local_blob": "ffc2948f91623accd07c633dc6d7a0ec0378dd17"
+    },
+    {
+      "custom_path": "frontend/src/custom/utils/formatters.ts",
+      "upstream_path": "frontend/src/utils/formatters.ts",
+      "reviewed_blob": "ebffa2e681bc9ca07d15145ecf01805b0e35fce6",
+      "reviewed_local_blob": "80daccfc8c5c4d36f2e9f1b88be29498377a7607"
+    },
+    {
+      "custom_path": "frontend/src/custom/user/WegooBatchImageGuideView.vue",
+      "upstream_path": "frontend/src/views/user/BatchImageGuideView.vue",
+      "reviewed_blob": "4cedca99491800131aa42fdbc016872ddb9a53e9",
+      "reviewed_local_blob": "4cf6744e3868ec9c1572b7608be340906fca3114"
+    },
+    {
+      "custom_path": "frontend/src/custom/composables/useModelWhitelist.ts",
+      "upstream_path": "frontend/src/composables/useModelWhitelist.ts",
+      "reviewed_blob": "0dc62515899a5b62d44db2c69d935d8767640a76",
+      "reviewed_local_blob": "953b558763fef51b64f8f023ccdaf1aed7276fcf"
+    },
+    {
+      "custom_path": "frontend/src/custom/admin/account/WegooModelWhitelistSelector.vue",
+      "upstream_path": "frontend/src/components/account/ModelWhitelistSelector.vue",
+      "reviewed_blob": "d8cec05cb977997a82005d075a490871088d2a05",
+      "reviewed_local_blob": "0ae48d43ddda0c5ef5caadc97c4db53d2f2fe8c5"
+    },
+    {
+      "custom_path": "frontend/src/custom/composables/usePersistedPageSize.ts",
+      "upstream_path": "frontend/src/composables/usePersistedPageSize.ts",
+      "reviewed_blob": "7ff647af38523132136a0c21a8586ee77e29d97e",
+      "reviewed_local_blob": "ec0405e5590550fb67c34c059969ce460bf9874a"
+    },
+    {
+      "custom_path": "frontend/src/custom/composables/useTableLoader.ts",
+      "upstream_path": "frontend/src/composables/useTableLoader.ts",
+      "reviewed_blob": "67c1dcdbf4cdccb60fb1b7572972fa2ef692bb92",
+      "reviewed_local_blob": "9488ddafe5425beee9cfab14d5c1cfe04fb9360a"
+    },
+    {
+      "custom_path": "frontend/src/custom/styles/onboarding.css",
+      "upstream_path": "frontend/src/styles/onboarding.css",
+      "reviewed_blob": "4894c4d723b61304f54b25b4c6e357b4fa4e933b",
+      "reviewed_local_blob": "c85ddd2b4e0f3553625b231b2480c4104d2548af"
+    },
+    {
+      "custom_path": "frontend/src/custom/composables/useChannelMonitorFormat.ts",
+      "upstream_path": "frontend/src/composables/useChannelMonitorFormat.ts",
+      "reviewed_blob": "bd094a9332e8166e17cd9decf16842b3ebc31796",
+      "reviewed_local_blob": "9da836d58359f6c87d8322e2c710a8aa74d4da89"
+    },
+    {
+      "custom_path": "frontend/src/custom/stores/auth.ts",
+      "upstream_path": "frontend/src/stores/auth.ts",
+      "reviewed_blob": "c0f3477d3b097dc7e94939399d67c3a810af5a50",
+      "reviewed_local_blob": "6ffd29abd143cd03dc88f4b3897e5c361daa6f27"
+    },
+    {
+      "custom_path": "frontend/src/custom/stores/announcements.ts",
+      "upstream_path": "frontend/src/stores/announcements.ts",
+      "reviewed_blob": "6f636d93e47b7a85dc670324fd85118ddd651468",
+      "reviewed_local_blob": "c185cf980c91729e7ea8d824255fd2bf2acb31db"
+    },
+    {
+      "custom_path": "frontend/src/custom/stores/index.ts",
+      "upstream_path": "frontend/src/stores/index.ts",
+      "reviewed_blob": "02ea149b369c83c9cc631e9468167bc7643fb95e",
+      "reviewed_local_blob": "2c06c02a25a81c389ac888f2a0238d1d5bdd0487"
+    },
+    {
+      "custom_path": "frontend/src/custom/types/index-fork.ts",
+      "upstream_path": "frontend/src/types/index.ts",
+      "reviewed_blob": "cb0a698fb907d6228fcef710831120558c23d438",
+      "reviewed_local_blob": "1fa010746c07fdb8d3e6144728f2b0d60a21b5e6"
+    },
+    {
+      "custom_path": "frontend/src/custom/types/payment.ts",
+      "upstream_path": "frontend/src/types/payment.ts",
+      "reviewed_blob": "b94dbf42e4e3d86de540bf4b500c24cd173b423b",
+      "reviewed_local_blob": "a9fe8e4b341150c6ceaf025ce285c4a59d4aca44"
+    }
+  ],
+  "local_only_paths": [
+    "frontend/src/custom/admin/config/messagesDispatch.ts",
+    "frontend/src/custom/admin/InvoicesView.vue",
+    "frontend/src/custom/admin/SchedulerView.vue",
+    "frontend/src/custom/admin/TicketsView.vue",
+    "frontend/src/custom/admin/WegooUpstreamsView.vue",
+    "frontend/src/custom/admin/WegooUserPricingView.vue",
+    "frontend/src/custom/admin/announcements/WegooAnnouncementUserSelector.vue",
+    "frontend/src/custom/admin/account/AccountBulkModelTestModal.vue",
+    "frontend/src/custom/admin/account/AccountBulkVerifyModal.vue",
+    "frontend/src/custom/admin/adminApple.css",
+    "frontend/src/custom/admin/groups/WegooCompositeRoutesModal.vue",
+    "frontend/src/custom/api/admin/groups.d.ts",
+    "frontend/src/custom/api/admin/groups.ts",
+    "frontend/src/custom/api/admin/accountMonitor.ts",
+    "frontend/src/custom/api/admin/bulkVerify.ts",
+    "frontend/src/custom/api/admin/invoices.ts",
+    "frontend/src/custom/api/admin/subscriptions.ts",
+    "frontend/src/custom/api/admin/tickets.ts",
+    "frontend/src/custom/api/admin/upstreams.ts",
+    "frontend/src/custom/api/channels.d.ts",
+    "frontend/src/custom/api/groups.ts",
+    "frontend/src/custom/api/imageGeneration.ts",
+    "frontend/src/custom/api/invoices.ts",
+    "frontend/src/custom/api/publicGateway.ts",
+    "frontend/src/custom/api/subscriptions.ts",
+    "frontend/src/custom/api/tickets.ts",
+    "frontend/src/custom/assets/icons/usdt.svg",
+    "frontend/src/custom/common/GroupRateDiscountNotice.vue",
+    "frontend/src/custom/common/LowBalanceRetentionBanner.vue",
+    "frontend/src/custom/composables/useMinuteNow.ts",
+    "frontend/src/custom/composables/useSettlementCurrency.ts",
+    "frontend/src/custom/devtools/gateway-route-smoke.mjs",
+    "frontend/src/custom/i18n/index.ts",
+    "frontend/src/custom/i18n/locales/en-custom.ts",
+    "frontend/src/custom/i18n/locales/en.ts",
+    "frontend/src/custom/i18n/locales/mergeLocale.ts",
+    "frontend/src/custom/i18n/locales/zh-custom.ts",
+    "frontend/src/custom/i18n/locales/zh.ts",
+    "frontend/src/custom/loginAgreement/service-specific-terms.zh.md",
+    "frontend/src/custom/loginAgreement/supported-regions.zh.md",
+    "frontend/src/custom/loginAgreement/terms.zh.md",
+    "frontend/src/custom/loginAgreement/usage-policy.zh.md",
+    "frontend/src/custom/loginAgreementDefaults.ts",
+    "frontend/src/custom/channels/pricing.ts",
+    "frontend/src/custom/payment/currency.ts",
+    "frontend/src/custom/payment/orderAmounts.ts",
+    "frontend/src/custom/public/DocsView.vue",
+    "frontend/src/custom/public/EnterpriseView.vue",
+    "frontend/src/custom/public/ModelsView.vue",
+    "frontend/src/custom/public/PublicGatewayHeader.vue",
+    "frontend/src/custom/public/StatusView.vue",
+    "frontend/src/custom/public/publicGateway.css",
+    "frontend/src/custom/router/meta.d.ts",
+    "frontend/src/custom/stores/paymentCheckout.ts",
+    "frontend/src/custom/stores/subscriptionCapability.ts",
+    "frontend/src/custom/stores/tickets.ts",
+    "frontend/src/custom/tickets/TicketAttachmentFields.vue",
+    "frontend/src/custom/tickets/TicketAttachments.vue",
+    "frontend/src/custom/tickets/TicketContextLink.vue",
+    "frontend/src/custom/styles/tailwindTheme.js",
+    "frontend/src/custom/types/index.ts",
+    "frontend/src/custom/utils/balanceBusinessCategory.ts",
+    "frontend/src/custom/utils/browserStorage.ts",
+    "frontend/src/custom/utils/cacheUsage.ts",
+    "frontend/src/custom/utils/chunkRecovery.ts",
+    "frontend/src/custom/utils/docsLink.ts",
+    "frontend/src/custom/utils/groupRateDiscount.ts",
+    "frontend/src/custom/utils/imageGenerationGroups.ts",
+    "frontend/src/custom/utils/modalLock.ts",
+    "frontend/src/custom/utils/paymentRecordSemantics.ts",
+    "frontend/src/custom/utils/publicNavigation.ts",
+    "frontend/src/custom/utils/schedulerAccountOrdering.ts",
+    "frontend/src/custom/utils/seo.ts",
+    "frontend/src/custom/utils/theme.ts",
+    "frontend/src/custom/vite/wegooIndexHtml.ts",
+    "frontend/src/custom/user/WegooChannelStatusWorkspace.vue",
+    "frontend/src/custom/user/ImageGenerationView.vue",
+    "frontend/src/custom/user/InvoicesView.vue",
+    "frontend/src/custom/user/WegooMessagesView.vue",
+    "frontend/src/custom/user/TicketsView.vue",
+    "frontend/src/custom/user/UserPageHero.vue",
+    "frontend/src/custom/user/UserSummaryStats.vue",
+    "frontend/src/custom/user/affiliateApi.ts",
+    "frontend/src/custom/user/channelStatus.ts",
+    "frontend/src/custom/user/profile/WegooProfileHero.vue"
+  ]
+}

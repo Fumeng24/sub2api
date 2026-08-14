@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "locales": {
+    "zh": {
+      "added_keys": 2213,
+      "overrides": 548,
+      "added_keys_sha256": "806f1d6f915291a42654aa53759a9f7b1ce0f27b1b093b265da7ecf5a22702d8",
+      "override_upstream_values_sha256": "1d16d61ea86cda71686120fa3da544257b76e6759b00504bf4f6a1252863b5de"
+    },
+    "en": {
+      "added_keys": 2208,
+      "overrides": 549,
+      "added_keys_sha256": "2a84c1b244ab95f43ac82fc2357de74eb0b276be1b74118c3db65d398fdf030b",
+      "override_upstream_values_sha256": "4b6a3f500babd8000eedd0ebf994bb19a1a48d42231fd3f56c4df3b61a20449d"
+    }
+  }
+}
