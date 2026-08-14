@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 
 import AnnouncementPopup from '../AnnouncementPopup.vue'
 import { useAnnouncementStore } from '@/stores/announcements'
+import { loadLocaleMessages } from '@/i18n'
 
 const announcementMarkdownStyles = readFileSync(
   resolve(process.cwd(), 'src/styles/announcement-markdown.css'),
@@ -34,8 +35,9 @@ const announcement = {
 }
 
 describe('AnnouncementPopup', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia())
+    await loadLocaleMessages('en')
   })
 
   afterEach(() => {

@@ -1,5 +1,8 @@
 import { sanitizeUrl } from '@/utils/url'
 
+// Used only until the public settings response is available.
+export const DEFAULT_SITE_NAME = "Wegoo's API"
+
 export function updateFavicon(logoUrl: string): void {
   const sanitizedLogoUrl = sanitizeUrl(logoUrl, {
     allowRelative: true,

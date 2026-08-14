@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+Allow: /api/v1/public/model-pricing
+Allow: /api/v1/public/channels/available
+Allow: /api/v1/public/channel-monitors
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /keys
+Disallow: /image-generation
+Disallow: /usage
+Disallow: /tickets
+Disallow: /redeem
+Disallow: /affiliate
+Disallow: /available-channels
+Disallow: /profile
+Disallow: /subscriptions
+Disallow: /purchase
+Disallow: /orders
+Disallow: /payment
+Disallow: /custom
+Disallow: /setup
+Disallow: /auth
+Disallow: /api
+
+Sitemap: https://ai.wegoo.site/sitemap.xml

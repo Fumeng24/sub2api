@@ -3,6 +3,7 @@
     <Transition name="popup-fade">
       <div
         v-if="displayedAnnouncement"
+        data-testid="announcement-popup-dialog"
         class="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-gradient-to-br from-black/70 via-black/60 to-black/70 p-4 pt-[8vh] backdrop-blur-md"
       >
         <div

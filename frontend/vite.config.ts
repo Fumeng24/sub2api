@@ -92,11 +92,13 @@ export default defineConfig(({ mode }) => {
       injectPublicSettings(backendUrl)
     ],
   resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src'),
+    alias: [
+      { find: /^@\/types\/payment$/, replacement: resolve(__dirname, 'src/custom/types/payment.ts') },
+      { find: /^@\/types$/, replacement: resolve(__dirname, 'src/custom/types/index-fork.ts') },
+      { find: '@', replacement: resolve(__dirname, 'src') },
       // 使用 vue-i18n 运行时版本，避免 CSP unsafe-eval 问题
-      'vue-i18n': 'vue-i18n/dist/vue-i18n.runtime.esm-bundler.js'
-    }
+      { find: 'vue-i18n', replacement: 'vue-i18n/dist/vue-i18n.runtime.esm-bundler.js' }
+    ]
   },
   define: {
     // 启用 vue-i18n JIT 编译，在 CSP 环境下处理消息插值
@@ -106,6 +108,8 @@ export default defineConfig(({ mode }) => {
   build: {
     outDir: '../backend/internal/web/dist',
     emptyOutDir: true,
+    // Locale bundles are lazy-loaded and stay below 160 kB after gzip.
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         /**
@@ -166,7 +170,7 @@ export default defineConfig(({ mode }) => {
           target: backendUrl,
           changeOrigin: true
         },
-        '/setup': {
+        '^/setup/(status|test-db|test-redis|install)': {
           target: backendUrl,
           changeOrigin: true
         }

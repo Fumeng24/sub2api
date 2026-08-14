@@ -33,10 +33,62 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/home',
     name: 'Home',
-    component: () => import('@/views/HomeView.vue'),
+    component: () => import('@/custom/home/WegooHomeView.vue'),
     meta: {
       requiresAuth: false,
       title: 'Home'
+    }
+  },
+  {
+    path: '/pricing',
+    name: 'PublicModels',
+    component: () => import('@/custom/public/ModelsView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Models',
+      seoTitle: 'AI 模型价格和公开分组 - Wegoo AI',
+      description:
+        '查看 Wegoo AI 公开模型、标准分组、端点类型和价格字段。公开页使用后端只读事实源，完整授权分组以控制台为准。',
+      canonicalPath: '/pricing'
+    }
+  },
+  {
+    path: '/docs',
+    name: 'PublicDocs',
+    component: () => import('@/custom/public/DocsView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Docs',
+      seoTitle: 'Wegoo AI API 接入文档',
+      description:
+        '快速接入 Wegoo AI Gateway，创建 API Key，替换 Base URL，并使用 OpenAI SDK、Anthropic SDK、Codex CLI 或 Claude Code 调用模型。',
+      canonicalPath: '/docs'
+    }
+  },
+  {
+    path: '/status',
+    name: 'PublicStatus',
+    component: () => import('@/custom/public/StatusView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Status',
+      seoTitle: 'AI 模型服务状态 - Wegoo AI',
+      description:
+        '查看 Wegoo AI 用户可见服务状态、模型族可用性、延迟和近期状态趋势。公开页不暴露真实上游账号。',
+      canonicalPath: '/status'
+    }
+  },
+  {
+    path: '/enterprise',
+    name: 'Enterprise',
+    component: () => import('@/custom/public/EnterpriseView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Enterprise',
+      seoTitle: '企业充值、发票和专属支持 - Wegoo AI',
+      description:
+        'Wegoo AI 企业服务承接大额充值、人工收款、发票协作、对账和专属支持，余额来源与可开票口径以后台记录为准。',
+      canonicalPath: '/enterprise'
     }
   },
   {
@@ -216,6 +268,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/image-generation',
+    name: 'ImageGeneration',
+    component: () => import('@/custom/user/ImageGenerationView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Image Generation',
+      titleKey: 'imageGeneration.title',
+      descriptionKey: 'imageGeneration.description'
+    }
+  },
+  {
     path: '/batch-image',
     name: 'BatchImageGuide',
     alias: '/docs/batch-image',
@@ -238,6 +302,28 @@ const routes: RouteRecordRaw[] = [
       title: 'Usage Records',
       titleKey: 'usage.title',
       descriptionKey: 'usage.description'
+    }
+  },
+  {
+    path: '/messages',
+    name: 'Messages',
+    component: () => import('@/custom/user/WegooMessagesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Messages',
+      titleKey: 'announcements.title'
+    }
+  },
+  {
+    path: '/tickets',
+    name: 'Tickets',
+    component: () => import('@/custom/user/TicketsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Tickets',
+      titleKey: 'tickets.title'
     }
   },
   {
@@ -301,6 +387,14 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/payment',
+    redirect: (to) => ({
+      path: '/purchase',
+      query: to.query,
+      hash: to.hash
+    })
+  },
+  {
     path: '/purchase',
     name: 'PurchaseSubscription',
     component: () => import('@/views/user/PaymentView.vue'),
@@ -309,8 +403,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Purchase Subscription',
       titleKey: 'nav.buySubscription',
-      descriptionKey: 'purchase.description',
-      requiresPayment: true
+      descriptionKey: 'purchase.description'
     }
   },
   {
@@ -323,6 +416,17 @@ const routes: RouteRecordRaw[] = [
       title: 'My Orders',
       titleKey: 'nav.myOrders',
       requiresPayment: true
+    }
+  },
+  {
+    path: '/invoices',
+    name: 'Invoices',
+    component: () => import('@/custom/user/InvoicesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Invoices',
+      titleKey: 'nav.invoices'
     }
   },
   {
@@ -426,6 +530,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/scheduler',
+    name: 'AdminScheduler',
+    component: () => import('@/custom/admin/SchedulerView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Scheduler Management',
+      titleKey: 'admin.scheduler.title',
+      descriptionKey: 'admin.scheduler.description'
+    }
+  },
+  {
     path: '/admin/audit-logs',
     name: 'AdminAuditLogs',
     component: () => import('@/views/admin/AuditLogView.vue'),
@@ -459,6 +575,18 @@ const routes: RouteRecordRaw[] = [
       title: 'Group Management',
       titleKey: 'admin.groups.title',
       descriptionKey: 'admin.groups.description'
+    }
+  },
+  {
+    path: '/admin/user-pricing',
+    name: 'AdminUserPricing',
+    component: () => import('@/custom/admin/WegooUserPricingView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'User Pricing',
+      titleKey: 'admin.userPricing.title',
+      descriptionKey: 'admin.userPricing.description'
     }
   },
   {
@@ -525,6 +653,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/upstreams',
+    name: 'AdminUpstreams',
+    component: () => import('@/custom/admin/WegooUpstreamsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Upstream Management',
+      titleKey: 'admin.upstreams.title',
+      descriptionKey: 'admin.upstreams.description'
+    }
+  },
+  {
     path: '/admin/announcements',
     name: 'AdminAnnouncements',
     component: () => import('@/views/admin/AnnouncementsView.vue'),
@@ -534,6 +674,18 @@ const routes: RouteRecordRaw[] = [
       title: 'Announcements',
       titleKey: 'admin.announcements.title',
       descriptionKey: 'admin.announcements.description'
+    }
+  },
+  {
+    path: '/admin/tickets',
+    name: 'AdminTickets',
+    component: () => import('@/custom/admin/TicketsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresSupport: true,
+      title: 'Ticket Management',
+      titleKey: 'admin.tickets.title',
+      descriptionKey: 'admin.tickets.description'
     }
   },
   {
@@ -582,6 +734,17 @@ const routes: RouteRecordRaw[] = [
       title: 'System Settings',
       titleKey: 'admin.settings.title',
       descriptionKey: 'admin.settings.description'
+    }
+  },
+  {
+    path: '/admin/business-settings',
+    name: 'AdminBusinessSettings',
+    component: () => import('@/views/admin/BusinessSettingsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Business Settings',
+      titleKey: 'nav.businessSettings'
     }
   },
   {
@@ -701,6 +864,17 @@ const routes: RouteRecordRaw[] = [
       requiresPayment: true
     }
   },
+  {
+    path: '/admin/invoices',
+    name: 'AdminInvoices',
+    component: () => import('@/custom/admin/InvoicesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Invoice Management',
+      titleKey: 'nav.invoiceManagement'
+    }
+  },
 
   // ==================== 404 Not Found ====================
   {
@@ -790,6 +964,7 @@ router.beforeEach(async (to, _from, next) => {
   // Check if route requires authentication
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
   const requiresAdmin = to.meta.requiresAdmin === true
+  const requiresSupport = to.meta.requiresSupport === true
 
   if (to.path === '/setup') {
     try {
@@ -814,7 +989,7 @@ router.beforeEach(async (to, _from, next) => {
         return
       }
       // Admin users go to admin dashboard, regular users go to user dashboard
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.isAdmin ? '/admin/dashboard' : authStore.isSupport ? '/admin/tickets' : '/dashboard')
       return
     }
     // Model Plaza:公开路由但受「启用开关 + 可选强制登录」双重控制(后端同口径 fail-closed)
@@ -873,6 +1048,11 @@ router.beforeEach(async (to, _from, next) => {
   // Check admin requirement
   if (requiresAdmin && !authStore.isAdmin) {
     // User is authenticated but not admin, redirect to user dashboard
+    next(authStore.isSupport ? '/admin/tickets' : '/dashboard')
+    return
+  }
+
+  if (requiresSupport && !authStore.canAccessTicketAdmin) {
     next('/dashboard')
     return
   }
@@ -940,9 +1120,9 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
-  // Backend mode: admin gets full access, non-admin blocked
+  // Backend mode: administrators and support agents can access protected routes.
   if (appStore.backendModeEnabled) {
-    if (authStore.isAuthenticated && authStore.isAdmin) {
+    if (authStore.isAuthenticated && (authStore.isAdmin || authStore.isSupport)) {
       next()
       return
     }

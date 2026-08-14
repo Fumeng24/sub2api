@@ -6,6 +6,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
 import type { ApiResponse } from '@/types'
 import { getLocale } from '@/i18n'
+import { createSafeStorageFacade } from '@/custom/utils/browserStorage'
 import {
   ADMIN_UI_REQUEST_HEADER,
   USER_UI_REQUEST_HEADER,
@@ -15,6 +16,9 @@ import {
 import { refreshAuthTokens } from './tokenRefresh'
 import { getAPIBaseURL } from './url'
 export { buildApiUrl, buildGatewayUrl } from './url'
+
+const localStorage = createSafeStorageFacade('localStorage')
+const sessionStorage = createSafeStorageFacade('sessionStorage')
 
 // ==================== Axios Instance Configuration ====================
 
@@ -251,6 +255,7 @@ apiClient.interceptors.response.use(
         error: apiData.error,
         message: apiData.message || apiData.detail || error.message,
         metadata: apiData.metadata,
+        data: apiData.data,
       })
     }
 

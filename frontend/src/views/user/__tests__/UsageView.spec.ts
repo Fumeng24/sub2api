@@ -10,10 +10,13 @@ const {
   getDashboardSnapshotV2,
   list,
   getAvailable,
+  listMyErrorRequests,
   showError,
   showWarning,
   showSuccess,
   showInfo,
+  routerPush,
+  routeState,
 } = vi.hoisted(() => ({
   query: vi.fn(),
   getStats: vi.fn(),
@@ -21,10 +24,13 @@ const {
   getDashboardSnapshotV2: vi.fn(),
   list: vi.fn(),
   getAvailable: vi.fn(),
+  listMyErrorRequests: vi.fn(),
   showError: vi.fn(),
   showWarning: vi.fn(),
   showSuccess: vi.fn(),
   showInfo: vi.fn(),
+  routerPush: vi.fn(),
+  routeState: { query: {} as Record<string, string> },
 }))
 
 const messages: Record<string, string> = {
@@ -70,6 +76,7 @@ vi.mock('@/api', () => ({
     getStats,
     getDashboardModels,
     getDashboardSnapshotV2,
+    listMyErrorRequests,
   },
   keysAPI: {
     list,
@@ -80,7 +87,18 @@ vi.mock('@/api', () => ({
 }))
 
 vi.mock('@/stores/app', () => ({
-  useAppStore: () => ({ showError, showWarning, showSuccess, showInfo }),
+  useAppStore: () => ({
+    showError,
+    showWarning,
+    showSuccess,
+    showInfo,
+    cachedPublicSettings: { allow_user_view_error_requests: true },
+  }),
+}))
+
+vi.mock('vue-router', () => ({
+  useRoute: () => routeState,
+  useRouter: () => ({ push: routerPush }),
 }))
 
 vi.mock('vue-i18n', async () => {
@@ -119,6 +137,7 @@ const usageLog = {
   duration_ms: 345,
   created_at: '2026-03-08T00:00:00Z',
   model: 'gpt-5.4',
+  upstream_model: 'gpt-5.4-upstream',
   reasoning_effort: null,
   ip_address: '203.0.113.10',
   api_key: { name: 'demo-key' },
@@ -142,6 +161,7 @@ function mountUsageView() {
         GroupDistributionChart: chartStub,
         EndpointDistributionChart: chartStub,
         TokenUsageTrend: chartStub,
+        UserErrorRequestsTable: { template: '<div data-testid="error-table-stub" />' },
       },
     },
   })
@@ -155,10 +175,12 @@ describe('user UsageView', () => {
     getDashboardSnapshotV2.mockReset()
     list.mockReset()
     getAvailable.mockReset()
+    listMyErrorRequests.mockReset()
     showError.mockReset()
     showWarning.mockReset()
     showSuccess.mockReset()
     showInfo.mockReset()
+    routeState.query = {}
 
     query.mockResolvedValue({ items: [usageLog], total: 1, pages: 1 })
     getStats.mockResolvedValue({
@@ -189,6 +211,17 @@ describe('user UsageView', () => {
     })
     list.mockResolvedValue({ items: [{ id: 1, name: 'demo-key' }] })
     getAvailable.mockResolvedValue([{ id: 1, name: 'default' }])
+    listMyErrorRequests.mockResolvedValue({ items: [], total: 0 })
+  })
+
+  it('opens the error requests tab from the dashboard deep link', async () => {
+    routeState.query = { tab: 'errors' }
+
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="error-table-stub"]').exists()).toBe(true)
+    expect(listMyErrorRequests).toHaveBeenCalled()
   })
 
   it('loads logs, stats, model stats, and snapshot on first render', async () => {
@@ -239,8 +272,8 @@ describe('user UsageView', () => {
     expect(showSuccess).toHaveBeenCalled()
     expect(csvContent.startsWith('\uFEFF')).toBe(true)
     expect(csvContent.slice(1)).toBe([
-      'Time,API Key Name,Model,Reasoning Effort,Inbound Endpoint,IP Address,Type,Billing Mode,Input Tokens,Output Tokens,Cache Read Tokens,Cache Creation Tokens,Rate Multiplier,Billed Cost,Original Cost,First Token (ms),Duration (ms)',
-      '2026-03-08T00:00:00Z,demo-key,gpt-5.4,"\'-",,203.0.113.10,Sync,Token,4057,101,278272,4,1,0.09288300,0.09288300,12,345',
+      'Time,API Key Name,Requested Model,Upstream Model,Reasoning Effort,Inbound Endpoint,IP Address,Type,Billing Mode,Input Tokens,Output Tokens,Cache Read Tokens,Cache Creation Tokens,Rate Multiplier,Billed Cost,Original Cost,First Token (ms),Duration (ms)',
+      '2026-03-08T00:00:00Z,demo-key,gpt-5.4,gpt-5.4-upstream,"\'-",,203.0.113.10,Sync,Token,4057,101,278272,4,1,0.09288300,0.09288300,12,345',
     ].join('\n'))
     expect(csvContent).toContain('IP Address')
     expect(csvContent).toContain('203.0.113.10')

@@ -22,10 +22,10 @@ export const useAnnouncementStore = defineStore('announcements', () => {
   )
 
   // Actions
-  async function fetchAnnouncements(force = false) {
+  async function fetchAnnouncements(force = false): Promise<boolean> {
     const now = Date.now()
     if (!force && lastFetchTime.value > 0 && now - lastFetchTime.value < THROTTLE_MS) {
-      return
+      return true
     }
 
     // Set immediately to prevent concurrent duplicate requests
@@ -36,10 +36,12 @@ export const useAnnouncementStore = defineStore('announcements', () => {
       const all = await announcementsAPI.list(false)
       announcements.value = all.slice(0, 20)
       enqueueNewPopups()
+      return true
     } catch (err: any) {
       // Revert throttle timestamp on failure so retry is allowed
       lastFetchTime.value = 0
       console.error('Failed to fetch announcements:', err)
+      return false
     } finally {
       loading.value = false
     }

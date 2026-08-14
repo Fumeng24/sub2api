@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div data-testid="dashboard-charts" class="space-y-6">
     <!-- Date Range Filter -->
     <div class="card p-4">
       <div class="flex flex-wrap items-center gap-4">

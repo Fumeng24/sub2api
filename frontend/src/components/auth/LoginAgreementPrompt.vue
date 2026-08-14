@@ -6,6 +6,7 @@
     <div class="flex items-start gap-2">
       <input
         id="login-agreement-consent"
+        data-testid="login-agreement-checkbox"
         type="checkbox"
         :checked="accepted"
         class="mt-[2px] h-4 w-4 flex-shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-900"
@@ -49,6 +50,7 @@
       </div>
       <button
         type="button"
+        data-testid="login-agreement-open"
         class="flex-shrink-0 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-700"
         @click="emit('open')"
       >
@@ -61,6 +63,7 @@
     <Transition name="agreement-fade">
       <div
         v-if="dialogVisible"
+        data-testid="login-agreement-modal"
         class="fixed inset-0 z-[140] flex items-center justify-center overflow-y-auto bg-gray-950/60 p-4 backdrop-blur-sm"
       >
         <div class="w-full max-w-[600px] overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/10 dark:bg-dark-900 dark:ring-white/10">
@@ -122,6 +125,7 @@
             <div class="grid grid-cols-2 gap-3">
               <button
                 type="button"
+                data-testid="login-agreement-reject"
                 class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-dark-700 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700"
                 @click="emit('reject')"
               >
@@ -129,6 +133,7 @@
               </button>
               <button
                 type="button"
+                data-testid="login-agreement-accept"
                 class="rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-primary-600/20 transition hover:bg-primary-700"
                 @click="emit('accept')"
               >

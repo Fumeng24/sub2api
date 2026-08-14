@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 import AccountsView from '../AccountsView.vue'
@@ -76,6 +76,10 @@ const makeAccounts = (count: number) => Array.from({ length: count }, (_, index)
   created_at: '2026-07-23T00:00:00Z',
   updated_at: '2026-07-23T00:00:00Z'
 }))
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 const AccountBulkActionsBarStub = {
   props: ['selectedIds', 'totalResults', 'selectingAll', 'allResultsSelected'],
@@ -198,6 +202,8 @@ describe('admin AccountsView select all filtered results', () => {
   })
 
   it('keeps the original page selection when loading all results fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
     const currentPage = makeAccounts(20)
     listAccounts.mockImplementation(async (_page: number, pageSize: number) => {
       if (pageSize === 1000) {

@@ -19,8 +19,10 @@ const refreshUser = vi.hoisted(() => vi.fn())
 const fetchActiveSubscriptions = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const showError = vi.hoisted(() => vi.fn())
 const showInfo = vi.hoisted(() => vi.fn())
+const showSuccess = vi.hoisted(() => vi.fn())
 const showWarning = vi.hoisted(() => vi.fn())
 const getCheckoutInfo = vi.hoisted(() => vi.fn())
+const redeemCardCode = vi.hoisted(() => vi.fn())
 const bridgeInvoke = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', async () => {
@@ -73,6 +75,7 @@ vi.mock('@/stores', () => ({
   useAppStore: () => ({
     showError,
     showInfo,
+    showSuccess,
     showWarning,
   }),
 }))
@@ -80,6 +83,12 @@ vi.mock('@/stores', () => ({
 vi.mock('@/api/payment', () => ({
   paymentAPI: {
     getCheckoutInfo,
+  },
+}))
+
+vi.mock('@/api/redeem', () => ({
+  redeemAPI: {
+    redeem: redeemCardCode,
   },
 }))
 
@@ -277,6 +286,109 @@ async function mountSubscriptionPlanList(planCount: number) {
   return wrapper
 }
 
+async function mountRechargePage(overrides: Partial<CheckoutInfoResponse> = {}) {
+  vi.useRealTimers()
+  routeState.path = '/purchase'
+  routeState.query = {}
+  routerReplace.mockReset().mockResolvedValue(undefined)
+  routerPush.mockReset().mockResolvedValue(undefined)
+  routerResolve.mockClear()
+  createOrder.mockReset()
+  redeemCardCode.mockReset()
+  refreshUser.mockReset().mockResolvedValue(undefined)
+  fetchActiveSubscriptions.mockReset().mockResolvedValue(undefined)
+  showError.mockReset()
+  showInfo.mockReset()
+  showSuccess.mockReset()
+  showWarning.mockReset()
+  getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture(overrides))
+  bridgeInvoke.mockReset()
+  window.localStorage.clear()
+  ;(window as Window & { WeixinJSBridge?: { invoke: typeof bridgeInvoke } }).WeixinJSBridge = undefined
+
+  const wrapper = shallowMount(PaymentView, {
+    global: {
+      stubs: {
+        AppLayout: {
+          template: '<div><slot /></div>',
+        },
+        Teleport: true,
+        Transition: false,
+      },
+    },
+  })
+  await flushPromises()
+  await flushPromises()
+  return wrapper
+}
+
+describe('PaymentView recharge methods', () => {
+  it('keeps card-code purchase and redemption on the purchase page by default', async () => {
+    const wrapper = await mountRechargePage()
+
+    expect(wrapper.find('[data-test="card-code-panel"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('payment.cardCodePurchase.title')
+    expect(wrapper.findComponent({ name: 'AmountInput' }).exists()).toBe(false)
+    expect(createOrder).not.toHaveBeenCalled()
+  })
+
+  it('switches to the existing online recharge flow without creating an order', async () => {
+    const wrapper = await mountRechargePage()
+
+    await wrapper.find('[data-test="online-recharge-mode"]').trigger('click')
+
+    expect(wrapper.find('[data-test="card-code-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="online-recharge-panel"]').exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'AmountInput' }).exists()).toBe(true)
+    expect(createOrder).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-test="card-code-mode"]').trigger('click')
+    expect(wrapper.find('[data-test="card-code-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="online-recharge-panel"]').exists()).toBe(false)
+  })
+
+  it('redeems a card code and refreshes the visible account state', async () => {
+    const wrapper = await mountRechargePage()
+    redeemCardCode.mockResolvedValue({
+      message: 'ok',
+      type: 'balance',
+      value: 12,
+      new_balance: 34,
+    })
+
+    await wrapper.find('#payment-redeem-code').setValue('  CARD-123  ')
+    await wrapper.find('[data-test="card-code-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(redeemCardCode).toHaveBeenCalledWith('CARD-123')
+    expect(refreshUser).toHaveBeenCalledOnce()
+    expect(showSuccess).toHaveBeenCalledWith('redeem.codeRedeemSuccess')
+    expect(wrapper.find('[data-test="card-code-success"]').text()).toContain('$12.00')
+    expect(createOrder).not.toHaveBeenCalled()
+  })
+
+  it('shows the API error and leaves online order creation untouched', async () => {
+    const wrapper = await mountRechargePage()
+    redeemCardCode.mockRejectedValue(new Error('invalid card code'))
+
+    await wrapper.find('#payment-redeem-code').setValue('BAD-CODE')
+    await wrapper.find('[data-test="card-code-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="card-code-error"]').text()).toContain('invalid card code')
+    expect(showError).toHaveBeenCalledWith('redeem.redeemFailed')
+    expect(createOrder).not.toHaveBeenCalled()
+  })
+
+  it('keeps card-code recharge available when online balance recharge is disabled', async () => {
+    const wrapper = await mountRechargePage({ balance_disabled: true })
+
+    expect(wrapper.find('[data-test="card-code-panel"]').exists()).toBe(true)
+    await wrapper.find('[data-test="online-recharge-mode"]').trigger('click')
+    expect(wrapper.find('[data-test="online-recharge-unavailable"]').exists()).toBe(true)
+  })
+})
+
 describe('PaymentView subscription plan grid', () => {
   it.each([3, 4, 6])('keeps %i plans on the existing mobile/tablet/desktop grid', async (planCount) => {
     const wrapper = await mountSubscriptionPlanList(planCount)
@@ -459,6 +571,7 @@ describe('PaymentView payment recovery', () => {
     await flushPromises()
     await wrapper.find('[data-test="payment-done"]').trigger('click')
     await flushPromises()
+    await wrapper.find('[data-test="online-recharge-mode"]').trigger('click')
 
     expect(wrapper.find('[data-test="method-selector"]').text()).toBe('ldc')
   })

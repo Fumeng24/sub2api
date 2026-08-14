@@ -1,6 +1,6 @@
 <template>
   <!-- Row 1: Core Stats -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div data-testid="dashboard-stats" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
     <!-- Balance -->
     <div v-if="!isSimple" class="card p-4">
       <div class="flex items-center gap-3">
@@ -79,6 +79,9 @@
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.todayTokens') }}</p>
           <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatTokens(stats?.today_tokens || 0) }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('dashboard.input') }}: {{ formatTokens(stats?.today_input_tokens || 0) }} / {{ t('dashboard.output') }}: {{ formatTokens(stats?.today_output_tokens || 0) }}</p>
+          <p class="mt-1 text-xs font-medium text-primary-600 dark:text-primary-400">
+            {{ t('usage.cacheHitRate') }}: {{ todayCacheHitRate }}
+          </p>
         </div>
       </div>
     </div>
@@ -246,6 +249,14 @@ const props = defineProps<{
   platformQuotas?: PlatformQuotaItem[] | null
 }>()
 const { t } = useI18n()
+
+const todayCacheHitRate = computed(() => {
+  const input = props.stats?.today_input_tokens ?? 0
+  const cacheCreation = props.stats?.today_cache_creation_tokens ?? 0
+  const cacheRead = props.stats?.today_cache_read_tokens ?? 0
+  const promptTokens = input + cacheCreation + cacheRead
+  return promptTokens > 0 ? `${((cacheRead / promptTokens) * 100).toFixed(1)}%` : '-'
+})
 
 const PLATFORM_LABELS: Record<string, string> = {
   anthropic: 'Claude',

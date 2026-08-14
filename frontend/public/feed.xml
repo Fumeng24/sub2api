@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Wegoo AI Updates</title>
+    <link>https://ai.wegoo.site/home</link>
+    <atom:link href="https://ai.wegoo.site/feed.xml" rel="self" type="application/rss+xml" />
+    <description>Public updates for Wegoo AI Gateway, model catalog, service status, billing, invoices, and API integration.</description>
+    <language>zh-CN</language>
+    <lastBuildDate>Sat, 27 Jun 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>Public model catalog and service status are available</title>
+      <link>https://ai.wegoo.site/pricing</link>
+      <guid isPermaLink="false">wegoo-ai-public-catalog-status-2026-06-27</guid>
+      <pubDate>Sat, 27 Jun 2026 00:00:00 +0000</pubDate>
+      <description>Wegoo AI now exposes public model pricing, public service status, quick API docs, and enterprise billing support pages backed by read-only public fact sources.</description>
+    </item>
+    <item>
+      <title>AI crawler entry points added</title>
+      <link>https://ai.wegoo.site/llms.txt</link>
+      <guid isPermaLink="false">wegoo-ai-crawler-entrypoints-2026-06-27</guid>
+      <pubDate>Sat, 27 Jun 2026 00:00:00 +0000</pubDate>
+      <description>Wegoo AI provides llms.txt, sitemap.xml, feed.xml, structured data, and no-JavaScript fallback content for AI crawler and search engine discovery.</description>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,379 @@
+.admin-apple-page {
+  color: var(--apple-text);
+}
+
+.admin-apple-page .card,
+.admin-apple-page .layout-section-panel,
+.admin-apple-page .layout-section-pagination,
+.admin-apple-page .table-scroll-container,
+.admin-apple-page [class~='rounded-3xl'],
+.admin-apple-panel,
+.admin-gateway-panel,
+.admin-apple-table-shell {
+  background: var(--apple-surface);
+  border: 1px solid var(--apple-border);
+  border-radius: 8px;
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.admin-apple-page .layout-section-panel {
+  padding: 0.75rem;
+}
+
+.admin-toolbar {
+  display: grid;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.admin-toolbar-filters {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-toolbar-search {
+  min-width: min(100%, 16rem);
+  flex: 1 1 18rem;
+}
+
+.admin-toolbar-filter {
+  min-width: min(100%, 9.5rem);
+  flex: 0 1 10.5rem;
+}
+
+.admin-toolbar-filter-wide {
+  min-width: min(100%, 12rem);
+  flex: 0 1 13rem;
+}
+
+.admin-toolbar-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.admin-toolbar-actions .btn {
+  min-height: 2.375rem;
+}
+
+.admin-toolbar-actions > .relative,
+.admin-toolbar-actions > .contents > .relative {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.admin-toolbar-actions > .relative > .btn,
+.admin-toolbar-actions > .contents > .relative > .btn {
+  width: 100%;
+}
+
+.admin-toolbar-primary {
+  min-width: max-content;
+}
+
+@media (min-width: 1280px) {
+  .admin-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-toolbar-actions {
+    max-width: 32rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--apple-border-soft);
+  }
+}
+
+@media (max-width: 639px) {
+  .admin-toolbar-actions {
+    justify-content: stretch;
+  }
+
+  .admin-toolbar-actions .btn {
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+
+  .admin-toolbar-actions > .relative,
+  .admin-toolbar-actions > .contents > .relative {
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+
+  .admin-toolbar-actions .btn:only-child,
+  .admin-toolbar-actions .admin-toolbar-primary {
+    flex-basis: 100%;
+  }
+}
+
+.admin-apple-page .rounded-xl,
+.admin-apple-page .rounded-2xl,
+.admin-apple-page .rounded-3xl {
+  border-radius: 8px;
+}
+
+.admin-apple-page .shadow-sm,
+.admin-apple-page .shadow-md,
+.admin-apple-page .shadow-lg,
+.admin-apple-page .shadow-xl,
+.admin-apple-page .shadow-2xl {
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.admin-apple-page .bg-gray-50,
+.admin-apple-page .bg-gray-100,
+.admin-apple-page .bg-slate-50,
+.admin-apple-page .bg-slate-100,
+.admin-apple-page [class~='bg-gray-50/30'],
+.admin-apple-page [class~='bg-gray-50/50'],
+.admin-apple-page [class~='bg-gray-50/80'],
+.admin-apple-page [class~='bg-gray-50/95'],
+.admin-apple-page [class~='bg-white/90'] {
+  background-color: var(--apple-surface-elevated);
+}
+
+.dark .admin-apple-page .dark\:bg-dark-700,
+.dark .admin-apple-page .dark\:bg-dark-800,
+.dark .admin-apple-page .dark\:bg-dark-900,
+.dark .admin-apple-page .dark\:bg-gray-800,
+.dark .admin-apple-page .dark\:bg-gray-900,
+.dark .admin-apple-page [class~='dark:bg-dark-700/50'],
+.dark .admin-apple-page [class~='dark:bg-dark-800/50'],
+.dark .admin-apple-page [class~='dark:bg-dark-800/60'],
+.dark .admin-apple-page [class~='dark:bg-dark-800/70'],
+.dark .admin-apple-page [class~='dark:bg-dark-900/30'],
+.dark .admin-apple-page [class~='dark:bg-dark-900/40'] {
+  background-color: var(--apple-surface-elevated);
+}
+
+.admin-apple-page .border-gray-100,
+.admin-apple-page .border-gray-200,
+.admin-apple-page .border-slate-200,
+.dark .admin-apple-page .dark\:border-dark-600,
+.dark .admin-apple-page .dark\:border-dark-700,
+.dark .admin-apple-page .dark\:border-gray-700 {
+  border-color: var(--apple-border);
+}
+
+.admin-apple-page .ring-gray-900\/5,
+.admin-apple-page .ring-black\/5,
+.dark .admin-apple-page .dark\:ring-dark-700,
+.dark .admin-apple-page .dark\:ring-white\/10 {
+  --tw-ring-color: var(--apple-border);
+}
+
+.admin-apple-page .btn {
+  border-radius: 8px;
+  box-shadow: none;
+  letter-spacing: 0;
+}
+
+.admin-apple-page .btn-primary,
+.admin-apple-page .bg-primary-600 {
+  background-color: var(--apple-blue);
+}
+
+.admin-apple-page .btn-primary:hover {
+  background-color: var(--apple-blue-hover);
+}
+
+.admin-apple-page .btn-secondary {
+  background: var(--apple-surface);
+  border-color: var(--apple-border);
+  color: var(--apple-text);
+}
+
+.admin-apple-page .input,
+.admin-apple-page .select-trigger,
+.admin-apple-page textarea,
+.admin-apple-page select {
+  border-color: var(--apple-border);
+  border-radius: 8px;
+  background-color: var(--apple-surface);
+  color: var(--apple-text);
+}
+
+.admin-apple-page .dropdown,
+.admin-apple-page .action-menu-content,
+.admin-apple-page [class*='menu-content'],
+.admin-apple-page [class*='Dropdown'],
+.admin-apple-page [class*='dropdown'] {
+  background: var(--apple-surface);
+  border: 1px solid var(--apple-border);
+  border-radius: 8px;
+  box-shadow: var(--apple-shadow-md);
+}
+
+.admin-apple-page .table-wrapper,
+.admin-apple-page .table-container {
+  --data-table-sticky-bg: var(--apple-surface-solid, var(--apple-surface));
+  --data-table-sticky-header-bg: var(--apple-surface-elevated-solid, var(--apple-surface-elevated));
+  --data-table-sticky-hover-bg: color-mix(in srgb, var(--apple-blue) 5%, var(--data-table-sticky-bg));
+  background: var(--apple-surface);
+  border-radius: 8px;
+}
+
+.admin-apple-page .table-wrapper table,
+.admin-apple-page .table,
+.admin-apple-page table {
+  font-size: 13px;
+}
+
+.admin-apple-page .table-wrapper .table-header,
+.admin-apple-page .table-wrapper thead,
+.admin-apple-page .table-wrapper .sticky-header-cell,
+.admin-apple-page .table th {
+  background: var(--data-table-sticky-header-bg);
+  color: var(--apple-muted);
+  letter-spacing: 0;
+}
+
+.admin-apple-page .table-wrapper tbody,
+.admin-apple-page .table-body {
+  background: var(--apple-surface);
+}
+
+.admin-apple-page .table-wrapper th,
+.admin-apple-page .table-wrapper td,
+.admin-apple-page .table th,
+.admin-apple-page .table td {
+  border-color: var(--apple-border-soft);
+}
+
+.admin-apple-page .table-wrapper tbody tr:hover,
+.admin-apple-page .table tbody tr:hover {
+  background: color-mix(in srgb, var(--apple-blue) 5%, var(--apple-surface));
+}
+
+.admin-apple-page .table-wrapper tbody .sticky-col {
+  background: var(--data-table-sticky-bg);
+}
+
+.admin-apple-page .table-wrapper tbody tr:hover .sticky-col {
+  background: var(--data-table-sticky-hover-bg);
+}
+
+.admin-apple-page .table-scroll-container :is(th, td) {
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+
+.admin-apple-stat-icon {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--apple-blue) 18%, var(--apple-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--apple-blue) 9%, var(--apple-surface-elevated));
+  color: var(--apple-blue);
+}
+
+.admin-apple-stat-icon :is(svg, span) {
+  color: var(--apple-blue);
+}
+
+.admin-apple-page .settings-tabs-shell {
+  top: 4.75rem;
+  border: 1px solid var(--apple-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--apple-surface) 94%, transparent);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.admin-apple-page .settings-tab {
+  border-radius: 8px;
+  letter-spacing: 0;
+}
+
+.admin-apple-page .settings-tab::before {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--apple-blue) 6%, var(--apple-surface));
+}
+
+.admin-apple-page .settings-tab-active {
+  border-color: color-mix(in srgb, var(--apple-blue) 32%, var(--apple-border));
+  background: color-mix(in srgb, var(--apple-blue) 8%, var(--apple-surface));
+  box-shadow: none;
+  color: var(--apple-blue);
+}
+
+.admin-apple-page .settings-tab-active::after {
+  background: var(--apple-blue);
+}
+
+.dark .admin-apple-page .settings-tabs-shell {
+  border-color: var(--apple-border);
+  background: color-mix(in srgb, var(--apple-surface) 90%, transparent);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.dark .admin-apple-page .settings-tab::before {
+  background: color-mix(in srgb, var(--apple-blue) 8%, var(--apple-surface));
+}
+
+.dark .admin-apple-page .settings-tab-active {
+  box-shadow: none;
+}
+
+.admin-apple-page .channel-tab,
+.admin-apple-page .tab {
+  letter-spacing: 0;
+}
+
+.admin-apple-page .channel-tab-active,
+.admin-apple-page .tab-active {
+  border-color: var(--apple-blue);
+  color: var(--apple-blue);
+}
+
+.admin-apple-page pre {
+  border-radius: 8px;
+}
+
+.admin-ops-panel,
+.admin-apple-modal-panel {
+  background: var(--apple-surface);
+  border: 1px solid var(--apple-border);
+  border-radius: 8px;
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.admin-apple-modal-panel {
+  box-shadow: var(--apple-shadow-md);
+}
+
+.admin-ops-surface,
+.admin-ops-metric,
+.admin-apple-muted-panel {
+  background: var(--apple-surface-elevated);
+  border: 1px solid var(--apple-border-soft);
+  border-radius: 8px;
+}
+
+.admin-ops-metric {
+  padding: 1rem;
+}
+
+.admin-ops-popover {
+  background: var(--apple-surface);
+  border: 1px solid var(--apple-border);
+  border-radius: 8px;
+  box-shadow: var(--apple-shadow-md);
+}
+
+.admin-ops-panel :is(.admin-ops-surface, .admin-ops-metric) {
+  box-shadow: none;
+}
+
+@media (max-width: 767px) {
+  .admin-apple-page .table-scroll-container :is(th, td) {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+}

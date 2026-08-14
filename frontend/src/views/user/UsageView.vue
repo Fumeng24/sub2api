@@ -202,6 +202,7 @@
         :page="errorPage"
         :page-size="errorPageSize"
         :visible-column-keys="errVisibleColumnKeys"
+        @createTicket="openErrorTicket"
         @sort="onErrorSort"
         @update:page="onErrorPage"
         @update:pageSize="onErrorPageSize"
@@ -215,6 +216,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -231,7 +233,7 @@ import Icon from '@/components/icons/Icon.vue'
 import UserErrorRequestsTable from '@/components/user/UserErrorRequestsTable.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
-import { getBillingModeLabel, getDisplayBillingMode as resolveDisplayBillingMode } from '@/utils/billingMode'
+import { BILLING_MODE_IMAGE, getBillingModeLabel } from '@/utils/billingMode'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import type {
   ApiKey,
@@ -250,6 +252,8 @@ import { COMMON_ERROR_STATUS_CODES } from '@/utils/errorBadges'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const route = useRoute()
+const router = useRouter()
 
 type DistributionMetric = 'tokens' | 'actual_cost'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
@@ -350,6 +354,7 @@ const endpointDistributionMetric = ref<DistributionMetric>('tokens')
 const endpointDistributionSource = ref<EndpointSource>('inbound')
 const activeTab = ref<'usage' | 'errors'>('usage')
 const errorViewEnabled = computed(() => appStore.cachedPublicSettings?.allow_user_view_error_requests ?? false)
+const shouldOpenErrorsTab = computed(() => route.query.tab === 'errors')
 
 const filters = ref<UsageQueryParams>({
   start_date: startDate.value,
@@ -605,7 +610,10 @@ const getRequestTypeExportText = (log: UsageLog): string => {
 
 const getDisplayBillingMode = (
   row: Pick<UsageLog, 'billing_mode' | 'image_count'> | null | undefined
-): string | null | undefined => resolveDisplayBillingMode(row)
+): string | null | undefined => {
+  if ((row?.image_count ?? 0) > 0) return BILLING_MODE_IMAGE
+  return row?.billing_mode
+}
 
 const escapeCSVValue = (value: unknown): string => {
   if (value == null) return ''
@@ -638,7 +646,8 @@ const exportToCSV = async () => {
     const headers = [
       'Time',
       'API Key Name',
-      'Model',
+      'Requested Model',
+      'Upstream Model',
       'Reasoning Effort',
       'Inbound Endpoint',
       'IP Address',
@@ -658,6 +667,7 @@ const exportToCSV = async () => {
       log.created_at,
       log.api_key?.name || '',
       log.model,
+      log.upstream_model || log.model,
       formatReasoningEffort(log.reasoning_effort),
       log.inbound_endpoint || '',
       log.ip_address || '',
@@ -735,7 +745,7 @@ const loadSavedColumns = () => {
 }
 
 // 错误请求 tab 独立列设置(机制同用量列设置,存储互不影响)
-const ERR_ALWAYS_VISIBLE = ['status', 'created_at']
+const ERR_ALWAYS_VISIBLE = ['status', 'created_at', 'actions']
 const ERR_DEFAULT_HIDDEN_COLUMNS = ['user_agent']
 const ERR_HIDDEN_COLUMNS_KEY = 'user-usage-error-hidden-columns'
 
@@ -753,6 +763,7 @@ const errAllColumns = computed<Column[]>(() => [
   { key: 'message', label: t('usage.errors.message') },
   { key: 'created_at', label: t('usage.errors.time') },
   { key: 'user_agent', label: t('usage.userAgent') },
+  { key: 'actions', label: t('common.actions') },
 ])
 
 const errHiddenColumns = reactive<Set<string>>(new Set())
@@ -870,12 +881,36 @@ const switchToErrors = () => {
   if (errorRows.value.length === 0) void loadErrors()
 }
 
+function openErrorTicket(row: UserErrorRequest) {
+  void router.push({
+    path: '/tickets',
+    query: {
+      new: '1',
+      context_type: 'request',
+      context_id: String(row.id),
+      subject: `${t('usage.errors.title')} #${row.id}`,
+      model: row.model || '',
+      request_id: String(row.id),
+      inbound_endpoint: row.inbound_endpoint || '',
+      status_code: String(row.status_code || ''),
+      category: row.category || '',
+      platform: row.platform || '',
+      error_message: row.message || '',
+      api_key_name: row.key_name || '',
+      created_at: row.created_at || '',
+    },
+  })
+}
+
 onMounted(() => {
   loadSavedColumns()
   loadSavedErrColumns()
   document.addEventListener('click', handleColumnClickOutside)
   void loadFilterOptions()
   refreshData()
+  if (shouldOpenErrorsTab.value && errorViewEnabled.value) {
+    switchToErrors()
+  }
 })
 
 onUnmounted(() => {
@@ -885,5 +920,11 @@ onUnmounted(() => {
 
 watch(endpointDistributionSource, () => {
   // Endpoint source switching is handled by the chart component using already loaded stats.
+})
+
+watch([shouldOpenErrorsTab, errorViewEnabled], ([openErrors, enabled]) => {
+  if (openErrors && enabled && activeTab.value !== 'errors') {
+    switchToErrors()
+  }
 })
 </script>

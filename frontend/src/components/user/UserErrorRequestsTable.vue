@@ -1,5 +1,5 @@
 <template>
-  <div class="flex min-h-0 flex-1 flex-col">
+  <div data-testid="usage-error-desktop-table" class="flex min-h-0 flex-1 flex-col">
     <div class="card flex min-h-0 flex-1 flex-col overflow-hidden">
       <IpGeoBatchToolbar :ips="rows.map((r) => r.client_ip)" @failed="emit('ipGeoBatchFailed')" />
 
@@ -101,6 +101,30 @@
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
 
+        <template #cell-actions="{ row }">
+          <div class="flex items-center gap-1" @click.stop>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm px-2"
+              :data-testid="`usage-error-detail-${row.id}`"
+              :title="t('common.details')"
+              :aria-label="t('common.details')"
+              @click="openDetail(row.id)"
+            >
+              <Icon name="eye" size="sm" />
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              :data-testid="`usage-error-ticket-${row.id}`"
+              @click="emit('createTicket', row)"
+            >
+              <Icon name="chatBubble" size="sm" />
+              {{ t('tickets.createTicket') }}
+            </button>
+          </div>
+        </template>
+
         <template #empty><EmptyState :message="t('usage.errors.empty')" /></template>
       </DataTable>
     </div>
@@ -129,6 +153,7 @@ import Pagination from '@/components/common/Pagination.vue'
 import UserErrorDetailModal from '@/components/user/UserErrorDetailModal.vue'
 import IpGeoCell from '@/components/common/IpGeoCell.vue'
 import IpGeoBatchToolbar from '@/components/common/IpGeoBatchToolbar.vue'
+import Icon from '@/components/icons/Icon.vue'
 import { formatDateTime } from '@/utils/format'
 import {
   mapErrorSortKey,
@@ -155,6 +180,7 @@ const emit = defineEmits<{
   (e: 'update:pageSize', v: number): void
   (e: 'ipGeoBatchFailed'): void
   (e: 'sort', sortBy: string, sortOrder: 'asc' | 'desc'): void
+  (e: 'createTicket', row: UserErrorRequest): void
 }>()
 
 function onSort(key: string, order: 'asc' | 'desc') {
@@ -178,6 +204,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'message', label: t('usage.errors.message') },
   { key: 'created_at', label: t('usage.errors.time'), sortable: true },
   { key: 'user_agent', label: t('usage.userAgent') },
+  { key: 'actions', label: t('common.actions') },
 ])
 
 const columns = computed<Column[]>(() =>

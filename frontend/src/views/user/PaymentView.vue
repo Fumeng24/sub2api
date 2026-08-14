@@ -41,56 +41,163 @@
               <p class="mt-1 text-base font-semibold text-gray-900 dark:text-white">{{ user?.username || '' }}</p>
               <p class="mt-0.5 text-sm font-medium text-green-600 dark:text-green-400">{{ t('payment.currentBalance') }}: {{ user?.balance?.toFixed(2) || '0.00' }}</p>
             </div>
-            <div v-if="enabledMethods.length === 0" class="card py-16 text-center">
-              <p class="text-gray-500 dark:text-gray-400">{{ t('payment.notAvailable') }}</p>
-            </div>
-            <template v-else>
-            <div class="card p-6">
-              <AmountInput
-                v-model="amount"
-                :amounts="[10, 20, 50, 100, 200, 500, 1000, 2000, 5000]"
-                :min="globalMinAmount"
-                :max="globalMaxAmount"
-              />
-              <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{ amountError }}</p>
-            </div>
-            <div v-if="enabledMethods.length >= 1" class="card p-6">
-              <PaymentMethodSelector
-                :methods="methodOptions"
-                :selected="selectedMethod"
-                @select="selectedMethod = $event"
-              />
-            </div>
-            <div v-if="validAmount > 0" class="card p-6">
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-500 dark:text-gray-400">{{ t('payment.paymentAmount') }}</span>
-                  <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(validAmount) }}</span>
-                </div>
-                <div v-if="feeRate > 0" class="flex justify-between">
-                  <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
-                  <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(feeAmount) }}</span>
-                </div>
-                <div v-if="feeRate > 0" class="flex justify-between border-t border-gray-200 pt-2 dark:border-dark-600">
-                  <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
-                  <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatSelectedPaymentAmount(totalAmount) }}</span>
-                </div>
-                <div v-if="balanceRechargeMultiplier !== 1" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
-                  <span class="text-gray-500 dark:text-gray-400">{{ t('payment.creditedBalance') }}</span>
-                  <span class="text-gray-900 dark:text-white">${{ creditedAmount.toFixed(2) }}</span>
-                </div>
-                <p v-if="balanceRechargeMultiplier !== 1" class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
-                  {{ t('payment.rechargeRatePreview', { usd: balanceRechargeMultiplier.toFixed(2) }) }}
+
+            <div class="card p-4 sm:p-5" aria-labelledby="recharge-method-title">
+              <div class="mb-3">
+                <h2 id="recharge-method-title" class="text-sm font-semibold text-gray-900 dark:text-white">
+                  {{ t('payment.rechargeMethod.title') }}
+                </h2>
+                <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                  {{ selectedRechargeMode === 'online' ? t('payment.rechargeMethod.nativeDescription') : t('payment.rechargeMethod.cardCodeDescription') }}
                 </p>
               </div>
+              <div class="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-dark-800">
+                <button
+                  type="button"
+                  data-test="card-code-mode"
+                  class="flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors sm:px-3"
+                  :class="selectedRechargeMode === 'card_code' ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                  @click="selectedRechargeMode = 'card_code'"
+                >
+                  <Icon name="gift" size="sm" class="shrink-0" />
+                  <span class="min-w-0 break-words">{{ t('payment.rechargeMethod.cardCodeTitle') }}</span>
+                </button>
+                <button
+                  type="button"
+                  data-test="online-recharge-mode"
+                  class="flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors sm:px-3"
+                  :class="selectedRechargeMode === 'online' ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                  @click="selectedRechargeMode = 'online'"
+                >
+                  <Icon name="creditCard" size="sm" class="shrink-0" />
+                  <span class="min-w-0 break-words">{{ t('payment.rechargeMethod.nativeTitle') }}</span>
+                </button>
+              </div>
             </div>
-            <button :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmit || submitting" @click="handleSubmitRecharge">
-              <span v-if="submitting" class="flex items-center justify-center gap-2">
-                <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                {{ t('common.processing') }}
-              </span>
-              <span v-else>{{ t('payment.createOrder') }} {{ formatSelectedPaymentAmount(totalAmount) }}</span>
-            </button>
+
+            <div v-if="selectedRechargeMode === 'card_code'" class="card overflow-hidden" data-test="card-code-panel">
+              <div class="p-5 sm:p-6">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('payment.cardCodePurchase.title') }}</h2>
+                <p class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('payment.cardCodePurchase.description') }}</p>
+                <button type="button" class="btn btn-primary mt-4 w-full justify-center sm:w-auto" @click="openCardCodePurchase">
+                  <Icon name="externalLink" size="sm" />
+                  {{ t('payment.cardCodePurchase.action') }}
+                </button>
+              </div>
+              <div class="border-t border-gray-100 p-5 dark:border-dark-700 sm:p-6">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('payment.cardCodePurchase.redeemTitle') }}</h2>
+                <p class="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('payment.cardCodePurchase.redeemDescription') }}</p>
+                <form class="mt-4 space-y-3" data-test="card-code-form" @submit.prevent="handleCardCodeRedeem">
+                  <label for="payment-redeem-code" class="sr-only">{{ t('payment.cardCodePurchase.redeemLabel') }}</label>
+                  <div class="relative">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                      <Icon name="gift" size="sm" class="text-gray-400 dark:text-dark-500" />
+                    </div>
+                    <input
+                      id="payment-redeem-code"
+                      v-model="cardCodeRedeemCode"
+                      type="text"
+                      class="input py-3 pl-11"
+                      :placeholder="t('payment.cardCodePurchase.redeemPlaceholder')"
+                      :disabled="cardCodeRedeemSubmitting"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    class="btn btn-secondary w-full justify-center py-3"
+                    :disabled="!cardCodeRedeemCode.trim() || cardCodeRedeemSubmitting"
+                  >
+                    <Icon
+                      :name="cardCodeRedeemSubmitting ? 'refresh' : 'checkCircle'"
+                      size="sm"
+                      :class="cardCodeRedeemSubmitting ? 'animate-spin' : ''"
+                    />
+                    {{ cardCodeRedeemSubmitting ? t('redeem.redeeming') : t('payment.cardCodePurchase.redeemAction') }}
+                  </button>
+                </form>
+                <div
+                  v-if="cardCodeRedeemResult"
+                  class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300"
+                  data-test="card-code-success"
+                >
+                  <p class="font-semibold">{{ t('redeem.redeemSuccess') }}</p>
+                  <p v-if="cardCodeRedeemResult.type === 'balance'" class="mt-1">
+                    {{ t('redeem.added') }}: ${{ cardCodeRedeemResult.value.toFixed(2) }}
+                  </p>
+                  <p v-else-if="cardCodeRedeemResult.type === 'concurrency'" class="mt-1">
+                    {{ t('redeem.added') }}: {{ cardCodeRedeemResult.value }} {{ t('redeem.concurrentRequests') }}
+                  </p>
+                  <p v-else-if="cardCodeRedeemResult.type === 'subscription'" class="mt-1">
+                    {{ t('redeem.subscriptionAssigned') }}
+                  </p>
+                  <p v-if="cardCodeRedeemResult.new_balance !== undefined" class="mt-1">
+                    {{ t('redeem.newBalance') }}: <span class="font-semibold">${{ cardCodeRedeemResult.new_balance.toFixed(2) }}</span>
+                  </p>
+                </div>
+                <div
+                  v-if="cardCodeRedeemError"
+                  class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300"
+                  data-test="card-code-error"
+                >
+                  {{ cardCodeRedeemError }}
+                </div>
+              </div>
+            </div>
+
+            <template v-else>
+              <div v-if="!canUseOnlineRecharge" class="card py-16 text-center" data-test="online-recharge-unavailable">
+                <Icon name="creditCard" size="xl" class="mx-auto mb-3 text-gray-300 dark:text-dark-600" />
+                <p class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.rechargeMethod.nativeUnavailableTitle') }}</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('payment.rechargeMethod.unlockHint') }}</p>
+              </div>
+              <template v-else>
+                <div class="card p-6" data-test="online-recharge-panel">
+                  <AmountInput
+                    v-model="amount"
+                    :amounts="[10, 20, 50, 100, 200, 500, 1000, 2000, 5000]"
+                    :min="globalMinAmount"
+                    :max="globalMaxAmount"
+                  />
+                  <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{ amountError }}</p>
+                </div>
+                <div class="card p-6">
+                  <PaymentMethodSelector
+                    :methods="methodOptions"
+                    :selected="selectedMethod"
+                    @select="selectedMethod = $event"
+                  />
+                </div>
+                <div v-if="validAmount > 0" class="card p-6">
+                  <div class="space-y-2 text-sm">
+                    <div class="flex justify-between gap-4">
+                      <span class="text-gray-500 dark:text-gray-400">{{ t('payment.paymentAmount') }}</span>
+                      <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(validAmount) }}</span>
+                    </div>
+                    <div v-if="feeRate > 0" class="flex justify-between gap-4">
+                      <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
+                      <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(feeAmount) }}</span>
+                    </div>
+                    <div v-if="feeRate > 0" class="flex justify-between gap-4 border-t border-gray-200 pt-2 dark:border-dark-600">
+                      <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
+                      <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatSelectedPaymentAmount(totalAmount) }}</span>
+                    </div>
+                    <div v-if="balanceRechargeMultiplier !== 1" class="flex justify-between gap-4" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
+                      <span class="text-gray-500 dark:text-gray-400">{{ t('payment.creditedBalance') }}</span>
+                      <span class="text-gray-900 dark:text-white">${{ creditedAmount.toFixed(2) }}</span>
+                    </div>
+                    <p v-if="balanceRechargeMultiplier !== 1" class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
+                      {{ t('payment.rechargeRatePreview', { usd: balanceRechargeMultiplier.toFixed(2) }) }}
+                    </p>
+                  </div>
+                </div>
+                <button :class="['btn w-full py-3 text-base font-medium', paymentButtonClass]" :disabled="!canSubmit || submitting" @click="handleSubmitRecharge">
+                  <span v-if="submitting" class="flex items-center justify-center gap-2">
+                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                    {{ t('common.processing') }}
+                  </span>
+                  <span v-else>{{ t('payment.createOrder') }} {{ formatSelectedPaymentAmount(totalAmount) }}</span>
+                </button>
+              </template>
             </template>
           </template>
           <!-- Subscribe Tab -->
@@ -217,7 +324,7 @@
             </template>
           </template>
         </template>
-        <div v-if="(checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan" class="card p-4">
+        <div v-if="(checkout.help_text || checkout.help_image_url) && paymentPhase === 'select' && !selectedPlan && (activeTab !== 'recharge' || selectedRechargeMode === 'online')" class="card p-4">
           <div class="flex flex-col items-center gap-3">
             <img v-if="checkout.help_image_url" :src="checkout.help_image_url" alt=""
               class="h-40 max-w-full cursor-pointer rounded-lg object-contain transition-opacity hover:opacity-80"
@@ -264,6 +371,7 @@ import { usePaymentStore } from '@/stores/payment'
 import { useSubscriptionStore } from '@/stores/subscriptions'
 import { useAppStore } from '@/stores'
 import { paymentAPI } from '@/api/payment'
+import { redeemAPI } from '@/api/redeem'
 import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
 import { isMobileDevice } from '@/utils/device'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel, type PeakRateFields } from '@/utils/peak-rate'
@@ -292,6 +400,8 @@ import { planValiditySuffix as validitySuffixOf } from '@/components/payment/val
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
 import { hasWechatResumeQuery, parseWechatResumeRoute, stripWechatResumeQuery } from './paymentWechatResume'
+
+const CARD_CODE_PURCHASE_URL = 'https://catfk.com/shop/wegoo'
 
 const i18n = useI18n()
 const { t } = i18n
@@ -327,6 +437,17 @@ const amount = ref<number | null>(null)
 const selectedMethod = ref('')
 const selectedPlan = ref<SubscriptionPlan | null>(null)
 const previewImage = ref('')
+const selectedRechargeMode = ref<'card_code' | 'online'>('card_code')
+const cardCodeRedeemCode = ref('')
+const cardCodeRedeemSubmitting = ref(false)
+const cardCodeRedeemError = ref('')
+const cardCodeRedeemResult = ref<{
+  message: string
+  type: string
+  value: number
+  new_balance?: number
+  new_concurrency?: number
+} | null>(null)
 
 const paymentPhase = ref<'select' | 'paying'>('select')
 
@@ -507,13 +628,14 @@ const checkout = ref<CheckoutInfoResponse>({
 
 const tabs = computed(() => {
   const result: { key: 'recharge' | 'subscription'; label: string }[] = []
-  if (!checkout.value.balance_disabled) result.push({ key: 'recharge', label: t('payment.tabTopUp') })
+  result.push({ key: 'recharge', label: t('payment.tabTopUp') })
   result.push({ key: 'subscription', label: t('payment.tabSubscribe') })
   return result
 })
 
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
+const canUseOnlineRecharge = computed(() => !checkout.value.balance_disabled && enabledMethods.value.length > 0)
 const validAmount = computed(() => amount.value ?? 0)
 const balanceRechargeMultiplier = computed(() => {
   const multiplier = checkout.value.balance_recharge_multiplier
@@ -646,7 +768,8 @@ const amountError = computed(() => {
 })
 
 const canSubmit = computed(() =>
-  validAmount.value > 0
+  canUseOnlineRecharge.value
+    && validAmount.value > 0
     && amountFitsMethod(validAmount.value, selectedMethod.value)
     && selectedLimit.value?.available !== false
 )
@@ -757,6 +880,35 @@ function closeRenewalModal() {
 async function handleSubmitRecharge() {
   if (!canSubmit.value || submitting.value) return
   await createOrder(validAmount.value, 'balance')
+}
+
+function openCardCodePurchase() {
+  const opened = window.open(CARD_CODE_PURCHASE_URL, '_blank', 'noopener,noreferrer')
+  if (opened) opened.opener = null
+}
+
+async function handleCardCodeRedeem() {
+  const code = cardCodeRedeemCode.value.trim()
+  if (!code || cardCodeRedeemSubmitting.value) return
+
+  cardCodeRedeemSubmitting.value = true
+  cardCodeRedeemError.value = ''
+  cardCodeRedeemResult.value = null
+  try {
+    const result = await redeemAPI.redeem(code)
+    cardCodeRedeemResult.value = result
+    cardCodeRedeemCode.value = ''
+    await authStore.refreshUser()
+    if (result.type === 'subscription') {
+      await subscriptionStore.fetchActiveSubscriptions(true)
+    }
+    appStore.showSuccess(t('redeem.codeRedeemSuccess'))
+  } catch (err: unknown) {
+    cardCodeRedeemError.value = extractApiErrorMessage(err, t('redeem.failedToRedeem'))
+    appStore.showError(t('redeem.redeemFailed'))
+  } finally {
+    cardCodeRedeemSubmitting.value = false
+  }
 }
 
 async function confirmSubscribe() {
@@ -1135,9 +1287,6 @@ onMounted(async () => {
       }
     }
     await resumeWechatPaymentFromQuery()
-    if (checkout.value.balance_disabled) {
-      activeTab.value = 'subscription'
-    }
     // Handle renewal navigation: ?tab=subscription&group=123
     if (route.query.tab === 'subscription') {
       activeTab.value = 'subscription'

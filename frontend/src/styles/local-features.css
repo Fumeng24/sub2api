@@ -1,0 +1,57 @@
+:root {
+  --apple-bg: #f9fafb;
+  --apple-surface: #ffffff;
+  --apple-surface-solid: #ffffff;
+  --apple-surface-elevated: #f9fafb;
+  --apple-surface-elevated-solid: #f9fafb;
+  --apple-text: #111827;
+  --apple-muted: #6b7280;
+  --apple-muted-2: #9ca3af;
+  --apple-blue: #0d9488;
+  --apple-blue-hover: #0f766e;
+  --apple-danger: #dc2626;
+  --apple-warning: #d97706;
+  --apple-success: #059669;
+  --apple-border: #e5e7eb;
+  --apple-border-soft: #f3f4f6;
+  --apple-hover: #f3f4f6;
+  --apple-focus-ring: rgb(20 184 166 / 35%);
+  --apple-radius: 1rem;
+  --apple-shadow-sm: 0 1px 3px rgb(0 0 0 / 4%), 0 1px 2px rgb(0 0 0 / 6%);
+  --apple-shadow-md: 0 10px 40px rgb(0 0 0 / 8%);
+}
+
+.dark {
+  --apple-bg: #020617;
+  --apple-surface: #1e293b;
+  --apple-surface-solid: #1e293b;
+  --apple-surface-elevated: #0f172a;
+  --apple-surface-elevated-solid: #0f172a;
+  --apple-text: #f3f4f6;
+  --apple-muted: #cbd5e1;
+  --apple-muted-2: #94a3b8;
+  --apple-blue: #2dd4bf;
+  --apple-blue-hover: #5eead4;
+  --apple-danger: #f87171;
+  --apple-warning: #fbbf24;
+  --apple-success: #34d399;
+  --apple-border: #475569;
+  --apple-border-soft: #334155;
+  --apple-hover: #334155;
+  --apple-focus-ring: rgb(45 212 191 / 35%);
+  --apple-shadow-sm: 0 1px 3px rgb(0 0 0 / 24%);
+  --apple-shadow-md: 0 10px 40px rgb(0 0 0 / 32%);
+}
+
+.admin-apple-page {
+  color: var(--apple-text);
+}
+
+.admin-gateway-panel,
+.admin-apple-panel,
+.admin-apple-table-shell {
+  border: 1px solid var(--apple-border);
+  border-radius: 1rem;
+  background: var(--apple-surface);
+  box-shadow: var(--apple-shadow-sm);
+}

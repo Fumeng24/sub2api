@@ -53,3 +53,22 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar integration guide', () => {
+  it('renders the configured guide before all account navigation', () => {
+    const guideIndex = componentSource.indexOf('data-testid="sidebar-integration-guide"')
+    const adminNavigationIndex = componentSource.indexOf('<!-- Admin View: Admin menu first')
+
+    expect(guideIndex).toBeGreaterThan(-1)
+    expect(guideIndex).toBeLessThan(adminNavigationIndex)
+    expect(componentSource).toContain('sidebar-doc-link')
+    expect(componentSource).toContain("t('nav.docsBadge')")
+  })
+
+  it('supports safe external links and client-side internal guide routes', () => {
+    expect(componentSource).toContain("from '@/custom/utils/docsLink'")
+    expect(componentSource).toContain('resolveDocsLink(')
+    expect(componentSource).toContain('shouldUseClientDocsNavigation(event, link)')
+    expect(componentSource).toContain("docsLink.external ? '_blank' : undefined")
+  })
+})

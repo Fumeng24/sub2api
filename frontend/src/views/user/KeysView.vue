@@ -373,6 +373,7 @@
             <div class="flex items-center gap-1">
               <!-- Use Key Button -->
               <button
+                :data-testid="`use-key-open-${row.id}`"
                 @click="openUseKeyModal(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400"
               >
@@ -994,6 +995,8 @@
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
+      :group-name="selectedKey?.group?.name || ''"
+      :custom-endpoints="publicSettings?.custom_endpoints || []"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
       @close="closeUseKeyModal"
     />

@@ -1,0 +1,360 @@
+<template>
+  <div class="legal-gateway-shell min-h-screen">
+    <header class="legal-gateway-header">
+      <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+        <RouterLink to="/home" class="flex min-w-0 items-center gap-3">
+          <span class="legal-logo-frame flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg">
+            <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
+          </span>
+          <span class="truncate text-base font-semibold text-[var(--legal-text)]">
+            {{ siteName }}
+          </span>
+        </RouterLink>
+        <RouterLink
+          to="/login"
+          class="legal-login-link inline-flex flex-shrink-0 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition"
+        >
+          {{ t('home.login') }}
+        </RouterLink>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-10">
+      <div v-if="loading" class="flex min-h-[320px] items-center justify-center">
+        <div class="h-8 w-8 animate-spin rounded-full border-2 border-[color:var(--legal-border)] border-t-[color:var(--legal-blue)]"></div>
+      </div>
+
+      <section
+        v-else-if="loadError"
+        class="legal-state-panel rounded-lg border p-6"
+      >
+        <h1 class="text-lg font-semibold text-[var(--legal-text)]">{{ t('legal.loadFailed') }}</h1>
+        <p class="mt-2 text-sm text-[var(--legal-muted)]">{{ t('legal.retryLater') }}</p>
+      </section>
+
+      <section
+        v-else-if="!currentDocument"
+        class="legal-state-panel rounded-lg border p-6"
+      >
+        <div class="flex items-start gap-3">
+          <span class="legal-icon-box flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md">
+            <Icon name="document" size="sm" />
+          </span>
+          <div>
+            <h1 class="text-lg font-semibold text-[var(--legal-text)]">{{ t('legal.notFound') }}</h1>
+            <p class="mt-2 text-sm leading-6 text-[var(--legal-muted)]">
+              {{ t('legal.notFoundDescription') }}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <article v-else>
+        <div class="legal-document-hero mb-6 rounded-lg border p-5 sm:p-6">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <span class="legal-icon-box flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md">
+              <Icon :name="documentIcon" size="md" />
+            </span>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase text-[var(--legal-blue)]">{{ t('legal.gateway.kicker') }}</p>
+              <p class="mt-2 text-sm font-medium text-[var(--legal-muted)]">{{ documentTypeLabel }}</p>
+              <h1 class="mt-2 break-words text-2xl font-semibold tracking-normal text-[var(--legal-text)] sm:text-3xl">
+                {{ currentDocument.title }}
+              </h1>
+              <p v-if="updatedAt" class="mt-3 text-sm text-[var(--legal-muted)]">
+                {{ t('legal.updatedAt', { date: updatedAt }) }}
+              </p>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <span class="legal-meta-pill">
+                  <Icon name="shield" size="xs" :stroke-width="2" />
+                  {{ t('legal.gateway.officialRecord') }}
+                </span>
+                <span class="legal-meta-pill">
+                  <Icon name="document" size="xs" :stroke-width="2" />
+                  {{ t('legal.gateway.markdownSource') }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="hasContent"
+          class="legal-document-content"
+          v-html="renderedHtml"
+        ></div>
+        <div
+          v-else
+          class="legal-state-panel rounded-lg border border-dashed px-6 py-14 text-center text-sm text-[var(--legal-muted)]"
+        >
+          {{ t('legal.empty') }}
+        </div>
+      </article>
+    </main>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import { useI18n } from 'vue-i18n'
+import Icon from '@/components/icons/Icon.vue'
+import { getPublicSettings } from '@/api/auth'
+import { getLocale } from '@/i18n'
+import { sanitizeUrl } from '@/utils/url'
+import { DEFAULT_SITE_NAME } from '@/utils/branding'
+import type { LoginAgreementDocument, PublicSettings } from '@/types'
+import zhAdminCompliance from '../../../../docs/legal/admin-compliance.zh.md?raw'
+import enAdminCompliance from '../../../../docs/legal/admin-compliance.en.md?raw'
+
+type LegalDocumentIcon = 'document' | 'shield' | 'globe' | 'cog'
+
+const route = useRoute()
+const { t } = useI18n()
+const settings = ref<PublicSettings | null>(null)
+const loading = ref(true)
+const loadError = ref(false)
+
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+})
+
+const documentId = computed(() => String(route.params.documentId || ''))
+const isAdminComplianceDocument = computed(() => documentId.value === 'admin-compliance')
+const documents = computed(() => settings.value?.login_agreement_documents ?? [])
+const siteName = computed(() => settings.value?.site_name || DEFAULT_SITE_NAME)
+const siteLogo = computed(() => sanitizeUrl(settings.value?.site_logo || '', {
+  allowRelative: true,
+  allowDataUrl: true,
+}))
+const updatedAt = computed(() =>
+  isAdminComplianceDocument.value ? '' : settings.value?.login_agreement_updated_at || ''
+)
+const documentTypeLabel = computed(() =>
+  isAdminComplianceDocument.value ? t('legal.adminCompliance') : t('legal.loginAgreement')
+)
+
+const currentDocument = computed<LoginAgreementDocument | null>(() => {
+  if (isAdminComplianceDocument.value) {
+    return {
+      id: 'admin-compliance',
+      title: t('adminCompliance.title'),
+      content_md: getLocale() === 'zh' ? zhAdminCompliance : enAdminCompliance
+    }
+  }
+  const id = documentId.value
+  if (!id) {
+    return null
+  }
+  return documents.value.find((doc) => doc.id === id) ?? null
+})
+
+const hasContent = computed(() => Boolean(currentDocument.value?.content_md?.trim()))
+
+const renderedHtml = computed(() => {
+  const content = currentDocument.value?.content_md?.trim() || ''
+  if (!content) {
+    return ''
+  }
+  const html = marked.parse(content) as string
+  return DOMPurify.sanitize(html)
+})
+
+const documentIcon = computed<LegalDocumentIcon>(() => {
+  const title = currentDocument.value?.title || ''
+  if (title.includes('政策') || title.includes('隐私')) {
+    return 'shield'
+  }
+  if (title.includes('国家') || title.includes('地区')) {
+    return 'globe'
+  }
+  if (title.includes('特定')) {
+    return 'cog'
+  }
+  return 'document'
+})
+
+onMounted(async () => {
+  loading.value = true
+  loadError.value = false
+  try {
+    settings.value = await getPublicSettings()
+  } catch {
+    loadError.value = true
+  } finally {
+    loading.value = false
+  }
+})
+</script>
+
+<style scoped>
+.legal-gateway-shell {
+  --legal-bg: #05070b;
+  --legal-surface: #0b0f16;
+  --legal-surface-elevated: #111722;
+  --legal-text: #f5f7fb;
+  --legal-muted: #9aa4b2;
+  --legal-muted-2: #6f7a89;
+  --legal-border: rgb(255 255 255 / 12%);
+  --legal-border-soft: rgb(255 255 255 / 8%);
+  --legal-blue: #58b8ff;
+  --legal-success: #4ade80;
+
+  background:
+    radial-gradient(circle at 20% 0%, rgb(88 184 255 / 0.10), transparent 28rem),
+    linear-gradient(180deg, #05070b 0%, #080b11 100%);
+  color: var(--legal-text);
+}
+
+.legal-gateway-header {
+  border-bottom: 1px solid var(--legal-border-soft);
+  background: rgb(5 7 11 / 0.86);
+  backdrop-filter: saturate(180%) blur(16px);
+}
+
+.legal-logo-frame,
+.legal-icon-box,
+.legal-state-panel,
+.legal-document-hero {
+  border-color: var(--legal-border);
+  background: color-mix(in srgb, var(--legal-surface-elevated) 72%, var(--legal-surface));
+}
+
+.legal-logo-frame {
+  box-shadow: inset 0 0 0 1px var(--legal-border-soft);
+}
+
+.legal-icon-box {
+  color: var(--legal-blue);
+  box-shadow: inset 0 0 0 1px var(--legal-border-soft);
+}
+
+.legal-login-link {
+  background: var(--legal-blue);
+  color: #06101d;
+  box-shadow: 0 10px 24px rgb(88 184 255 / 0.16);
+}
+
+.legal-login-link:hover {
+  filter: brightness(1.08);
+}
+
+.legal-document-hero {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.055), transparent 48%),
+    color-mix(in srgb, var(--legal-surface) 92%, black 8%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+}
+
+.legal-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid var(--legal-border-soft);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.025);
+  padding: 0.25rem 0.625rem;
+  color: var(--legal-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.legal-document-content {
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  color: var(--legal-text);
+  border: 1px solid var(--legal-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--legal-surface) 94%, white 6%);
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+}
+
+.legal-document-content :deep(h1) {
+  @apply mb-4 mt-8 border-b pb-3 text-3xl font-semibold;
+  border-color: var(--legal-border-soft);
+}
+
+.legal-document-content :deep(h2) {
+  @apply mb-3 mt-7 text-2xl font-semibold;
+}
+
+.legal-document-content :deep(h3) {
+  @apply mb-2 mt-6 text-xl font-semibold;
+}
+
+.legal-document-content :deep(h4) {
+  @apply mb-2 mt-5 text-lg font-semibold;
+}
+
+.legal-document-content :deep(p) {
+  @apply mb-4;
+  color: var(--legal-muted);
+}
+
+.legal-document-content :deep(a) {
+  color: var(--legal-blue);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.legal-document-content :deep(ul) {
+  @apply mb-4 list-disc pl-6;
+}
+
+.legal-document-content :deep(ol) {
+  @apply mb-4 list-decimal pl-6;
+}
+
+.legal-document-content :deep(li) {
+  @apply mb-1;
+  color: var(--legal-muted);
+}
+
+.legal-document-content :deep(blockquote) {
+  @apply my-5 border-l-4 pl-4;
+  border-color: var(--legal-blue);
+  color: var(--legal-muted);
+}
+
+.legal-document-content :deep(code) {
+  @apply rounded px-1.5 py-0.5 font-mono text-sm;
+  background: var(--legal-surface-elevated);
+  color: var(--legal-text);
+}
+
+.legal-document-content :deep(pre) {
+  @apply my-5 overflow-x-auto rounded-lg bg-gray-950 p-4 text-gray-100;
+}
+
+.legal-document-content :deep(pre code) {
+  @apply bg-transparent p-0 text-inherit;
+}
+
+.legal-document-content :deep(table) {
+  @apply my-5 block w-full overflow-x-auto border-collapse;
+}
+
+.legal-document-content :deep(th) {
+  @apply border px-3 py-2 text-left font-semibold;
+  border-color: var(--legal-border);
+  background: var(--legal-surface-elevated);
+}
+
+.legal-document-content :deep(td) {
+  @apply border px-3 py-2;
+  border-color: var(--legal-border);
+  color: var(--legal-muted);
+}
+
+.legal-document-content :deep(img) {
+  @apply my-5 h-auto max-w-full rounded-lg;
+}
+
+.legal-document-content :deep(hr) {
+  @apply my-7;
+  border-color: var(--legal-border-soft);
+}
+</style>

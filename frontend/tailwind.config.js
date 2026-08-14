@@ -1,6 +1,17 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
+  content: [
+    './index.html',
+    './src/*.{vue,js,ts,jsx,tsx}',
+    './src/{__tests__,api,assets,components,composables,constants,features,i18n,router,stores,styles,types,utils,views}/**/*.{vue,js,ts,jsx,tsx}',
+    './src/custom/admin/{InvoicesView,SchedulerView,TicketsView,WegooUpstreamsView,WegooUserPricingView}.vue',
+    './src/custom/channels/WegooAvailableChannelsTable.vue',
+    './src/custom/common/WegooEmptyState.vue',
+    './src/custom/public/**/*.vue',
+    './src/custom/user/monitor/**/*.vue',
+    './src/custom/user/{ImageGenerationView,InvoicesView,TicketsView,UserPageHero,UserSummaryStats,WegooMessagesView}.vue',
+    './src/custom/tickets/**/*.vue',
+  ],
   darkMode: 'class',
   theme: {
     extend: {

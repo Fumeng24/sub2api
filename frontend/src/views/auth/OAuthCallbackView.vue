@@ -91,7 +91,7 @@
         </button>
       </div>
 
-      <div v-else class="card p-6">
+      <div v-else data-testid="oauth-callback-manual" class="card p-6">
         <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
           {{ t('auth.oauth.callbackTitle') }}
         </h1>
@@ -103,7 +103,7 @@
           <div>
             <label class="input-label">{{ t('auth.oauth.code') }}</label>
             <div class="flex gap-2">
-              <input class="input flex-1 font-mono text-sm" :value="code" readonly />
+              <input class="input flex-1 font-mono text-sm" data-testid="oauth-callback-code" :value="code" readonly />
               <button class="btn btn-secondary" type="button" :disabled="!code" @click="copy(code)">
                 {{ t('common.copy') }}
               </button>
@@ -113,7 +113,7 @@
           <div>
             <label class="input-label">{{ t('auth.oauth.state') }}</label>
             <div class="flex gap-2">
-              <input class="input flex-1 font-mono text-sm" :value="state" readonly />
+              <input class="input flex-1 font-mono text-sm" data-testid="oauth-callback-state" :value="state" readonly />
               <button
                 class="btn btn-secondary"
                 type="button"
@@ -128,7 +128,7 @@
           <div>
             <label class="input-label">{{ t('auth.oauth.fullUrl') }}</label>
             <div class="flex gap-2">
-              <input class="input flex-1 font-mono text-xs" :value="fullUrl" readonly />
+              <input class="input flex-1 font-mono text-xs" data-testid="oauth-callback-full-url" :value="fullUrl" readonly />
               <button
                 class="btn btn-secondary"
                 type="button"

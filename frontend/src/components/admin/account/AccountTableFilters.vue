@@ -1,6 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center gap-3">
     <SearchInput
+      data-test="account-filters"
       :model-value="searchQuery"
       :placeholder="t('admin.accounts.searchAccounts')"
       class="w-full sm:w-64"

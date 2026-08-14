@@ -20,7 +20,7 @@ const {
   getModelsListCandidates: vi.fn(),
   getUsageSummary: vi.fn(),
   getCapacitySummary: vi.fn(),
-  getLiveCapability: vi.fn(),
+  getLiveCapability: vi.fn().mockResolvedValue({ supported: false }),
   showSuccess: vi.fn(),
   showError: vi.fn()
 }))

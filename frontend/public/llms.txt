@@ -1,0 +1,43 @@
+# Wegoo AI
+
+Wegoo AI is a developer-focused AI Gateway for GPT/Codex, Claude, Gemini, and image-generation models. One API key can be used across supported model families through OpenAI-compatible and Anthropic-compatible endpoints.
+
+## Core Positioning
+
+- Transparent forwarding: model requests are routed to the configured upstream without hidden prompt injection or silent model replacement.
+- Multi-model access: developers can manage API keys, model groups, usage records, wallet balance, invoices, tickets, and service status in one console.
+- Auditable billing: usage logs expose model, token, cache, latency, and cost metadata so users can understand each charge.
+- Balance clarity: paid recharge, card-code recharge, manual collection, refunds, gift compensation, referral rewards, and invoiceable balance are classified separately.
+
+## Public Pages
+
+- Home: https://ai.wegoo.site/home
+- Models and pricing: https://ai.wegoo.site/pricing
+- API docs: https://ai.wegoo.site/docs
+- Service status: https://ai.wegoo.site/status
+- Enterprise, invoices, and manual collection: https://ai.wegoo.site/enterprise
+- API key usage lookup: https://ai.wegoo.site/key-usage
+
+## Public Fact Sources
+
+- Public model pricing: https://ai.wegoo.site/api/v1/public/model-pricing
+- Public model groups compatibility endpoint: https://ai.wegoo.site/api/v1/public/channels/available
+- Public service monitors: https://ai.wegoo.site/api/v1/public/channel-monitors
+- Public sitemap: https://ai.wegoo.site/sitemap.xml
+- Public update feed: https://ai.wegoo.site/feed.xml
+
+Public model and status pages should be treated as the source of truth for unauthenticated visitors. Logged-in users may see additional private groups, exclusive groups, subscriptions, user-specific discounts, and account-level details in the console.
+
+## Integration
+
+Use an API key created in the Wegoo AI console and replace the SDK base URL with the Wegoo AI endpoint shown in the dashboard or docs page.
+
+OpenAI-compatible clients can use the `/v1` endpoint. Anthropic-compatible clients can use the Anthropic-compatible gateway endpoint when enabled for the selected group. Codex CLI and Claude Code users should follow the current console/docs instructions because group permissions and model support are configured by the platform.
+
+## Billing And Invoices
+
+Invoiceable sources include normal user recharge, card-code recharge, and administrator-confirmed manual collection when classified as paid recharge. Gift compensation, referral rewards, and non-payment balance adjustments are not invoiceable. Refunds reduce the corresponding net recharge amount.
+
+## Support
+
+Use the ticket system in the console for account, billing, invoice, request-log, and model-status issues. Enterprise users can use the enterprise page to request manual collection, invoice coordination, and dedicated support.

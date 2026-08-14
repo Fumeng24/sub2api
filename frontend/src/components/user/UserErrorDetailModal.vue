@@ -14,7 +14,7 @@
     </div>
 
     <!-- Detail content -->
-    <div v-else-if="detail" class="space-y-4 text-sm">
+    <div v-else-if="detail" data-testid="usage-error-detail-modal" class="space-y-4 text-sm">
       <div class="grid grid-cols-2 gap-x-6 gap-y-3">
         <!-- Time -->
         <div>

@@ -1,0 +1,89 @@
+<template>
+  <div class="space-y-4">
+    <button type="button" :disabled="buttonDisabled" class="btn btn-secondary w-full" @click="startLogin">
+      <span
+        class="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-green-200 bg-green-50 text-xs font-semibold text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300"
+      >
+        W
+      </span>
+      {{ t('auth.oidc.signIn', { providerName }) }}
+    </button>
+
+    <p
+      v-if="disabledHint"
+      data-testid="wechat-oauth-hint"
+      class="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-200"
+    >
+      {{ disabledHint }}
+    </p>
+
+    <div v-if="showDivider" class="flex items-center gap-3">
+      <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
+      <span class="text-xs text-gray-500 dark:text-dark-400">
+        {{ t('auth.oauthOrContinue') }}
+      </span>
+      <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { resolveWeChatOAuthStart } from '@/api/auth'
+import { useAppStore } from '@/stores'
+import { resolveAffiliateReferralCode, storeOAuthAffiliateCode } from '@/utils/oauthAffiliate'
+
+const props = withDefaults(defineProps<{
+  disabled?: boolean
+  affCode?: string
+  showDivider?: boolean
+}>(), {
+  showDivider: true,
+})
+
+const appStore = useAppStore()
+const route = useRoute()
+const { t } = useI18n()
+const providerName = computed(() => t('auth.wechatProviderName'))
+
+const resolvedStart = computed(() => resolveWeChatOAuthStart(appStore.cachedPublicSettings))
+const buttonDisabled = computed(() => props.disabled || resolvedStart.value.mode === null)
+const disabledHint = computed(() => {
+  if (props.disabled) {
+    return ''
+  }
+  switch (resolvedStart.value.unavailableReason) {
+    case 'external_browser_required':
+      return t('auth.oauthFlow.wechatSystemBrowserOnly')
+    case 'wechat_browser_required':
+      return t('auth.oauthFlow.wechatBrowserOnly')
+    case 'native_app_required':
+      return t('auth.oauthFlow.wechatNativeAppRequired')
+    case 'not_configured':
+      return t('auth.oauthFlow.wechatNotConfigured')
+    default:
+      return ''
+  }
+})
+
+onMounted(() => {
+  if (!appStore.cachedPublicSettings && !appStore.publicSettingsLoaded) {
+    appStore.fetchPublicSettings()
+  }
+})
+
+function startLogin(): void {
+  if (buttonDisabled.value || !resolvedStart.value.mode) {
+    return
+  }
+  const redirectTo = (route.query.redirect as string) || '/dashboard'
+  storeOAuthAffiliateCode(resolveAffiliateReferralCode(props.affCode, route.query.aff, route.query.aff_code))
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api/v1'
+  const normalized = apiBase.replace(/\/$/, '')
+  const mode = resolvedStart.value.mode
+  const startURL = `${normalized}/auth/oauth/wechat/start?mode=${mode}&redirect=${encodeURIComponent(redirectTo)}`
+  window.location.href = startURL
+}
+</script>

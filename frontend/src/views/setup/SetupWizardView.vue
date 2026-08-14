@@ -60,7 +60,7 @@
       <!-- Step Content -->
       <div class="rounded-2xl bg-white p-8 shadow-xl dark:bg-dark-800">
         <!-- Step 1: Database -->
-        <div v-if="currentStep === 0" class="space-y-6">
+        <div v-if="currentStep === 0" data-test="setup-step-database" class="space-y-6">
           <div class="mb-6 text-center">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
               {{ t('setup.database.title') }}
@@ -149,6 +149,7 @@
           </div>
 
           <button
+            data-test="setup-test-db"
             @click="testDatabaseConnection"
             :disabled="testingDb"
             class="btn btn-secondary w-full"
@@ -185,7 +186,7 @@
         </div>
 
         <!-- Step 2: Redis -->
-        <div v-if="currentStep === 1" class="space-y-6">
+        <div v-if="currentStep === 1" data-test="setup-step-redis" class="space-y-6">
           <div class="mb-6 text-center">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
               {{ t('setup.redis.title') }}
@@ -259,6 +260,7 @@
           </div>
 
           <button
+            data-test="setup-test-redis"
             @click="testRedisConnection"
             :disabled="testingRedis"
             class="btn btn-secondary w-full"
@@ -301,7 +303,7 @@
         </div>
 
         <!-- Step 3: Admin -->
-        <div v-if="currentStep === 2" class="space-y-6">
+        <div v-if="currentStep === 2" data-test="setup-step-admin" class="space-y-6">
           <div class="mb-6 text-center">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
               {{ t('setup.admin.title') }}
@@ -314,6 +316,7 @@
           <div>
             <label class="input-label">{{ t('setup.admin.email') }}</label>
             <input
+              data-test="setup-admin-email"
               v-model="formData.admin.email"
               type="email"
               class="input"
@@ -324,6 +327,7 @@
           <div>
             <label class="input-label">{{ t('setup.admin.password') }}</label>
             <input
+              data-test="setup-admin-password"
               v-model="formData.admin.password"
               type="password"
               class="input"
@@ -334,6 +338,7 @@
           <div>
             <label class="input-label">{{ t('setup.admin.confirmPassword') }}</label>
             <input
+              data-test="setup-admin-confirm-password"
               v-model="confirmPassword"
               type="password"
               class="input"
@@ -349,7 +354,7 @@
         </div>
 
         <!-- Step 4: Complete -->
-        <div v-if="currentStep === 3" class="space-y-6">
+        <div v-if="currentStep === 3" data-test="setup-step-complete" class="space-y-6">
           <div class="mb-6 text-center">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
               {{ t('setup.ready.title') }}
@@ -456,6 +461,7 @@
 
           <button
             v-if="currentStep < 3"
+            data-test="setup-next"
             @click="nextStep"
             :disabled="!canProceed"
             class="btn btn-primary"

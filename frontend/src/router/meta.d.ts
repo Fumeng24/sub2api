@@ -20,6 +20,12 @@ declare module 'vue-router' {
     requiresAdmin?: boolean
 
     /**
+     * Whether this route is available to administrators and support agents
+     * @default false
+     */
+    requiresSupport?: boolean
+
+    /**
      * Page title for this route
      */
     title?: string
@@ -64,5 +70,17 @@ declare module 'vue-router' {
      * i18n key for the page description
      */
     descriptionKey?: string
+
+    /** SEO title used by public pages. */
+    seoTitle?: string
+
+    /** Public-page meta description. */
+    description?: string
+
+    /** Canonical path for public pages. */
+    canonicalPath?: string
+
+    /** Optional robots directive. */
+    robots?: string
   }
 }
