@@ -263,6 +263,8 @@ export interface PublicSettings extends Custom.PublicSettingsCustom {
   balance_low_notify_threshold: number
   channel_monitor_enabled: boolean
   channel_monitor_default_interval_seconds: number
+  channel_monitor_mode?: 'v1' | 'v2' | string
+  channel_monitor_hide_throughput?: boolean
   available_channels_enabled: boolean
   model_plaza_enabled: boolean
   model_plaza_require_auth: boolean

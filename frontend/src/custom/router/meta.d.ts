@@ -14,6 +14,7 @@ declare module 'vue-router' {
 
     requiresPurchaseAvailable?: boolean
     featureFlag?: RegisteredFeatureFlag
+    channelMonitorMode?: 'v1' | 'v2'
     requiresSubscriptionGroups?: boolean
   }
 }

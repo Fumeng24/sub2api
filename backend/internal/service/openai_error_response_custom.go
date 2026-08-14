@@ -56,7 +56,7 @@ func openAIErrorResponseForClass(statusCode int, class openAIUpstreamErrorClass,
 	case openAIUpstreamErrorTransient:
 		return http.StatusBadGateway, "api_error", clientFacingTemporaryUnavailableMessage
 	case openAIUpstreamErrorModelUnsupported:
-		return http.StatusServiceUnavailable, "api_error", clientFacingGroupUnavailableMessage
+		return http.StatusServiceUnavailable, "api_error", clientFacingModelGroupUnavailableMessage
 	}
 	switch statusCode {
 	case http.StatusBadRequest:

@@ -22,6 +22,12 @@ export default {
           enabledHint: '关闭后后台不再执行定时检测，已有数据保留。',
           defaultInterval: '默认检测间隔（秒）',
           defaultIntervalHint: '新建渠道监控时表单的默认值，可被单个渠道覆盖。范围 15 – 3600 秒。',
+          mode: '监控模式',
+          modeV1: 'V1 主动探测',
+          modeV2: 'V2 真实流量观测',
+          modeHint: 'V2 只聚合真实用户流量，不参与账号调度。切换模式会改变监控数据来源；建议先保持 V1，待 V2 积累足够历史后再切换。',
+          hideThroughput: '对用户隐藏吞吐详情',
+          hideThroughputHint: '管理员仍可查看 RPM/TPM；用户侧 V2 只展示稳定性、延迟和缓存指标。',
         },
         availableChannels: {
           title: '可用渠道',

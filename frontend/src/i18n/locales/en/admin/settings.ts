@@ -22,6 +22,12 @@ export default {
           enabledHint: 'Disabling stops background checks; existing history is preserved.',
           defaultInterval: 'Default check interval (seconds)',
           defaultIntervalHint: 'Pre-fills the interval when creating a new monitor; each monitor can override it. Range 15 – 3600.',
+          mode: 'Monitor mode',
+          modeV1: 'V1 active probes',
+          modeV2: 'V2 traffic observer',
+          modeHint: 'V2 aggregates real user traffic and does not participate in account routing. Switching modes changes which monitor data is shown; keep V1 until V2 has enough history.',
+          hideThroughput: 'Hide throughput details from users',
+          hideThroughputHint: 'Admins can still see RPM/TPM; user-facing V2 views only show reliability, latency and cache metrics.',
         },
         availableChannels: {
           title: 'Available Channels',

@@ -151,6 +151,7 @@ func TestClassifyNoAccountError_HasModelSupport_KeepsRoutingMessageGenerationToC
 
 	require.Equal(t, http.StatusServiceUnavailable, cls.Status, "model exists somewhere — caller stays on 503")
 	require.Equal(t, "api_error", cls.ErrType)
+	require.Equal(t, service.ClientFacingModelGroupUnavailableMessage(), cls.Message)
 	require.False(t, cls.ModelNotFound)
 }
 
@@ -165,6 +166,7 @@ func TestClassifyNoAccountError_ModelSupportedOnlyByRateLimitedAccount_Returns50
 
 	require.Equal(t, http.StatusServiceUnavailable, cls.Status)
 	require.Equal(t, "api_error", cls.ErrType)
+	require.Equal(t, service.ClientFacingModelGroupUnavailableMessage(), cls.Message)
 	require.False(t, cls.ModelNotFound, "temporary account cooldown must remain retryable")
 }
 

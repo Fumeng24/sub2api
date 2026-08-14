@@ -70,6 +70,7 @@
  */
 
 import { useAppStore } from '@/stores/app'
+import { DEFAULT_INTERVAL_SECONDS } from '@/constants/channelMonitor'
 import type { PublicSettings } from '@/types'
 
 export type FeatureFlagMode = 'opt-in' | 'opt-out'
@@ -151,4 +152,36 @@ export function isFeatureFlagEnabled(flag: FeatureFlagDefinition): boolean {
  */
 export function makeSidebarFlag(flag: FeatureFlagDefinition): () => boolean {
   return () => isFeatureFlagEnabled(flag)
+}
+
+/** True when the channel monitor feature is enabled for the current site. */
+export function isChannelMonitorRouteEnabled(): boolean {
+  return isFeatureFlagEnabled(FeatureFlags.channelMonitor)
+}
+
+export type ChannelMonitorMode = 'v1' | 'v2'
+
+/** V2 is an explicit observer-mode opt-in; missing/legacy values stay on V1. */
+export function getChannelMonitorMode(): ChannelMonitorMode {
+  const appStore = useAppStore()
+  return appStore.cachedPublicSettings?.channel_monitor_mode === 'v2' ? 'v2' : 'v1'
+}
+
+export function isChannelMonitorV1Mode(): boolean {
+  return isChannelMonitorRouteEnabled() && getChannelMonitorMode() === 'v1'
+}
+
+export function isChannelMonitorV2Mode(): boolean {
+  return isChannelMonitorRouteEnabled() && getChannelMonitorMode() === 'v2'
+}
+
+export function getChannelMonitorRefreshIntervalSeconds(): number {
+  const appStore = useAppStore()
+  const configured = appStore.cachedPublicSettings?.channel_monitor_default_interval_seconds
+  return configured && configured > 0 ? configured : DEFAULT_INTERVAL_SECONDS
+}
+
+export function isChannelMonitorThroughputHidden(): boolean {
+  const appStore = useAppStore()
+  return Boolean(appStore.cachedPublicSettings?.channel_monitor_hide_throughput)
 }

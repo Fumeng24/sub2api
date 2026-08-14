@@ -26,7 +26,7 @@ func TestClientFacingErrorMessage_RedactsInternalDetails(t *testing.T) {
 			status:  http.StatusServiceUnavailable,
 			errType: "api_error",
 			msg:     "No available accounts: no available accounts supporting model: gpt-5 (candidate_accounts=[1 2], excluded_account_count=2)",
-			want:    clientFacingGroupUnavailableMessage,
+			want:    clientFacingModelGroupUnavailableMessage,
 		},
 		{
 			name:    "openai selection failure without model detail",
@@ -40,7 +40,7 @@ func TestClientFacingErrorMessage_RedactsInternalDetails(t *testing.T) {
 			status:  http.StatusServiceUnavailable,
 			errType: "api_error",
 			msg:     "Requested model is not supported by upstream",
-			want:    clientFacingGroupUnavailableMessage,
+			want:    clientFacingModelGroupUnavailableMessage,
 		},
 		{
 			name:    "endpoint unsupported",

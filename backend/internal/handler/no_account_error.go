@@ -80,6 +80,12 @@ func classifyNoAccountError(
 	}
 
 	result := diag.DiagnoseModelAvailabilityForPlatform(ctx, apiKey.GroupID, routingModel, platform)
+	if result.HasAccountsInPool && result.HasModelSupport {
+		// The group has accounts configured for this model, but all currently
+		// usable candidates were exhausted/blocked. Keep 503 retry semantics while
+		// telling the user that the problem is model-scoped, not whole-group-wide.
+		fallback.Message = service.ClientFacingModelGroupUnavailableMessage()
+	}
 	if result.HasAccountsInPool && !result.HasModelSupport {
 		return noAccountErrorClassification{
 			Status:        http.StatusNotFound,

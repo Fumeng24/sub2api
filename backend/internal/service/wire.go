@@ -849,6 +849,8 @@ var ProviderSet = wire.NewSet(
 	ProvideBalanceNotifyService,
 	ProvideChannelMonitorService,
 	ProvideChannelMonitorRunner,
+	ProvideChannelMonitorV2Service,
+	ProvideChannelMonitorV2Aggregator,
 	NewChannelMonitorRequestTemplateService,
 	ProvideUserPlatformQuotaUsageFlusher,
 )
@@ -893,8 +895,26 @@ func ProvidePaymentOrderExpiryService(paymentSvc *PaymentService, lockCache Lead
 func ProvideChannelMonitorService(
 	repo ChannelMonitorRepository,
 	encryptor SecretEncryptor,
+	settingService *SettingService,
 ) *ChannelMonitorService {
-	return NewChannelMonitorService(repo, encryptor)
+	svc := NewChannelMonitorService(repo, encryptor)
+	svc.SetRuntimeReader(settingService)
+	return svc
+}
+
+// ProvideChannelMonitorV2Service wires the passive real-traffic monitor.
+func ProvideChannelMonitorV2Service(repo ChannelMonitorV2Repository, settingService *SettingService) *ChannelMonitorV2Service {
+	return NewChannelMonitorV2Service(repo)
+}
+
+// ProvideChannelMonitorV2Aggregator starts the bounded, leader-locked V2
+// aggregation worker. It remains gated by channel-monitor settings and the
+// persisted V2 config, so restoring the code does not automatically add load
+// until the feature is explicitly enabled.
+func ProvideChannelMonitorV2Aggregator(repo ChannelMonitorV2Repository, db *sql.DB, settingService *SettingService) *ChannelMonitorV2Aggregator {
+	aggregator := NewChannelMonitorV2Aggregator(repo, db, settingService)
+	aggregator.Start()
+	return aggregator
 }
 
 // ProvideChannelMonitorRunner 创建并启动渠道监控调度器。

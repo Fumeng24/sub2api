@@ -6832,6 +6832,31 @@
                 {{ t('admin.settings.features.channelMonitor.defaultIntervalHint') }}
               </p>
             </div>
+
+            <div v-if="form.channel_monitor_enabled">
+              <label class="input-label">
+                {{ t('admin.settings.features.channelMonitor.mode') }}
+              </label>
+              <select v-model="form.channel_monitor_mode" class="input">
+                <option value="v1">{{ t('admin.settings.features.channelMonitor.modeV1') }}</option>
+                <option value="v2">{{ t('admin.settings.features.channelMonitor.modeV2') }}</option>
+              </select>
+              <p class="mt-1 text-xs text-gray-400">
+                {{ t('admin.settings.features.channelMonitor.modeHint') }}
+              </p>
+            </div>
+
+            <div v-if="form.channel_monitor_enabled" class="flex items-center justify-between">
+              <div>
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.features.channelMonitor.hideThroughput') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.features.channelMonitor.hideThroughputHint') }}
+                </p>
+              </div>
+              <Toggle v-model="form.channel_monitor_hide_throughput" />
+            </div>
           </div>
         </div>
 
@@ -9192,6 +9217,8 @@ type SettingsForm = Omit<
   openai_advanced_scheduler_weight_upstream_cost: string;
   openai_advanced_scheduler_weight_previous_response: string;
   openai_advanced_scheduler_weight_session_sticky: string;
+  channel_monitor_mode: "v1" | "v2";
+  channel_monitor_hide_throughput: boolean;
   // 系统全局平台限额 map；form 内始终归一化为全 4 平台对象（模板非空绑定依赖此不变量）
   default_platform_quotas: DefaultPlatformQuotasMap;
 };
@@ -9459,6 +9486,8 @@ const form = reactive<SettingsForm>({
   // Channel Monitor feature switch
   channel_monitor_enabled: true,
   channel_monitor_default_interval_seconds: 60,
+  channel_monitor_mode: "v1",
+  channel_monitor_hide_throughput: false,
   // Available Channels feature switch
   available_channels_enabled: false,
   // Model Plaza feature switches + description
@@ -11094,6 +11123,8 @@ async function saveSettings() {
       channel_monitor_enabled: form.channel_monitor_enabled,
       channel_monitor_default_interval_seconds:
         Number(form.channel_monitor_default_interval_seconds) || 60,
+      channel_monitor_mode: form.channel_monitor_mode === "v2" ? "v2" : "v1",
+      channel_monitor_hide_throughput: Boolean(form.channel_monitor_hide_throughput),
       // Available Channels feature switch
       available_channels_enabled: form.available_channels_enabled,
       // Model Plaza feature switches + description

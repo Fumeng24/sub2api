@@ -7,6 +7,11 @@ import (
 
 const clientFacingTemporaryUnavailableMessage = "Service temporarily unavailable, please retry later"
 const clientFacingGroupUnavailableMessage = "Current group is unavailable, please switch groups"
+
+// This is distinct from clientFacingGroupUnavailableMessage: the group may be
+// healthy for other models, while the requested model has no currently usable
+// account. Keep it retryable (503) but make the scope actionable to users.
+const clientFacingModelGroupUnavailableMessage = "The requested model is temporarily unavailable in the current group. Please retry later or switch groups."
 const clientFacingModelUnsupportedMessage = "The requested model is not supported by the current group. Please choose a supported model or switch groups."
 
 func ClientFacingTemporaryUnavailableMessage() string {
@@ -15,6 +20,10 @@ func ClientFacingTemporaryUnavailableMessage() string {
 
 func ClientFacingGroupUnavailableMessage() string {
 	return clientFacingGroupUnavailableMessage
+}
+
+func ClientFacingModelGroupUnavailableMessage() string {
+	return clientFacingModelGroupUnavailableMessage
 }
 
 func ClientFacingModelUnsupportedMessage() string {
@@ -68,9 +77,9 @@ func clientErrorSpecificReplacement(message string) (string, bool) {
 	case strings.HasPrefix(lower, "no available gemini accounts"):
 		return clientFacingGroupUnavailableMessage, true
 	case strings.Contains(lower, "no available") && (strings.Contains(lower, "requested model") || strings.Contains(lower, "supporting model")):
-		return clientFacingGroupUnavailableMessage, true
+		return clientFacingModelGroupUnavailableMessage, true
 	case strings.Contains(lower, "requested model is not supported by upstream"):
-		return clientFacingGroupUnavailableMessage, true
+		return clientFacingModelGroupUnavailableMessage, true
 	default:
 		return "", false
 	}

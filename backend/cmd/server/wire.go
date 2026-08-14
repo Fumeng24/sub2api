@@ -26,9 +26,10 @@ import (
 )
 
 type Application struct {
-	Server      *http.Server
-	PromptAudit *securityaudit.PromptService
-	Cleanup     func()
+	Server                     *http.Server
+	PromptAudit                *securityaudit.PromptService
+	ChannelMonitorV2Aggregator *service.ChannelMonitorV2Aggregator
+	Cleanup                    func()
 }
 
 func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
@@ -61,7 +62,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		provideCustomCleanup,
 
 		// Application struct
-		wire.Struct(new(Application), "Server", "PromptAudit", "Cleanup"),
+		wire.Struct(new(Application), "Server", "PromptAudit", "ChannelMonitorV2Aggregator", "Cleanup"),
 	)
 	return nil, nil
 }
@@ -115,6 +116,7 @@ func provideCleanup(
 	backupSvc *service.BackupService,
 	paymentOrderExpiry *service.PaymentOrderExpiryService,
 	channelMonitorRunner *service.ChannelMonitorRunner,
+	channelMonitorV2Aggregator *service.ChannelMonitorV2Aggregator,
 	quotaFlusher *service.UserPlatformQuotaUsageFlusher,
 	upstreamBillingProbe *service.UpstreamBillingProbeService,
 	upstreamHandler *adminhandler.UpstreamHandler,
@@ -133,6 +135,12 @@ func provideCleanup(
 
 		// 应用层清理步骤可并行执行，基础设施资源（Redis/Ent）最后按顺序关闭。
 		parallelSteps := []cleanupStep{
+			{"ChannelMonitorV2Aggregator", func() error {
+				if channelMonitorV2Aggregator != nil {
+					channelMonitorV2Aggregator.Stop()
+				}
+				return nil
+			}},
 			{"OpsIngressRejectAggregator", func() error {
 				if opsIngressReject != nil {
 					opsIngressReject.Stop()

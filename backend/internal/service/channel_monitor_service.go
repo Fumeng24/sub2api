@@ -62,11 +62,19 @@ type ChannelMonitorRepository interface {
 	UpdateAggregationWatermark(ctx context.Context, date time.Time) error
 }
 
+// channelMonitorRuntimeReader is the optional settings view used by the V1
+// runner and V2 passive aggregator. Keeping it small avoids coupling the
+// monitor service to the settings repository implementation.
+type channelMonitorRuntimeReader interface {
+	GetChannelMonitorRuntime(ctx context.Context) ChannelMonitorRuntime
+}
+
 // ChannelMonitorService 渠道监控管理服务。
 type ChannelMonitorService struct {
 	repo      ChannelMonitorRepository
 	encryptor SecretEncryptor
 	channelMonitorServiceCustomFields
+	settings channelMonitorRuntimeReader
 	// scheduler 由 wire 通过 SetScheduler 注入；CRUD 后调用对应钩子即时同步任务。
 	// 测试或未注入场景下保持 nil，所有钩子调用变为 no-op。
 	scheduler MonitorScheduler
@@ -83,6 +91,20 @@ const ChannelMonitorDuplicateOperationIDMetadataKey = "sub2api:duplicate_operati
 // NewChannelMonitorService 创建渠道监控服务实例。
 func NewChannelMonitorService(repo ChannelMonitorRepository, encryptor SecretEncryptor) *ChannelMonitorService {
 	return &ChannelMonitorService{repo: repo, encryptor: encryptor}
+}
+
+// SetRuntimeReader injects the settings view used by the monitor runners.
+func (s *ChannelMonitorService) SetRuntimeReader(r channelMonitorRuntimeReader) {
+	if s != nil {
+		s.settings = r
+	}
+}
+
+func (s *ChannelMonitorService) probeRuntime(ctx context.Context) ChannelMonitorRuntime {
+	if s == nil || s.settings == nil {
+		return ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV1}
+	}
+	return s.settings.GetChannelMonitorRuntime(ctx)
 }
 
 // ---------- CRUD ----------
@@ -439,6 +461,13 @@ func (s *ChannelMonitorService) ListHistory(ctx context.Context, id int64, model
 // RunCheck 同步触发对一个监控的检测：并发跑 primary + extra 模型，
 // 写历史记录并更新 last_checked_at。返回每个模型的检测结果。
 func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*CheckResult, error) {
+	runtime := s.probeRuntime(ctx)
+	if !runtime.Enabled {
+		return nil, ErrChannelMonitorDisabled
+	}
+	if !runtime.ActiveProbesAllowed() {
+		return nil, ErrChannelMonitorActiveProbesRetired
+	}
 	m, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err

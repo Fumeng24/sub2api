@@ -393,6 +393,16 @@ const (
 	// When false: runner skips scheduling and user-facing endpoints return an empty list.
 	SettingKeyChannelMonitorEnabled = "channel_monitor_enabled"
 
+	// SettingKeyChannelMonitorMode selects the channel-monitor implementation.
+	// V1 is the active probe view; V2 is the passive real-traffic aggregation view.
+	SettingKeyChannelMonitorMode = "channel_monitor_mode"
+	ChannelMonitorModeV1         = "v1"
+	ChannelMonitorModeV2         = "v2"
+
+	// SettingKeyChannelMonitorHideThroughput controls whether non-admin V2 views
+	// expose absolute RPM/TPM values.
+	SettingKeyChannelMonitorHideThroughput = "channel_monitor_hide_throughput"
+
 	// SettingKeyChannelMonitorDefaultIntervalSeconds controls the default interval (seconds)
 	// pre-filled when creating a new channel monitor from the admin UI. Range: [15, 3600].
 	SettingKeyChannelMonitorDefaultIntervalSeconds = "channel_monitor_default_interval_seconds"

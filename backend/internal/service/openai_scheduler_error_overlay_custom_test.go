@@ -33,9 +33,9 @@ func TestOpenAISelectAccountWithLoadAwareness_LegacyAliasDoesNotMatchDifferentMo
 	require.Nil(t, selection)
 }
 
-func TestOpenAIErrorResponseForClass_ModelUnsupportedReturnsGroupUnavailable(t *testing.T) {
+func TestOpenAIErrorResponseForClass_ModelUnsupportedReturnsModelGroupUnavailable(t *testing.T) {
 	status, errType, msg := openAIErrorResponseForClass(http.StatusNotFound, openAIUpstreamErrorModelUnsupported, "model not found", false)
 	require.Equal(t, http.StatusServiceUnavailable, status)
 	require.Equal(t, "api_error", errType)
-	require.Equal(t, clientFacingGroupUnavailableMessage, msg)
+	require.Equal(t, clientFacingModelGroupUnavailableMessage, msg)
 }

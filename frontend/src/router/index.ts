@@ -13,6 +13,11 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import {
+  FeatureFlags,
+  getChannelMonitorMode,
+  isFeatureFlagEnabled,
+} from '@/utils/featureFlags'
 
 /**
  * Route definitions with lazy loading
@@ -618,6 +623,19 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/channel-monitor-v2',
+    name: 'AdminChannelMonitorV2',
+    component: () => import('@/views/user/ChannelStatusV2View.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Channel Monitor V2',
+      titleKey: 'channelMonitorV2.title',
+      featureFlag: 'channelMonitor',
+      channelMonitorMode: 'v2'
+    }
+  },
+  {
     path: '/monitor',
     name: 'ChannelStatus',
     component: () => import('@/views/user/ChannelStatusView.vue'),
@@ -626,6 +644,19 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Channel Status',
       titleKey: 'nav.channelStatus'
+    }
+  },
+  {
+    path: '/monitor-v2',
+    name: 'ChannelStatusV2',
+    component: () => import('@/views/user/ChannelStatusV2View.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Channel Status V2',
+      titleKey: 'channelMonitorV2.title',
+      featureFlag: 'channelMonitor',
+      channelMonitorMode: 'v2'
     }
   },
   {
@@ -1050,6 +1081,27 @@ router.beforeEach(async (to, _from, next) => {
     // User is authenticated but not admin, redirect to user dashboard
     next(authStore.isSupport ? '/admin/tickets' : '/dashboard')
     return
+  }
+
+  if (to.meta.featureFlag) {
+    if (!appStore.cachedPublicSettings) {
+      await appStore.fetchPublicSettings().catch(() => null)
+    }
+    const flag = FeatureFlags[to.meta.featureFlag as keyof typeof FeatureFlags]
+    if (flag && !isFeatureFlagEnabled(flag)) {
+      next(authStore.isAdmin ? '/admin/settings' : '/dashboard')
+      return
+    }
+  }
+
+  if (to.meta.channelMonitorMode === 'v2') {
+    if (!appStore.cachedPublicSettings) {
+      await appStore.fetchPublicSettings().catch(() => null)
+    }
+    if (getChannelMonitorMode() !== 'v2') {
+      next(authStore.isAdmin ? '/admin/settings' : '/monitor')
+      return
+    }
   }
 
   if (requiresSupport && !authStore.canAccessTicketAdmin) {
