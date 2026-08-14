@@ -199,11 +199,11 @@ security:
 # =============================================================================
 gateway:
   # Timeout for waiting upstream response headers (seconds)
-  # 等待上游响应头超时时间（秒）
-  response_header_timeout: 600
+  # 等待上游响应头超时时间（秒）；默认 60 秒，为常见 CDN 的 100 秒首包上限预留切号时间。
+  response_header_timeout: 60
   # OpenAI/Codex upstream response header timeout (seconds, 0=disabled)
-  # OpenAI/Codex 等待上游响应头超时时间（秒，0=禁用本地响应头超时）
-  openai_response_header_timeout: 0
+  # OpenAI/Codex 等待上游响应头超时时间（秒）；默认 45 秒，兼顾慢账号可用性与故障切换。
+  openai_response_header_timeout: 45
   # Native OpenAI HTTP Responses first semantic output timeout (seconds, 0=disabled)
   # Includes response-header wait; does not apply to passthrough or WebSocket transports.
   # A timed-out request may already have incurred upstream usage; account failover can therefore duplicate upstream billing.
@@ -213,6 +213,11 @@ gateway:
   openai_first_output_timeout_seconds: 0
   # Optional high/xhigh/max override (seconds, 0=use the standard timeout)
   openai_high_effort_first_output_timeout_seconds: 0
+  # Remote compaction semantic output timeout (seconds). This starts after
+  # upstream response handoff and does not include large request upload time.
+  openai_compact_first_output_timeout_seconds: 120
+  # Optional high/xhigh/max remote compaction override.
+  openai_compact_high_effort_first_output_timeout_seconds: 180
   # Max request body size in bytes (default: 256MB)
   # 请求体最大字节数（默认 256MB）
   max_body_size: 268435456
@@ -412,18 +417,41 @@ gateway:
       # use-it-or-lose-it：倾向「会话窗口最早重置」的账号，剩余重置时间越短得分越高。
       # 0 表示关闭（默认，不改变原有行为）；调大可让即将重置的账号被优先用尽。
       reset: 0.0
-      # 倾向 7d 剩余额度更健康的账号；0 表示关闭（默认，不改变原有行为），小流量灰度可设为 0.3。
+      # 倾向 7d/5h 剩余额度更健康的账号；0 表示关闭（默认，不改变原有行为），小流量灰度可设为 0.3。
       quota_headroom: 0.0
       # 倾向上游声明倍率更低的账号；0 表示关闭（默认），建议启用时从 1.5 开始。
       upstream_cost: 0.0
   # OpenAI 高级调度器补充配置
   openai_scheduler:
-    # 是否允许 session_hash sticky 在账号健康度恶化时临时逃逸；false 可一键回退旧行为
+    # 是否允许 session_hash sticky 在账号进入慢保留或并发槽位已满时逃逸；false 可一键回退
     sticky_escape_enabled: true
-    # TTFT EWMA 超过该阈值（毫秒）时跳过 sticky，默认 15s，避免轻微抖动就逃逸
-    sticky_escape_ttft_ms: 15000
-    # 错误率 EWMA 超过该阈值时跳过 sticky，默认 0.5，仅在明显降级时触发
+    # 慢保留记录超过该实测 TTFT（毫秒）时才拆除已有粘性，避免轻微抖动导致频繁换号
+    sticky_escape_ttft_ms: 25000
+    # 兼容旧配置保留
     sticky_escape_error_rate: 0.5
+    # Slow-but-usable accounts remain schedulable, but are only selected after
+    # normal candidates for the same mapped upstream model are exhausted.
+    slow_reserve:
+      enabled: true
+      # A successful streamed request above this first-token threshold becomes a
+      # pending slow sample; the second sample in the TTL enters reserve.
+      ttft_ms: 15000
+      # Pending/reserve state automatically expires after this duration.
+      ttl_seconds: 180
+      # Bound the in-memory account + upstream-model state map.
+      max_entries: 4096
+    runtime_cooldowns:
+      oauth_429_fallback_cooldown_seconds: 5
+      request_error_cooldown_seconds: 30
+      transient_cooldown_persist_min_interval_seconds: 15
+      stop_scheduling_bridge_cooldown_seconds: 120
+      account_circuit_half_open_probe_ttl_seconds: 30
+      # OpenAI/Gateway 账号熔断恢复探针单次超时
+      probe_timeout_seconds: 30
+      # 探针失败后的重试间隔（cadence）
+      probe_retry_delay_seconds: 5
+      # 10000 表示默认不对探针增加额外进程内并发门控；调低后按进程限流
+      probe_max_concurrency: 10000
   # OpenAI HTTP upstream protocol strategy.
   # OpenAI HTTP 上游协议策略（默认 HTTP/2；代理明确不兼容时可临时回退 HTTP/1.1）。
   openai_http2:
@@ -440,21 +468,6 @@ gateway:
     failure_threshold: 2
     window_seconds: 60
     ttl_seconds: 600
-  # Grok free-tier local soft gate (scheduler filter only; admin QueryQuota/import probe bypasses it).
-  # Enabled by default because free detection requires an explicit subscription_tier/plan_type of "free".
-  # Stats/query failures fail open so DB issues do not block all Grok traffic.
-  grok:
-    # Email/password OAuth is off by default and hidden in the admin UI.
-    # Setting true enables POST /admin/grok/oauth/password (password → SSO → Build OAuth).
-    # Prefer SSO cookie, browser OAuth, or refresh_token re-auth in production.
-    password_auth_enabled: false
-    free_quota_soft_gate_enabled: true
-    free_quota_token_limit: 500000
-    free_quota_soft_gate_percent: 95
-    free_quota_window_hours: 24
-    # Stats cache for free-tier soft gate. Hot path never waits on DB: misses
-    # fail open and refresh in the background. Prefer >= 60s in production.
-    free_quota_stats_cache_seconds: 60
   # HTTP upstream connection pool settings (HTTP/2 + multi-proxy scenario defaults)
   # HTTP 上游连接池配置（HTTP/2 + 多代理场景默认值）
   # Max idle connections across all hosts
@@ -525,9 +538,9 @@ gateway:
   # Auto inject anthropic-beta header for API-key accounts when needed (default: off)
   # 需要时自动为 API-key 账户注入 anthropic-beta 头（默认：关闭）
   inject_beta_for_apikey: false
-  # Allow failover on selected 400 errors (default: off)
-  # 允许在特定 400 错误时进行故障转移（默认：关闭）
-  failover_on_400: false
+  # Allow failover on selected upstream compatibility 400 errors (default: on)
+  # 允许在特定上游兼容层 400 错误时进行故障转移（默认：开启）
+  failover_on_400: true
   # Scheduling configuration
   # 调度配置
   scheduling:
@@ -543,6 +556,9 @@ gateway:
     # Fallback max waiting queue size
     # 兜底最大排队长度
     fallback_max_waiting: 100
+    # Whether generic Gateway may relax soft filters as weak fallback.
+    # 通用 Gateway 是否允许放宽软过滤弱兜底；默认关闭，避免借用冷却/不健康账号。
+    weak_fallback_enabled: false
     # Prefer the account whose session window resets soonest (use-it-or-lose-it).
     # 负载感知选择时优先用尽「会话窗口最早重置」的账号；false 保持
     # 原有「优先级 → 负载率 → LRU」行为（默认）。
@@ -574,6 +590,23 @@ gateway:
     outbox_backlog_rebuild_rows: 10000
     # 全量重建周期（秒），0 表示禁用
     full_rebuild_interval_seconds: 300
+    # Candidate account slot pool (Layer 2 optimization)
+    # 候选账号索引池配置（Layer 2 调度优化）
+    # Reduces Redis command count from O(N) to O(1) per request
+    # 将每请求 Redis 命令数从 O(N) 降到 O(1)
+    slot_pool:
+      # Enable slot pool (disabled by default)
+      # 启用池（默认禁用）
+      enabled: false
+      # Pool rebuild interval (duration), 0 to disable periodic rebuild
+      # 池周期性重建间隔（时间段），0 表示禁用周期性重建
+      rebuild_interval: 5m
+      # Max retries when acquiring from pool
+      # 从池获取账号的最大重试次数
+      max_retries: 10
+      # Fallback to load-batch on pool error
+      # 池错误时是否降级到 load-batch
+      fallback_on_error: true
   # TLS fingerprint simulation / TLS 指纹伪装
   # Default profile "claude_cli_v2" simulates Node.js 20.x
   # 默认模板 "claude_cli_v2" 模拟 Node.js 20.x 指纹

@@ -34,8 +34,8 @@
 ### 开发工具
 
 ```bash
-# golangci-lint（CI 用 v2.9，本地建议装同一版以免版本差异带来的噪音）
-go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9
+# golangci-lint v2.7
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7
 
 # pnpm (前端包管理)
 npm install -g pnpm
@@ -47,13 +47,13 @@ npm install -g pnpm
 
 | Workflow | 触发条件 | 检查内容 |
 |----------|----------|----------|
-| **backend-ci.yml** | push, pull_request | 单元测试 + 集成测试 + golangci-lint v2.9 |
+| **backend-ci.yml** | push, pull_request | 单元测试 + 集成测试 + golangci-lint v2.7 |
 | **security-scan.yml** | push, pull_request, 每周一 | govulncheck + gosec + pnpm audit |
 | **release.yml** | tag `v*` | 构建发布（PR 不触发） |
 
 ### CI 要求
 
-- Go 版本必须是 **1.26.5**：三个 workflow 都用 `go-version-file: backend/go.mod` 取版本，随后硬断言 `go version | grep -q 'go1.26.5'`。升级 Go 时要同时改 `backend/go.mod` 和 `backend-ci.yml`（两处）、`release.yml`、`security-scan.yml` 里的这句断言，否则 CI 会在版本校验步骤直接失败。
+- Go 版本必须是 **1.25.7**
 - 前端使用 `pnpm install --frozen-lockfile`，必须提交 `pnpm-lock.yaml`
 
 ### 本地测试命令
@@ -264,19 +264,26 @@ psql -U sub2api -h 127.0.0.1 -d sub2api -f migration.sql
 ### Git 操作
 
 ```bash
-# 同步上游
-git fetch upstream
-git checkout main
-git merge upstream/main
-git push origin main
+# 查看官方与本站的真实差异。默认只读
+python3 tools/upstream_delta.py --local HEAD --upstream upstream/main --fetch
 
-# 创建功能分支
-git checkout -b feature/xxx
+# 从最新官方创建独立 worktree，并开始真实双父 merge
+make upstream-sync-prepare
 
-# Rebase 到最新 main
-git fetch upstream
-git rebase upstream/main
+# 当前分支已同步时执行硬性门禁
+make upstream-check
+
+# 仅在逐文件审查官方差异后，刷新官方文件覆盖清单
+make upstream-owned-policy-refresh
+
+# 仅在逐个对比官方源与 custom 派生副本后刷新
+make upstream-overlay-policy-refresh
 ```
+
+官方同步禁止使用 cherry-pick、复制代码或 equivalence 登记代替 merge。同步分支
+必须以最新 `upstream/main` 为第一父，再把同步前本站 `HEAD` 作为第二父；全量验证
+通过后，生产主工作树只能 `git merge --ff-only` 推进。本站定制优先放独立文件，
+官方热点文件只留最小接入点。完整流程见 `docs/UPSTREAM_MERGE_PLAN_CN.md`。
 
 ### 前端操作
 

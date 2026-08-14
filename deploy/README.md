@@ -24,6 +24,7 @@ This directory contains files for deploying Sub2API on Linux servers and Apple-s
 | `install.sh` | One-click binary installation script |
 | `install-datamanagementd.sh` | datamanagementd 一键安装脚本 |
 | `sub2api.service` | Systemd service unit file |
+| `sub2api.env.example` | Bare-metal runtime tuning environment template |
 | `sub2api-datamanagementd.service` | datamanagementd systemd service unit file |
 | `DATAMANAGEMENTD_CN.md` | datamanagementd 部署与联动说明（中文） |
 | `config.example.yaml` | Example configuration file |
@@ -453,24 +454,64 @@ To change after installation:
    sudo systemctl restart sub2api
    ```
 
+#### Bare-Metal Runtime Tuning
+
+Binary/systemd installs read optional runtime tuning from `/etc/sub2api/sub2api.env`:
+
+```ini
+EnvironmentFile=-/etc/sub2api/sub2api.env
+```
+
+The one-line installer creates this file automatically without overwriting an existing file. For manual installs:
+
+```bash
+sudo mkdir -p /etc/sub2api /opt/sub2api/data/logs
+sudo cp deploy/sub2api.env.example /etc/sub2api/sub2api.env
+sudo chown -R sub2api:sub2api /etc/sub2api /opt/sub2api/data
+sudo chmod 600 /etc/sub2api/sub2api.env
+```
+
+Important defaults for gateway failover and high concurrency:
+
+```env
+DATA_DIR=/etc/sub2api
+LOG_OUTPUT_FILE_PATH=/opt/sub2api/data/logs/sub2api.log
+GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=45
+GATEWAY_OPENAI_COMPACT_FIRST_OUTPUT_TIMEOUT_SECONDS=120
+GATEWAY_OPENAI_COMPACT_HIGH_EFFORT_FIRST_OUTPUT_TIMEOUT_SECONDS=180
+GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_RETRY_DELAY_SECONDS=5
+GATEWAY_SCHEDULING_WEAK_FALLBACK_ENABLED=false
+GATEWAY_MAX_CONNS_PER_HOST=2048
+GATEWAY_MAX_IDLE_CONNS=8192
+GATEWAY_MAX_IDLE_CONNS_PER_HOST=4096
+SERVER_MAX_REQUEST_BODY_SIZE=268435456
+```
+
+After editing `/etc/sub2api/sub2api.env`, reload and restart:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart sub2api
+```
+
 #### Gemini OAuth Configuration
 
-If you need to use AI Studio OAuth for Gemini accounts, add the OAuth client credentials to the systemd service file:
+If you need to use AI Studio OAuth for Gemini accounts, add the OAuth client credentials to the systemd environment:
 
-1. Edit the service file:
+1. Edit the runtime environment file:
    ```bash
-   sudo nano /etc/systemd/system/sub2api.service
+   sudo nano /etc/sub2api/sub2api.env
    ```
 
-2. Add your OAuth credentials in the `[Service]` section (after the existing `Environment=` lines):
-   ```ini
-   Environment=GEMINI_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
-   Environment=GEMINI_OAUTH_CLIENT_SECRET=GOCSPX-your-client-secret
+2. Add your OAuth credentials:
+   ```env
+   GEMINI_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GEMINI_OAUTH_CLIENT_SECRET=GOCSPX-your-client-secret
    ```
 
    如需使用“内置 Gemini CLI OAuth Client”（Code Assist / Google One），还需要注入：
-   ```ini
-   Environment=GEMINI_CLI_OAUTH_CLIENT_SECRET=GOCSPX-your-built-in-secret
+   ```env
+   GEMINI_CLI_OAUTH_CLIENT_SECRET=GOCSPX-your-built-in-secret
    ```
 
 3. Reload and restart:
@@ -484,7 +525,7 @@ If you need to use AI Studio OAuth for Gemini accounts, add the OAuth client cre
 
 #### Application Configuration
 
-The main config file is at `/etc/sub2api/config.yaml` (created by Setup Wizard).
+The main config file is at `/etc/sub2api/config.yaml` (created by Setup Wizard). Binary installs set `DATA_DIR=/etc/sub2api` so the setup wizard, config loader, and install lock use the same system config directory.
 
 ### Prerequisites
 
@@ -502,7 +543,8 @@ The main config file is at `/etc/sub2api/config.yaml` (created by Setup Wizard).
 └── data/                # Runtime data
 
 /etc/sub2api/
-└── config.yaml          # Configuration file
+├── config.yaml          # Configuration file
+└── sub2api.env          # Runtime tuning environment
 ```
 
 ---
@@ -564,6 +606,10 @@ sudo journalctl -u sub2api -n 50
 # Check config file
 sudo cat /etc/sub2api/config.yaml
 
+# Check runtime tuning
+sudo systemctl show sub2api --property=Environment
+sudo cat /etc/sub2api/sub2api.env
+
 # Check PostgreSQL
 sudo systemctl status postgresql
 
@@ -576,7 +622,8 @@ sudo systemctl status redis
 1. **Port already in use**: Change `SERVER_PORT` in `.env` or systemd config
 2. **Database connection failed**: Check PostgreSQL is running and credentials are correct
 3. **Redis connection failed**: Check Redis is running and password is correct
-4. **Permission denied**: Ensure proper file ownership for binary install
+4. **Permission denied**: Ensure `/etc/sub2api` and `/opt/sub2api/data` are owned by `sub2api`
+5. **Runtime tuning not applied**: Check `systemctl show sub2api --property=Environment` after `daemon-reload` and restart
 
 ---
 

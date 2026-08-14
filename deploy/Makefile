@@ -1,4 +1,4 @@
-.PHONY: wire build build-embed test-unit test-integration test-e2e test-cover-integration
+.PHONY: wire build test-unit test-integration test-e2e test-cover-integration
 
 VERSION ?= $(shell ./scripts/resolve-version.sh)
 LDFLAGS ?= -s -w -X main.Version=$(VERSION)
@@ -9,13 +9,9 @@ wire:
 	@echo "Wire 代码生成完成"
 
 build:
-	@echo "构建后端（不嵌入前端）..."
-	@go build -ldflags="$(LDFLAGS)" -o bin/server ./cmd/server
-	@echo "构建完成: bin/server"
-
-build-embed:
 	@echo "构建后端（嵌入前端）..."
 	@go build -tags embed -ldflags="$(LDFLAGS)" -o bin/server ./cmd/server
+	@go version -m bin/server | grep -q -- '-tags=embed'
 	@echo "构建完成: bin/server (with embedded frontend)"
 
 test-unit:

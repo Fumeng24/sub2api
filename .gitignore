@@ -38,6 +38,8 @@ frontend/dist/
 *.tsbuildinfo
 vite.config.d.ts
 vite.config.js.timestamp-*
+frontend/src/custom/vite/*.d.ts
+frontend/src/custom/vite/*.js
 
 # 日志
 npm-debug.log*
@@ -83,6 +85,7 @@ temp/
 *.temp
 *.log
 *.bak
+backups/
 .cache/
 .dev/
 .serena/
@@ -135,7 +138,11 @@ docs/*
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
+!docs/OPENAI_FAILOVER_POLICY_CN.md
+!docs/upstream_equivalence.json
 !docs/ASYNC_IMAGE_TASKS.md
+!docs/USER_OUTREACH_TEMPLATE_PLAN_CN.md
+!docs/OPENAI_PRO_PLUS_SCHEDULING_POLICY_CN.md
 !docs/legal/
 !docs/legal/*.md
 .serena/
@@ -143,6 +150,3 @@ docs/*
 frontend/coverage/
 aicodex
 output/
-
-# Vitest / Vite cache at repo root
-.vite/

@@ -1,0 +1,164 @@
+.PHONY: build-datamanagementd test-datamanagementd upstream-delta upstream-check upstream-verify-frontend upstream-sync-prepare upstream-owned-policy-refresh upstream-overlay-policy-refresh
+
+FRONTEND_CRITICAL_VITEST := \
+	src/views/auth/__tests__/EmailVerifyView.spec.ts \
+	src/views/auth/__tests__/WechatPaymentCallbackView.spec.ts \
+	src/custom/auth/__tests__/WegooEmailVerifyView.spec.ts \
+	src/custom/auth/__tests__/WegooWechatPaymentCallbackView.spec.ts \
+	src/views/auth/__tests__/LinuxDoCallbackView.spec.ts \
+	src/views/auth/__tests__/WechatCallbackView.spec.ts \
+	src/views/auth/__tests__/OidcCallbackView.spec.ts \
+	src/views/auth/__tests__/OAuthCallbackView.spec.ts \
+	src/custom/auth/__tests__/WegooLinuxDoCallbackView.spec.ts \
+	src/custom/auth/__tests__/WegooWechatCallbackView.spec.ts \
+	src/custom/auth/__tests__/WegooOidcCallbackView.spec.ts \
+	src/custom/auth/__tests__/WegooOAuthCallbackView.spec.ts \
+	src/custom/user/__tests__/WegooPaymentView.spec.ts \
+	src/custom/payment/__tests__/WegooPaymentMethodSelector.spec.ts \
+	src/custom/user/__tests__/WegooUsageView.spec.ts \
+	src/custom/user/__tests__/DashboardNextSteps.spec.ts \
+	src/custom/user/__tests__/TicketUsageContext.spec.ts \
+	src/components/user/__tests__/UserErrorRequestsTable.spec.ts \
+	src/views/user/__tests__/PaymentResultView.spec.ts \
+	src/views/user/__tests__/ChannelStatusView.spec.ts \
+	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \
+	src/views/admin/__tests__/SettingsView.spec.ts \
+	src/custom/admin/__tests__/WegooSettingsView.spec.ts \
+	src/custom/admin/__tests__/WegooGroupsView.spec.ts \
+	src/views/admin/__tests__/groupsModelsList.spec.ts \
+	src/custom/admin/groups/__tests__/WegooGroupsModelsList.spec.ts \
+	src/views/admin/__tests__/AccountsView.bulkEdit.spec.ts \
+	src/views/admin/__tests__/AccountsView.schedulerScore.spec.ts \
+	src/views/admin/__tests__/AccountsView.sparkShadow.spec.ts \
+	src/views/admin/__tests__/AccountsView.usageWindowsHint.spec.ts \
+	src/custom/admin/__tests__/WegooAccountsView.bulkEdit.spec.ts \
+	src/custom/admin/__tests__/WegooAccountsView.schedulerScore.spec.ts \
+	src/custom/admin/__tests__/WegooAccountsView.sparkShadow.spec.ts \
+	src/custom/admin/__tests__/WegooAccountsView.usageWindowsHint.spec.ts \
+	src/views/admin/__tests__/UsersView.spec.ts \
+	src/custom/admin/__tests__/WegooUsersView.spec.ts \
+	src/custom/admin/user/__tests__/WegooUserAllowedGroupsModal.spec.ts \
+	src/custom/admin/__tests__/WegooRiskControlView.spec.ts \
+	src/views/admin/__tests__/UsageView.spec.ts \
+	src/custom/admin/__tests__/WegooUsageView.spec.ts \
+	src/views/admin/orders/__tests__/PlanEditDialog.spec.ts \
+	src/custom/admin/orders/__tests__/WegooPlanEditDialog.spec.ts \
+	src/components/charts/__tests__/GroupDistributionChart.spec.ts \
+	src/components/charts/__tests__/ModelDistributionChart.spec.ts \
+	src/custom/charts/__tests__/WegooGroupDistributionChart.spec.ts \
+	src/custom/charts/__tests__/WegooModelDistributionChart.spec.ts \
+	src/components/account/__tests__/BulkEditAccountModal.spec.ts \
+	src/custom/admin/account/__tests__/WegooBulkEditAccountModal.spec.ts \
+	src/components/admin/account/__tests__/AccountActionMenu.spark_shadow.spec.ts \
+	src/custom/admin/account/__tests__/WegooAccountActionMenu.spark_shadow.spec.ts \
+	src/components/account/__tests__/AccountStatusIndicator.spec.ts \
+	src/components/account/__tests__/AccountUsageCell.spec.ts \
+	src/components/account/__tests__/UsageProgressBar.spec.ts \
+	src/custom/admin/account/__tests__/WegooAccountStatusIndicator.spec.ts \
+	src/custom/admin/account/__tests__/WegooAccountUsageCell.spec.ts \
+	src/custom/admin/account/__tests__/WegooUsageProgressBar.spec.ts \
+	src/components/auth/__tests__/PendingOAuthCreateAccountForm.spec.ts \
+	src/components/auth/__tests__/WechatOAuthSection.spec.ts \
+	src/components/admin/account/__tests__/AccountTestModal.spec.ts \
+	src/custom/admin/account/__tests__/WegooAccountTestModal.spec.ts \
+	src/components/account/__tests__/EditAccountModal.spec.ts \
+	src/custom/admin/account/__tests__/WegooEditAccountModal.spec.ts \
+	src/components/admin/usage/__tests__/UsageFilters.spec.ts \
+	src/custom/admin/usage/__tests__/WegooUsageFilters.spec.ts \
+	src/components/admin/usage/__tests__/UsageTable.spec.ts \
+	src/custom/admin/usage/__tests__/WegooUsageTable.spec.ts \
+	src/components/keys/__tests__/EndpointPopover.spec.ts \
+	src/custom/keys/__tests__/WegooEndpointPopover.spec.ts \
+	src/custom/api/__tests__/apiExtensions.spec.ts \
+	src/custom/api/admin/__tests__/accountsExtensions.spec.ts \
+	src/custom/api/admin/__tests__/adminExtensions.spec.ts \
+	src/custom/auth/__tests__/WegooPendingOAuthCreateAccountForm.spec.ts \
+	src/custom/auth/__tests__/WegooWechatOAuthSection.spec.ts \
+	src/components/payment/__tests__/SubscriptionPlanCard.spec.ts \
+	src/custom/payment/__tests__/WegooSubscriptionPlanCard.spec.ts \
+	src/components/admin/payment/__tests__/orderCurrencyDisplay.spec.ts \
+	src/custom/admin/payment/__tests__/WegooOrderCurrencyDisplay.spec.ts \
+	src/components/payment/__tests__/paymentFlow.spec.ts \
+	src/custom/payment/__tests__/WegooPaymentFlow.spec.ts \
+	src/components/payment/__tests__/providerConfig.spec.ts \
+	src/custom/payment/__tests__/WegooProviderConfig.spec.ts \
+	src/components/payment/__tests__/PaymentStatusPanel.spec.ts \
+	src/custom/payment/__tests__/WegooPaymentStatusPanel.spec.ts \
+	src/views/admin/__tests__/DashboardView.spec.ts \
+	src/custom/admin/__tests__/WegooDashboardView.spec.ts \
+	src/views/admin/__tests__/RedeemView.batchUpdate.spec.ts \
+	src/custom/admin/__tests__/WegooRedeemView.batchUpdate.spec.ts \
+	src/custom/__tests__/loginAgreementDefaults.spec.ts \
+	src/custom/__tests__/adminPresentation.spec.ts \
+	src/custom/__tests__/channelStatus.spec.ts \
+	src/custom/__tests__/monitorPresentation.spec.ts \
+	src/custom/__tests__/onboardingPolicy.spec.ts \
+	src/custom/__tests__/routeOverlayCoverage.spec.ts \
+	src/custom/admin/ops/__tests__/WegooOpsErrorScopeCharts.spec.ts \
+	src/custom/admin/account/__tests__/WegooImportDataModal.spec.ts \
+	src/custom/admin/models/__tests__/WegooModelWhitelist.spec.ts \
+	src/custom/admin/monitor/__tests__/WegooMonitorKeyPickerDialog.spec.ts \
+	src/custom/admin/__tests__/WegooSubscriptionsView.spec.ts \
+	src/custom/admin/usage/__tests__/WegooUsageStatsCards.spec.ts \
+	src/custom/auth/__tests__/WegooTotpLoginModal.spec.ts \
+	src/custom/common/__tests__/WegooDataTable.spec.ts \
+	src/custom/common/__tests__/WegooDateRangePicker.spec.ts \
+	src/custom/common/__tests__/WegooGroupSelector.spec.ts \
+	src/custom/common/__tests__/WegooHelpTooltip.spec.ts \
+	src/custom/composables/__tests__/usePersistedPageSize.spec.ts \
+	src/custom/composables/__tests__/useChannelMonitorFormat.spec.ts \
+	src/custom/utils/__tests__/billingMode.spec.ts \
+	src/custom/utils/__tests__/embedded-url.spec.ts \
+	src/custom/utils/__tests__/formatters.spec.ts \
+	src/i18n/__tests__/localeOverlay.spec.ts \
+	src/views/admin/__tests__/adminGatewayCoverage.spec.ts \
+	src/views/public/__tests__/publicGatewayCoverage.spec.ts \
+	src/views/public/__tests__/StatusView.spec.ts \
+	src/custom/layout/__tests__/WegooAppHeader.spec.ts \
+	src/custom/layout/__tests__/WegooAppSidebar.spec.ts \
+	src/custom/layout/__tests__/docUrlSanitization.spec.ts \
+	src/custom/layout/__tests__/siteLogoSanitization.spec.ts \
+	src/views/user/__tests__/KeysView.spec.ts \
+	src/views/user/__tests__/KeysView.gatewayAccess.spec.ts \
+	src/components/channels/__tests__/AvailableChannelsTable.spec.ts \
+	src/utils/__tests__/publicGatewaySeo.spec.ts \
+	src/custom/keys/__tests__/WegooUseKeyModal.spec.ts \
+	src/custom/keys/__tests__/ccswitchImport.spec.ts \
+	src/custom/public/__tests__/WegooKeyUsageView.spec.ts
+
+# Reviewed after the v0.1.170 upstream merge. Includes compatibility tests that
+# intentionally cover site-specific scheduler, billing, and frontend overlays.
+UPSTREAM_HANDWRITTEN_OVERLAP_MAX := 302
+FRONTEND_NODE_OPTIONS := NODE_OPTIONS=--max-old-space-size=4096
+
+build-datamanagementd:
+	@cd datamanagement && go build -o datamanagementd ./cmd/datamanagementd
+
+test-datamanagementd:
+	@cd datamanagement && go test ./...
+
+upstream-delta:
+	@python3 tools/upstream_delta.py --local HEAD --upstream upstream/main --fetch
+
+upstream-check:
+	@python3 tools/upstream_delta.py --local HEAD --upstream upstream/main --check --require-clean --max-handwritten-overlap $(UPSTREAM_HANDWRITTEN_OVERLAP_MAX)
+	@PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_upstream_*.py'
+	@PYTHONDONTWRITEBYTECODE=1 python3 tools/audit_upstream_owned.py --check --local HEAD --upstream upstream/main
+	@PYTHONDONTWRITEBYTECODE=1 python3 tools/audit_upstream_overlay.py --check --local HEAD --upstream upstream/main
+	@node tools/audit_i18n_overlay.cjs --check --upstream=upstream/main
+
+upstream-verify-frontend: upstream-check
+	@$(FRONTEND_NODE_OPTIONS) pnpm --dir frontend run lint:check
+	@$(FRONTEND_NODE_OPTIONS) pnpm --dir frontend run typecheck
+	@$(FRONTEND_NODE_OPTIONS) pnpm --dir frontend run test:run
+	@$(FRONTEND_NODE_OPTIONS) pnpm --dir frontend run build
+	@git diff --check
+
+upstream-sync-prepare:
+	@python3 tools/upstream_sync.py prepare --local HEAD --upstream upstream/main --fetch
+
+upstream-owned-policy-refresh:
+	@python3 tools/audit_upstream_owned.py --local HEAD --upstream upstream/main --write-policy --reviewed
+
+upstream-overlay-policy-refresh:
+	@python3 tools/audit_upstream_overlay.py --local HEAD --upstream upstream/main --write-policy --reviewed

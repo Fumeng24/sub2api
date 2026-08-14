@@ -1,0 +1,49 @@
+name: Upstream Alignment
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Fetch official upstream
+        run: |
+          git remote add upstream https://github.com/Wei-Shaw/sub2api.git 2>/dev/null || \
+            git remote set-url upstream https://github.com/Wei-Shaw/sub2api.git
+          git fetch upstream main --prune
+
+      - name: Install frontend audit dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+
+      - name: Verify upstream ancestry, overlay boundaries, and frontend
+        run: make upstream-verify-frontend

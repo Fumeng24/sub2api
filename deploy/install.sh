@@ -36,6 +36,9 @@ INSTALL_DIR="/opt/sub2api"
 SERVICE_NAME="sub2api"
 SERVICE_USER="sub2api"
 CONFIG_DIR="/etc/sub2api"
+ENV_FILE="$CONFIG_DIR/sub2api.env"
+SYSTEMD_DROPIN_DIR="/etc/systemd/system/${SERVICE_NAME}.service.d"
+RUNTIME_DROPIN_FILE="$SYSTEMD_DROPIN_DIR/runtime-env.conf"
 
 # Server configuration (will be set by user)
 SERVER_HOST="0.0.0.0"
@@ -701,13 +704,111 @@ setup_directories() {
     # Create directories
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$INSTALL_DIR/data"
+    mkdir -p "$INSTALL_DIR/data/logs"
     mkdir -p "$CONFIG_DIR"
+
+    migrate_legacy_data_dir
+    install_runtime_env_file
 
     # Set ownership
     chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$CONFIG_DIR"
 
     print_success "$(msg 'dirs_configured')"
+}
+
+write_default_runtime_env_file() {
+    cat > "$ENV_FILE" << EOF
+# Sub2API bare-metal runtime environment.
+# Edit this file for runtime tuning, then restart sub2api.
+
+DATA_DIR=$CONFIG_DIR
+LOG_OUTPUT_FILE_PATH=$INSTALL_DIR/data/logs/sub2api.log
+
+SERVER_MAX_REQUEST_BODY_SIZE=268435456
+GATEWAY_MAX_BODY_SIZE=268435456
+SERVER_H2C_ENABLED=true
+
+GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=45
+GATEWAY_OPENAI_COMPACT_FIRST_OUTPUT_TIMEOUT_SECONDS=120
+GATEWAY_OPENAI_COMPACT_HIGH_EFFORT_FIRST_OUTPUT_TIMEOUT_SECONDS=180
+GATEWAY_OPENAI_HTTP2_ENABLED=true
+GATEWAY_OPENAI_HTTP2_ALLOW_PROXY_FALLBACK_TO_HTTP1=true
+GATEWAY_OPENAI_HTTP2_FALLBACK_ERROR_THRESHOLD=2
+GATEWAY_OPENAI_HTTP2_FALLBACK_WINDOW_SECONDS=60
+GATEWAY_OPENAI_HTTP2_FALLBACK_TTL_SECONDS=600
+
+GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_TIMEOUT_SECONDS=30
+GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_RETRY_DELAY_SECONDS=5
+GATEWAY_OPENAI_SCHEDULER_RUNTIME_COOLDOWNS_PROBE_MAX_CONCURRENCY=10000
+
+GATEWAY_MAX_CONNS_PER_HOST=2048
+GATEWAY_MAX_IDLE_CONNS=8192
+GATEWAY_MAX_IDLE_CONNS_PER_HOST=4096
+
+GATEWAY_SCHEDULING_STICKY_SESSION_MAX_WAITING=3
+GATEWAY_SCHEDULING_STICKY_SESSION_WAIT_TIMEOUT=120s
+GATEWAY_SCHEDULING_FALLBACK_WAIT_TIMEOUT=30s
+GATEWAY_SCHEDULING_FALLBACK_MAX_WAITING=100
+GATEWAY_SCHEDULING_WEAK_FALLBACK_ENABLED=false
+GATEWAY_SCHEDULING_LOAD_BATCH_ENABLED=true
+GATEWAY_SCHEDULING_DB_FALLBACK_ENABLED=true
+GATEWAY_SCHEDULING_OUTBOX_POLL_INTERVAL_SECONDS=1
+GATEWAY_SCHEDULING_FULL_REBUILD_INTERVAL_SECONDS=300
+
+RATE_LIMIT_OVERLOAD_COOLDOWN_MINUTES=10
+DASHBOARD_AGGREGATION_ENABLED=true
+DASHBOARD_AGGREGATION_RETENTION_DAILY_DAYS=730
+EOF
+}
+
+install_runtime_env_file() {
+    mkdir -p "$CONFIG_DIR"
+
+    if [ -f "$ENV_FILE" ]; then
+        print_info "Runtime env file exists, keeping: $ENV_FILE"
+        return 0
+    fi
+
+    if [ -f "$INSTALL_DIR/sub2api.env.example" ]; then
+        cp "$INSTALL_DIR/sub2api.env.example" "$ENV_FILE"
+    else
+        write_default_runtime_env_file
+    fi
+
+    chmod 600 "$ENV_FILE"
+    if id "$SERVICE_USER" &>/dev/null; then
+        chown "$SERVICE_USER:$SERVICE_USER" "$ENV_FILE"
+    fi
+    print_success "Runtime env file created: $ENV_FILE"
+}
+
+migrate_legacy_data_dir() {
+    mkdir -p "$CONFIG_DIR"
+
+    if [ ! -f "$CONFIG_DIR/config.yaml" ] && [ -f "$INSTALL_DIR/config.yaml" ]; then
+        cp -p "$INSTALL_DIR/config.yaml" "$CONFIG_DIR/config.yaml"
+        print_info "Migrated config.yaml to $CONFIG_DIR"
+    fi
+
+    if [ ! -f "$CONFIG_DIR/.installed" ] && [ -f "$INSTALL_DIR/.installed" ]; then
+        cp -p "$INSTALL_DIR/.installed" "$CONFIG_DIR/.installed"
+        print_info "Migrated install lock to $CONFIG_DIR"
+    fi
+}
+
+install_runtime_systemd_dropin() {
+    mkdir -p "$SYSTEMD_DROPIN_DIR"
+    cat > "$RUNTIME_DROPIN_FILE" << EOF
+[Service]
+# Bare-metal runtime configuration is managed through $ENV_FILE.
+ReadWritePaths=$INSTALL_DIR $CONFIG_DIR
+Environment=DATA_DIR=$CONFIG_DIR
+Environment=LOG_OUTPUT_FILE_PATH=$INSTALL_DIR/data/logs/sub2api.log
+EnvironmentFile=-$ENV_FILE
+EOF
+    systemctl daemon-reload
+    print_success "Systemd runtime drop-in installed: $RUNTIME_DROPIN_FILE"
 }
 
 # Install systemd service
@@ -739,12 +840,17 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/opt/sub2api
+ReadWritePaths=/opt/sub2api /etc/sub2api
 
 # Environment - Server configuration
 Environment=GIN_MODE=release
 Environment=SERVER_HOST=${SERVER_HOST}
 Environment=SERVER_PORT=${SERVER_PORT}
+Environment=DATA_DIR=/etc/sub2api
+Environment=LOG_OUTPUT_FILE_PATH=/opt/sub2api/data/logs/sub2api.log
+
+# Optional bare-metal runtime tuning.
+EnvironmentFile=-/etc/sub2api/sub2api.env
 
 [Install]
 WantedBy=multi-user.target
@@ -880,8 +986,8 @@ upgrade() {
     get_latest_version
     download_and_extract
 
-    # Set permissions
-    chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/sub2api"
+    setup_directories
+    install_runtime_systemd_dropin
 
     # Start service
     print_info "$(msg 'starting_service')"
@@ -942,8 +1048,8 @@ install_version() {
     # Download and install
     download_and_extract
 
-    # Set permissions
-    chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/sub2api"
+    setup_directories
+    install_runtime_systemd_dropin
 
     # Start service
     print_info "$(msg 'starting_service')"
@@ -991,6 +1097,7 @@ uninstall() {
 
     print_info "$(msg 'removing_files')"
     rm -f /etc/systemd/system/sub2api.service
+    rm -rf "$SYSTEMD_DROPIN_DIR"
     systemctl daemon-reload
 
     print_info "$(msg 'removing_install_dir')"
