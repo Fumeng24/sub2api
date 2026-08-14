@@ -167,7 +167,7 @@ func (s *OpsSystemLogSink) shouldIndex(event *logger.LogEvent) bool {
 		}
 	}
 	if strings.Contains(component, "http.access") {
-		return true
+		return shouldIndexAccessLogCustom(event)
 	}
 	if strings.Contains(component, "audit") {
 		return true
@@ -371,6 +371,9 @@ func asString(v any) string {
 }
 
 func asInt64Ptr(v any) *int64 {
+	if n, handled := asInt64PtrCustom(v); handled {
+		return n
+	}
 	switch t := v.(type) {
 	case int:
 		n := int64(t)

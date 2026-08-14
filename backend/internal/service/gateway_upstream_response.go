@@ -216,6 +216,10 @@ func (s *GatewayService) shouldFailoverOn400(respBody []byte) bool {
 	if msg == "" {
 		return false
 	}
+	if strings.Contains(msg, "bad response status code 400") ||
+		strings.Contains(msg, "bad_response_status_code") {
+		return true
+	}
 
 	// 缺少/错误的 beta header：换账号/链路可能成功（尤其是混合调度时）。
 	// 更精确匹配 beta 相关的兼容性问题，避免误触发切换。
@@ -311,6 +315,9 @@ func extractUpstreamErrorCode(body []byte) string {
 	if code := strings.TrimSpace(gjson.GetBytes(body, "error.code").String()); code != "" {
 		return code
 	}
+	if code := strings.TrimSpace(gjson.GetBytes(body, "code").String()); code != "" {
+		return code
+	}
 
 	inner := strings.TrimSpace(gjson.GetBytes(body, "error.message").String())
 	if !strings.HasPrefix(inner, "{") {
@@ -318,6 +325,9 @@ func extractUpstreamErrorCode(body []byte) string {
 	}
 
 	if code := strings.TrimSpace(gjson.Get(inner, "error.code").String()); code != "" {
+		return code
+	}
+	if code := strings.TrimSpace(gjson.Get(inner, "code").String()); code != "" {
 		return code
 	}
 
@@ -500,7 +510,7 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 	default:
 		statusCode = http.StatusBadGateway
 		errType = "upstream_error"
-		errMsg = "Upstream request failed"
+		errMsg = clientFacingTemporaryUnavailableMessage
 	}
 
 	// 返回自定义错误响应
@@ -1006,6 +1016,9 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 			if !ok {
 				// 上游完成，返回结果
 				if !sawTerminalEvent {
+					if claudeUsageHasTokens(usage) {
+						logger.LegacyPrintf("service.gateway", "[Anthropic] Stream ended without terminal event but usage was collected: account=%d input=%d output=%d cache_creation=%d cache_read=%d", account.ID, usage.InputTokens, usage.OutputTokens, usage.CacheCreationInputTokens, usage.CacheReadInputTokens)
+					}
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, fmt.Errorf("stream usage incomplete: missing terminal event")
 				}
 				return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, nil

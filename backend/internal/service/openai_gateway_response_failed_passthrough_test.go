@@ -80,8 +80,8 @@ func TestForwardAsChatCompletions_ResponseFailed_PassthroughRule(t *testing.T) {
 	errType := gjson.Get(respBody, "error.type").String()
 	require.Equal(t, "upstream_error", errType)
 	errMsg := gjson.Get(respBody, "error.message").String()
-	require.NotEmpty(t, errMsg, "passthrough should preserve error message")
-	require.Contains(t, errMsg, "context window")
+	require.NotEmpty(t, errMsg, "passthrough should return a client-safe error message")
+	require.NotContains(t, respBody, "response.failed")
 }
 
 func TestForwardAsAnthropic_ResponseFailed_PassthroughRule(t *testing.T) {

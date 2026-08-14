@@ -561,6 +561,9 @@ func stringifyCodexContentText(value any) string {
 func normalizeCodexModel(model string) string {
 	model = strings.TrimSpace(model)
 	if model == "" {
+		if normalized, handled := normalizeEmptyCodexModelCustom(); handled {
+			return normalized
+		}
 		return "gpt-5.4"
 	}
 	if mapped, ok := normalizeKnownCodexModel(model); ok {
@@ -951,11 +954,11 @@ func applyCodexImageGenerationBridgeInstructions(reqBody map[string]any) bool {
 
 	existing = strings.TrimRight(existing, " \t\r\n")
 	if strings.TrimSpace(existing) == "" {
-		reqBody["instructions"] = codexImageGenerationBridgeText
+		reqBody["instructions"] = codexImageGenerationBridgeTextCustom
 		return true
 	}
 
-	reqBody["instructions"] = existing + "\n\n" + codexImageGenerationBridgeText
+	reqBody["instructions"] = existing + "\n\n" + codexImageGenerationBridgeTextCustom
 	return true
 }
 

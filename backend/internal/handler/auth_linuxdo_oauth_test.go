@@ -631,7 +631,7 @@ func TestLinuxDoOAuthCallbackCreatesChoicePendingSessionWhenSignupRequiresInvite
 	require.Equal(t, "third_party_signup", completion["choice_reason"])
 }
 
-func TestLinuxDoOAuthCallbackEmailVerificationCompletesWithBoundEmail(t *testing.T) {
+func TestLinuxDoOAuthCallbackEmailVerificationRequiresCreateAccount(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
@@ -696,41 +696,6 @@ func TestLinuxDoOAuthCallbackEmailVerificationCompletesWithBoundEmail(t *testing
 	require.Equal(t, "email_verification_required", completion["choice_reason"])
 	require.NotContains(t, completion, "email")
 	require.NotContains(t, completion, "resolved_email")
-
-	createRecorder := httptest.NewRecorder()
-	createCtx, _ := gin.CreateTestContext(createRecorder)
-	body := bytes.NewBufferString(`{"email":"fresh@example.com","verify_code":"246810","password":"secret-123","adopt_display_name":false,"adopt_avatar":false}`)
-	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/oauth/pending/create-account", body)
-	createReq.Header.Set("Content-Type", "application/json")
-	createReq.AddCookie(sessionCookie)
-	createReq.AddCookie(&http.Cookie{Name: oauthPendingBrowserCookieName, Value: encodeCookieValue("browser-email")})
-	createCtx.Request = createReq
-
-	handler.CreatePendingOAuthAccount(createCtx)
-
-	require.Equal(t, http.StatusOK, createRecorder.Code)
-	responseData := decodeJSONBody(t, createRecorder)
-	require.NotEmpty(t, responseData["access_token"])
-
-	userEntity, err := client.User.Query().
-		Where(dbuser.EmailEQ("fresh@example.com")).
-		Only(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "linuxdo", userEntity.SignupSource)
-
-	identity, err := client.AuthIdentity.Query().
-		Where(
-			authidentity.ProviderTypeEQ("linuxdo"),
-			authidentity.ProviderKeyEQ("linuxdo"),
-			authidentity.ProviderSubjectEQ("email-verify-123"),
-		).
-		Only(ctx)
-	require.NoError(t, err)
-	require.Equal(t, userEntity.ID, identity.UserID)
-
-	storedSession, err := client.PendingAuthSession.Get(ctx, session.ID)
-	require.NoError(t, err)
-	require.NotNil(t, storedSession.ConsumedAt)
 }
 
 func TestLinuxDoOAuthCallbackDirectlyLogsInNewUserWhenEmailVerificationDisabled(t *testing.T) {

@@ -64,3 +64,69 @@ func TestAnnouncementTargeting_Matches_AndOrSemantics(t *testing.T) {
 	require.False(t, targeting.Matches(99.9, map[int64]struct{}{10: {}}))
 	require.True(t, targeting.Matches(100, map[int64]struct{}{10: {}}))
 }
+
+func TestAnnouncementTargeting_MatchesForUser(t *testing.T) {
+	targeting := AnnouncementTargeting{
+		AnyOf: []AnnouncementConditionGroup{{
+			AllOf: []AnnouncementCondition{{
+				Type:     AnnouncementConditionTypeUser,
+				Operator: AnnouncementOperatorIn,
+				UserIDs:  []int64{42, 84},
+			}},
+		}},
+	}
+
+	require.True(t, targeting.MatchesForUser(42, 0, nil))
+	require.False(t, targeting.MatchesForUser(7, 0, nil))
+	require.False(t, targeting.Matches(0, nil), "user-only targeting must not match without a user ID")
+}
+
+func TestAnnouncementTargeting_NormalizeAndValidatePreservesUserIDs(t *testing.T) {
+	targeting := AnnouncementTargeting{
+		AnyOf: []AnnouncementConditionGroup{{
+			AllOf: []AnnouncementCondition{{
+				Type:     AnnouncementConditionTypeUser,
+				Operator: AnnouncementOperatorIn,
+				UserIDs:  []int64{42, 84},
+			}},
+		}},
+	}
+
+	normalized, err := targeting.NormalizeAndValidate()
+	require.NoError(t, err)
+	require.Equal(t, []int64{42, 84}, normalized.AnyOf[0].AllOf[0].UserIDs)
+}
+
+func TestAnnouncementTargeting_NormalizeAndValidateUserIDs(t *testing.T) {
+	targeting := AnnouncementTargeting{
+		AnyOf: []AnnouncementConditionGroup{{
+			AllOf: []AnnouncementCondition{{
+				Type:     AnnouncementConditionTypeUser,
+				Operator: AnnouncementOperatorIn,
+				UserIDs:  []int64{0},
+			}},
+		}},
+	}
+	_, err := targeting.NormalizeAndValidate()
+	require.ErrorIs(t, err, ErrAnnouncementInvalidTarget)
+}
+
+func TestAnnouncementTargeting_NormalizeAndValidateRejectsTooManyUserIDs(t *testing.T) {
+	userIDs := make([]int64, 101)
+	for i := range userIDs {
+		userIDs[i] = int64(i + 1)
+	}
+
+	targeting := AnnouncementTargeting{
+		AnyOf: []AnnouncementConditionGroup{{
+			AllOf: []AnnouncementCondition{{
+				Type:     AnnouncementConditionTypeUser,
+				Operator: AnnouncementOperatorIn,
+				UserIDs:  userIDs,
+			}},
+		}},
+	}
+
+	_, err := targeting.NormalizeAndValidate()
+	require.ErrorIs(t, err, ErrAnnouncementInvalidTarget)
+}

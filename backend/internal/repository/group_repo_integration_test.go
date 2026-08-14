@@ -8,8 +8,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/suite"
@@ -57,6 +59,10 @@ func (s *GroupRepoSuite) TestCreate() {
 		IsExclusive:      false,
 		Status:           service.StatusActive,
 		SubscriptionType: service.SubscriptionTypeStandard,
+		AutoSortConfig: service.GroupAutoSortConfig{
+			Enabled: true,
+			Basis:   "latency",
+		},
 	}
 
 	err := s.repo.Create(s.ctx, group)
@@ -66,6 +72,13 @@ func (s *GroupRepoSuite) TestCreate() {
 	got, err := s.repo.GetByID(s.ctx, group.ID)
 	s.Require().NoError(err, "GetByID")
 	s.Require().Equal("test-create", got.Name)
+	s.Require().Equal(group.AutoSortConfig, got.AutoSortConfig)
+
+	group.AutoSortConfig = service.GroupAutoSortConfig{Enabled: false, Basis: "availability"}
+	s.Require().NoError(s.repo.Update(s.ctx, group), "Update")
+	got, err = s.repo.GetByID(s.ctx, group.ID)
+	s.Require().NoError(err, "GetByID after update")
+	s.Require().Equal(group.AutoSortConfig, got.AutoSortConfig)
 }
 
 func (s *GroupRepoSuite) TestCreateFromSourcePreservesPriorityAndFiltersIneligibleAccounts() {
@@ -243,6 +256,59 @@ func (s *GroupRepoSuite) TestDelete() {
 	_, err = s.repo.GetByID(s.ctx, group.ID)
 	s.Require().Error(err, "expected error after delete")
 	s.Require().ErrorIs(err, service.ErrGroupNotFound)
+}
+
+func (s *GroupRepoSuite) TestListAccountSchedulingConfigs_IgnoresDeletedAccounts() {
+	group := mustCreateGroup(s.T(), s.tx.Client(), &service.Group{
+		Name:             "scheduling-group",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	})
+	active := mustCreateAccount(s.T(), s.tx.Client(), &service.Account{Name: "active-account", Status: service.StatusActive, Schedulable: true})
+	deleted := mustCreateAccount(s.T(), s.tx.Client(), &service.Account{Name: "deleted-account", Status: service.StatusActive, Schedulable: true})
+
+	mustBindAccountToGroup(s.T(), s.tx.Client(), active.ID, group.ID, 1)
+	mustBindAccountToGroup(s.T(), s.tx.Client(), deleted.ID, group.ID, 2)
+
+	_, delErr := s.tx.Client().Account.Delete().Where(dbaccount.IDEQ(deleted.ID)).Exec(s.ctx)
+	s.Require().NoError(delErr)
+
+	entries, err := s.repo.ListAccountSchedulingConfigs(s.ctx, group.ID)
+	s.Require().NoError(err, "ListAccountSchedulingConfigs")
+	s.Require().Len(entries, 1)
+	s.Require().Equal(active.ID, entries[0].AccountID)
+	s.Require().NotNil(entries[0].Account)
+	s.Require().Equal("active-account", entries[0].Account.Name)
+}
+
+func (s *GroupRepoSuite) TestListAccountSchedulingConfigs_IncludesBlockReason() {
+	group := mustCreateGroup(s.T(), s.tx.Client(), &service.Group{
+		Name:             "scheduling-block-reason",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	})
+	account := mustCreateAccount(s.T(), s.tx.Client(), &service.Account{
+		Name:        "expired-account",
+		Status:      service.StatusActive,
+		Schedulable: true,
+	})
+	s.Require().NoError(s.tx.Client().Account.UpdateOneID(account.ID).
+		SetAutoPauseOnExpired(true).
+		SetExpiresAt(time.Now().Add(-time.Minute)).
+		Exec(s.ctx))
+	mustBindAccountToGroup(s.T(), s.tx.Client(), account.ID, group.ID, 1)
+
+	entries, err := s.repo.ListAccountSchedulingConfigs(s.ctx, group.ID)
+	s.Require().NoError(err)
+	s.Require().Len(entries, 1)
+	s.Require().Equal("expired", entries[0].State)
+	s.Require().Equal(service.AccountSchedulingBlockExpired, entries[0].BlockReason)
 }
 
 // --- List / ListWithFilters ---
@@ -844,6 +910,14 @@ func (s *GroupRepoSuite) TestListWithFilters_RateLimitedAccountCount() {
 		[]any{"acc-expired", service.PlatformAnthropic, service.AccountTypeOAuth},
 		&expiredID))
 
+	var quotaExceededID int64
+	s.Require().NoError(scanSingleRow(s.ctx, s.tx,
+		`INSERT INTO accounts (name, platform, type, extra)
+		 VALUES ($1, $2, $3, '{"quota_limit": 10, "quota_used": 10}'::jsonb)
+		 RETURNING id`,
+		[]any{"acc-quota-exceeded", service.PlatformAnthropic, service.AccountTypeAPIKey},
+		&quotaExceededID))
+
 	_, err := s.tx.ExecContext(s.ctx,
 		"INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())",
 		normalID, g.ID, 1)
@@ -864,6 +938,10 @@ func (s *GroupRepoSuite) TestListWithFilters_RateLimitedAccountCount() {
 		"INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())",
 		expiredID, g.ID, 5)
 	s.Require().NoError(err)
+	_, err = s.tx.ExecContext(s.ctx,
+		"INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())",
+		quotaExceededID, g.ID, 6)
+	s.Require().NoError(err)
 
 	isExclusive := false
 	groups, _, err := s.repo.ListWithFilters(s.ctx,
@@ -879,7 +957,7 @@ func (s *GroupRepoSuite) TestListWithFilters_RateLimitedAccountCount() {
 		}
 	}
 	s.Require().NotNil(found, "created group must appear in ListWithFilters result")
-	s.Assert().Equal(int64(5), found.AccountCount, "AccountCount must include all linked accounts")
+	s.Assert().Equal(int64(6), found.AccountCount, "AccountCount must include all linked accounts")
 	s.Assert().Equal(int64(1), found.ActiveAccountCount, "ActiveAccountCount must include only currently schedulable accounts")
 	s.Assert().Equal(int64(3), found.RateLimitedAccountCount, "RateLimitedAccountCount must include temporarily limited accounts")
 
@@ -1020,4 +1098,52 @@ func (s *GroupRepoSuite) TestDelete_SoftDeletedGroup_lockForUpdate() {
 	_, err = s.repo.GetByID(s.ctx, group.ID)
 	s.Require().Error(err, "should fail to get soft-deleted group")
 	s.Require().ErrorIs(err, service.ErrGroupNotFound)
+}
+
+func (s *GroupRepoSuite) TestUpdateAccountSchedulingConfigsPersistsGroupPriorityAndSortOrder() {
+	group := &service.Group{
+		Name:             "group-scheduling-order",
+		Platform:         service.PlatformOpenAI,
+		RateMultiplier:   1,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, group))
+
+	var accountID int64
+	s.Require().NoError(scanSingleRow(
+		s.ctx,
+		s.tx,
+		"INSERT INTO accounts (name, platform, type) VALUES ($1, $2, $3) RETURNING id",
+		[]any{"group-scheduling-account", service.PlatformOpenAI, service.AccountTypeAPIKey},
+		&accountID,
+	))
+	_, err := s.tx.ExecContext(
+		s.ctx,
+		"INSERT INTO account_groups (account_id, group_id, priority, sort_order, created_at) VALUES ($1, $2, 90, 90, NOW())",
+		accountID,
+		group.ID,
+	)
+	s.Require().NoError(err)
+
+	err = s.repo.UpdateAccountSchedulingConfigs(s.ctx, group.ID, []service.AccountSchedulingConfig{{
+		AccountID: accountID,
+		Priority:  3,
+		Role:      service.AccountGroupRolePrimary,
+		Weight:    100,
+		SortOrder: 30,
+	}})
+	s.Require().NoError(err)
+
+	var priority, sortOrder int
+	s.Require().NoError(scanSingleRow(
+		s.ctx,
+		s.tx,
+		"SELECT priority, sort_order FROM account_groups WHERE account_id = $1 AND group_id = $2",
+		[]any{accountID, group.ID},
+		&priority,
+		&sortOrder,
+	))
+	s.Require().Equal(30, priority)
+	s.Require().Equal(30, sortOrder)
 }

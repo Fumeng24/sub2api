@@ -414,8 +414,6 @@ func TestOpenAIGatewayService_BuildOpenAIWSHeadersPreservesCodexIdentity(t *test
 		"",
 		"",
 		"",
-		"",
-		"",
 	)
 
 	require.NoError(t, err)

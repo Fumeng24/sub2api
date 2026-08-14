@@ -567,7 +567,7 @@ func TestCancelOrderStillClosesUnpaidUpstreamOrder(t *testing.T) {
 	require.Equal(t, OrderStatusCancelled, reloaded.Status)
 }
 
-func TestReconcilePendingWxpayOrdersBackfillsPaidOrder(t *testing.T) {
+func TestReconcilePendingPaymentOrdersBackfillsPaidAlipayOrder(t *testing.T) {
 	ctx := context.Background()
 	client := newPaymentOrderLifecycleTestClient(t)
 
@@ -587,7 +587,7 @@ func TestReconcilePendingWxpayOrdersBackfillsPaidOrder(t *testing.T) {
 		SetFeeRate(0).
 		SetRechargeCode("WXPAY-RECONCILE").
 		SetOutTradeNo("sub2_wxpay_reconcile").
-		SetPaymentType(payment.TypeWxpay).
+		SetPaymentType(payment.TypeAlipay).
 		SetPaymentTradeNo("").
 		SetOrderType(payment.OrderTypeBalance).
 		SetStatus(OrderStatusPending).
@@ -635,7 +635,7 @@ func TestReconcilePendingWxpayOrdersBackfillsPaidOrder(t *testing.T) {
 	)
 	registry := payment.NewRegistry()
 	provider := &paymentOrderLifecycleQueryProvider{
-		key: payment.TypeWxpay,
+		key: payment.TypeAlipay,
 		resp: &payment.QueryOrderResponse{
 			TradeNo: "wxpay-upstream-trade-123",
 			Status:  payment.ProviderStatusPaid,
@@ -655,7 +655,7 @@ func TestReconcilePendingWxpayOrdersBackfillsPaidOrder(t *testing.T) {
 		providersLoaded: true,
 	}
 
-	recovered, err := svc.ReconcilePendingWxpayOrders(ctx)
+	recovered, err := svc.ReconcilePendingPaymentOrders(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, recovered)
 	require.Equal(t, order.OutTradeNo, provider.lastQueryTradeNo)

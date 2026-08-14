@@ -943,7 +943,7 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 			"report_html":         "<h2>日报</h2><p>请求量：2,374</p>",
 		}
 		addNotificationEmailOpsSummarySampleVariables(variables)
-		return variables
+		return notificationEmailSampleVariablesCustom(locale, variables)
 	}
 	variables := map[string]string{
 		"site_name":           defaultSiteName,
@@ -991,7 +991,7 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 		"report_html":         "<h2>Daily summary</h2><p>Requests: 2,374</p>",
 	}
 	addNotificationEmailOpsSummarySampleVariables(variables)
-	return variables
+	return notificationEmailSampleVariablesCustom(locale, variables)
 }
 
 func addNotificationEmailOpsSummarySampleVariables(variables map[string]string) {
@@ -1631,6 +1631,9 @@ func notificationEmailOpsScheduledReportTemplate(locale string) string {
 }
 
 func notificationEmailCard(accent, title, content string) string {
+	if custom := notificationEmailCardCustom(accent, title, content); custom != "" {
+		return custom
+	}
 	return `<!DOCTYPE html>
 <html>
 <head>

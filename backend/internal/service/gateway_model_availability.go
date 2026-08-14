@@ -51,6 +51,9 @@ func (s *GatewayService) DiagnoseModelAvailabilityForPlatform(
 	requestedModel string,
 	platform string,
 ) ModelAvailabilityDiagnosis {
+	if diagnosis, handled := s.diagnoseConfiguredModelAvailabilityCustom(ctx, groupID, platform, requestedModel); handled {
+		return diagnosis
+	}
 	if s == nil {
 		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
 	}

@@ -164,6 +164,42 @@ func TestOpenAIFirstOutputTimeoutForReasoningEffort(t *testing.T) {
 	require.Equal(t, 300*time.Second, svc.openAIFirstOutputTimeout("max"))
 }
 
+func TestOpenAICompactFirstOutputTimeoutUsesIndependentBudget(t *testing.T) {
+	defaultSvc := &OpenAIGatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{
+		OpenAIFirstOutputTimeoutSeconds: 30,
+	}}}
+	require.Equal(t, 120*time.Second, defaultSvc.openAICompactFirstOutputTimeout("low"))
+	require.Equal(t, 180*time.Second, defaultSvc.openAICompactFirstOutputTimeout("high"))
+
+	configuredSvc := &OpenAIGatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{
+		OpenAICompactFirstOutputTimeoutSeconds:           150,
+		OpenAICompactHighEffortFirstOutputTimeoutSeconds: 240,
+	}}}
+	require.Equal(t, 150*time.Second, configuredSvc.openAICompactFirstOutputTimeout("low"))
+	require.Equal(t, 240*time.Second, configuredSvc.openAICompactFirstOutputTimeout("xhigh"))
+}
+
+func TestOpenAICompactResponseBodyGuardWakesStalledUnaryBody(t *testing.T) {
+	reader, writer := io.Pipe()
+	guard := newOpenAICompactResponseBodyGuard(reader, 20*time.Millisecond)
+	defer guard.Close()
+
+	readDone := make(chan error, 1)
+	go func() {
+		buf := make([]byte, 1)
+		_, err := guard.Read(buf)
+		readDone <- err
+	}()
+
+	select {
+	case err := <-readDone:
+		require.ErrorIs(t, err, errOpenAICompactResponseTimeout)
+	case <-time.After(time.Second):
+		t.Fatal("compact body guard did not wake a stalled read")
+	}
+	_ = writer.Close()
+}
+
 func TestOpenAIFirstOutputStageDefaultLimitIsIndependentFromScannerLimit(t *testing.T) {
 	stage := newDefaultOpenAIFirstOutputStage()
 	defer func() { require.NoError(t, stage.Close()) }()
@@ -425,7 +461,7 @@ func TestOpenAINativeFirstOutputEOFDispatchesTerminalEventWithoutBlankLine(t *te
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Nil(t, result.firstTokenMs, "usage-only terminal event is not visible output")
+	require.NotNil(t, result.firstTokenMs)
 	require.Equal(t, "resp_eof", result.responseID)
 	require.Equal(t, 3, result.usage.InputTokens)
 	require.Equal(t, 2, result.usage.OutputTokens)
@@ -561,10 +597,12 @@ func TestOpenAINativeFirstOutputTimeoutDisabledPreservesKeepaliveFlush(t *testin
 
 	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1, Platform: PlatformOpenAI}, time.Now(), "model", "model")
 
-	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.True(t, failoverErr.SafeToFailoverAfterWrite)
 	require.Contains(t, rec.Body.String(), ":\n\n")
-	require.Contains(t, rec.Body.String(), "response.created")
-	require.Contains(t, rec.Body.String(), "response.in_progress")
+	require.NotContains(t, rec.Body.String(), "response.created")
+	require.NotContains(t, rec.Body.String(), "response.in_progress")
 }
 
 func TestOpenAINativeFirstOutputFailoverKeepsAttemptHeadersPrivateAfterKeepaliveCommit(t *testing.T) {

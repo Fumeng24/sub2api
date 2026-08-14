@@ -36,6 +36,7 @@ type PublicSettingsProvider interface {
 
 // FrontendServer serves the embedded frontend with settings injection
 type FrontendServer struct {
+	frontendServerCustom
 	distFS      fs.FS
 	fileServer  http.Handler
 	baseHTML    []byte
@@ -67,12 +68,13 @@ func NewFrontendServer(settingsProvider PublicSettingsProvider) (*FrontendServer
 	cache.SetBaseHTML(baseHTML)
 
 	return &FrontendServer{
-		distFS:      distFS,
-		fileServer:  http.FileServer(http.FS(distFS)),
-		baseHTML:    baseHTML,
-		cache:       cache,
-		settings:    settingsProvider,
-		overrideDir: filepath.Join("data", "public"),
+		frontendServerCustom: newFrontendServerCustom(baseHTML),
+		distFS:               distFS,
+		fileServer:           http.FileServer(http.FS(distFS)),
+		baseHTML:             baseHTML,
+		cache:                cache,
+		settings:             settingsProvider,
+		overrideDir:          filepath.Join("data", "public"),
 	}, nil
 }
 
@@ -89,7 +91,7 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 		path := c.Request.URL.Path
 
 		// Skip API routes
-		if shouldBypassEmbeddedFrontend(path) {
+		if shouldBypassEmbeddedFrontendRequest(c.Request.Method, path) {
 			c.Next()
 			return
 		}
@@ -99,8 +101,15 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 			cleanPath = "index.html"
 		}
 
-		// For index.html or SPA routes, serve with injected settings
-		if cleanPath == "index.html" || !s.fileExists(cleanPath) {
+		if cleanPath == "index.html" {
+			s.serveIndexHTML(c)
+			return
+		}
+
+		if !s.fileExists(cleanPath) {
+			if serveMissingFrontendPathCustom(c, cleanPath, s.frontendServerCustom) {
+				return
+			}
 			s.serveIndexHTML(c)
 			return
 		}
@@ -160,7 +169,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 		content := replaceNoncePlaceholder(cached.Content, nonce)
 
 		c.Header("ETag", cached.ETag)
-		c.Header("Cache-Control", "no-cache") // Must revalidate
+		c.Header("Cache-Control", "no-store")
 		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 		c.Abort()
 		return
@@ -196,7 +205,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 	if cached != nil {
 		c.Header("ETag", cached.ETag)
 	}
-	c.Header("Cache-Control", "no-cache")
+	c.Header("Cache-Control", "no-store")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	c.Abort()
 }
@@ -278,10 +287,14 @@ func injectSiteTitle(html, settingsJSON []byte) []byte {
 		return html
 	}
 
-	// Find and replace the existing <title>...</title>
+	// Find and replace the existing <title>...</title>.
+	// Keep explicit SEO titles from index.html; only replace the upstream default.
 	titleStart := bytes.Index(html, []byte("<title>"))
 	titleEnd := bytes.Index(html, []byte("</title>"))
 	if titleStart == -1 || titleEnd == -1 || titleEnd <= titleStart {
+		return html
+	}
+	if !shouldReplaceEmbeddedSiteTitleCustom(html, titleStart, titleEnd) {
 		return html
 	}
 
@@ -307,18 +320,20 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 	}
 	fileServer := http.FileServer(http.FS(distFS))
 	overrideDir := filepath.Join("data", "public")
+	frontendCustom := newFrontendServerCustom(readFrontendBaseHTML(distFS))
 
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
 
-		if shouldBypassEmbeddedFrontend(path) {
+		if shouldBypassEmbeddedFrontendRequest(c.Request.Method, path) {
 			c.Next()
 			return
 		}
 
 		cleanPath := strings.TrimPrefix(path, "/")
 		if cleanPath == "" {
-			cleanPath = "index.html"
+			serveIndexHTML(c, distFS)
+			return
 		}
 
 		if file, err := distFS.Open(cleanPath); err == nil {
@@ -330,6 +345,10 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 			applyStaticAssetCacheHeaders(c.Writer.Header(), cleanPath)
 			fileServer.ServeHTTP(c.Writer, c.Request)
 			c.Abort()
+			return
+		}
+
+		if serveMissingFrontendPathCustom(c, cleanPath, frontendCustom) {
 			return
 		}
 
@@ -350,23 +369,6 @@ func tryServeOverrideFile(c *gin.Context, overrideDir, cleanPath string) bool {
 	c.File(filePath)
 	c.Abort()
 	return true
-}
-
-func shouldBypassEmbeddedFrontend(path string) bool {
-	trimmed := strings.TrimSpace(path)
-	return strings.HasPrefix(trimmed, "/api/") ||
-		strings.HasPrefix(trimmed, "/v1/") ||
-		strings.HasPrefix(trimmed, "/v1beta/") ||
-		strings.HasPrefix(trimmed, "/backend-api/") ||
-		strings.HasPrefix(trimmed, "/antigravity/") ||
-		strings.HasPrefix(trimmed, "/setup/") ||
-		trimmed == "/health" ||
-		trimmed == "/models" ||
-		trimmed == "/responses" ||
-		strings.HasPrefix(trimmed, "/responses/") ||
-		trimmed == "/alpha/search" ||
-		strings.HasPrefix(trimmed, "/images/") ||
-		strings.HasPrefix(trimmed, "/videos/")
 }
 
 func serveIndexHTML(c *gin.Context, fsys fs.FS) {

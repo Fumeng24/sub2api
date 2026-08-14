@@ -23,6 +23,9 @@ func (s *OpenAIGatewayService) DiagnoseModelAvailabilityForPlatform(
 	requestedModel string,
 	platform string,
 ) ModelAvailabilityDiagnosis {
+	if diagnosis, handled := s.diagnoseModelAvailabilityCustom(ctx, groupID, requestedModel, platform); handled {
+		return diagnosis
+	}
 	if s == nil {
 		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
 	}

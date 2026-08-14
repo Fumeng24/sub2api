@@ -358,6 +358,7 @@ type concurrencyCache struct {
 	rdb                 *redis.Client
 	slotTTLSeconds      int // 槽位过期时间（秒）
 	waitQueueTTLSeconds int // 等待队列过期时间（秒）
+	concurrencyCacheCustom
 }
 
 // NewConcurrencyCache 创建并发控制缓存
@@ -663,6 +664,9 @@ func (c *concurrencyCache) GetAccountConcurrency(ctx context.Context, accountID 
 }
 
 func (c *concurrencyCache) GetAccountConcurrencyBatch(ctx context.Context, accountIDs []int64) (map[int64]int, error) {
+	if result, err, handled := c.tryGetAccountConcurrencyBatchCustom(ctx, accountIDs); handled {
+		return result, err
+	}
 	if len(accountIDs) == 0 {
 		return map[int64]int{}, nil
 	}
@@ -947,6 +951,9 @@ func (c *concurrencyCache) GetAccountWaitingCount(ctx context.Context, accountID
 }
 
 func (c *concurrencyCache) GetAccountsLoadBatch(ctx context.Context, accounts []service.AccountWithConcurrency) (map[int64]*service.AccountLoadInfo, error) {
+	if result, err, handled := c.tryGetAccountsLoadBatchCustom(ctx, accounts); handled {
+		return result, err
+	}
 	if len(accounts) == 0 {
 		return map[int64]*service.AccountLoadInfo{}, nil
 	}

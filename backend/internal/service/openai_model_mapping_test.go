@@ -143,6 +143,19 @@ func TestResolveOpenAIForwardModel(t *testing.T) {
 			messagesDispatchMappedModel: "  ",
 			expectedModel:               "gpt-5.5",
 		},
+		{
+			name: "does not map legacy gpt-5.2 to account supported gpt-5.5",
+			account: &Account{
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{
+						"gpt-5.5": "gpt-5.5",
+					},
+				},
+			},
+			requestedModel: "gpt-5.2",
+			expectedModel:  "gpt-5.2",
+		},
 	}
 
 	for _, tt := range tests {
@@ -227,7 +240,7 @@ func TestNormalizeCodexModel(t *testing.T) {
 		"gpt-5.3-codex-spark":       "gpt-5.3-codex-spark",
 		"gpt-5.3-codex-spark-high":  "gpt-5.3-codex-spark",
 		"gpt-5.3-codex-spark-xhigh": "gpt-5.3-codex-spark",
-		"gpt-5.3":                   "gpt-5.3-codex",
+		"gpt-5.3":                   "gpt-5.3",
 		"gpt-image-2":               "gpt-image-2",
 		"gpt-5.4-nano":              "gpt-5.4-nano",
 		"gpt-5.4-nano-high":         "gpt-5.4-nano",
@@ -274,10 +287,22 @@ func TestNormalizeOpenAIModelForUpstream(t *testing.T) {
 			want:    "gpt6",
 		},
 		{
-			name:    "oauth normalizes known codex alias",
+			name:    "oauth normalizes same-model reasoning suffix",
 			account: &Account{Type: AccountTypeOAuth},
 			model:   "gpt-5.4-high",
 			want:    "gpt-5.4",
+		},
+		{
+			name:    "oauth does not map removed model to newer model",
+			account: &Account{Type: AccountTypeOAuth},
+			model:   "gpt-5.1-codex",
+			want:    "gpt-5.1-codex",
+		},
+		{
+			name:    "oauth does not map bare gpt-5 to current model",
+			account: &Account{Type: AccountTypeOAuth},
+			model:   "gpt-5",
+			want:    "gpt-5",
 		},
 		{
 			name:    "oauth preserves GPT-5.5 Pro model",

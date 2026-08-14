@@ -25,6 +25,26 @@ func Priority(v int) predicate.AccountGroup {
 	return predicate.AccountGroup(sql.FieldEQ(FieldPriority, v))
 }
 
+// Role applies equality check predicate on the "role" field. It's identical to RoleEQ.
+func Role(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldRole, v))
+}
+
+// Weight applies equality check predicate on the "weight" field. It's identical to WeightEQ.
+func Weight(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldWeight, v))
+}
+
+// SortOrder applies equality check predicate on the "sort_order" field. It's identical to SortOrderEQ.
+func SortOrder(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldSortOrder, v))
+}
+
+// SchedulingConfigured applies equality check predicate on the "scheduling_configured" field. It's identical to SchedulingConfiguredEQ.
+func SchedulingConfigured(v bool) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldSchedulingConfigured, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.AccountGroup {
 	return predicate.AccountGroup(sql.FieldEQ(FieldCreatedAt, v))
@@ -108,6 +128,161 @@ func PriorityLT(v int) predicate.AccountGroup {
 // PriorityLTE applies the LTE predicate on the "priority" field.
 func PriorityLTE(v int) predicate.AccountGroup {
 	return predicate.AccountGroup(sql.FieldLTE(FieldPriority, v))
+}
+
+// RoleEQ applies the EQ predicate on the "role" field.
+func RoleEQ(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldRole, v))
+}
+
+// RoleNEQ applies the NEQ predicate on the "role" field.
+func RoleNEQ(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldNEQ(FieldRole, v))
+}
+
+// RoleIn applies the In predicate on the "role" field.
+func RoleIn(vs ...string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldIn(FieldRole, vs...))
+}
+
+// RoleNotIn applies the NotIn predicate on the "role" field.
+func RoleNotIn(vs ...string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldNotIn(FieldRole, vs...))
+}
+
+// RoleGT applies the GT predicate on the "role" field.
+func RoleGT(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldGT(FieldRole, v))
+}
+
+// RoleGTE applies the GTE predicate on the "role" field.
+func RoleGTE(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldGTE(FieldRole, v))
+}
+
+// RoleLT applies the LT predicate on the "role" field.
+func RoleLT(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldLT(FieldRole, v))
+}
+
+// RoleLTE applies the LTE predicate on the "role" field.
+func RoleLTE(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldLTE(FieldRole, v))
+}
+
+// RoleContains applies the Contains predicate on the "role" field.
+func RoleContains(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldContains(FieldRole, v))
+}
+
+// RoleHasPrefix applies the HasPrefix predicate on the "role" field.
+func RoleHasPrefix(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldHasPrefix(FieldRole, v))
+}
+
+// RoleHasSuffix applies the HasSuffix predicate on the "role" field.
+func RoleHasSuffix(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldHasSuffix(FieldRole, v))
+}
+
+// RoleEqualFold applies the EqualFold predicate on the "role" field.
+func RoleEqualFold(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEqualFold(FieldRole, v))
+}
+
+// RoleContainsFold applies the ContainsFold predicate on the "role" field.
+func RoleContainsFold(v string) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldContainsFold(FieldRole, v))
+}
+
+// WeightEQ applies the EQ predicate on the "weight" field.
+func WeightEQ(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldWeight, v))
+}
+
+// WeightNEQ applies the NEQ predicate on the "weight" field.
+func WeightNEQ(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldNEQ(FieldWeight, v))
+}
+
+// WeightIn applies the In predicate on the "weight" field.
+func WeightIn(vs ...int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldIn(FieldWeight, vs...))
+}
+
+// WeightNotIn applies the NotIn predicate on the "weight" field.
+func WeightNotIn(vs ...int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldNotIn(FieldWeight, vs...))
+}
+
+// WeightGT applies the GT predicate on the "weight" field.
+func WeightGT(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldGT(FieldWeight, v))
+}
+
+// WeightGTE applies the GTE predicate on the "weight" field.
+func WeightGTE(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldGTE(FieldWeight, v))
+}
+
+// WeightLT applies the LT predicate on the "weight" field.
+func WeightLT(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldLT(FieldWeight, v))
+}
+
+// WeightLTE applies the LTE predicate on the "weight" field.
+func WeightLTE(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldLTE(FieldWeight, v))
+}
+
+// SortOrderEQ applies the EQ predicate on the "sort_order" field.
+func SortOrderEQ(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldSortOrder, v))
+}
+
+// SortOrderNEQ applies the NEQ predicate on the "sort_order" field.
+func SortOrderNEQ(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldNEQ(FieldSortOrder, v))
+}
+
+// SortOrderIn applies the In predicate on the "sort_order" field.
+func SortOrderIn(vs ...int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldIn(FieldSortOrder, vs...))
+}
+
+// SortOrderNotIn applies the NotIn predicate on the "sort_order" field.
+func SortOrderNotIn(vs ...int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldNotIn(FieldSortOrder, vs...))
+}
+
+// SortOrderGT applies the GT predicate on the "sort_order" field.
+func SortOrderGT(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldGT(FieldSortOrder, v))
+}
+
+// SortOrderGTE applies the GTE predicate on the "sort_order" field.
+func SortOrderGTE(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldGTE(FieldSortOrder, v))
+}
+
+// SortOrderLT applies the LT predicate on the "sort_order" field.
+func SortOrderLT(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldLT(FieldSortOrder, v))
+}
+
+// SortOrderLTE applies the LTE predicate on the "sort_order" field.
+func SortOrderLTE(v int) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldLTE(FieldSortOrder, v))
+}
+
+// SchedulingConfiguredEQ applies the EQ predicate on the "scheduling_configured" field.
+func SchedulingConfiguredEQ(v bool) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldEQ(FieldSchedulingConfigured, v))
+}
+
+// SchedulingConfiguredNEQ applies the NEQ predicate on the "scheduling_configured" field.
+func SchedulingConfiguredNEQ(v bool) predicate.AccountGroup {
+	return predicate.AccountGroup(sql.FieldNEQ(FieldSchedulingConfigured, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

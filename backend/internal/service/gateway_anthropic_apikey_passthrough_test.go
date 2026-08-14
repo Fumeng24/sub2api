@@ -648,36 +648,42 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_CountTokens404PassthroughNotE
 		statusCode      int
 		respBody        string
 		wantPassthrough bool
+		wantStatus      int
 	}{
 		{
 			name:            "404 endpoint not found passes through as 404",
 			statusCode:      http.StatusNotFound,
 			respBody:        `{"error":{"message":"Not found: /v1/messages/count_tokens","type":"not_found_error"}}`,
 			wantPassthrough: true,
+			wantStatus:      http.StatusNotFound,
 		},
 		{
 			name:            "404 generic not found does not passthrough",
 			statusCode:      http.StatusNotFound,
 			respBody:        `{"error":{"message":"resource not found","type":"not_found_error"}}`,
 			wantPassthrough: false,
+			wantStatus:      http.StatusNotFound,
 		},
 		{
 			name:            "400 Invalid URL does not passthrough",
 			statusCode:      http.StatusBadRequest,
 			respBody:        `{"error":{"message":"Invalid URL (POST /v1/messages/count_tokens)","type":"invalid_request_error"}}`,
 			wantPassthrough: false,
+			wantStatus:      http.StatusBadRequest,
 		},
 		{
 			name:            "400 model error does not passthrough",
 			statusCode:      http.StatusBadRequest,
 			respBody:        `{"error":{"message":"model not found: claude-unknown","type":"invalid_request_error"}}`,
 			wantPassthrough: false,
+			wantStatus:      http.StatusBadRequest,
 		},
 		{
 			name:            "500 internal error does not passthrough",
 			statusCode:      http.StatusInternalServerError,
 			respBody:        `{"error":{"message":"internal error","type":"api_error"}}`,
 			wantPassthrough: false,
+			wantStatus:      http.StatusBadGateway,
 		},
 	}
 
@@ -735,7 +741,7 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_CountTokens404PassthroughNotE
 				require.Equal(t, "not_found_error", errObj["type"])
 			} else {
 				require.Error(t, err)
-				require.Equal(t, tt.statusCode, rec.Code)
+				require.Equal(t, tt.wantStatus, rec.Code)
 			}
 		})
 	}
@@ -1097,7 +1103,7 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_StreamingStillCollectsUsageAf
 	require.Equal(t, 5, result.usage.OutputTokens)
 }
 
-func TestGatewayService_AnthropicAPIKeyPassthrough_MissingTerminalEventReturnsError(t *testing.T) {
+func TestGatewayService_AnthropicAPIKeyPassthrough_MissingTerminalEventWithUsageReturnsSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	rec := httptest.NewRecorder()
@@ -1125,9 +1131,11 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_MissingTerminalEventReturnsEr
 	}
 
 	result, err := svc.handleStreamingResponseAnthropicAPIKeyPassthrough(context.Background(), resp, c, &Account{ID: 1}, time.Now(), "claude-3-7-sonnet-20250219")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "missing terminal event")
+	require.NoError(t, err)
 	require.NotNil(t, result)
+	require.NotNil(t, result.usage)
+	require.Equal(t, 11, result.usage.InputTokens)
+	require.Equal(t, 5, result.usage.OutputTokens)
 }
 
 func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardDirect_NonStreamingSuccess(t *testing.T) {
@@ -1208,9 +1216,12 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardDirect_UpstreamRequest
 
 	result, err := svc.forwardAnthropicAPIKeyPassthrough(context.Background(), c, account, []byte(`{"model":"x"}`), "x", "x", false, time.Now())
 	require.Nil(t, result)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "upstream request failed")
-	require.Equal(t, http.StatusBadGateway, rec.Code)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, 0, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "dial tcp timeout")
+	require.True(t, failoverErr.RetryableOnSameAccount)
+	require.Equal(t, 0, rec.Body.Len())
 }
 
 func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardDirect_EmptyResponseBody(t *testing.T) {

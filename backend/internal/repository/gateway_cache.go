@@ -93,10 +93,10 @@ func (c *gatewayCache) GetGrokVideoPendingBilling(ctx context.Context, key strin
 		return nil, errors.New("invalid grok video pending billing key")
 	}
 	val, err := c.rdb.Get(ctx, grokVideoPendingBillingPrefix+key).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return nil, nil
+	}
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	return val, nil

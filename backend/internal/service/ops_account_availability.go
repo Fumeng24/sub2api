@@ -66,6 +66,10 @@ func (s *OpsService) GetAccountAvailabilityStats(ctx context.Context, platformFi
 		}
 
 		isAvailable := acc.Status == StatusActive && acc.Schedulable && !isRateLimited && !isOverloaded && !isTempUnsched
+		blockReason := ""
+		if flags, handled := accountAvailabilityFlagsCustom(&acc, now); handled {
+			blockReason, isAvailable, isRateLimited, isOverloaded, isTempUnsched, hasError = flags.values()
+		}
 
 		if acc.Platform != "" {
 			if _, ok := platform[acc.Platform]; !ok {
@@ -124,6 +128,7 @@ func (s *OpsService) GetAccountAvailabilityStats(ctx context.Context, platformFi
 			GroupID:     displayGroupID,
 			GroupName:   displayGroupName,
 			Status:      acc.Status,
+			BlockReason: blockReason,
 
 			IsAvailable:   isAvailable,
 			IsRateLimited: isRateLimited,

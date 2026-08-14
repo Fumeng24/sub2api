@@ -24,6 +24,7 @@ type ChannelMonitorRepository interface {
 	Update(ctx context.Context, m *ChannelMonitor) error
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, params ChannelMonitorListParams) ([]*ChannelMonitor, int64, error)
+	UpdateSortOrders(ctx context.Context, updates []ChannelMonitorSortOrderUpdate) error
 	FindByDuplicateOperationID(ctx context.Context, operationID string) (*ChannelMonitor, error)
 
 	// 调度器辅助
@@ -61,19 +62,11 @@ type ChannelMonitorRepository interface {
 	UpdateAggregationWatermark(ctx context.Context, date time.Time) error
 }
 
-// channelMonitorRuntimeReader is the optional settings view used to gate V1
-// active probes by channel_monitor_enabled + channel_monitor_mode.
-type channelMonitorRuntimeReader interface {
-	GetChannelMonitorRuntime(ctx context.Context) ChannelMonitorRuntime
-}
-
 // ChannelMonitorService 渠道监控管理服务。
 type ChannelMonitorService struct {
 	repo      ChannelMonitorRepository
 	encryptor SecretEncryptor
-	// settings is optional; when nil, RunCheck fails closed for active probes
-	// (mode defaults to v2 / retired) so tests without settings never hit upstream.
-	settings channelMonitorRuntimeReader
+	channelMonitorServiceCustomFields
 	// scheduler 由 wire 通过 SetScheduler 注入；CRUD 后调用对应钩子即时同步任务。
 	// 测试或未注入场景下保持 nil，所有钩子调用变为 no-op。
 	scheduler MonitorScheduler
@@ -92,22 +85,6 @@ func NewChannelMonitorService(repo ChannelMonitorRepository, encryptor SecretEnc
 	return &ChannelMonitorService{repo: repo, encryptor: encryptor}
 }
 
-// SetRuntimeReader injects the settings reader used to gate active probes.
-// Optional: when unset, active probes are treated as mode=v2 (retired).
-func (s *ChannelMonitorService) SetRuntimeReader(r channelMonitorRuntimeReader) {
-	if s == nil {
-		return
-	}
-	s.settings = r
-}
-
-func (s *ChannelMonitorService) probeRuntime(ctx context.Context) ChannelMonitorRuntime {
-	if s == nil || s.settings == nil {
-		return ChannelMonitorRuntime{Enabled: true, Mode: ChannelMonitorModeV2}
-	}
-	return s.settings.GetChannelMonitorRuntime(ctx)
-}
-
 // ---------- CRUD ----------
 
 // List 列表查询（支持 provider/enabled/search 过滤 + 分页）。
@@ -124,18 +101,18 @@ func (s *ChannelMonitorService) List(ctx context.Context, params ChannelMonitorL
 		return nil, 0, fmt.Errorf("list channel monitors: %w", err)
 	}
 	for _, it := range items {
-		s.decryptInPlace(it)
+		s.resolveDisplayAPIKeyInPlace(ctx, it)
 	}
 	return items, total, nil
 }
 
-// Get 查询单个监控（解密 API Key）。
+// Get 查询单个监控（解析 API Key 用于脱敏展示）。
 func (s *ChannelMonitorService) Get(ctx context.Context, id int64) (*ChannelMonitor, error) {
 	m, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	s.decryptInPlace(m)
+	s.resolveDisplayAPIKeyInPlace(ctx, m)
 	return m, nil
 }
 
@@ -150,7 +127,11 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 	if err := validateExtraHeaders(p.ExtraHeaders); err != nil {
 		return nil, err
 	}
-	encrypted, err := s.encryptor.Encrypt(p.APIKey)
+	plainAPIKey, linkedAPIKeyID, err := s.resolveCreateAPIKey(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	encrypted, err := s.encryptor.Encrypt(plainAPIKey)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt api key: %w", err)
 	}
@@ -160,9 +141,11 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		APIMode:          defaultAPIMode(p.APIMode),
 		Endpoint:         normalizeEndpoint(p.Endpoint),
 		APIKey:           encrypted, // 注意：传入 repository 时该字段为密文
+		APIKeyID:         cloneInt64Ptr(linkedAPIKeyID),
 		PrimaryModel:     normalizeMonitorPrimaryModel(p.Provider, p.PrimaryModel),
 		ExtraModels:      normalizeModels(p.ExtraModels),
 		GroupName:        strings.TrimSpace(p.GroupName),
+		SortOrder:        p.SortOrder,
 		Enabled:          p.Enabled,
 		IntervalSeconds:  p.IntervalSeconds,
 		JitterSeconds:    p.JitterSeconds,
@@ -177,7 +160,7 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 	}
 	// 不再调 s.Get 重走解密链：已知刚加密的明文，直接构造响应。
 	// 这样可避免 SecretEncryptor 解密失败时 APIKey 被静默清空的问题（见 Fix 4）。
-	m.APIKey = strings.TrimSpace(p.APIKey)
+	m.APIKey = plainAPIKey
 	if s.scheduler != nil {
 		s.scheduler.Schedule(m)
 	}
@@ -353,13 +336,16 @@ func validateCreateParams(p ChannelMonitorCreateParams) error {
 	if err := validateInterval(p.IntervalSeconds); err != nil {
 		return err
 	}
+	if err := validateChannelMonitorCreateCustom(p); err != nil {
+		return err
+	}
 	if err := validateJitter(p.JitterSeconds, p.IntervalSeconds); err != nil {
 		return err
 	}
 	if err := validateEndpoint(p.Endpoint); err != nil {
 		return err
 	}
-	if strings.TrimSpace(p.APIKey) == "" {
+	if p.APIKeyID == nil && strings.TrimSpace(p.APIKey) == "" {
 		return ErrChannelMonitorMissingAPIKey
 	}
 	if normalizeMonitorPrimaryModel(p.Provider, p.PrimaryModel) == "" {
@@ -378,7 +364,7 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 		return nil, err
 	}
 
-	newPlainAPIKey, apiKeyUpdated, err := s.applyAPIKeyUpdate(existing, p.APIKey)
+	newPlainAPIKey, apiKeyUpdated, err := s.applyAPIKeyUpdateCustom(ctx, existing, p)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +377,7 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 	if apiKeyUpdated {
 		existing.APIKey = newPlainAPIKey
 	} else {
-		s.decryptInPlace(existing)
+		s.resolveDisplayAPIKeyInPlace(ctx, existing)
 	}
 	if s.scheduler != nil {
 		// Schedule 内部根据 Enabled 自动选择 Unschedule 或重建任务，
@@ -452,22 +438,15 @@ func (s *ChannelMonitorService) ListHistory(ctx context.Context, id int64, model
 
 // RunCheck 同步触发对一个监控的检测：并发跑 primary + extra 模型，
 // 写历史记录并更新 last_checked_at。返回每个模型的检测结果。
-// 仅当 channel_monitor_enabled=true 且 channel_monitor_mode=v1 时真正探测；
-// mode=v2 时返回 ErrChannelMonitorActiveProbesRetired，不产生上游流量。
 func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*CheckResult, error) {
-	rt := s.probeRuntime(ctx)
-	if !rt.Enabled {
-		return nil, ErrChannelMonitorDisabled
-	}
-	if !rt.ActiveProbesAllowed() {
-		return nil, ErrChannelMonitorActiveProbesRetired
-	}
-	m, err := s.Get(ctx, id) // 已解密 APIKey
+	m, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if m.APIKeyDecryptFailed {
-		return nil, ErrChannelMonitorAPIKeyDecryptFailed
+	if err := s.resolveRuntimeAPIKeyInPlace(ctx, m); err != nil {
+		results := buildChannelMonitorErrorResults(m, channelMonitorRuntimeKeyErrorKind(err)+": "+err.Error())
+		s.persistCheckResults(ctx, m, results)
+		return nil, err
 	}
 	results := s.runChecksConcurrent(ctx, m)
 	s.persistCheckResults(ctx, m, results)
@@ -548,7 +527,7 @@ func (s *ChannelMonitorService) ListEnabledMonitors(ctx context.Context) ([]*Cha
 		return nil, err
 	}
 	for _, m := range all {
-		s.decryptInPlace(m)
+		s.resolveDisplayAPIKeyInPlace(ctx, m)
 	}
 	return all, nil
 }
@@ -698,6 +677,9 @@ func applyMonitorUpdate(existing *ChannelMonitor, p ChannelMonitorUpdateParams) 
 			return err
 		}
 		existing.Endpoint = normalizeEndpoint(*p.Endpoint)
+	}
+	if err := applyChannelMonitorUpdateCustom(existing, p); err != nil {
+		return err
 	}
 	if p.PrimaryModel != nil {
 		primaryModel := normalizeMonitorPrimaryModel(existing.Provider, *p.PrimaryModel)

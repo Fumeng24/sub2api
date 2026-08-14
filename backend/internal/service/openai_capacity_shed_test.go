@@ -144,6 +144,101 @@ func TestOpenAIStreamCapacityShedErrorFramePrecedingFailedStillFailsOver(t *test
 	require.Empty(t, rec.Body.String())
 }
 
+// The response-handling path must stage large preamble events even when the
+// first-output timeout is disabled. Otherwise bufio can leak the attempt before
+// response.failed has a chance to trigger account failover.
+func TestOpenAIResponseHandlingCapacityShedLargePreambleStillFailsOver(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &OpenAIGatewayService{cfg: &config.Config{
+		Gateway: config.GatewayConfig{
+			OpenAIFirstOutputTimeoutSeconds: 0,
+			MaxLineSize:                     defaultMaxLineSize,
+		},
+	}}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	largeCreated := `data: {"type":"response.created","response":{"id":"resp_large","padding":"` +
+		strings.Repeat("x", 128*1024) + `"},"sequence_number":0}`
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			"event: response.created",
+			largeCreated,
+			"",
+			"event: error",
+			`data: {"type":"error","error":{"type":"service_unavailable_error","code":"server_is_overloaded","message":"Our servers are currently overloaded. Please try again later."},"sequence_number":1}`,
+			"",
+			"event: response.failed",
+			`data: {"type":"response.failed","response":{"id":"resp_large","status":"failed","error":{"code":"server_is_overloaded","message":"Our servers are currently overloaded. Please try again later."}},"sequence_number":2}`,
+			"",
+		}, "\n"))),
+		Header: http.Header{"X-Request-Id": []string{"rid-response-handling-shed"}},
+	}
+
+	_, err := svc.handleStreamingResponse(
+		c.Request.Context(), resp, c,
+		&Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Name: "acc"},
+		time.Now(), "model", "model",
+	)
+
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.True(t, failoverErr.RetryableOnSameAccount)
+	require.True(t, failoverErr.RequestScopedTransient)
+	require.False(t, failoverErr.SafeToFailoverAfterWrite, "no downstream bytes means normal failover must remain uncapped")
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+}
+
+// OAuth Codex traffic uses the passthrough stream path. A retryable error frame
+// must remain staged with even a large response.created event so response.failed
+// can still trigger failover without leaking attempt-local bytes to the client.
+func TestOpenAIPassthroughCapacityShedLargePreambleStillFailsOver(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &OpenAIGatewayService{cfg: &config.Config{
+		Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize},
+	}}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	largeCreated := `data: {"type":"response.created","response":{"id":"resp_large","padding":"` +
+		strings.Repeat("x", 128*1024) + `"},"sequence_number":0}`
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			"event: response.created",
+			largeCreated,
+			"",
+			"event: response.in_progress",
+			`data: {"type":"response.in_progress","response":{"id":"resp_large"},"sequence_number":1}`,
+			"",
+			"event: error",
+			`data: {"type":"error","error":{"type":"service_unavailable_error","code":"server_is_overloaded","message":"Our servers are currently overloaded. Please try again later."},"sequence_number":2}`,
+			"",
+			"event: response.failed",
+			`data: {"type":"response.failed","response":{"id":"resp_large","status":"failed","error":{"code":"server_is_overloaded","message":"Our servers are currently overloaded. Please try again later."}},"sequence_number":3}`,
+			"",
+		}, "\n"))),
+		Header: http.Header{"X-Request-Id": []string{"rid-passthrough-shed"}},
+	}
+
+	_, err := svc.handleStreamingResponsePassthrough(
+		c.Request.Context(), resp, c,
+		&Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Name: "acc"},
+		time.Now(), "model", "model",
+	)
+
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.True(t, failoverErr.RetryableOnSameAccount)
+	require.True(t, failoverErr.RequestScopedTransient)
+	require.False(t, c.Writer.Written())
+	require.Empty(t, rec.Body.String())
+	_, marked := GetOpsStreamError(c)
+	require.False(t, marked, "a recoverable upstream attempt is not a client-visible failure")
+}
+
 // 流中途（已有真实输出）降载时无法再 failover，此时必须把降载码改写为客户端
 // 可重试的 server_error 再转发——Codex 对 server_is_overloaded/slow_down 判致命
 // 并终止会话，对其余错误码执行内置退避重试。消息原样保留。
@@ -188,6 +283,11 @@ func TestOpenAIStreamCapacityShedAfterOutputRewritesCodeForClient(t *testing.T) 
 	require.Contains(t, body, `"code":"server_error"`)
 	require.NotContains(t, body, "server_is_overloaded")
 	require.Contains(t, body, "Our servers are currently overloaded")
+	streamErr, ok := GetOpsStreamError(c)
+	require.True(t, ok)
+	require.True(t, streamErr.CountTowardsSLA)
+	require.Equal(t, http.StatusServiceUnavailable, streamErr.IntendedStatus)
+	require.Equal(t, "server_is_overloaded", streamErr.Code)
 }
 
 // helper 单测：只有降载码被改写，其余错误码（尤其 rate_limit_exceeded，客户端
@@ -241,6 +341,13 @@ func TestSanitizeOpenAICapacityShedErrorCodeForClient(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestOpenAIStreamDiagnosticEventType(t *testing.T) {
+	require.Equal(t, "response.output_item.added", openAIStreamDiagnosticEventType(" response.output_item.added "))
+	require.Equal(t, "unknown", openAIStreamDiagnosticEventType(""))
+	require.Equal(t, "unknown", openAIStreamDiagnosticEventType("response.output_text.delta\nsecret"))
+	require.Equal(t, "unknown", openAIStreamDiagnosticEventType(strings.Repeat("x", 97)))
 }
 
 // 出站身份的版本声明只能有一个来源：UA 的版本段、version 头、探针版本三处必须同源，

@@ -259,7 +259,10 @@ func (r *dashboardAggregationRepository) CleanupUsageBillingDedup(ctx context.Co
 			WHERE ctid IN (SELECT ctid FROM victims)
 		`, cutoff.UTC(), usageBillingDedupCleanupBatchSize)
 		if err != nil {
-			return err
+			res, err = r.cleanupUsageBillingDedupErrorCustom(ctx, cutoff, err)
+			if err != nil {
+				return err
+			}
 		}
 		affected, err := res.RowsAffected()
 		if err != nil {

@@ -24,17 +24,12 @@ func parentHealthyForShadow(account *Account, lookup func(int64) *Account) bool 
 	return parent.IsOpenAIOAuth() && parent.IsCredentialUsableForShadow()
 }
 
-// sparkModelVariants 返回所有归一到 spark 的模型 ID（当前仅 base：spark 无 effort 变体）。
-// 从 codexModelMap 派生，使集合与别名表单一来源、不漂移；若上游将来新增 spark 变体，
-// 在 codexModelMap 注册后此处自动跟随。
+// sparkModelVariants returns the explicit model IDs accepted by spark shadow
+// accounts. Codex transform may still normalize effort aliases for compatibility,
+// but shadow account model_mapping stays base-only so routing cannot silently
+// broaden to extra aliases.
 func sparkModelVariants() []string {
-	out := make([]string, 0, 1)
-	for alias, target := range codexModelMap {
-		if target == "gpt-5.3-codex-spark" {
-			out = append(out, alias)
-		}
-	}
-	return out
+	return []string{"gpt-5.3-codex-spark"}
 }
 
 // defaultSparkShadowModelMapping 返回 spark 影子账号的默认 model_mapping。

@@ -129,6 +129,9 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 				Kind:               "request_error",
 				Message:            safeErr,
 			})
+			if customErr, handled := newAnthropicPassthroughRequestFailoverCustom(safeErr); handled {
+				return nil, customErr
+			}
 			c.JSON(http.StatusBadGateway, gin.H{
 				"type": "error",
 				"error": gin.H{
@@ -225,6 +228,10 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 			}
 		}
 		return s.handleRetryExhaustedError(ctx, resp, c, account)
+	}
+
+	if result, err, handled := s.handleAnthropicPassthrough400FailoverCustom(ctx, c, account, resp, input.RequestModel); handled {
+		return result, err
 	}
 
 	if resp.StatusCode >= 400 && s.shouldFailoverUpstreamError(resp.StatusCode) {
@@ -513,6 +520,9 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 						if time.Since(lastRead) >= streamInterval {
 							return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: true}, fmt.Errorf("stream usage incomplete after timeout")
 						}
+					}
+					if result, handled := handleAnthropicPassthroughIncompleteStreamCustom(account, usage, firstTokenMs, clientDisconnected); handled {
+						return result, nil
 					}
 					return &streamingResult{usage: usage, firstTokenMs: firstTokenMs, clientDisconnect: clientDisconnected}, fmt.Errorf("stream usage incomplete: missing terminal event")
 				}

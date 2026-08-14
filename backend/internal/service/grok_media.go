@@ -427,7 +427,11 @@ func (s *OpenAIGatewayService) StoreGrokVideoPendingBilling(
 	if err != nil {
 		return err
 	}
-	return s.cache.SetGrokVideoPendingBilling(ctx, key, payload, grokVideoPendingBillingTTL(s.cfg))
+	billingCache, ok := s.cache.(GrokVideoBillingCache)
+	if !ok {
+		return fmt.Errorf("grok video pending billing cache is unsupported")
+	}
+	return billingCache.SetGrokVideoPendingBilling(ctx, key, payload, grokVideoPendingBillingTTL(s.cfg))
 }
 
 // LoadGrokVideoPendingBilling returns the create-time snapshot (may be nil on miss).
@@ -443,7 +447,11 @@ func (s *OpenAIGatewayService) LoadGrokVideoPendingBilling(
 	if key == "" {
 		return nil, fmt.Errorf("grok video pending billing key is invalid")
 	}
-	payload, err := s.cache.GetGrokVideoPendingBilling(ctx, key)
+	billingCache, ok := s.cache.(GrokVideoBillingCache)
+	if !ok {
+		return nil, fmt.Errorf("grok video pending billing cache is unsupported")
+	}
+	payload, err := billingCache.GetGrokVideoPendingBilling(ctx, key)
 	if err != nil || len(payload) == 0 {
 		return nil, err
 	}
@@ -468,7 +476,11 @@ func (s *OpenAIGatewayService) ClaimGrokVideoBilling(
 	if key == "" {
 		return false, fmt.Errorf("grok video billing claim key is invalid")
 	}
-	return s.cache.ClaimGrokVideoBilled(ctx, key, grokVideoBilledClaimTTL(s.cfg))
+	billingCache, ok := s.cache.(GrokVideoBillingCache)
+	if !ok {
+		return false, fmt.Errorf("grok video billing claim cache is unsupported")
+	}
+	return billingCache.ClaimGrokVideoBilled(ctx, key, grokVideoBilledClaimTTL(s.cfg))
 }
 
 // ReleaseGrokVideoBilling clears a claim after a failed durable RecordUsage so a
@@ -485,7 +497,11 @@ func (s *OpenAIGatewayService) ReleaseGrokVideoBilling(
 	if key == "" {
 		return fmt.Errorf("grok video billing claim key is invalid")
 	}
-	return s.cache.ReleaseGrokVideoBilled(ctx, key)
+	billingCache, ok := s.cache.(GrokVideoBillingCache)
+	if !ok {
+		return fmt.Errorf("grok video billing claim cache is unsupported")
+	}
+	return billingCache.ReleaseGrokVideoBilled(ctx, key)
 }
 
 // StableGrokVideoBillingRequestID is the durable usage_logs / dedup key for one
@@ -1121,6 +1137,19 @@ func sanitizeGrokMediaForwardBody(endpoint GrokMediaEndpoint, body []byte, conte
 
 func (r GrokMediaRequestInfo) HasInputImage() bool {
 	return len(r.InputImageURLs) > 0 || len(r.Uploads) > 0
+}
+
+// HasImageEditInput reports whether a request contains source or mask image
+// data, including multipart uploads.
+func (r GrokMediaRequestInfo) HasImageEditInput() bool {
+	return r.HasInputImage() || strings.TrimSpace(r.MaskImageURL) != "" || r.MaskUpload != nil
+}
+
+// GrokImageModelSupportsEditing identifies the explicit xAI image-edit model.
+// Keep this model-scoped so a reference image cannot silently route to the
+// text-to-image model.
+func GrokImageModelSupportsEditing(model string) bool {
+	return strings.Contains(strings.ToLower(strings.TrimSpace(model)), "imagine-edit")
 }
 
 // NormalizeGrokMediaModelForEndpoint resolves the built-in upstream model alias

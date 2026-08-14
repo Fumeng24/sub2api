@@ -343,6 +343,7 @@ func redeemBatchUpdateFieldsFromDTO(in dto.BatchUpdateRedeemCodeFields) service.
 		Type:   in.Type,
 		Value:  in.Value,
 	}
+	service.SetRedeemCodeBatchBusinessCategoryCustom(&out, in.BusinessCategory)
 	if in.ExpiresAt.Set {
 		out.ExpiresAt = service.NullableTimeUpdate{Set: true, Value: in.ExpiresAt.Value}
 	}

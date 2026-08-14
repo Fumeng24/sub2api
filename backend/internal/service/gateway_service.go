@@ -476,15 +476,15 @@ type GatewayCache interface {
 	// Delete sticky session binding, used to proactively clean up when account becomes unavailable
 	DeleteSessionAccountID(ctx context.Context, groupID int64, sessionHash string) error
 
-	// Grok async video billing snapshot (create → status success).
-	// SetGrokVideoPendingBilling stores create-time model/duration/resolution for status billing.
+}
+
+// GrokVideoBillingCache is an optional extension implemented by caches that
+// support durable async-video billing. Keeping it separate preserves
+// compatibility with lightweight GatewayCache test/dry-run implementations.
+type GrokVideoBillingCache interface {
 	SetGrokVideoPendingBilling(ctx context.Context, key string, payload []byte, ttl time.Duration) error
-	// GetGrokVideoPendingBilling returns the create-time billing snapshot; miss → nil, nil.
 	GetGrokVideoPendingBilling(ctx context.Context, key string) ([]byte, error)
-	// ClaimGrokVideoBilled atomically marks a video request as billed (SetNX).
-	// Returns true when this caller won the claim; false when already billed or claim unavailable.
 	ClaimGrokVideoBilled(ctx context.Context, key string, ttl time.Duration) (bool, error)
-	// ReleaseGrokVideoBilled clears a claim so a failed RecordUsage can retry billing.
 	ReleaseGrokVideoBilled(ctx context.Context, key string) error
 }
 
@@ -561,6 +561,7 @@ type AccountSelectionResult struct {
 	Acquired    bool
 	ReleaseFunc func()
 	WaitPlan    *AccountWaitPlan // nil means no wait allowed
+	accountSelectionResultCustom
 	// profitGate 携带本次选号真实生效的利润门（无门为 nil）。门安装在调度栈的
 	// 局部 ctx 上，handler 必须经 ContextWithSelectionProfitGate 重放后才能在
 	// 调度栈之外做抢槽后终检与准入后粘性绑定。
@@ -658,6 +659,8 @@ type UpstreamFailoverError struct {
 	ResponseHeaders          http.Header // 上游响应头，用于透传 cf-ray/cf-mitigated/content-type 等诊断信息
 	ForceCacheBilling        bool        // Antigravity 粘性会话切换时设为 true
 	RetryableOnSameAccount   bool        // 临时性错误（如 Google 间歇性 400、空响应），应在同一账号上重试 N 次再切换
+	RetryOnSelectionExhausted bool       // 候选耗尽后允许清空排除列表并退避重试
+	SchedulerCategory         string     // 本站调度健康分类覆盖
 	RequestScopedTransient   bool        // 故障因素与账号无关（如上游按客户端身份/模型容量降载）：可同账号重试，但不得据此对账号做临时封禁
 	SafeToFailoverAfterWrite bool        // 仅写出 SSE 注释等非语义字节时，仍可在同一客户端流中切换账号
 	Stage                    GatewayFailureStage
@@ -763,6 +766,7 @@ type GatewayService struct {
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	gatewayServiceCustomDependencies
 }
 
 // NewGatewayService creates a new GatewayService

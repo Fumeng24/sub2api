@@ -44,7 +44,7 @@ type BatchImageGroupPricingRepository interface {
 }
 
 type BatchImageUserGroupRateRepository interface {
-	GetByUserAndGroup(ctx context.Context, userID, groupID int64) (*float64, error)
+	GetRateConfigByUserAndGroup(ctx context.Context, userID, groupID int64) (*UserGroupRateConfig, error)
 }
 
 type BatchImageSubmitRequest struct {
@@ -1018,12 +1018,17 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 		}
 		effectiveGroupMultiplier := groupDefaultMultiplier
 		if s.UserGroupRateRepo != nil {
-			userRate, rateErr := s.UserGroupRateRepo.GetByUserAndGroup(ctx, owner.UserID, group.ID)
+			userRate, rateErr := s.UserGroupRateRepo.GetRateConfigByUserAndGroup(ctx, owner.UserID, group.ID)
 			if rateErr != nil {
 				return nil, ErrBatchImageSettlementPricingMissing
 			}
 			if userRate != nil {
-				effectiveGroupMultiplier = *userRate
+				switch {
+				case userRate.RateMultiplier != nil:
+					effectiveGroupMultiplier = *userRate.RateMultiplier
+				case userRate.DiscountMultiplier != nil:
+					effectiveGroupMultiplier = groupDefaultMultiplier * *userRate.DiscountMultiplier
+				}
 			}
 		}
 		groupMultiplier = effectiveGroupMultiplier

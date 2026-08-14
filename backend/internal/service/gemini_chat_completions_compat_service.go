@@ -37,6 +37,9 @@ func (s *GeminiMessagesCompatService) ForwardAsChatCompletions(
 	if strings.TrimSpace(ccReq.Model) == "" {
 		return nil, s.writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", "model is required")
 	}
+	if account.Type == AccountTypeAPIKey && isImageGenerationModel(ccReq.Model) {
+		return s.forwardImageAsRawChatCompletions(ctx, c, account, body)
+	}
 
 	originalModel := ccReq.Model
 	clientStream := ccReq.Stream
@@ -131,7 +134,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 				AccountID:          account.ID,
 				AccountName:        account.Name,
 				UpstreamStatusCode: 0,
-				Kind:               "request_error",
+				Kind:               "failover",
 				Message:            safeErr,
 			})
 			if attempt < geminiMaxRetries {
@@ -140,6 +143,9 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 				continue
 			}
 			setOpsUpstreamError(c, 0, safeErr, "")
+			if customErr, handled := geminiChatCompletionsRequestFailoverCustom(safeErr); handled {
+				return nil, customErr
+			}
 			return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed after retries: "+safeErr)
 		}
 
@@ -215,12 +221,14 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 		if s.rateLimitService != nil {
 			policy = s.rateLimitService.CheckErrorPolicy(ctx, account, resp.StatusCode, respBody, mappedModel)
 		}
-		// 与 messages 兼容层一致：只有 None / Matched 才走账号状态处理。
-		// Skipped（池模式、或自定义错误码未命中）与 TempUnscheduled 已由策略层裁决完毕。
-		if policy == ErrorPolicyNone || policy == ErrorPolicyMatched {
+		evBody := unwrapIfNeeded(account.Type == AccountTypeOAuth, respBody)
+		if s.shouldFailoverGeminiBillingExhaustion(ctx, c, account, resp.StatusCode, resp.Header, requestID, respBody, evBody) {
+			return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode, ResponseBody: evBody}
+		}
+
+		if policy != ErrorPolicyTempUnscheduled {
 			s.handleGeminiUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
 		}
-		evBody := unwrapIfNeeded(account.Type == AccountTypeOAuth, respBody)
 
 		if s.shouldFailoverGeminiUpstreamError(resp.StatusCode) {
 			upstreamMsg := sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(evBody)))
@@ -821,6 +829,10 @@ func (s *GeminiMessagesCompatService) writeGeminiChatCompletionsMappedError(
 		})
 	}
 
+	if customErr, handled := s.writeGeminiChatCompletionsErrorOverride(c, upstreamStatus, upstreamMsg, body); handled {
+		return customErr
+	}
+
 	if status, errType, errMsg, matched := applyErrorPassthroughRule(
 		c,
 		PlatformGemini,
@@ -892,6 +904,7 @@ func (s *GeminiMessagesCompatService) writeGeminiChatCompletionsMappedError(
 }
 
 func (s *GeminiMessagesCompatService) writeChatCompletionsError(c *gin.Context, status int, errType, message string) error {
+	message = ClientFacingErrorMessage(status, errType, message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"type":    errType,

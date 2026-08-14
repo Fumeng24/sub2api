@@ -305,6 +305,7 @@ func buildPaymentOrderProviderSnapshot(sel *payment.InstanceSelection, req Creat
 		}
 		snapshot["currency"] = paymentProviderConfigCurrency(providerKey, sel.Config)
 	}
+	extendPaymentOrderProviderSnapshotCustom(snapshot, sel)
 
 	if len(snapshot) == 1 {
 		return nil
@@ -398,7 +399,7 @@ func (s *PaymentService) usesOfficialWxpayVisibleMethod(ctx context.Context) boo
 }
 
 func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.PaymentOrder, req CreateOrderRequest, cfg *PaymentConfig, limitAmount float64, payAmountStr string, payAmount float64, plan *dbent.SubscriptionPlan, sel *payment.InstanceSelection) (*CreateOrderResponse, error) {
-	prov, err := provider.CreateProvider(sel.ProviderKey, sel.InstanceID, sel.Config)
+	prov, err := provider.CreateProviderWithExtensions(sel.ProviderKey, sel.InstanceID, sel.Config)
 	if err != nil {
 		slog.Error("[PaymentService] CreateProvider failed", "provider", sel.ProviderKey, "instance", sel.InstanceID, "error", err)
 		// If the provider returned a structured ApplicationError (e.g. WXPAY_CONFIG_MISSING_KEY),

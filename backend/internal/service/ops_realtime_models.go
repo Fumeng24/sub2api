@@ -78,6 +78,8 @@ type AccountAvailability struct {
 
 	Status string `json:"status"`
 
+	BlockReason string `json:"block_reason,omitempty"`
+
 	IsAvailable   bool `json:"is_available"`
 	IsRateLimited bool `json:"is_rate_limited"`
 	IsOverloaded  bool `json:"is_overloaded"`

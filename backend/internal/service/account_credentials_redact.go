@@ -7,8 +7,6 @@ var SensitiveCredentialKeys = []string{
 	"access_token", "refresh_token", "id_token", "agent_private_key",
 	// API Key 类
 	"api_key", "session_key", "cookie",
-	// Grok Web SSO / password (must never persist or echo after Build OAuth)
-	"password", "sso_token", "sso", "sso-rw", "clearTextPassword",
 	// 云服务凭据
 	"aws_secret_access_key", "aws_session_token",
 	"service_account_json", "service_account", "private_key",
@@ -25,7 +23,7 @@ var sensitiveCredentialKeySet = func() map[string]struct{} {
 // IsSensitiveCredentialKey 判断指定键是否为敏感凭证子键。
 func IsSensitiveCredentialKey(key string) bool {
 	_, ok := sensitiveCredentialKeySet[key]
-	return ok
+	return ok || isSensitiveCredentialKeyCustom(key)
 }
 
 // MergePreservingSensitiveCreds 把 incoming 写入 existing 之上，但敏感子键采用"incoming 没提供就保留 existing"
@@ -36,6 +34,9 @@ func IsSensitiveCredentialKey(key string) bool {
 //   - 非敏感键：完全由 incoming 决定（用户可以编辑、删除非敏感字段）。
 //   - 敏感键：incoming 显式提供则覆盖（用户主动旋转 token），否则保留 existing。
 func MergePreservingSensitiveCreds(existing, incoming map[string]any) map[string]any {
+	if out, handled := mergePreservingSensitiveCredsCustom(existing, incoming); handled {
+		return out
+	}
 	out := make(map[string]any, len(incoming)+len(SensitiveCredentialKeys))
 	for k, v := range incoming {
 		out[k] = v

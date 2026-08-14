@@ -289,7 +289,6 @@ FROM cleared`, userID)
 		affected, err := txClient.User.Update().
 			Where(user.IDEQ(userID)).
 			AddBalance(transferred).
-			AddTotalRecharged(transferred).
 			Save(txCtx)
 		if err != nil {
 			return fmt.Errorf("credit user balance by affiliate quota: %w", err)
@@ -796,9 +795,12 @@ WHERE user_id = $1`, userID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		if err := rows.Close(); err != nil {
 			return nil, err
 		}
 		return nil, service.ErrAffiliateProfileNotFound
@@ -820,6 +822,10 @@ WHERE user_id = $1`, userID)
 		&out.CreatedAt,
 		&out.UpdatedAt,
 	); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
 		return nil, err
 	}
 	if inviterID.Valid {
@@ -828,6 +834,9 @@ WHERE user_id = $1`, userID)
 	if rebateRate.Valid {
 		v := rebateRate.Float64
 		out.AffRebateRatePercent = &v
+	}
+	if err := hydrateAffiliateSummaryCustom(ctx, client, &out); err != nil {
+		return nil, err
 	}
 	return &out, nil
 }
@@ -851,10 +860,12 @@ LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		if err := rows.Close(); err != nil {
 			return nil, err
 		}
 		return nil, service.ErrAffiliateProfileNotFound
@@ -876,6 +887,10 @@ LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 		&out.CreatedAt,
 		&out.UpdatedAt,
 	); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
 		return nil, err
 	}
 	if inviterID.Valid {
@@ -884,6 +899,9 @@ LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 	if rebateRate.Valid {
 		v := rebateRate.Float64
 		out.AffRebateRatePercent = &v
+	}
+	if err := hydrateAffiliateSummaryCustom(ctx, client, &out); err != nil {
+		return nil, err
 	}
 	return &out, nil
 }

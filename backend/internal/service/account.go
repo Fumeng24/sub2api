@@ -6,7 +6,6 @@ import (
 	"errors"
 	"hash/fnv"
 	"log/slog"
-	"net/url"
 	"reflect"
 	"sort"
 	"strconv"
@@ -28,6 +27,7 @@ type Account struct {
 	Credentials             map[string]any
 	Extra                   map[string]any
 	ProxyID                 *int64
+	UpstreamID              *int64
 	ProxyFallbackOriginID   *int64
 	ProxyFallbackOriginName *string // 仅展示用
 	Concurrency             int
@@ -72,7 +72,6 @@ type Account struct {
 	modelMappingCacheRawPtr         uintptr
 	modelMappingCacheRawLen         int
 	modelMappingCacheRawSig         uint64
-	modelMappingCacheRuntimeVersion uint64
 
 	// header_overrides 热路径缓存（非持久化字段，同 model_mapping 缓存先例）
 	headerOverrideCache               map[string]string
@@ -178,6 +177,9 @@ func (a *Account) EffectiveLoadFactor() int {
 }
 
 func (a *Account) IsSchedulable() bool {
+	if a == nil {
+		return false
+	}
 	if !a.IsActive() || !a.Schedulable {
 		return false
 	}
@@ -555,7 +557,6 @@ func stringMappingFromRaw(raw any) map[string]string {
 }
 
 func (a *Account) GetModelMapping() map[string]string {
-	runtimeVersion := xai.RuntimeModelMappingVersion()
 	credentialsPtr := mapPtr(a.Credentials)
 	rawMapping, _ := a.Credentials["model_mapping"].(map[string]any)
 	rawPtr := mapPtr(rawMapping)
@@ -566,8 +567,7 @@ func (a *Account) GetModelMapping() map[string]string {
 	if a.modelMappingCacheReady &&
 		a.modelMappingCacheCredentialsPtr == credentialsPtr &&
 		a.modelMappingCacheRawPtr == rawPtr &&
-		a.modelMappingCacheRawLen == rawLen &&
-		a.modelMappingCacheRuntimeVersion == runtimeVersion {
+		a.modelMappingCacheRawLen == rawLen {
 		rawSig = modelMappingSignature(rawMapping)
 		rawSigReady = true
 		if a.modelMappingCacheRawSig == rawSig {
@@ -586,7 +586,6 @@ func (a *Account) GetModelMapping() map[string]string {
 	a.modelMappingCacheRawPtr = rawPtr
 	a.modelMappingCacheRawLen = rawLen
 	a.modelMappingCacheRawSig = rawSig
-	a.modelMappingCacheRuntimeVersion = runtimeVersion
 	return mapping
 }
 
@@ -819,7 +818,10 @@ func (a *Account) IsModelSupported(requestedModel string) bool {
 		return true
 	}
 	normalized := normalizeRequestedModelForLookup(a.Platform, requestedModel)
-	return normalized != requestedModel && mappingSupportsRequestedModel(mapping, normalized)
+	if normalized != requestedModel && mappingSupportsRequestedModel(mapping, normalized) {
+		return true
+	}
+	return a.isAdditionalModelSupportedCustom(requestedModel)
 }
 
 // GetMappedModel 获取映射后的模型名（支持通配符，最长优先匹配）
@@ -845,7 +847,7 @@ func (a *Account) ResolveMappedModel(requestedModel string) (mappedModel string,
 			return mappedModel, true
 		}
 	}
-	return requestedModel, false
+	return a.resolveAdditionalMappedModelCustom(requestedModel)
 }
 
 // GetOpenAICompactMode returns the compact routing mode for an OpenAI account.
@@ -1316,18 +1318,29 @@ func (a *Account) GetOpenAIRefreshToken() string {
 // traffic (OAuth authorization and token refresh) always uses the official
 // auth endpoints regardless of this value.
 func (a *Account) GetGrokBaseURL() string {
-	if a == nil || !a.IsGrok() {
+	if !a.IsGrok() {
 		return ""
 	}
+	baseURL := strings.TrimSpace(a.GetCredential("base_url"))
 	if a.IsGrokOAuth() {
-		return a.GetGrokBaseURLOr(xai.DefaultCLIBaseURL)
+		// Operators switch subscription traffic between the official CLI
+		// gateway, the official/regional API hosts and third-party relays
+		// (individual endpoints go down from time to time), so a stored
+		// value is always honored as-is. Only empty or unparseable values
+		// fall back to the default CLI gateway.
+		if baseURL == "" || !xai.IsParseableBaseURL(baseURL) {
+			return xai.DefaultCLIBaseURL
+		}
+		return baseURL
 	}
-	return a.GetGrokBaseURLOr(xai.DefaultBaseURL)
+	if baseURL != "" {
+		return baseURL
+	}
+	return xai.DefaultBaseURL
 }
 
-// GetGrokBaseURLOr resolves an explicit account endpoint, falling back to the
-// supplied default. Official OAuth endpoints are normalized here; custom
-// endpoints are retained for the request builder's operator URL policy.
+// GetGrokBaseURLOr resolves the account endpoint and falls back to the supplied
+// default when the account has no usable Grok base URL.
 func (a *Account) GetGrokBaseURLOr(defaultBaseURL string) string {
 	if a == nil || !a.IsGrok() {
 		return ""
@@ -1341,22 +1354,10 @@ func (a *Account) GetGrokBaseURLOr(defaultBaseURL string) string {
 		}
 	}
 	baseURL := strings.TrimSpace(a.GetCredential("base_url"))
-	if baseURL == "" {
+	if baseURL == "" || !xai.IsParseableBaseURL(baseURL) {
 		return defaultBaseURL
 	}
-	if !a.IsGrokOAuth() {
-		return baseURL
-	}
-	// Explicit regional/API or custom values remain pinned. Custom endpoints are checked by the
-	// operator URL policy at the request builder, which has access to config.
-	if validated, err := xai.ValidateTrustedBaseURL(baseURL); err == nil {
-		return validated
-	}
-	if parsed, err := url.Parse(baseURL); err == nil && parsed.Scheme != "" && parsed.Host != "" &&
-		parsed.User == nil && parsed.RawQuery == "" && parsed.Fragment == "" {
-		return strings.TrimRight(baseURL, "/")
-	}
-	return defaultBaseURL
+	return strings.TrimRight(baseURL, "/")
 }
 
 // GetGrokMediaBaseURL selects the upstream used by Grok Imagine APIs.
@@ -2201,6 +2202,12 @@ func (a *Account) getExtraBool(key string) bool {
 		}
 	}
 	return false
+}
+
+// ShouldConvertOpenAIImageURLToBase64 keeps provider-hosted image URLs out of
+// client responses for accounts whose upstream cannot return b64_json itself.
+func (a *Account) ShouldConvertOpenAIImageURLToBase64() bool {
+	return a != nil && a.Platform == PlatformOpenAI && a.getExtraBool("openai_image_url_to_b64")
 }
 
 // getExtraString 从 Extra 中读取指定 key 的字符串值

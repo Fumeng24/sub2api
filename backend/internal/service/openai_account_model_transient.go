@@ -19,11 +19,16 @@ const (
 	// attempt plus a failover before reaching a healthy account. Low-traffic
 	// deployments were hit hardest, which is the opposite of what a breaker
 	// should do.
-	openAIModelTransientStreakTTL     = 30 * time.Minute
-	openAIModelTransientShortCooldown = 10 * time.Second
-	openAIModelTransientLongCooldown  = 45 * time.Second
-	openAIModelTransientDefaultMax    = 4096
-	openAIModelTransientMaxModelBytes = 512
+	openAIModelTransientStreakTTL = 30 * time.Minute
+	// A visible upstream failure must remove the account+model from the next
+	// request immediately.  The first two strikes use a short quarantine so a
+	// recovered account can return without causing sticky-session churn; repeat
+	// failures back off much further.
+	openAIModelTransientShortCooldown  = 2 * time.Minute
+	openAIModelTransientRepeatCooldown = 5 * time.Minute
+	openAIModelTransientLongCooldown   = 15 * time.Minute
+	openAIModelTransientDefaultMax     = 4096
+	openAIModelTransientMaxModelBytes  = 512
 )
 
 type openAIAccountModelKey struct {
@@ -48,6 +53,7 @@ type openAIAccountModelTransientState struct {
 	mu         sync.Mutex
 	entries    map[openAIAccountModelKey]openAIAccountModelTransientEntry
 	maxEntries int
+	onChange   func(accountID int64, model string)
 }
 
 func newOpenAIAccountModelTransientState(maxEntries int) *openAIAccountModelTransientState {
@@ -58,6 +64,15 @@ func newOpenAIAccountModelTransientState(maxEntries int) *openAIAccountModelTran
 		entries:    make(map[openAIAccountModelKey]openAIAccountModelTransientEntry),
 		maxEntries: maxEntries,
 	}
+}
+
+func (s *openAIAccountModelTransientState) setChangeNotifier(notifier func(accountID int64, model string)) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.onChange = notifier
+	s.mu.Unlock()
 }
 
 func normalizeOpenAIAccountModelTransientModel(model string) string {
@@ -86,7 +101,6 @@ func (s *openAIAccountModelTransientState) recordFailure(accountID int64, model 
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.entries == nil {
 		s.entries = make(map[openAIAccountModelKey]openAIAccountModelTransientEntry)
 	}
@@ -108,12 +122,12 @@ func (s *openAIAccountModelTransientState) recordFailure(accountID int64, model 
 	entry.lastFailure = now
 	entry.lastTouched = now
 
-	cooldown := time.Duration(0)
+	cooldown := openAIModelTransientShortCooldown
 	switch {
+	case entry.failureStreak == 2:
+		cooldown = openAIModelTransientRepeatCooldown
 	case entry.failureStreak >= 3:
 		cooldown = openAIModelTransientLongCooldown
-	case entry.failureStreak == 2:
-		cooldown = openAIModelTransientShortCooldown
 	}
 	if cooldown > 0 {
 		entry.blockUntil = now.Add(cooldown)
@@ -121,11 +135,17 @@ func (s *openAIAccountModelTransientState) recordFailure(accountID int64, model 
 		entry.blockUntil = time.Time{}
 	}
 	s.entries[key] = entry
-	return openAIAccountModelTransientDecision{
+	decision := openAIAccountModelTransientDecision{
 		FailureStreak: entry.failureStreak,
 		Cooldown:      cooldown,
 		BlockUntil:    entry.blockUntil,
 	}
+	notifier := s.onChange
+	s.mu.Unlock()
+	if notifier != nil {
+		notifier(key.AccountID, key.Model)
+	}
+	return decision
 }
 
 func (s *openAIAccountModelTransientState) recordSuccess(accountID int64, model string) {
@@ -134,14 +154,68 @@ func (s *openAIAccountModelTransientState) recordSuccess(accountID int64, model 
 		return
 	}
 	s.mu.Lock()
+	_, existed := s.entries[key]
 	delete(s.entries, key)
+	notifier := s.onChange
+	s.mu.Unlock()
+	if existed && notifier != nil {
+		notifier(key.AccountID, key.Model)
+	}
+}
+
+func (s *openAIAccountModelTransientState) snapshot(accountID int64, model string) (openAIAccountModelTransientEntry, bool) {
+	key, ok := openAIAccountModelTransientKey(accountID, model)
+	if s == nil || !ok {
+		return openAIAccountModelTransientEntry{}, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entry, exists := s.entries[key]
+	if !exists || entry.lastFailure.IsZero() {
+		return openAIAccountModelTransientEntry{}, false
+	}
+	return entry, true
+}
+
+func (s *openAIAccountModelTransientState) restore(accountID int64, model string, failureStreak int, lastFailure, blockUntil *time.Time, updatedAt time.Time) {
+	key, ok := openAIAccountModelTransientKey(accountID, model)
+	if s == nil || !ok || failureStreak <= 0 || lastFailure == nil {
+		return
+	}
+	now := time.Now()
+	if now.Sub(*lastFailure) > openAIModelTransientStreakTTL || now.Before(*lastFailure) {
+		return
+	}
+	entry := openAIAccountModelTransientEntry{
+		failureStreak: failureStreak,
+		lastFailure:   *lastFailure,
+		lastTouched:   updatedAt,
+	}
+	if entry.lastTouched.IsZero() {
+		entry.lastTouched = now
+	}
+	if blockUntil != nil {
+		entry.blockUntil = *blockUntil
+	}
+	s.mu.Lock()
+	if s.entries == nil {
+		s.entries = make(map[openAIAccountModelKey]openAIAccountModelTransientEntry)
+	}
+	if existing, exists := s.entries[key]; !exists || existing.lastFailure.Before(entry.lastFailure) {
+		s.evictOldestLocked()
+		s.entries[key] = entry
+	}
 	s.mu.Unlock()
 }
 
 func (s *openAIAccountModelTransientState) isBlocked(accountID int64, model string, now time.Time) bool {
+	return s.activeFailureStreak(accountID, model, now) > 0
+}
+
+func (s *openAIAccountModelTransientState) activeFailureStreak(accountID int64, model string, now time.Time) int {
 	key, ok := openAIAccountModelTransientKey(accountID, model)
 	if s == nil || !ok {
-		return false
+		return 0
 	}
 	if now.IsZero() {
 		now = time.Now()
@@ -151,15 +225,18 @@ func (s *openAIAccountModelTransientState) isBlocked(accountID int64, model stri
 	defer s.mu.Unlock()
 	entry, exists := s.entries[key]
 	if !exists {
-		return false
+		return 0
 	}
 	if !entry.lastFailure.IsZero() && now.Sub(entry.lastFailure) > openAIModelTransientStreakTTL {
 		delete(s.entries, key)
-		return false
+		return 0
 	}
 	entry.lastTouched = now
 	s.entries[key] = entry
-	return !entry.blockUntil.IsZero() && now.Before(entry.blockUntil)
+	if entry.blockUntil.IsZero() || !now.Before(entry.blockUntil) {
+		return 0
+	}
+	return entry.failureStreak
 }
 
 func (s *openAIAccountModelTransientState) size() int {

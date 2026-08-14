@@ -193,11 +193,7 @@ func (s *AccountTestService) buildGrokUpstreamModelsRequest(ctx context.Context,
 		if err != nil {
 			return nil, newUpstreamModelSyncConfigError("Invalid Grok base URL", err)
 		}
-		baseURL := account.GetGrokBaseURL()
-		if s.settingService != nil {
-			baseURL = s.settingService.ResolveGrokBaseURL(ctx, account)
-		}
-		validatedBaseURL, err := validator(baseURL)
+		validatedBaseURL, err := validator(account.GetGrokBaseURL())
 		if err != nil {
 			return nil, newUpstreamModelSyncConfigError("Invalid Grok base URL", err)
 		}
@@ -511,6 +507,9 @@ type upstreamModelEntryMetadata struct {
 }
 
 func extractUpstreamModelIDs(body []byte) ([]string, error) {
+	if models, handled, err := extractCustomUpstreamModelIDs(body); handled {
+		return models, err
+	}
 	return extractUpstreamModelIDsWithSelector(body, upstreamModelEntryID)
 }
 
@@ -533,7 +532,7 @@ func extractUpstreamModelIDsWithSelector(body []byte, selectID func(upstreamMode
 		for _, entry := range arrayResponse {
 			models = append(models, selectID(entry))
 		}
-		return dedupeAndSortModelIDs(models), nil
+		return normalizeCustomUpstreamModelIDs(dedupeAndSortModelIDs(models)), nil
 	}
 
 	models := make([]string, 0, len(response.Data)+len(response.Models))
@@ -553,7 +552,7 @@ func extractUpstreamModelIDsWithSelector(body []byte, selectID func(upstreamMode
 		}
 	}
 
-	return dedupeAndSortModelIDs(models), nil
+	return normalizeCustomUpstreamModelIDs(dedupeAndSortModelIDs(models)), nil
 }
 
 func upstreamModelEntryID(entry upstreamModelEntry) string {

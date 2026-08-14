@@ -27,7 +27,7 @@ func (AccountGroup) Annotations() []schema.Annotation {
 }
 
 func (AccountGroup) Fields() []ent.Field {
-	return []ent.Field{
+	return accountGroupFieldsCustom([]ent.Field{
 		field.Int64("account_id"),
 		field.Int64("group_id"),
 		field.Int("priority").
@@ -36,7 +36,7 @@ func (AccountGroup) Fields() []ent.Field {
 			Immutable().
 			Default(time.Now).
 			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
-	}
+	})
 }
 
 func (AccountGroup) Edges() []ent.Edge {
@@ -53,8 +53,8 @@ func (AccountGroup) Edges() []ent.Edge {
 }
 
 func (AccountGroup) Indexes() []ent.Index {
-	return []ent.Index{
+	return accountGroupIndexesCustom([]ent.Index{
 		index.Fields("group_id"),
 		index.Fields("priority"),
-	}
+	})
 }

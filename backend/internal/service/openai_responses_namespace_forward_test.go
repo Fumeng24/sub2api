@@ -29,7 +29,7 @@ const codexNamespaceRequestBody = `{
 	]
 }`
 
-const namespaceForwardOKResponse = `{"id":"resp_ns","output":[],"usage":{"input_tokens":1,"output_tokens":1,"input_tokens_details":{"cached_tokens":0}}}`
+const namespaceForwardOKResponse = `{"id":"resp_ns","output":[{"type":"message","content":[{"type":"output_text","text":"compaction completed successfully"}]}],"usage":{"input_tokens":1,"output_tokens":1,"input_tokens_details":{"cached_tokens":0}}}`
 
 // OAuth 出口即 namespace 扩展的定义方：声明必须原样送达，历史调用项必须保留
 // namespace（缺字段上游会 400 "Missing namespace for function_call"），而非调用项上的

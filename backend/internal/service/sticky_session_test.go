@@ -122,8 +122,8 @@ func TestShouldClearStickySession(t *testing.T) {
 		{
 			name: "overloaded account",
 			account: &Account{
-				Status:       StatusActive,
-				Schedulable:  true,
+				Status:        StatusActive,
+				Schedulable:   true,
 				OverloadUntil: &future,
 			},
 			requestedModel: "",
@@ -144,6 +144,46 @@ func TestShouldClearStickySession(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, shouldClearStickySession(tt.account, tt.requestedModel))
+		})
+	}
+}
+
+func TestStickySessionClearReason(t *testing.T) {
+	now := time.Now()
+	future := now.Add(time.Hour)
+	resetAt := now.Add(time.Minute).Format(time.RFC3339)
+
+	tests := []struct {
+		name           string
+		account        *Account
+		requestedModel string
+		want           string
+	}{
+		{name: "nil account", account: nil, want: ""},
+		{name: "manual unschedulable", account: &Account{Status: StatusActive, Schedulable: false}, want: AccountSchedulingBlockManual.String()},
+		{name: "account rate limited", account: &Account{Status: StatusActive, Schedulable: true, RateLimitResetAt: &future}, want: AccountSchedulingBlockRateLimited.String()},
+		{
+			name: "model rate limited",
+			account: &Account{
+				Status:      StatusActive,
+				Schedulable: true,
+				Extra: map[string]any{
+					"model_rate_limits": map[string]any{
+						"gpt-5.4": map[string]any{
+							"rate_limit_reset_at": resetAt,
+						},
+					},
+				},
+			},
+			requestedModel: "gpt-5.4",
+			want:           "model_rate_limited",
+		},
+		{name: "healthy", account: &Account{Status: StatusActive, Schedulable: true}, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, stickySessionClearReason(tt.account, tt.requestedModel))
 		})
 	}
 }

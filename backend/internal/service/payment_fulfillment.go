@@ -129,7 +129,7 @@ func isValidProviderAmount(amount float64) bool {
 }
 
 func validateProviderNotificationMetadata(order *dbent.PaymentOrder, providerKey string, metadata map[string]string) error {
-	return validateProviderSnapshotMetadata(order, providerKey, metadata)
+	return validateCustomProviderSnapshotMetadata(order, providerKey, metadata)
 }
 
 func expectedNotificationProviderKey(registry *payment.Registry, orderPaymentType string, orderProviderKey string, instanceProviderKey string) string {
@@ -341,6 +341,7 @@ func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, l
 		return s.markCompleted(ctx, o, lease, "RECHARGE_SUCCESS")
 	case redeemActionCreate:
 		rc := &RedeemCode{Code: o.RechargeCode, Type: RedeemTypeBalance, Value: o.Amount, Status: StatusUnused}
+		SetRedeemCodeBusinessCategoryCustom(rc, BalanceBusinessCategoryRecharge)
 		if err := s.redeemService.CreateCode(ctx, rc); err != nil {
 			return fmt.Errorf("create redeem code: %w", err)
 		}
@@ -720,15 +721,21 @@ func (s *PaymentService) tryClaimAffiliateRebateAudit(ctx context.Context, clien
 	if err != nil {
 		return false, err
 	}
-	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
+			_ = rows.Close()
 			return false, err
 		}
-		return false, nil
+		return false, rows.Close()
 	}
 	var claimID int64
 	if err := rows.Scan(&claimID); err != nil {
+		_ = rows.Close()
+		return false, err
+	}
+	// lib/pq requires the RETURNING result set to be closed before another
+	// statement can run on the same transaction connection.
+	if err := rows.Close(); err != nil {
 		return false, err
 	}
 	return true, nil

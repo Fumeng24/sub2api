@@ -249,6 +249,41 @@ func TestAdminService_ListGroups_PassesSortParams(t *testing.T) {
 	}, repo.listWithFiltersParams)
 }
 
+func TestAdminService_CreateAndUpdateGroup_PersistsAutoSortConfig(t *testing.T) {
+	t.Run("create", func(t *testing.T) {
+		repo := &groupRepoStubForAdmin{}
+		svc := &adminServiceImpl{groupRepo: repo}
+		want := GroupAutoSortConfig{Enabled: true, Basis: "availability"}
+
+		group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+			Name: "auto-sort-create", Platform: PlatformOpenAI, RateMultiplier: 1,
+			AutoSortConfig: want,
+		})
+		require.NoError(t, err)
+		require.Equal(t, want, group.AutoSortConfig)
+		require.Equal(t, want, repo.created.AutoSortConfig)
+	})
+
+	t.Run("update and preserve when omitted", func(t *testing.T) {
+		existing := &Group{
+			ID: 1, Name: "auto-sort-update", Platform: PlatformOpenAI, Status: StatusActive,
+			AutoSortConfig: GroupAutoSortConfig{Enabled: true, Basis: "rate"},
+		}
+		repo := &groupRepoStubForAdmin{getByID: existing}
+		svc := &adminServiceImpl{groupRepo: repo}
+		want := GroupAutoSortConfig{Enabled: true, Basis: "latency"}
+
+		group, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{AutoSortConfig: &want})
+		require.NoError(t, err)
+		require.Equal(t, want, group.AutoSortConfig)
+		require.Equal(t, want, repo.updated.AutoSortConfig)
+
+		_, err = svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{})
+		require.NoError(t, err)
+		require.Equal(t, want, repo.updated.AutoSortConfig)
+	})
+}
+
 // TestAdminService_CreateGroup_WithImagePricing 测试创建分组时 ImagePrice 字段正确传递
 func TestAdminService_CreateGroup_WithImagePricing(t *testing.T) {
 	repo := &groupRepoStubForAdmin{}

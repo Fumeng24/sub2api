@@ -10,10 +10,11 @@ import (
 
 func TestMergePreservingSensitiveCreds_PreservesSensitiveWhenIncomingMissing(t *testing.T) {
 	existing := map[string]any{
-		"refresh_token": "rt-old",
-		"access_token":  "at-old",
-		"api_key":       "sk-old",
-		"base_url":      "https://old.example.com",
+		"refresh_token":             "rt-old",
+		"access_token":              "at-old",
+		"api_key":                   "sk-old",
+		"upstream_sub2api_password": "sub2api-old",
+		"base_url":                  "https://old.example.com",
 	}
 	incoming := map[string]any{
 		"base_url":      "https://new.example.com",
@@ -25,6 +26,7 @@ func TestMergePreservingSensitiveCreds_PreservesSensitiveWhenIncomingMissing(t *
 	require.Equal(t, "rt-old", out["refresh_token"], "incoming 没传 refresh_token，应保留 existing")
 	require.Equal(t, "at-old", out["access_token"])
 	require.Equal(t, "sk-old", out["api_key"])
+	require.Equal(t, "sub2api-old", out["upstream_sub2api_password"])
 	require.Equal(t, "https://new.example.com", out["base_url"], "非敏感键由 incoming 决定")
 	require.Equal(t, map[string]any{"foo": "bar"}, out["model_mapping"])
 }
@@ -33,14 +35,16 @@ func TestMergePreservingSensitiveCreds_OverwritesWhenIncomingProvidesSensitive(t
 	existing := map[string]any{
 		"refresh_token": "rt-old",
 		"api_key":       "sk-old",
+		"apiKey":        "sk-camel-old",
 	}
 	incoming := map[string]any{
 		"refresh_token": "rt-new",
-		// 显式没传 api_key —— 应保留
+		"api_key":       "sk-new",
 	}
 	out := MergePreservingSensitiveCreds(existing, incoming)
 	require.Equal(t, "rt-new", out["refresh_token"], "incoming 显式传入应覆盖")
-	require.Equal(t, "sk-old", out["api_key"], "incoming 没传应保留")
+	require.Equal(t, "sk-new", out["api_key"], "incoming 显式传入应覆盖")
+	require.NotContains(t, out, "apiKey", "incoming 已提供同类敏感键时不应保留旧别名")
 }
 
 func TestMergePreservingSensitiveCreds_DoesNotMutateInputs(t *testing.T) {
@@ -82,8 +86,15 @@ func TestMergePreservingSensitiveCreds_NonSensitiveDeletionAllowed(t *testing.T)
 
 func TestIsSensitiveCredentialKey(t *testing.T) {
 	require.True(t, IsSensitiveCredentialKey("refresh_token"))
+	require.True(t, IsSensitiveCredentialKey("refreshToken"))
 	require.True(t, IsSensitiveCredentialKey("api_key"))
+	require.True(t, IsSensitiveCredentialKey("apiKey"))
+	require.True(t, IsSensitiveCredentialKey("x-api-key"))
+	require.True(t, IsSensitiveCredentialKey("Authorization"))
+	require.True(t, IsSensitiveCredentialKey("clientSecret"))
+	require.True(t, IsSensitiveCredentialKey("upstream_sub2api_password"))
 	require.True(t, IsSensitiveCredentialKey("private_key"))
+	require.True(t, IsSensitiveCredentialKey("privateKey"))
 	require.False(t, IsSensitiveCredentialKey("base_url"))
 	require.False(t, IsSensitiveCredentialKey(""))
 	require.False(t, IsSensitiveCredentialKey("model_mapping"))

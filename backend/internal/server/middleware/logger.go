@@ -81,7 +81,7 @@ func Logger() gin.HandlerFunc {
 		l := logger.FromContext(c.Request.Context()).With(fields...)
 		l.Info("http request completed", zap.Time("completed_at", endTime))
 
-		if len(c.Errors) > 0 {
+		if len(c.Errors) > 0 && !onlyRequestBodyLimitErrors(c.Errors.String()) {
 			l.Warn("http request contains gin errors", zap.String("errors", c.Errors.String()))
 		}
 	}

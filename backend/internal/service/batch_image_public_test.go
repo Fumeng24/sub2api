@@ -958,9 +958,11 @@ type publicBatchImageUserGroupRateRepo struct {
 	rates map[int64]*float64
 }
 
-func (r *publicBatchImageUserGroupRateRepo) GetByUserAndGroup(_ context.Context, _ int64, groupID int64) (*float64, error) {
+func (r *publicBatchImageUserGroupRateRepo) GetRateConfigByUserAndGroup(_ context.Context, _ int64, groupID int64) (*UserGroupRateConfig, error) {
 	if r != nil && r.rates != nil {
-		return r.rates[groupID], nil
+		if rate := r.rates[groupID]; rate != nil {
+			return &UserGroupRateConfig{RateMultiplier: rate}, nil
+		}
 	}
 	return nil, nil
 }

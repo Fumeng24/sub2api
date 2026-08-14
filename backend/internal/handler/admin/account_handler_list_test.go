@@ -304,6 +304,9 @@ func TestAccountHandlerListSchedulerScoreIgnoresPagination(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
 	require.Len(t, payload.Data.Items, 1)
 	require.Equal(t, int64(301), payload.Data.Items[0].ID)
-	require.Less(t, payload.Data.Items[0].SchedulerScore.BaseScore, 3.75)
+	// The health-first scheduler gives an unmeasured account a neutral error
+	// factor and a probationary TTFT factor; this remains independent of the
+	// hidden pagination peer while reflecting the new runtime weights.
+	require.InDelta(t, 6.7, payload.Data.Items[0].SchedulerScore.BaseScore, 1e-9)
 	require.Empty(t, payload.Data.Items[0].SchedulerScores)
 }

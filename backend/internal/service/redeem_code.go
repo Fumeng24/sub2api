@@ -17,6 +17,7 @@ type RedeemCode struct {
 	Notes     string
 	CreatedAt time.Time
 	ExpiresAt *time.Time
+	RedeemCodeCustom
 
 	GroupID      *int64
 	ValidityDays int

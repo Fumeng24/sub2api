@@ -177,6 +177,7 @@ func TestUserUsageListAllowsVideoBillingMode(t *testing.T) {
 func TestUserUsageListKeepsUserBillingAndIPWithoutAdminCostFields(t *testing.T) {
 	ipAddress := "203.0.113.10"
 	upstreamModel := "upstream-private-model"
+	modelMappingChain := "gpt-5→upstream-private-model"
 	billingTier := "internal-tier"
 	channelID := int64(99)
 	accountRateMultiplier := 1.7
@@ -198,6 +199,7 @@ func TestUserUsageListKeepsUserBillingAndIPWithoutAdminCostFields(t *testing.T) 
 			RateMultiplier:        0.8,
 			IPAddress:             &ipAddress,
 			UpstreamModel:         &upstreamModel,
+			ModelMappingChain:     &modelMappingChain,
 			BillingTier:           &billingTier,
 			ChannelID:             &channelID,
 			AccountRateMultiplier: &accountRateMultiplier,
@@ -223,7 +225,8 @@ func TestUserUsageListKeepsUserBillingAndIPWithoutAdminCostFields(t *testing.T) 
 	require.NotContains(t, body, "upstream_endpoint")
 	require.NotContains(t, body, "account_rate_multiplier")
 	require.NotContains(t, body, "account_stats_cost")
-	require.NotContains(t, body, "upstream_model")
+	require.Contains(t, body, `"upstream_model":"upstream-private-model"`)
+	require.Contains(t, body, `"model_mapping_chain":"gpt-5→upstream-private-model"`)
 	require.NotContains(t, body, "upstream_response_model")
 	require.NotContains(t, body, "upstream_model_mismatch")
 	require.NotContains(t, body, "billing_tier")

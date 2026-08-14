@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,7 +75,11 @@ func TestOpenAIHandleStreamingAwareError_ResponsesStreamingEmitsResponseFailed(t
 	id, _ := resp["id"].(string)
 	assert.True(t, strings.HasPrefix(id, "resp_"), "id should start with resp_, got %q", id)
 	assert.Equal(t, "rate_limit_exceeded", errObj["code"])
-	assert.Equal(t, "Concurrency limit exceeded for user, please retry later", errObj["message"])
+	assert.Equal(t, service.ClientFacingErrorMessage(http.StatusTooManyRequests, "rate_limit_error", "Concurrency limit exceeded for user, please retry later"), errObj["message"])
+	streamErr, ok := service.GetOpsStreamError(c)
+	require.True(t, ok, "stream error should be marked for ops logging")
+	assert.Equal(t, "rate_limit_error", streamErr.ErrType)
+	assert.Equal(t, http.StatusTooManyRequests, streamErr.IntendedStatus)
 }
 
 // 当 setOpsRequestContext 写过 model，合成事件应回填该字段（与 codebase 已有 makeResponsesCompletedEvent 对齐）。
@@ -127,7 +132,7 @@ func TestOpenAIHandleStreamingAwareError_ResponsesStreamingJSONEscaping(t *testi
 		{"反斜杠", "server_error", `path C:\Users\test\file.txt not found`},
 		{"双引号+反斜杠", "upstream_error", `error parsing "key\value": unexpected token`},
 		{"换行与制表", "server_error", "line1\nline2\ttab"},
-		{"普通", "upstream_error", "Upstream service temporarily unavailable"},
+		{"普通", "upstream_error", service.ClientFacingTemporaryUnavailableMessage()},
 	}
 
 	for _, tc := range cases {
@@ -137,7 +142,7 @@ func TestOpenAIHandleStreamingAwareError_ResponsesStreamingJSONEscaping(t *testi
 			h.handleStreamingAwareError(c, http.StatusBadGateway, tc.errType, tc.message, true)
 
 			_, errObj := parseResponsesFailedSSE(t, w.Body.String())
-			assert.Equal(t, tc.message, errObj["message"], "message 必须被原样还原")
+			assert.Equal(t, service.ClientFacingErrorMessage(http.StatusBadGateway, tc.errType, tc.message), errObj["message"], "message must be sanitized for clients")
 		})
 	}
 }
@@ -161,7 +166,7 @@ func TestGatewayHandleStreamingAwareError_ResponsesStreamingEmitsResponseFailed(
 
 	_, errObj := parseResponsesFailedSSE(t, w.Body.String())
 	assert.Equal(t, "upstream_error", errObj["code"])
-	assert.Equal(t, "upstream gone", errObj["message"])
+	assert.Equal(t, service.ClientFacingTemporaryUnavailableMessage(), errObj["message"])
 }
 
 // Gateway handler: /v1/messages preserves the legacy data:{type:error,...} format

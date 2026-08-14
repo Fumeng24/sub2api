@@ -235,6 +235,7 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 	}
 
 	setGatewayRequestRanges(parsed, protocol, jsonStr)
+	cloneGatewayRequestScalarStringsCustom(parsed)
 	return nil
 }
 

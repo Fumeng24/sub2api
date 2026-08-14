@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -108,6 +109,26 @@ func (_u *ChannelMonitorUpdate) SetNillableAPIKeyEncrypted(v *string) *ChannelMo
 	return _u
 }
 
+// SetAPIKeyID sets the "api_key_id" field.
+func (_u *ChannelMonitorUpdate) SetAPIKeyID(v int64) *ChannelMonitorUpdate {
+	_u.mutation.SetAPIKeyID(v)
+	return _u
+}
+
+// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
+func (_u *ChannelMonitorUpdate) SetNillableAPIKeyID(v *int64) *ChannelMonitorUpdate {
+	if v != nil {
+		_u.SetAPIKeyID(*v)
+	}
+	return _u
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (_u *ChannelMonitorUpdate) ClearAPIKeyID() *ChannelMonitorUpdate {
+	_u.mutation.ClearAPIKeyID()
+	return _u
+}
+
 // SetPrimaryModel sets the "primary_model" field.
 func (_u *ChannelMonitorUpdate) SetPrimaryModel(v string) *ChannelMonitorUpdate {
 	_u.mutation.SetPrimaryModel(v)
@@ -151,6 +172,27 @@ func (_u *ChannelMonitorUpdate) SetNillableGroupName(v *string) *ChannelMonitorU
 // ClearGroupName clears the value of the "group_name" field.
 func (_u *ChannelMonitorUpdate) ClearGroupName() *ChannelMonitorUpdate {
 	_u.mutation.ClearGroupName()
+	return _u
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (_u *ChannelMonitorUpdate) SetSortOrder(v int) *ChannelMonitorUpdate {
+	_u.mutation.ResetSortOrder()
+	_u.mutation.SetSortOrder(v)
+	return _u
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_u *ChannelMonitorUpdate) SetNillableSortOrder(v *int) *ChannelMonitorUpdate {
+	if v != nil {
+		_u.SetSortOrder(*v)
+	}
+	return _u
+}
+
+// AddSortOrder adds value to the "sort_order" field.
+func (_u *ChannelMonitorUpdate) AddSortOrder(v int) *ChannelMonitorUpdate {
+	_u.mutation.AddSortOrder(v)
 	return _u
 }
 
@@ -333,6 +375,11 @@ func (_u *ChannelMonitorUpdate) AddDailyRollups(v ...*ChannelMonitorDailyRollup)
 	return _u.AddDailyRollupIDs(ids...)
 }
 
+// SetAPIKey sets the "api_key" edge to the APIKey entity.
+func (_u *ChannelMonitorUpdate) SetAPIKey(v *APIKey) *ChannelMonitorUpdate {
+	return _u.SetAPIKeyID(v.ID)
+}
+
 // SetRequestTemplateID sets the "request_template" edge to the ChannelMonitorRequestTemplate entity by ID.
 func (_u *ChannelMonitorUpdate) SetRequestTemplateID(id int64) *ChannelMonitorUpdate {
 	_u.mutation.SetRequestTemplateID(id)
@@ -397,6 +444,12 @@ func (_u *ChannelMonitorUpdate) RemoveDailyRollups(v ...*ChannelMonitorDailyRoll
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveDailyRollupIDs(ids...)
+}
+
+// ClearAPIKey clears the "api_key" edge to the APIKey entity.
+func (_u *ChannelMonitorUpdate) ClearAPIKey() *ChannelMonitorUpdate {
+	_u.mutation.ClearAPIKey()
+	return _u
 }
 
 // ClearRequestTemplate clears the "request_template" edge to the ChannelMonitorRequestTemplate entity.
@@ -543,6 +596,12 @@ func (_u *ChannelMonitorUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if _u.mutation.GroupNameCleared() {
 		_spec.ClearField(channelmonitor.FieldGroupName, field.TypeString)
 	}
+	if value, ok := _u.mutation.SortOrder(); ok {
+		_spec.SetField(channelmonitor.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSortOrder(); ok {
+		_spec.AddField(channelmonitor.FieldSortOrder, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.Enabled(); ok {
 		_spec.SetField(channelmonitor.FieldEnabled, field.TypeBool, value)
 	}
@@ -665,6 +724,35 @@ func (_u *ChannelMonitorUpdate) sqlSave(ctx context.Context) (_node int, err err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(channelmonitordailyrollup.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.APIKeyCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   channelmonitor.APIKeyTable,
+			Columns: []string{channelmonitor.APIKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.APIKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   channelmonitor.APIKeyTable,
+			Columns: []string{channelmonitor.APIKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -797,6 +885,26 @@ func (_u *ChannelMonitorUpdateOne) SetNillableAPIKeyEncrypted(v *string) *Channe
 	return _u
 }
 
+// SetAPIKeyID sets the "api_key_id" field.
+func (_u *ChannelMonitorUpdateOne) SetAPIKeyID(v int64) *ChannelMonitorUpdateOne {
+	_u.mutation.SetAPIKeyID(v)
+	return _u
+}
+
+// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
+func (_u *ChannelMonitorUpdateOne) SetNillableAPIKeyID(v *int64) *ChannelMonitorUpdateOne {
+	if v != nil {
+		_u.SetAPIKeyID(*v)
+	}
+	return _u
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (_u *ChannelMonitorUpdateOne) ClearAPIKeyID() *ChannelMonitorUpdateOne {
+	_u.mutation.ClearAPIKeyID()
+	return _u
+}
+
 // SetPrimaryModel sets the "primary_model" field.
 func (_u *ChannelMonitorUpdateOne) SetPrimaryModel(v string) *ChannelMonitorUpdateOne {
 	_u.mutation.SetPrimaryModel(v)
@@ -840,6 +948,27 @@ func (_u *ChannelMonitorUpdateOne) SetNillableGroupName(v *string) *ChannelMonit
 // ClearGroupName clears the value of the "group_name" field.
 func (_u *ChannelMonitorUpdateOne) ClearGroupName() *ChannelMonitorUpdateOne {
 	_u.mutation.ClearGroupName()
+	return _u
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (_u *ChannelMonitorUpdateOne) SetSortOrder(v int) *ChannelMonitorUpdateOne {
+	_u.mutation.ResetSortOrder()
+	_u.mutation.SetSortOrder(v)
+	return _u
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_u *ChannelMonitorUpdateOne) SetNillableSortOrder(v *int) *ChannelMonitorUpdateOne {
+	if v != nil {
+		_u.SetSortOrder(*v)
+	}
+	return _u
+}
+
+// AddSortOrder adds value to the "sort_order" field.
+func (_u *ChannelMonitorUpdateOne) AddSortOrder(v int) *ChannelMonitorUpdateOne {
+	_u.mutation.AddSortOrder(v)
 	return _u
 }
 
@@ -1022,6 +1151,11 @@ func (_u *ChannelMonitorUpdateOne) AddDailyRollups(v ...*ChannelMonitorDailyRoll
 	return _u.AddDailyRollupIDs(ids...)
 }
 
+// SetAPIKey sets the "api_key" edge to the APIKey entity.
+func (_u *ChannelMonitorUpdateOne) SetAPIKey(v *APIKey) *ChannelMonitorUpdateOne {
+	return _u.SetAPIKeyID(v.ID)
+}
+
 // SetRequestTemplateID sets the "request_template" edge to the ChannelMonitorRequestTemplate entity by ID.
 func (_u *ChannelMonitorUpdateOne) SetRequestTemplateID(id int64) *ChannelMonitorUpdateOne {
 	_u.mutation.SetRequestTemplateID(id)
@@ -1086,6 +1220,12 @@ func (_u *ChannelMonitorUpdateOne) RemoveDailyRollups(v ...*ChannelMonitorDailyR
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveDailyRollupIDs(ids...)
+}
+
+// ClearAPIKey clears the "api_key" edge to the APIKey entity.
+func (_u *ChannelMonitorUpdateOne) ClearAPIKey() *ChannelMonitorUpdateOne {
+	_u.mutation.ClearAPIKey()
+	return _u
 }
 
 // ClearRequestTemplate clears the "request_template" edge to the ChannelMonitorRequestTemplate entity.
@@ -1262,6 +1402,12 @@ func (_u *ChannelMonitorUpdateOne) sqlSave(ctx context.Context) (_node *ChannelM
 	if _u.mutation.GroupNameCleared() {
 		_spec.ClearField(channelmonitor.FieldGroupName, field.TypeString)
 	}
+	if value, ok := _u.mutation.SortOrder(); ok {
+		_spec.SetField(channelmonitor.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSortOrder(); ok {
+		_spec.AddField(channelmonitor.FieldSortOrder, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.Enabled(); ok {
 		_spec.SetField(channelmonitor.FieldEnabled, field.TypeBool, value)
 	}
@@ -1384,6 +1530,35 @@ func (_u *ChannelMonitorUpdateOne) sqlSave(ctx context.Context) (_node *ChannelM
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(channelmonitordailyrollup.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.APIKeyCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   channelmonitor.APIKeyTable,
+			Columns: []string{channelmonitor.APIKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.APIKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   channelmonitor.APIKeyTable,
+			Columns: []string{channelmonitor.APIKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

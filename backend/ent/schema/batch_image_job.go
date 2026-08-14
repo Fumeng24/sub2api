@@ -27,7 +27,7 @@ func (BatchImageJob) Annotations() []schema.Annotation {
 }
 
 func (BatchImageJob) Fields() []ent.Field {
-	return []ent.Field{
+	return batchImageJobFieldsCustom([]ent.Field{
 		field.String("batch_id").MaxLen(64).Immutable(),
 		field.Int64("user_id"),
 		field.Int64("api_key_id").Optional().Nillable(),
@@ -68,11 +68,11 @@ func (BatchImageJob) Fields() []ent.Field {
 		field.Time("started_at").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 		field.Time("finished_at").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 		field.Time("settled_at").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
-	}
+	})
 }
 
 func (BatchImageJob) Indexes() []ent.Index {
-	return []ent.Index{
+	return batchImageJobIndexesCustom([]ent.Index{
 		index.Fields("batch_id").Unique(),
 		index.Fields("user_id", "created_at"),
 		index.Fields("status"),
@@ -82,5 +82,5 @@ func (BatchImageJob) Indexes() []ent.Index {
 		index.Fields("output_expires_at"),
 		index.Fields("downloaded_at"),
 		index.Fields("user_deleted_at"),
-	}
+	})
 }

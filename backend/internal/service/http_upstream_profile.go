@@ -7,8 +7,10 @@ import "context"
 type HTTPUpstreamProfile string
 
 const (
-	HTTPUpstreamProfileDefault HTTPUpstreamProfile = ""
-	HTTPUpstreamProfileOpenAI  HTTPUpstreamProfile = "openai"
+	HTTPUpstreamProfileDefault               HTTPUpstreamProfile = ""
+	HTTPUpstreamProfileOpenAI                HTTPUpstreamProfile = "openai"
+	HTTPUpstreamProfileOpenAIWeakFallback    HTTPUpstreamProfile = "openai_weak_fallback"
+	HTTPUpstreamProfileOpenAINoHeaderTimeout HTTPUpstreamProfile = "openai_no_header_timeout"
 )
 
 type httpUpstreamProfileContextKey struct{}
@@ -35,7 +37,7 @@ func HTTPUpstreamProfileFromContext(ctx context.Context) HTTPUpstreamProfile {
 		return HTTPUpstreamProfileDefault
 	}
 	switch profile {
-	case HTTPUpstreamProfileOpenAI:
+	case HTTPUpstreamProfileOpenAI, HTTPUpstreamProfileOpenAIWeakFallback, HTTPUpstreamProfileOpenAINoHeaderTimeout:
 		return profile
 	default:
 		return HTTPUpstreamProfileDefault

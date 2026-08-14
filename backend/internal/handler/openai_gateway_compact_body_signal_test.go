@@ -43,7 +43,9 @@ func TestNormalizeOpenAIResponsesCompactRequest_RemoteV2StaysOnResponses(t *test
 	require.True(t, ok)
 
 	require.Equal(t, "/v1/responses", c.Request.URL.Path)
-	require.False(t, isOpenAIRemoteCompactPath(c))
+	require.True(t, isOpenAIRemoteCompactPath(c))
+	require.True(t, service.IsOpenAIRemoteCompactionV2(c))
+	require.False(t, service.IsOpenAIResponsesCompactPathForTest(c))
 	require.Equal(t, body, normalized)
 	require.True(t, gjson.GetBytes(normalized, "stream").Bool())
 	require.True(t, gjson.GetBytes(normalized, "store").Bool())
@@ -73,6 +75,9 @@ func TestNormalizeOpenAIResponsesCompactRequest_RemoteV2PathAliasesStayOnRespons
 			require.True(t, ok)
 			require.Equal(t, path, c.Request.URL.Path)
 			require.Equal(t, body, normalized)
+			require.True(t, isOpenAIRemoteCompactPath(c))
+			require.True(t, service.IsOpenAIRemoteCompactionV2(c))
+			require.False(t, service.IsOpenAIResponsesCompactPathForTest(c))
 		})
 	}
 }

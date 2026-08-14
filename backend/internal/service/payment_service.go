@@ -119,6 +119,7 @@ type OrderListParams struct {
 	OrderType   string
 	PaymentType string
 	Keyword     string
+	Invoiceable *bool
 }
 
 type RefundPlan struct {
@@ -249,7 +250,7 @@ func (s *PaymentService) loadProviders(ctx context.Context) {
 			cfg["paymentMode"] = inst.PaymentMode
 		}
 		instID := fmt.Sprintf("%d", inst.ID)
-		p, err := provider.CreateProvider(inst.ProviderKey, instID, cfg)
+		p, err := provider.CreateProviderWithExtensions(inst.ProviderKey, instID, cfg)
 		if err != nil {
 			slog.Warn("[PaymentService] failed to create provider for instance", "instanceID", inst.ID, "key", inst.ProviderKey, "error", err)
 			continue

@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
+	"github.com/Wei-Shaw/sub2api/ent/upstream"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 )
 
@@ -135,6 +136,20 @@ func (_c *AccountCreate) SetProxyFallbackOriginID(v int64) *AccountCreate {
 func (_c *AccountCreate) SetNillableProxyFallbackOriginID(v *int64) *AccountCreate {
 	if v != nil {
 		_c.SetProxyFallbackOriginID(*v)
+	}
+	return _c
+}
+
+// SetUpstreamID sets the "upstream_id" field.
+func (_c *AccountCreate) SetUpstreamID(v int64) *AccountCreate {
+	_c.mutation.SetUpstreamID(v)
+	return _c
+}
+
+// SetNillableUpstreamID sets the "upstream_id" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableUpstreamID(v *int64) *AccountCreate {
+	if v != nil {
+		_c.SetUpstreamID(*v)
 	}
 	return _c
 }
@@ -437,6 +452,11 @@ func (_c *AccountCreate) AddGroups(v ...*Group) *AccountCreate {
 // SetProxy sets the "proxy" edge to the Proxy entity.
 func (_c *AccountCreate) SetProxy(v *Proxy) *AccountCreate {
 	return _c.SetProxyID(v.ID)
+}
+
+// SetUpstream sets the "upstream" edge to the Upstream entity.
+func (_c *AccountCreate) SetUpstream(v *Upstream) *AccountCreate {
+	return _c.SetUpstreamID(v.ID)
 }
 
 // SetParentID sets the "parent" edge to the Account entity by ID.
@@ -838,6 +858,23 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 		_node.ProxyID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
+	if nodes := _c.mutation.UpstreamIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   account.UpstreamTable,
+			Columns: []string{account.UpstreamColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(upstream.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.UpstreamID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	if nodes := _c.mutation.ParentIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -1086,6 +1123,24 @@ func (u *AccountUpsert) AddProxyFallbackOriginID(v int64) *AccountUpsert {
 // ClearProxyFallbackOriginID clears the value of the "proxy_fallback_origin_id" field.
 func (u *AccountUpsert) ClearProxyFallbackOriginID() *AccountUpsert {
 	u.SetNull(account.FieldProxyFallbackOriginID)
+	return u
+}
+
+// SetUpstreamID sets the "upstream_id" field.
+func (u *AccountUpsert) SetUpstreamID(v int64) *AccountUpsert {
+	u.Set(account.FieldUpstreamID, v)
+	return u
+}
+
+// UpdateUpstreamID sets the "upstream_id" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateUpstreamID() *AccountUpsert {
+	u.SetExcluded(account.FieldUpstreamID)
+	return u
+}
+
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (u *AccountUpsert) ClearUpstreamID() *AccountUpsert {
+	u.SetNull(account.FieldUpstreamID)
 	return u
 }
 
@@ -1648,6 +1703,27 @@ func (u *AccountUpsertOne) UpdateProxyFallbackOriginID() *AccountUpsertOne {
 func (u *AccountUpsertOne) ClearProxyFallbackOriginID() *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
 		s.ClearProxyFallbackOriginID()
+	})
+}
+
+// SetUpstreamID sets the "upstream_id" field.
+func (u *AccountUpsertOne) SetUpstreamID(v int64) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetUpstreamID(v)
+	})
+}
+
+// UpdateUpstreamID sets the "upstream_id" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateUpstreamID() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateUpstreamID()
+	})
+}
+
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (u *AccountUpsertOne) ClearUpstreamID() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearUpstreamID()
 	})
 }
 
@@ -2433,6 +2509,27 @@ func (u *AccountUpsertBulk) UpdateProxyFallbackOriginID() *AccountUpsertBulk {
 func (u *AccountUpsertBulk) ClearProxyFallbackOriginID() *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
 		s.ClearProxyFallbackOriginID()
+	})
+}
+
+// SetUpstreamID sets the "upstream_id" field.
+func (u *AccountUpsertBulk) SetUpstreamID(v int64) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetUpstreamID(v)
+	})
+}
+
+// UpdateUpstreamID sets the "upstream_id" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateUpstreamID() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateUpstreamID()
+	})
+}
+
+// ClearUpstreamID clears the value of the "upstream_id" field.
+func (u *AccountUpsertBulk) ClearUpstreamID() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearUpstreamID()
 	})
 }
 

@@ -30,6 +30,7 @@ const (
 var (
 	errOpenAIFirstOutputStageLimit   = errors.New("openai first-output staging limit exceeded")
 	errOpenAIFirstOutputScannerLimit = errors.New("openai pre-output scanner token limit exceeded")
+	errOpenAICompactResponseTimeout  = errors.New("openai compact response deadline exceeded")
 )
 
 type openAIFirstOutputStage struct {
@@ -243,6 +244,66 @@ func (s *OpenAIGatewayService) openAIFirstOutputTimeout(reasoningEffort string) 
 	return time.Duration(seconds) * time.Second
 }
 
+const openAIKnownUnstableFirstOutputTimeout = 20 * time.Second
+
+// openAIFirstOutputTimeoutForAccount keeps the normal site-wide timeout for
+// healthy accounts, while bounding the next attempt for an account+model that
+// has already produced a recent timeout/upstream failure.  This is intentionally
+// a request-attempt cap rather than a global config change: healthy sticky
+// sessions keep their cache affinity, and a known-bad candidate cannot make a
+// user wait another full 30–35 seconds before failover.
+func (s *OpenAIGatewayService) openAIFirstOutputTimeoutForAccount(accountID int64, mappedModel, reasoningEffort string) time.Duration {
+	base := s.openAIFirstOutputTimeout(reasoningEffort)
+	if base <= 0 || accountID <= 0 || strings.TrimSpace(mappedModel) == "" {
+		return base
+	}
+	now := time.Now()
+	if slowState := s.getOpenAIAccountSlowReserveState(); slowState != nil {
+		if entry, ok := slowState.snapshot(accountID, mappedModel); ok && entry.ExpiresAt.After(now) {
+			if base > openAIKnownUnstableFirstOutputTimeout {
+				return openAIKnownUnstableFirstOutputTimeout
+			}
+			return base
+		}
+	}
+	if transientState := s.getOpenAIAccountModelTransientState(); transientState != nil {
+		if entry, ok := transientState.snapshot(accountID, mappedModel); ok && !entry.lastFailure.IsZero() && now.Sub(entry.lastFailure) <= openAIModelTransientStreakTTL {
+			if base > openAIKnownUnstableFirstOutputTimeout {
+				return openAIKnownUnstableFirstOutputTimeout
+			}
+		}
+	}
+	return base
+}
+
+const (
+	defaultOpenAICompactFirstOutputTimeoutSeconds       = 120
+	defaultOpenAICompactHighEffortFirstOutputTimeoutSec = 180
+)
+
+// openAICompactFirstOutputTimeout is independent from the normal Responses
+// timeout. Compact requests carry the whole prior conversation and can spend
+// substantially longer in upstream context processing before emitting their
+// compaction item. The streaming handler starts this budget after headers
+// arrive, so a large request upload does not consume the semantic budget.
+func (s *OpenAIGatewayService) openAICompactFirstOutputTimeout(reasoningEffort string) time.Duration {
+	seconds := defaultOpenAICompactFirstOutputTimeoutSeconds
+	highEffortSeconds := defaultOpenAICompactHighEffortFirstOutputTimeoutSec
+	if s != nil && s.cfg != nil {
+		if configured := s.cfg.Gateway.OpenAICompactFirstOutputTimeoutSeconds; configured > 0 {
+			seconds = configured
+		}
+		if configured := s.cfg.Gateway.OpenAICompactHighEffortFirstOutputTimeoutSeconds; configured > 0 {
+			highEffortSeconds = configured
+		}
+	}
+	switch strings.ToLower(strings.TrimSpace(reasoningEffort)) {
+	case "high", "xhigh", "max":
+		seconds = highEffortSeconds
+	}
+	return time.Duration(seconds) * time.Second
+}
+
 func (s *OpenAIGatewayService) newOpenAIFirstOutputTimeoutError(
 	ctx context.Context,
 	c *gin.Context,
@@ -283,6 +344,82 @@ type openAIFirstOutputHeaderGuard struct {
 	timer   *time.Timer
 	fired   chan struct{}
 	once    sync.Once
+}
+
+// openAICompactResponseBodyGuard keeps the compact deadline active after HTTP
+// response headers have arrived.  The normal transport profile deliberately
+// has no generic response-header timeout for compact requests, and the header
+// guard is stopped once headers are handed off; without this second guard a
+// legacy unary /responses/compact body could then block forever while holding
+// an account slot.  Closing the provider body wakes both io.ReadAll and SSE
+// scanners; Read returns a stable sentinel so callers can turn it into the
+// usual account failover error.
+type openAICompactResponseBodyGuard struct {
+	io.ReadCloser
+	timer    *time.Timer
+	timedOut chan struct{}
+	once     sync.Once
+}
+
+func newOpenAICompactResponseBodyGuard(body io.ReadCloser, timeout time.Duration) *openAICompactResponseBodyGuard {
+	guard := &openAICompactResponseBodyGuard{
+		ReadCloser: body,
+		timedOut:   make(chan struct{}),
+	}
+	if timeout <= 0 {
+		return guard
+	}
+	guard.timer = time.AfterFunc(timeout, func() {
+		close(guard.timedOut)
+		guard.closeUnderlying()
+	})
+	return guard
+}
+
+func (g *openAICompactResponseBodyGuard) Read(p []byte) (int, error) {
+	if g == nil || g.ReadCloser == nil {
+		return 0, io.EOF
+	}
+	n, err := g.ReadCloser.Read(p)
+	if g.didTimeout() && (err != nil || n == 0) {
+		return n, errOpenAICompactResponseTimeout
+	}
+	return n, err
+}
+
+func (g *openAICompactResponseBodyGuard) didTimeout() bool {
+	if g == nil || g.timedOut == nil {
+		return false
+	}
+	select {
+	case <-g.timedOut:
+		return true
+	default:
+		return false
+	}
+}
+
+func (g *openAICompactResponseBodyGuard) Close() error {
+	if g == nil {
+		return nil
+	}
+	return g.closeUnderlying()
+}
+
+func (g *openAICompactResponseBodyGuard) closeUnderlying() error {
+	if g == nil {
+		return nil
+	}
+	var err error
+	g.once.Do(func() {
+		if g.timer != nil {
+			g.timer.Stop()
+		}
+		if g.ReadCloser != nil {
+			err = g.ReadCloser.Close()
+		}
+	})
+	return err
 }
 
 func newOpenAIFirstOutputHeaderGuard(

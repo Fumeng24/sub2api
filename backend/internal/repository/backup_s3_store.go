@@ -66,20 +66,14 @@ func (s *S3BackupStore) UploadFile(ctx context.Context, key string, filePath str
 		return 0, fmt.Errorf("open upload file: %w", err)
 	}
 	defer func() { _ = file.Close() }()
-
 	info, err := file.Stat()
 	if err != nil {
 		return 0, fmt.Errorf("stat upload file: %w", err)
 	}
 	sizeBytes := info.Size()
-
 	finish := servertiming.ObserveDependency(ctx, "s3")
 	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:        &s.bucket,
-		Key:           &key,
-		Body:          file,
-		ContentLength: &sizeBytes,
-		ContentType:   &contentType,
+		Bucket: &s.bucket, Key: &key, Body: file, ContentLength: &sizeBytes, ContentType: &contentType,
 	})
 	finish()
 	if err != nil {

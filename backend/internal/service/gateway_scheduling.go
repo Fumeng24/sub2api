@@ -6,6 +6,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	mathrand "math/rand"
@@ -30,8 +31,39 @@ func (s *GatewayService) SelectAccountForModel(ctx context.Context, groupID *int
 	return s.SelectAccountForModelWithExclusions(ctx, groupID, sessionHash, requestedModel, nil)
 }
 
-// SelectAccountForModelWithExclusions selects an account supporting the requested model while excluding specified accounts.
+// SelectAccountForModelWithExclusions selects a normal account first. A
+// group-local reserve is considered only after normal selection is exhausted.
 func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*Account, error) {
+	account, err := s.selectAccountForModelWithExclusionsNormal(withGroupReserveDisabled(ctx), groupID, sessionHash, requestedModel, excludedIDs)
+	if err == nil || !groupReserveEnabled(ctx) || !errors.Is(err, ErrNoAvailableAccounts) {
+		return account, err
+	}
+
+	group, resolvedGroupID, resolveErr := s.checkClaudeCodeRestriction(ctx, groupID)
+	if resolveErr != nil || resolvedGroupID == nil || *resolvedGroupID <= 0 {
+		return nil, err
+	}
+	reserveCtx := s.withGroupContext(ctx, group)
+	reserveCtx, reserveModel, routeErr := s.resolveGroupReserveRoute(reserveCtx, group, requestedModel)
+	if routeErr != nil {
+		return nil, err
+	}
+	if s.checkChannelPricingRestriction(reserveCtx, resolvedGroupID, reserveModel) {
+		return nil, err
+	}
+	platform, hasForcePlatform, platformErr := s.resolvePlatform(reserveCtx, resolvedGroupID, group, reserveModel)
+	if platformErr != nil {
+		return nil, err
+	}
+	useMixed := (platform == PlatformAnthropic || platform == PlatformGemini) && !hasForcePlatform
+	reserve, reserveErr := s.selectGroupReserveGatewayAccount(reserveCtx, resolvedGroupID, reserveModel, platform, useMixed, excludedIDs)
+	if reserveErr != nil {
+		return nil, err
+	}
+	return reserve, nil
+}
+
+func (s *GatewayService) selectAccountForModelWithExclusionsNormal(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*Account, error) {
 	// 优先检查 context 中的强制平台（/antigravity 路由）
 	var platform string
 	forcePlatform, hasForcePlatform := ctx.Value(ctxkey.ForcePlatform).(string)
@@ -94,10 +126,60 @@ func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context
 	return s.hydrateSelectedAccount(ctx, account)
 }
 
-// SelectAccountWithLoadAwareness selects account with load-awareness and wait plan.
-// metadataUserID: 用于客户端亲和调度，从中提取客户端 ID
-// sub2apiUserID: 系统用户 ID，用于二维亲和调度
+// SelectAccountWithLoadAwareness selects normal candidates first, then uses a
+// short-lived reserve only within the request's resolved group.
 func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, metadataUserID string, sub2apiUserID int64) (*AccountSelectionResult, error) {
+	selection, err := s.selectAccountWithLoadAwarenessNormal(withGroupReserveDisabled(ctx), groupID, sessionHash, requestedModel, excludedIDs, metadataUserID, sub2apiUserID)
+	if err == nil || !groupReserveEnabled(ctx) || !errors.Is(err, ErrNoAvailableAccounts) {
+		return selection, err
+	}
+
+	group, resolvedGroupID, resolveErr := s.checkClaudeCodeRestriction(ctx, groupID)
+	if resolveErr != nil || resolvedGroupID == nil || *resolvedGroupID <= 0 {
+		return nil, err
+	}
+	reserveCtx := s.withGroupContext(ctx, group)
+	reserveCtx, reserveModel, routeErr := s.resolveGroupReserveRoute(reserveCtx, group, requestedModel)
+	if routeErr != nil {
+		return nil, err
+	}
+	if s.checkChannelPricingRestriction(reserveCtx, resolvedGroupID, reserveModel) {
+		return nil, err
+	}
+	platform, hasForcePlatform, platformErr := s.resolvePlatform(reserveCtx, resolvedGroupID, group, reserveModel)
+	if platformErr != nil {
+		return nil, err
+	}
+	useMixed := (platform == PlatformAnthropic || platform == PlatformGemini) && !hasForcePlatform
+	reserve, reserveErr := s.selectGroupReserveGatewayWithLoadAwareness(reserveCtx, resolvedGroupID, sessionHash, reserveModel, platform, useMixed, excludedIDs)
+	if reserveErr != nil {
+		return nil, err
+	}
+	return reserve, nil
+}
+
+// resolveGroupReserveRoute keeps final-reserve selection on the exact same
+// composite route as normal selection. A composite group can expose a public
+// model alias while the candidate's allowlist contains the resolved upstream
+// model, so checking the alias here would incorrectly discard a valid reserve.
+func (s *GatewayService) resolveGroupReserveRoute(ctx context.Context, group *Group, requestedModel string) (context.Context, string, error) {
+	if group == nil || group.Platform != PlatformComposite {
+		return ctx, requestedModel, nil
+	}
+	decision, ok, err := s.resolveCompositeRouteDecision(ctx, group, requestedModel, CompositeRouteEndpointAny)
+	if err != nil {
+		return ctx, requestedModel, err
+	}
+	if !ok {
+		return ctx, requestedModel, fmt.Errorf("%w supporting model: %s (composite target platform unknown)", ErrNoAvailableAccounts, requestedModel)
+	}
+	return WithCompositeRouteDecision(ctx, decision), decision.UpstreamModel, nil
+}
+
+// selectAccountWithLoadAwarenessNormal contains the pre-existing selection
+// algorithm. It runs with reserve selection disabled so inner legacy calls
+// cannot bypass normal candidates.
+func (s *GatewayService) selectAccountWithLoadAwarenessNormal(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, metadataUserID string, sub2apiUserID int64) (*AccountSelectionResult, error) {
 	// 调试日志：记录调度入口参数
 	excludedIDsList := make([]int64, 0, len(excludedIDs))
 	for id := range excludedIDs {
@@ -961,10 +1043,6 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 	if s.schedulerSnapshot != nil {
 		accounts, useMixed, err := s.schedulerSnapshot.ListSchedulableAccounts(ctx, groupID, platform, hasForcePlatform)
 		if err == nil {
-			accounts = s.filterAccountsBySchedulingThreshold(ctx, accounts)
-			if platform == PlatformGrok || strings.EqualFold(platform, PlatformGrok) {
-				accounts = s.filterGrokFreeQuotaAccountsForGateway(ctx, accounts)
-			}
 			slog.Debug("account_scheduling_list_snapshot",
 				"group_id", derefGroupID(groupID),
 				"platform", platform,
@@ -1026,7 +1104,7 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 					"tls_fingerprint", acc.IsTLSFingerprintEnabled())
 			}
 		}
-		return s.filterAccountsBySchedulingThreshold(ctx, filtered), useMixed, nil
+		return filtered, useMixed, nil
 	}
 
 	var accounts []Account
@@ -1060,10 +1138,6 @@ func (s *GatewayService) listSchedulableAccounts(ctx context.Context, groupID *i
 				"status", acc.Status,
 				"tls_fingerprint", acc.IsTLSFingerprintEnabled())
 		}
-	}
-	accounts = s.filterAccountsBySchedulingThreshold(ctx, accounts)
-	if platform == PlatformGrok || strings.EqualFold(platform, PlatformGrok) {
-		accounts = s.filterGrokFreeQuotaAccountsForGateway(ctx, accounts)
 	}
 	return accounts, useMixed, nil
 }
@@ -1436,50 +1510,10 @@ func (s *GatewayService) checkAndRegisterSession(ctx context.Context, account *A
 }
 
 func (s *GatewayService) getSchedulableAccount(ctx context.Context, accountID int64) (*Account, error) {
-	var (
-		account *Account
-		err     error
-	)
 	if s.schedulerSnapshot != nil {
-		account, err = s.schedulerSnapshot.GetAccount(ctx, accountID)
-	} else {
-		account, err = s.accountRepo.GetByID(ctx, accountID)
+		return s.schedulerSnapshot.GetAccount(ctx, accountID)
 	}
-	if err != nil || account == nil {
-		return account, err
-	}
-	if s.isAccountBlockedBySchedulingThreshold(ctx, account) {
-		return nil, nil
-	}
-	// Sticky / non-list selection must honor free soft-gate (same as listSchedulableAccounts).
-	if account.IsGrok() {
-		if gated := s.filterGrokFreeQuotaAccountsForGateway(ctx, []Account{*account}); len(gated) == 0 {
-			return nil, nil
-		}
-	}
-	return account, nil
-}
-
-func (s *GatewayService) filterAccountsBySchedulingThreshold(ctx context.Context, accounts []Account) []Account {
-	if len(accounts) == 0 {
-		return accounts
-	}
-
-	filtered := make([]Account, 0, len(accounts))
-	for i := range accounts {
-		if s.isAccountBlockedBySchedulingThreshold(ctx, &accounts[i]) {
-			continue
-		}
-		filtered = append(filtered, accounts[i])
-	}
-	return filtered
-}
-
-func (s *GatewayService) isAccountBlockedBySchedulingThreshold(ctx context.Context, account *Account) bool {
-	if s == nil || s.rateLimitService == nil || account == nil {
-		return false
-	}
-	return s.rateLimitService.ApplyAccountSchedulingThreshold(ctx, account)
+	return s.accountRepo.GetByID(ctx, accountID)
 }
 
 func (s *GatewayService) hydrateSelectedAccount(ctx context.Context, account *Account) (*Account, error) {
@@ -2448,6 +2482,9 @@ func (s *GatewayService) diagnoseSelectionFailure(
 	excludedIDs map[int64]struct{},
 	allowMixedScheduling bool,
 ) selectionFailureDiagnosis {
+	if diagnosis, handled := s.diagnoseSelectionFailureCustom(ctx, acc, requestedModel, platform, excludedIDs, allowMixedScheduling); handled {
+		return diagnosis
+	}
 	if acc == nil {
 		return selectionFailureDiagnosis{Category: "unschedulable", Detail: "account_nil"}
 	}

@@ -15,6 +15,7 @@ import (
 
 type rateLimitAccountRepoStub struct {
 	mockAccountRepoForGemini
+	rateLimitAccountRepoStubCustom
 	setErrorCalls          int
 	tempCalls              int
 	updateCredentialsCalls int
@@ -37,6 +38,7 @@ func (r *rateLimitAccountRepoStub) SetError(ctx context.Context, id int64, error
 func (r *rateLimitAccountRepoStub) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
 	r.tempCalls++
 	r.lastTempID = id
+	r.lastTempUntil = until
 	r.lastTempReason = reason
 	return nil
 }
@@ -59,6 +61,7 @@ type tokenCacheInvalidatorRecorder struct {
 }
 
 type openAI403CounterCacheStub struct {
+	openAI403CounterCacheStubCustom
 	counts     []int64
 	resetCalls []int64
 	err        error
@@ -69,10 +72,12 @@ func (s *openAI403CounterCacheStub) IncrementOpenAI403Count(_ context.Context, _
 		return 0, s.err
 	}
 	if len(s.counts) == 0 {
+		s.lastCount = 1
 		return 1, nil
 	}
 	count := s.counts[0]
 	s.counts = s.counts[1:]
+	s.lastCount = count
 	return count, nil
 }
 

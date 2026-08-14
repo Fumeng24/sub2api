@@ -37,6 +37,16 @@ func TestOpenAIFirstOutputFailoverStopsAfterOneAccountSwitch(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
+func TestOpenAICompactFirstOutputFailoverAllowsThreeTimeoutSwitches(t *testing.T) {
+	failoverErr := &service.UpstreamFailoverError{SafeToFailoverAfterWrite: true}
+	count := 0
+	for i := 0; i < maxOpenAICompactFirstOutputTimeoutSwitches; i++ {
+		require.False(t, openAIFirstOutputFailoverExhaustedWithLimit(failoverErr, &count, maxOpenAICompactFirstOutputTimeoutSwitches))
+	}
+	require.Equal(t, maxOpenAICompactFirstOutputTimeoutSwitches, count)
+	require.True(t, openAIFirstOutputFailoverExhaustedWithLimit(failoverErr, &count, maxOpenAICompactFirstOutputTimeoutSwitches))
+}
+
 func TestOpenAIRequestAllowsFailoverReplayStopsCanceledClient(t *testing.T) {
 	require.False(t, openAIRequestAllowsFailoverReplay(nil))
 

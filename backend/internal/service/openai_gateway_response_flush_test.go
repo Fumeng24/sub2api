@@ -179,8 +179,10 @@ func TestOpenAIResponseFlush_DataQueuedButBlankDrainsFlushesOnce(t *testing.T) {
 
 	waitOpenAIResponseFlushSignal(t, recorder.flushBlocked)
 	close(allowSecond)
-	waitOpenAIResponseFlushSignal(t, terminalWaiting)
+	// Guarded streams apply upstream backpressure while the downstream flush is
+	// blocked, so release the first flush before expecting further reads.
 	close(releaseFirstFlush)
+	waitOpenAIResponseFlushSignal(t, terminalWaiting)
 	waitOpenAIResponseFlushCount(t, recorder, 2)
 	close(allowTerminal)
 
@@ -216,8 +218,8 @@ func TestOpenAIResponseFlush_BurstDoesNotIncreaseFlushes(t *testing.T) {
 
 	waitOpenAIResponseFlushSignal(t, recorder.flushBlocked)
 	close(allowBurst)
-	waitOpenAIResponseFlushSignal(t, eofReached)
 	close(releaseFirstFlush)
+	waitOpenAIResponseFlushSignal(t, eofReached)
 
 	require.NoError(t, <-errCh)
 	require.NotNil(t, <-resultCh)
@@ -423,16 +425,19 @@ func TestOpenAIResponseFlush_ReusedTypeKeepsSSEBytesAndTerminalSemantics(t *test
 	tests := []struct {
 		name       string
 		body       string
+		wantBody   string
 		flushCount int
 	}{
 		{
 			name:       "whitespace around done",
 			body:       "data: \t[DONE]  \n\n",
+			wantBody:   "data: [DONE]  \n\n",
 			flushCount: 1,
 		},
 		{
 			name:       "invalid JSON before done",
 			body:       "data: {\"type\":\n\ndata: [DONE]\n\n",
+			wantBody:   "data: {\"type\":\n\ndata: [DONE]\n\n",
 			flushCount: 2,
 		},
 	}
@@ -446,7 +451,7 @@ func TestOpenAIResponseFlush_ReusedTypeKeepsSSEBytesAndTerminalSemantics(t *test
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			gotBody, flushes := recorder.snapshot()
-			require.Equal(t, tt.body, gotBody)
+			require.Equal(t, tt.wantBody, gotBody)
 			require.Len(t, flushes, tt.flushCount)
 		})
 	}

@@ -332,10 +332,6 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	videoPrice720P := normalizePrice(input.VideoPrice720P)
 	videoPrice1080P := normalizePrice(input.VideoPrice1080P)
 	webSearchPricePerCall := normalizePrice(input.WebSearchPricePerCall)
-	searchPricePer1k := normalizePrice(input.SearchPricePer1k)
-	audioRealtimePricePerMin := normalizePrice(input.AudioRealtimePricePerMin)
-	audioTTSPricePerMillionChars := normalizePrice(input.AudioTTSPricePerMillionChars)
-	audioSTTPricePerHour := normalizePrice(input.AudioSTTPricePerHour)
 	imageRateMultiplier := 1.0
 	if input.ImageRateMultiplier != nil {
 		if *input.ImageRateMultiplier < 0 {
@@ -486,12 +482,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		VideoPrice480P:                  videoPrice480P,
 		VideoPrice720P:                  videoPrice720P,
 		VideoPrice1080P:                 videoPrice1080P,
-		VideoModelPrices:                NormalizeVideoModelPrices(input.VideoModelPrices),
 		WebSearchPricePerCall:           webSearchPricePerCall,
-		SearchPricePer1k:                searchPricePer1k,
-		AudioRealtimePricePerMin:        audioRealtimePricePerMin,
-		AudioTTSPricePerMillionChars:    audioTTSPricePerMillionChars,
-		AudioSTTPricePerHour:            audioSTTPricePerHour,
 		ClaudeCodeOnly:                  input.ClaudeCodeOnly,
 		FallbackGroupID:                 input.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: fallbackOnInvalidRequest,
@@ -508,12 +499,15 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		RPMLimit:                        input.RPMLimit,
 		MaxReasoningEffort:              maxReasoningEffort,
 		ReasoningEffortMappings:         reasoningEffortMappings,
+		AutoSortConfig:                  input.AutoSortConfig,
 	}
+	applyCreateOpenAIGroupFieldsCustom(group, input)
 	sanitizeGroupMessagesDispatchFields(group)
 	if group.Platform != PlatformOpenAI {
 		group.AllowLive = false
 	}
 	sanitizeGroupReasoningEffortPolicy(group)
+	sanitizeCustomOpenAIGroupFields(group)
 	if err := s.groupRepo.Create(ctx, group); err != nil {
 		return nil, err
 	}
@@ -783,24 +777,8 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.VideoPrice1080P != nil {
 		group.VideoPrice1080P = normalizePrice(input.VideoPrice1080P)
 	}
-	// nil = leave unchanged; empty map = clear per-model prices.
-	if input.VideoModelPrices != nil {
-		group.VideoModelPrices = NormalizeVideoModelPrices(input.VideoModelPrices)
-	}
 	if input.WebSearchPricePerCall != nil {
 		group.WebSearchPricePerCall = normalizePrice(input.WebSearchPricePerCall)
-	}
-	if input.SearchPricePer1k != nil {
-		group.SearchPricePer1k = normalizePrice(input.SearchPricePer1k)
-	}
-	if input.AudioRealtimePricePerMin != nil {
-		group.AudioRealtimePricePerMin = normalizePrice(input.AudioRealtimePricePerMin)
-	}
-	if input.AudioTTSPricePerMillionChars != nil {
-		group.AudioTTSPricePerMillionChars = normalizePrice(input.AudioTTSPricePerMillionChars)
-	}
-	if input.AudioSTTPricePerHour != nil {
-		group.AudioSTTPricePerHour = normalizePrice(input.AudioSTTPricePerHour)
 	}
 
 	// Claude Code 客户端限制
@@ -889,11 +867,16 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		}
 		group.ReasoningEffortMappings = reasoningEffortMappings
 	}
+	if input.AutoSortConfig != nil {
+		group.AutoSortConfig = *input.AutoSortConfig
+	}
+	applyUpdateOpenAIGroupFieldsCustom(group, input)
 	sanitizeGroupMessagesDispatchFields(group)
 	if group.Platform != PlatformOpenAI {
 		group.AllowLive = false
 	}
 	sanitizeGroupReasoningEffortPolicy(group)
+	sanitizeCustomOpenAIGroupFields(group)
 
 	if err := s.groupRepo.Update(ctx, group); err != nil {
 		return nil, err

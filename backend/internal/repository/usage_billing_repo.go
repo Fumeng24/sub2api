@@ -103,6 +103,10 @@ func (r *usageBillingRepository) claimUsageBillingRequest(ctx context.Context, t
 		}
 		return false, nil
 	}
+	if isUndefinedTableError(err) {
+		logger.LegacyPrintf("repository.usage_billing", "usage_billing_dedup_archive missing; skipping archive dedup check")
+		return true, nil
+	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return false, err
 	}

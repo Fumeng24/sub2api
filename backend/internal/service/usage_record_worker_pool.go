@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -333,6 +334,7 @@ func (p *UsageRecordWorkerPool) execute(task UsageRecordTask) {
 			logger.L().With(
 				zap.String("component", "service.usage_record_worker_pool"),
 				zap.Any("panic", recovered),
+				zap.String("stack", string(debug.Stack())),
 			).Error("usage_record.task_panic")
 		}
 	}()

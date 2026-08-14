@@ -129,13 +129,20 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 		scheduleOllamaCloudUsageActivity(s.deferredService, account)
 	}
 
-	if classifyOpenAITransportError(err).Persistent {
+	transportClass := classifyOpenAITransportError(err)
+	if transportClass.Persistent {
 		s.tempUnscheduleOpenAITransportError(ctx, account, safeErr)
+	}
+	schedulerCategory := schedulerStatusZeroFailureCategory([]byte(safeErr))
+	if transportClass.Persistent {
+		schedulerCategory = "error"
 	}
 
 	return &UpstreamFailoverError{
-		StatusCode:   http.StatusBadGateway,
-		ResponseBody: openAITransportFailoverBody,
+		StatusCode:             http.StatusBadGateway,
+		ResponseBody:           openAITransportFailoverBody,
+		RetryableOnSameAccount: true,
+		SchedulerCategory:      schedulerCategory,
 	}
 }
 

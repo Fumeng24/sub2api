@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -21,12 +22,15 @@ type rateLimitClearRepoStub struct {
 	clearRateLimitCalls       int
 	clearAntigravityCalls     int
 	clearModelRateLimitCalls  int
+	clearSingleModelCalls     []string
 	clearTempUnschedCalls     int
+	clearGroupTempCalls       int
 	clearErrorErr             error
 	clearRateLimitErr         error
 	clearAntigravityErr       error
 	clearModelRateLimitErr    error
 	clearTempUnschedulableErr error
+	clearGroupTempErr         error
 }
 
 func (r *rateLimitClearRepoStub) GetByID(ctx context.Context, id int64) (*Account, error) {
@@ -57,9 +61,19 @@ func (r *rateLimitClearRepoStub) ClearModelRateLimits(ctx context.Context, id in
 	return r.clearModelRateLimitErr
 }
 
+func (r *rateLimitClearRepoStub) ClearModelRateLimit(_ context.Context, id int64, model string) error {
+	r.clearSingleModelCalls = append(r.clearSingleModelCalls, fmt.Sprintf("%d:%s", id, model))
+	return r.clearModelRateLimitErr
+}
+
 func (r *rateLimitClearRepoStub) ClearTempUnschedulable(ctx context.Context, id int64) error {
 	r.clearTempUnschedCalls++
 	return r.clearTempUnschedulableErr
+}
+
+func (r *rateLimitClearRepoStub) ClearGroupTempUnschedulable(context.Context, int64) error {
+	r.clearGroupTempCalls++
+	return r.clearGroupTempErr
 }
 
 type tempUnschedCacheRecorder struct {
@@ -264,6 +278,38 @@ func TestRateLimitService_RecoverAccountAfterSuccessfulTest_NoRecoverableStateIs
 	require.Equal(t, 0, repo.clearModelRateLimitCalls)
 	require.Equal(t, 0, repo.clearTempUnschedCalls)
 	require.Empty(t, cache.deletedIDs)
+}
+
+func TestRateLimitService_RecoverAccountModelAfterSuccessfulTest_PreservesOtherModelLimits(t *testing.T) {
+	now := time.Now()
+	future := now.Add(time.Hour)
+	repo := &rateLimitClearRepoStub{
+		getByIDAccount: &Account{
+			ID:                     18,
+			Platform:               PlatformOpenAI,
+			Type:                   AccountTypeAPIKey,
+			Status:                 StatusError,
+			Schedulable:            false,
+			TempUnschedulableUntil: &future,
+			Extra: map[string]any{
+				modelRateLimitsKey: map[string]any{
+					"gpt-5.5": map[string]any{"rate_limit_reset_at": future.Format(time.RFC3339)},
+					"gpt-5.6": map[string]any{"rate_limit_reset_at": future.Format(time.RFC3339)},
+				},
+			},
+		},
+	}
+	svc := NewRateLimitService(repo, nil, &config.Config{}, nil, &tempUnschedCacheRecorder{})
+
+	result, err := svc.RecoverAccountModelAfterSuccessfulTest(context.Background(), 18, "gpt-5.5")
+
+	require.NoError(t, err)
+	require.True(t, result.ClearedError)
+	require.True(t, result.ClearedRateLimit)
+	require.Equal(t, []string{"18:gpt-5.5"}, repo.clearSingleModelCalls)
+	require.Zero(t, repo.clearModelRateLimitCalls, "unrelated model cooldowns must remain")
+	require.Equal(t, 1, repo.clearRateLimitCalls)
+	require.Equal(t, 1, repo.clearTempUnschedCalls)
 }
 
 func TestRateLimitService_RecoverAccountAfterSuccessfulTest_ClearErrorFailed(t *testing.T) {

@@ -18,7 +18,9 @@ func resetViperWithJWTSecret(t *testing.T) {
 	t.Helper()
 	viper.Reset()
 	t.Cleanup(viper.Reset)
-	t.Setenv("CONFIG_FILE", "")
+	configFile := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("{}\n"), 0o600))
+	t.Setenv("CONFIG_FILE", configFile)
 	t.Setenv("DATA_DIR", "")
 	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
 }
@@ -246,6 +248,7 @@ func TestLoadTrustedProxiesPresenceFromYAML(t *testing.T) {
 			resetViperWithJWTSecret(t)
 			configDir := t.TempDir()
 			require.NoError(t, os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(test.yaml), 0o600))
+			t.Setenv("CONFIG_FILE", "")
 			t.Setenv("DATA_DIR", configDir)
 
 			cfg, err := Load()
@@ -299,10 +302,7 @@ func TestLoadReturnsErrorForMissingConfigFile(t *testing.T) {
 }
 
 func TestLoadForBootstrapAllowsMissingJWTSecret(t *testing.T) {
-	viper.Reset()
-	t.Cleanup(viper.Reset)
-	t.Setenv("CONFIG_FILE", "")
-	t.Setenv("DATA_DIR", "")
+	resetViperWithJWTSecret(t)
 	t.Setenv("JWT_SECRET", "")
 
 	cfg, err := LoadForBootstrap()
@@ -372,6 +372,8 @@ func TestLoadDefaultOpenAIFirstOutputTimeoutsDisabled(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, cfg.Gateway.OpenAIFirstOutputTimeoutSeconds)
 	require.Zero(t, cfg.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds)
+	require.Equal(t, 120, cfg.Gateway.OpenAICompactFirstOutputTimeoutSeconds)
+	require.Equal(t, 180, cfg.Gateway.OpenAICompactHighEffortFirstOutputTimeoutSeconds)
 }
 
 func TestLoadOpenAIFirstOutputTimeoutsFromEnv(t *testing.T) {
@@ -383,6 +385,17 @@ func TestLoadOpenAIFirstOutputTimeoutsFromEnv(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 90, cfg.Gateway.OpenAIFirstOutputTimeoutSeconds)
 	require.Equal(t, 240, cfg.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds)
+}
+
+func TestLoadOpenAICompactFirstOutputTimeoutsFromEnv(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("GATEWAY_OPENAI_COMPACT_FIRST_OUTPUT_TIMEOUT_SECONDS", "150")
+	t.Setenv("GATEWAY_OPENAI_COMPACT_HIGH_EFFORT_FIRST_OUTPUT_TIMEOUT_SECONDS", "300")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, 150, cfg.Gateway.OpenAICompactFirstOutputTimeoutSeconds)
+	require.Equal(t, 300, cfg.Gateway.OpenAICompactHighEffortFirstOutputTimeoutSeconds)
 }
 
 func TestValidateOpenAIFirstOutputTimeoutMinimum(t *testing.T) {
@@ -425,8 +438,8 @@ func TestLoadDefaultOpenAIWSConfig(t *testing.T) {
 	if !cfg.Gateway.OpenAIScheduler.StickyEscapeEnabled {
 		t.Fatalf("Gateway.OpenAIScheduler.StickyEscapeEnabled = false, want true")
 	}
-	if cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs != 15000 {
-		t.Fatalf("Gateway.OpenAIScheduler.StickyEscapeTTFTMs = %d, want 15000", cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs)
+	if cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs != 25000 {
+		t.Fatalf("Gateway.OpenAIScheduler.StickyEscapeTTFTMs = %d, want 25000", cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs)
 	}
 	if cfg.Gateway.OpenAIScheduler.StickyEscapeErrorRate != 0.5 {
 		t.Fatalf("Gateway.OpenAIScheduler.StickyEscapeErrorRate = %v, want 0.5", cfg.Gateway.OpenAIScheduler.StickyEscapeErrorRate)
@@ -538,19 +551,6 @@ func TestLoadOpenAICompactModelFromEnv(t *testing.T) {
 	require.Equal(t, "gpt-5.3-codex", cfg.Gateway.OpenAICompactModel)
 }
 
-func TestLoadDefaultGrokFreeQuotaSoftGate(t *testing.T) {
-	resetViperWithJWTSecret(t)
-
-	cfg, err := Load()
-	require.NoError(t, err)
-	require.False(t, cfg.Gateway.Grok.PasswordAuthEnabled)
-	require.True(t, cfg.Gateway.Grok.FreeQuotaSoftGateEnabled)
-	require.Equal(t, int64(500_000), cfg.Gateway.Grok.FreeQuotaTokenLimit)
-	require.Equal(t, 95, cfg.Gateway.Grok.FreeQuotaSoftGatePercent)
-	require.Equal(t, 24, cfg.Gateway.Grok.FreeQuotaWindowHours)
-	require.Equal(t, 60, cfg.Gateway.Grok.FreeQuotaStatsCacheSeconds)
-}
-
 func TestLoadDefaultOpenAIHTTP2Enabled(t *testing.T) {
 	resetViperWithJWTSecret(t)
 
@@ -588,12 +588,12 @@ func TestLoadOpenAIHTTP2DisabledFromEnv(t *testing.T) {
 	require.False(t, cfg.Gateway.OpenAIHTTP2.Enabled)
 }
 
-func TestLoadDefaultOpenAIResponseHeaderTimeoutUnlimited(t *testing.T) {
+func TestLoadDefaultOpenAIResponseHeaderTimeoutFortyFiveSeconds(t *testing.T) {
 	resetViperWithJWTSecret(t)
 
 	cfg, err := Load()
 	require.NoError(t, err)
-	require.Equal(t, 0, cfg.Gateway.OpenAIResponseHeaderTimeout)
+	require.Equal(t, 45, cfg.Gateway.OpenAIResponseHeaderTimeout)
 }
 
 func TestLoadOpenAIResponseHeaderTimeoutFromEnv(t *testing.T) {
@@ -743,6 +743,7 @@ func TestLoadForcedCodexInstructionsTemplate(t *testing.T) {
 	require.NoError(t, os.WriteFile(templatePath, []byte("server-prefix\n\n{{ .ExistingInstructions }}"), 0o644))
 	yamlSafePath := filepath.ToSlash(templatePath)
 	require.NoError(t, os.WriteFile(configPath, []byte("gateway:\n  forced_codex_instructions_template_file: \""+yamlSafePath+"\"\n"), 0o644))
+	t.Setenv("CONFIG_FILE", "")
 	t.Setenv("DATA_DIR", tempDir)
 
 	cfg, err := Load()
@@ -1783,6 +1784,16 @@ func TestValidateConfigErrors(t *testing.T) {
 			wantErr: "gateway.openai_high_effort_first_output_timeout_seconds",
 		},
 		{
+			name:    "gateway openai compact first output timeout below minimum",
+			mutate:  func(c *Config) { c.Gateway.OpenAICompactFirstOutputTimeoutSeconds = 29 },
+			wantErr: "gateway.openai_compact_first_output_timeout_seconds",
+		},
+		{
+			name:    "gateway openai compact high effort first output timeout too large",
+			mutate:  func(c *Config) { c.Gateway.OpenAICompactHighEffortFirstOutputTimeoutSeconds = 1801 },
+			wantErr: "gateway.openai_compact_high_effort_first_output_timeout_seconds",
+		},
+		{
 			name:    "gateway max idle conns",
 			mutate:  func(c *Config) { c.Gateway.MaxIdleConns = 0 },
 			wantErr: "gateway.max_idle_conns",
@@ -2305,6 +2316,9 @@ func TestValidateConfig_OpenAIWSRules(t *testing.T) {
 				c.Gateway.OpenAIWS.SchedulerScoreWeights.Queue = 0
 				c.Gateway.OpenAIWS.SchedulerScoreWeights.ErrorRate = 0
 				c.Gateway.OpenAIWS.SchedulerScoreWeights.TTFT = 0
+				c.Gateway.OpenAIWS.SchedulerScoreWeights.Reset = 0
+				c.Gateway.OpenAIWS.SchedulerScoreWeights.PreviousResponse = 0
+				c.Gateway.OpenAIWS.SchedulerScoreWeights.SessionSticky = 0
 			},
 			wantErr: "gateway.openai_ws.scheduler_score_weights must not all be zero",
 		},

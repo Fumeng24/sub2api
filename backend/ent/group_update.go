@@ -1106,6 +1106,20 @@ func (_u *GroupUpdate) AppendReasoningEffortMappings(v []domain.ReasoningEffortM
 	return _u
 }
 
+// SetAutoSortConfig sets the "auto_sort_config" field.
+func (_u *GroupUpdate) SetAutoSortConfig(v domain.GroupAutoSortConfig) *GroupUpdate {
+	_u.mutation.SetAutoSortConfig(v)
+	return _u
+}
+
+// SetNillableAutoSortConfig sets the "auto_sort_config" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableAutoSortConfig(v *domain.GroupAutoSortConfig) *GroupUpdate {
+	if v != nil {
+		_u.SetAutoSortConfig(*v)
+	}
+	return _u
+}
+
 // SetProfitControlEnabled sets the "profit_control_enabled" field.
 func (_u *GroupUpdate) SetProfitControlEnabled(v bool) *GroupUpdate {
 	_u.mutation.SetProfitControlEnabled(v)
@@ -1828,6 +1842,9 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, group.FieldReasoningEffortMappings, value)
 		})
+	}
+	if value, ok := _u.mutation.AutoSortConfig(); ok {
+		_spec.SetField(group.FieldAutoSortConfig, field.TypeJSON, value)
 	}
 	if value, ok := _u.mutation.ProfitControlEnabled(); ok {
 		_spec.SetField(group.FieldProfitControlEnabled, field.TypeBool, value)
@@ -3227,6 +3244,20 @@ func (_u *GroupUpdateOne) AppendReasoningEffortMappings(v []domain.ReasoningEffo
 	return _u
 }
 
+// SetAutoSortConfig sets the "auto_sort_config" field.
+func (_u *GroupUpdateOne) SetAutoSortConfig(v domain.GroupAutoSortConfig) *GroupUpdateOne {
+	_u.mutation.SetAutoSortConfig(v)
+	return _u
+}
+
+// SetNillableAutoSortConfig sets the "auto_sort_config" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableAutoSortConfig(v *domain.GroupAutoSortConfig) *GroupUpdateOne {
+	if v != nil {
+		_u.SetAutoSortConfig(*v)
+	}
+	return _u
+}
+
 // SetProfitControlEnabled sets the "profit_control_enabled" field.
 func (_u *GroupUpdateOne) SetProfitControlEnabled(v bool) *GroupUpdateOne {
 	_u.mutation.SetProfitControlEnabled(v)
@@ -3979,6 +4010,9 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, group.FieldReasoningEffortMappings, value)
 		})
+	}
+	if value, ok := _u.mutation.AutoSortConfig(); ok {
+		_spec.SetField(group.FieldAutoSortConfig, field.TypeJSON, value)
 	}
 	if value, ok := _u.mutation.ProfitControlEnabled(); ok {
 		_spec.SetField(group.FieldProfitControlEnabled, field.TypeBool, value)

@@ -125,15 +125,22 @@ func answerFromOpenAIRequest(body map[string]any) string {
 	prompt, _ := body["input"].(string)
 	if prompt == "" {
 		if messages, ok := body["messages"].([]any); ok && len(messages) > 0 {
-			if msg, ok := messages[0].(map[string]any); ok {
+			for _, item := range messages {
+				msg, ok := item.(map[string]any)
+				if !ok || msg["role"] != "user" {
+					continue
+				}
 				prompt, _ = msg["content"].(string)
+				if prompt != "" {
+					break
+				}
 			}
 		}
 	}
 	return answerFromChallengePrompt(prompt)
 }
 
-var challengeQuestionRegex = regexp.MustCompile(`Q: (\d+) ([+-]) (\d+) = \?\nA:$`)
+var challengeQuestionRegex = regexp.MustCompile(`(\d+)\s*([+-])\s*(\d+)`)
 
 func answerFromChallengePrompt(prompt string) string {
 	m := challengeQuestionRegex.FindStringSubmatch(prompt)
@@ -183,6 +190,21 @@ func TestRunCheckForModel_OpenAI_DefaultChatRequest(t *testing.T) {
 	}
 	if _, ok := h.lastBody["messages"]; !ok {
 		t.Error("chat body should contain messages")
+	}
+	messages, _ := h.lastBody["messages"].([]any)
+	if len(messages) != 2 {
+		t.Fatalf("chat body should contain compact system+user messages, got %#v", h.lastBody["messages"])
+	}
+	systemMsg, _ := messages[0].(map[string]any)
+	userMsg, _ := messages[1].(map[string]any)
+	if systemMsg["role"] != "system" || systemMsg["content"] != "." {
+		t.Errorf("first chat message should be compact system probe guard, got %#v", systemMsg)
+	}
+	if userMsg["role"] != "user" || strings.TrimSpace(userMsg["content"].(string)) == "" {
+		t.Errorf("second chat message should be non-empty user challenge, got %#v", userMsg)
+	}
+	if mt, ok := h.lastBody["max_tokens"].(float64); !ok || mt != monitorChallengeMaxTokens {
+		t.Errorf("chat body should use compact max_tokens=%d, got %v", monitorChallengeMaxTokens, h.lastBody["max_tokens"])
 	}
 	if _, ok := h.lastBody["instructions"]; ok {
 		t.Error("chat body must not contain top-level instructions")
@@ -328,6 +350,33 @@ func TestRunCheckForModel_OpenAIResponses_SkipsLeadingReasoningItem(t *testing.T
 	}
 	if h.lastPath != providerOpenAIResponsesPath {
 		t.Fatalf("expected responses path %q, got %q", providerOpenAIResponsesPath, h.lastPath)
+	}
+}
+
+func TestRunCheckForModel_Anthropic_AggregatesAllTextBlocks(t *testing.T) {
+	swapMonitorHTTPClient(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() { _ = r.Body.Close() }()
+		var parsed map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&parsed)
+		answer := answerFromOpenAIRequest(parsed)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"content": []map[string]any{
+				{"type": "thinking", "text": ""},
+				{"type": "text", "text": "prefix "},
+				{"type": "tool_use", "name": "search"},
+				{"type": "text", "text": answer},
+			},
+		})
+	}))
+	t.Cleanup(srv.Close)
+
+	res := runCheckForModel(context.Background(), MonitorProviderAnthropic, srv.URL, "sk-fake", "claude-plus", nil)
+
+	if res.Status != MonitorStatusOperational {
+		t.Fatalf("anthropic response with later text block should pass, got status=%s message=%q", res.Status, res.Message)
 	}
 }
 

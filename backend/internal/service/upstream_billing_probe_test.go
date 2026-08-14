@@ -688,7 +688,7 @@ func TestUpstreamBillingRateAtHandlesDST(t *testing.T) {
 	require.Equal(t, 2.0, rate)
 }
 
-func TestUpstreamBillingProbeFailurePreservesLastSuccessAndRetryAfter(t *testing.T) {
+func TestUpstreamBillingProbeFailureClearsLastSuccessAndHonorsRetryAfter(t *testing.T) {
 	receivedAt := time.Date(2026, time.July, 12, 12, 0, 0, 0, time.UTC)
 	initialRate := 0.35
 	previous := &UpstreamBillingProbeSnapshot{
@@ -723,10 +723,9 @@ func TestUpstreamBillingProbeFailurePreservesLastSuccessAndRetryAfter(t *testing
 	snapshot, err := svc.ProbeAccount(context.Background(), account.ID)
 	require.NoError(t, err)
 	require.Equal(t, UpstreamBillingProbeStatusFailed, snapshot.Status)
-	require.Equal(t, previous.Data, snapshot.Data)
-	require.Equal(t, previous.ReceivedAt, snapshot.ReceivedAt)
-	require.NotNil(t, snapshot.FreshUntil)
-	require.Equal(t, receivedAt.Add(time.Hour), *snapshot.FreshUntil)
+	require.Nil(t, snapshot.Data)
+	require.Nil(t, snapshot.ReceivedAt)
+	require.Nil(t, snapshot.FreshUntil)
 	require.Equal(t, 2, snapshot.FailureCount)
 	require.Equal(t, "http_error", snapshot.LastError)
 	require.False(t, snapshot.NextProbeAt.Before(fixedNow.Add(4*time.Hour)))

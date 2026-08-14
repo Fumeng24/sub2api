@@ -128,6 +128,9 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 	if account.ProxyID != nil {
 		builder.SetProxyID(*account.ProxyID)
 	}
+	if account.UpstreamID != nil {
+		builder.SetUpstreamID(*account.UpstreamID)
+	}
 	if account.LastUsedAt != nil {
 		builder.SetLastUsedAt(*account.LastUsedAt)
 	}
@@ -903,6 +906,7 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 					))
 				}),
 			)
+			q = q.Where(schedulableAccountListOverlayPredicates(time.Now())...)
 		case "rate_limited":
 			q = q.Where(
 				dbaccount.StatusEQ(service.StatusActive),
@@ -918,6 +922,7 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 		case "temp_unschedulable":
 			q = q.Where(
 				dbaccount.StatusEQ(service.StatusActive),
+				dbaccount.SchedulableEQ(true),
 				dbpredicate.Account(func(s *entsql.Selector) {
 					col := s.C("temp_unschedulable_until")
 					s.Where(entsql.And(
@@ -1651,6 +1656,7 @@ func (r *accountRepository) syncSchedulerAccountSnapshot(ctx context.Context, ac
 	if err := r.schedulerCache.SetAccount(ctx, account); err != nil {
 		logger.LegacyPrintf("repository.account", "[Scheduler] sync account snapshot write failed: id=%d err=%v", accountID, err)
 	}
+	r.syncSchedulerBucketMembershipCustom(ctx, account)
 }
 
 func (r *accountRepository) syncSchedulerAccountSnapshotDetached(ctx context.Context, accountID int64) {
@@ -1706,6 +1712,7 @@ func (r *accountRepository) syncSchedulerAccountSnapshots(ctx context.Context, a
 		if err := r.schedulerCache.SetAccount(ctx, account); err != nil {
 			logger.LegacyPrintf("repository.account", "[Scheduler] batch sync account snapshot write failed: id=%d err=%v", account.ID, err)
 		}
+		r.syncSchedulerBucketMembershipCustom(ctx, account)
 	}
 }
 
@@ -1726,11 +1733,12 @@ func (r *accountRepository) ClearError(ctx context.Context, id int64) error {
 }
 
 func (r *accountRepository) AddToGroup(ctx context.Context, accountID, groupID int64, priority int) error {
-	_, err := r.client.AccountGroup.Create().
+	builder := r.client.AccountGroup.Create().
 		SetAccountID(accountID).
 		SetGroupID(groupID).
-		SetPriority(priority).
-		Save(ctx)
+		SetPriority(priority)
+	configureAccountGroupCreateCustom(builder, priority)
+	_, err := builder.Save(ctx)
 	if err != nil {
 		return err
 	}
@@ -1776,10 +1784,14 @@ func (r *accountRepository) GetGroups(ctx context.Context, accountID int64) ([]s
 }
 
 func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, groupIDs []int64) error {
+	if handled, err := r.bindGroupsCustom(ctx, accountID, groupIDs); handled {
+		return err
+	}
 	existingGroupIDs, err := r.loadAccountGroupIDs(ctx, accountID)
 	if err != nil {
 		return err
 	}
+
 	// 使用事务保证删除旧绑定与创建新绑定的原子性
 	tx, err := r.client.Tx(ctx)
 	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
@@ -1987,7 +1999,7 @@ func (r *accountRepository) ListSchedulableByPlatform(ctx context.Context, platf
 	if err != nil {
 		return nil, err
 	}
-	return r.accountsToService(ctx, accounts)
+	return r.accountsToSchedulableService(ctx, accounts, now)
 }
 
 func (r *accountRepository) ListSchedulableByGroupIDAndPlatform(ctx context.Context, groupID int64, platform string) ([]service.Account, error) {
@@ -2021,7 +2033,7 @@ func (r *accountRepository) ListSchedulableByPlatforms(ctx context.Context, plat
 	if err != nil {
 		return nil, err
 	}
-	return r.accountsToService(ctx, accounts)
+	return r.accountsToSchedulableService(ctx, accounts, now)
 }
 
 func (r *accountRepository) ListSchedulableUngroupedByPlatform(ctx context.Context, platform string) ([]service.Account, error) {
@@ -2042,7 +2054,7 @@ func (r *accountRepository) ListSchedulableUngroupedByPlatform(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	return r.accountsToService(ctx, accounts)
+	return r.accountsToSchedulableService(ctx, accounts, now)
 }
 
 func (r *accountRepository) ListSchedulableUngroupedByPlatforms(ctx context.Context, platforms []string) ([]service.Account, error) {
@@ -2066,7 +2078,7 @@ func (r *accountRepository) ListSchedulableUngroupedByPlatforms(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	return r.accountsToService(ctx, accounts)
+	return r.accountsToSchedulableService(ctx, accounts, now)
 }
 
 func (r *accountRepository) ListSchedulableByGroupIDAndPlatforms(ctx context.Context, groupID int64, platforms []string) ([]service.Account, error) {
@@ -2424,6 +2436,45 @@ func (r *accountRepository) ClearModelRateLimits(ctx context.Context, id int64) 
 	return nil
 }
 
+// ClearModelRateLimit removes one model-scoped runtime limit without
+// recovering unrelated models on the same account.
+func (r *accountRepository) ClearModelRateLimit(ctx context.Context, id int64, scope string) error {
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		return nil
+	}
+	client := clientFromContext(ctx, r.client)
+	result, err := client.ExecContext(
+		ctx,
+		`UPDATE accounts SET
+			extra = jsonb_set(
+				COALESCE(extra, '{}'::jsonb),
+				'{model_rate_limits}'::text[],
+				COALESCE(extra->'model_rate_limits', '{}'::jsonb) - $1,
+				true
+			),
+			updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL`,
+		scope,
+		id,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return service.ErrAccountNotFound
+	}
+	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
+		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue clear model rate limit failed: account=%d scope=%s err=%v", id, scope, err)
+	}
+	r.syncSchedulerAccountSnapshot(ctx, id)
+	return nil
+}
+
 func (r *accountRepository) UpdateSessionWindow(ctx context.Context, id int64, start, end *time.Time, status string) error {
 	builder := r.client.Account.Update().
 		Where(dbaccount.IDEQ(id)).
@@ -2462,6 +2513,9 @@ func (r *accountRepository) UpdateSessionWindowEnd(ctx context.Context, id int64
 }
 
 func (r *accountRepository) SetSchedulable(ctx context.Context, id int64, schedulable bool) error {
+	if handled, err := r.setSchedulableCustom(ctx, id, schedulable); handled {
+		return err
+	}
 	_, err := r.client.Account.Update().
 		Where(dbaccount.IDEQ(id)).
 		SetSchedulable(schedulable).
@@ -3043,7 +3097,9 @@ func (r *accountRepository) queryAccountsByGroup(ctx context.Context, groupID in
 
 	groups, err := q.
 		Order(
+			dbaccountgroup.BySortOrder(),
 			dbaccountgroup.ByPriority(),
+			dbaccountgroup.ByAccountID(),
 			dbaccountgroup.ByAccountField(dbaccount.FieldPriority),
 		).
 		WithAccount().
@@ -3072,7 +3128,17 @@ func (r *accountRepository) queryAccountsByGroup(ctx context.Context, groupID in
 		}
 	}
 
-	return r.accountsToService(ctx, accounts)
+	result, err := r.accountsToService(ctx, accounts)
+	if err != nil {
+		return nil, err
+	}
+	for i := range result {
+		result[i].Priority = result[i].SchedulingPriorityForGroup(groupID)
+	}
+	if opts.schedulable {
+		result = filterSchedulableServiceAccountsForGroup(result, groupID, time.Now())
+	}
+	return result, nil
 }
 
 func (r *accountRepository) accountsToService(ctx context.Context, accounts []*dbent.Account) ([]service.Account, error) {
@@ -3192,7 +3258,7 @@ func (r *accountRepository) loadAccountGroups(ctx context.Context, accountIDs []
 		}
 		entries, err := r.client.AccountGroup.Query().
 			Where(dbaccountgroup.AccountIDIn(accountIDs[start:end]...)).
-			Order(dbaccountgroup.ByAccountID(), dbaccountgroup.ByPriority()).
+			Order(dbaccountgroup.ByAccountID(), dbaccountgroup.BySortOrder(), dbaccountgroup.ByPriority()).
 			All(ctx)
 		if err != nil {
 			return nil, nil, nil, err
@@ -3215,6 +3281,7 @@ func (r *accountRepository) loadAccountGroups(ctx context.Context, accountIDs []
 				CreatedAt: ag.CreatedAt,
 				Group:     groupSvc,
 			}
+			hydrateAccountGroupSchedulingCustom(&agSvc, ag)
 			accountGroupsByAccount[ag.AccountID] = append(accountGroupsByAccount[ag.AccountID], agSvc)
 			groupIDsByAccount[ag.AccountID] = append(groupIDsByAccount[ag.AccountID], ag.GroupID)
 			if groupSvc != nil {
@@ -3336,6 +3403,7 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 		Credentials:             copyJSONMap(m.Credentials),
 		Extra:                   copyJSONMap(m.Extra),
 		ProxyID:                 m.ProxyID,
+		UpstreamID:              m.UpstreamID,
 		ProxyFallbackOriginID:   m.ProxyFallbackOriginID,
 		Concurrency:             m.Concurrency,
 		Priority:                m.Priority,

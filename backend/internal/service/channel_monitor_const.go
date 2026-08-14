@@ -42,8 +42,9 @@ const (
 	// 又给 "upstream HTTP <status>: " 前缀留出余量，避免最终被 monitorMessageMaxBytes (500) 截得太狠。
 	monitorErrorBodySnippetMaxBytes = 300
 	// monitorChallengeMin / monitorChallengeMax challenge 操作数范围。
+	// OpenAI/Codex 探针按 token 成本优化，保持个位数随机算术即可验证模型响应。
 	monitorChallengeMin = 1
-	monitorChallengeMax = 50
+	monitorChallengeMax = 9
 
 	// providerOpenAIPath OpenAI Chat Completions 路径。
 	providerOpenAIPath = "/v1/chat/completions"
@@ -91,8 +92,8 @@ const (
 
 	// monitorAnthropicAPIVersion Anthropic Messages API 版本头。
 	monitorAnthropicAPIVersion = "2023-06-01"
-	// monitorChallengeMaxTokens 单次 challenge 请求的 max_tokens（足够回答个位数算术）。
-	monitorChallengeMaxTokens = 50
+	// monitorChallengeMaxTokens 单次 OpenAI challenge 请求的 max_tokens。
+	monitorChallengeMaxTokens = 2
 
 	// monitorRunOneBuffer runOne 的总超时缓冲（除请求超时与 ping 超时外的额外裕量）。
 	monitorRunOneBuffer = 10 * time.Second
@@ -148,27 +149,12 @@ var (
 		"CHANNEL_MONITOR_ENDPOINT_UNREACHABLE", "endpoint hostname could not be resolved",
 	)
 	ErrChannelMonitorMissingAPIKey = infraerrors.BadRequest(
-		"CHANNEL_MONITOR_MISSING_API_KEY", "api_key is required when creating a monitor",
+		"CHANNEL_MONITOR_MISSING_API_KEY", "api_key or api_key_id is required when creating a monitor",
 	)
 	ErrChannelMonitorMissingPrimaryModel = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_MISSING_PRIMARY_MODEL", "primary_model is required",
 	)
 	ErrChannelMonitorAPIKeyDecryptFailed = infraerrors.InternalServer(
 		"CHANNEL_MONITOR_KEY_DECRYPT_FAILED", "api key decryption failed; please re-edit the monitor with a fresh key",
-	)
-)
-
-var (
-	ErrChannelMonitorDisabled = infraerrors.Forbidden(
-		"CHANNEL_MONITOR_DISABLED",
-		"channel monitor feature is disabled",
-	)
-	ErrChannelMonitorActiveProbesRetired = infraerrors.Forbidden(
-		"CHANNEL_MONITOR_ACTIVE_PROBES_RETIRED",
-		"channel monitor active probes are retired in v2 mode",
-	)
-	ErrChannelMonitorModeMismatch = infraerrors.Forbidden(
-		"CHANNEL_MONITOR_MODE_MISMATCH",
-		"channel monitor mode does not allow this operation",
 	)
 )

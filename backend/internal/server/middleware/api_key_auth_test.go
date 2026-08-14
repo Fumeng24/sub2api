@@ -50,6 +50,41 @@ func TestAPIKeyAuthRejectsOversizedCredentialsBeforeLookup(t *testing.T) {
 	require.Zero(t, calls.Load())
 }
 
+func TestAPIKeyAuthTrimsHeaderCredentialAliases(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	apiKey := &service.APIKey{
+		ID:     100,
+		Key:    "header-trim-key",
+		Status: service.StatusActive,
+		User: &service.User{
+			ID:          7,
+			Status:      service.StatusActive,
+			Concurrency: 1,
+		},
+	}
+	repo := &stubApiKeyRepo{getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
+		if key != apiKey.Key {
+			return nil, service.ErrAPIKeyNotFound
+		}
+		clone := *apiKey
+		clone.User = apiKey.User
+		return &clone, nil
+	}}
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+
+	for _, header := range []string{"x-api-key", "x-goog-api-key"} {
+		r := gin.New()
+		r.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)))
+		r.GET("/t", func(c *gin.Context) { c.Status(http.StatusOK) })
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/t", nil)
+		req.Header.Set(header, "  "+apiKey.Key+"  ")
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, header)
+	}
+}
+
 func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

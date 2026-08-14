@@ -34,9 +34,11 @@ type ChannelMonitor struct {
 	APIMode         string
 	Endpoint        string
 	APIKey          string // 解密后的明文 API Key（仅在 service 内部使用，handler 层不应直接序列化返回）
+	APIKeyID        *int64 // 选择"我的 key"时绑定的用户 API Key；运行时优先读取当前 key
 	PrimaryModel    string
 	ExtraModels     []string
 	GroupName       string
+	SortOrder       int
 	Enabled         bool
 	IntervalSeconds int
 	JitterSeconds   int // 每次调度 ± [0, jitter] 的随机偏移（秒），0 = 固定间隔
@@ -78,9 +80,11 @@ type ChannelMonitorCreateParams struct {
 	APIMode          string
 	Endpoint         string
 	APIKey           string
+	APIKeyID         *int64
 	PrimaryModel     string
 	ExtraModels      []string
 	GroupName        string
+	SortOrder        int
 	Enabled          bool
 	IntervalSeconds  int
 	JitterSeconds    int
@@ -98,9 +102,12 @@ type ChannelMonitorUpdateParams struct {
 	APIMode         *string
 	Endpoint        *string
 	APIKey          *string // 空字符串表示不修改；非空字符串覆盖
+	APIKeyID        *int64
+	ClearAPIKeyID   bool
 	PrimaryModel    *string
 	ExtraModels     *[]string
 	GroupName       *string
+	SortOrder       *int
 	Enabled         *bool
 	IntervalSeconds *int
 	JitterSeconds   *int

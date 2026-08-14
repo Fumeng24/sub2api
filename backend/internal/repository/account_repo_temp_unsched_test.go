@@ -26,6 +26,47 @@ func TestAccountRepository_SetTempUnschedulable_NoRowsAffectedDoesNotWriteOutbox
 	require.NotContains(t, strings.Join(exec.execQueries, "\n"), "scheduler_outbox")
 }
 
+func TestAccountRepository_Transient5xxCooldownMutationsAreConditionallyScoped(t *testing.T) {
+	t.Run("clear", func(t *testing.T) {
+		exec := &recordingSQLExecutor{result: rowsAffectedResult(0)}
+		repo := newAccountRepositoryWithSQL(nil, exec, nil)
+
+		cleared, err := repo.ClearTransient5xxCooldown(context.Background(), 42)
+
+		require.NoError(t, err)
+		require.False(t, cleared)
+		require.Len(t, exec.execQueries, 1)
+		normalized := normalizeSQLWhitespace(exec.execQueries[0])
+		require.Contains(t, normalized, "status = $2")
+		require.Contains(t, normalized, "schedulable IS TRUE")
+		require.Contains(t, normalized, "LEFT(temp_unschedulable_reason, LENGTH($3)) = $3")
+		require.Contains(t, normalized, "LEFT(temp_unschedulable_reason, LENGTH($4)) = $4")
+		require.Equal(t, service.StatusActive, exec.execArgs[0][1])
+		require.Equal(t, service.Transient5xxCooldownReasonPrefix, exec.execArgs[0][2])
+		require.Equal(t, service.PoolTransient5xxCooldownReasonPrefix, exec.execArgs[0][3])
+	})
+
+	t.Run("renew", func(t *testing.T) {
+		exec := &recordingSQLExecutor{result: rowsAffectedResult(0)}
+		repo := newAccountRepositoryWithSQL(nil, exec, nil)
+
+		renewed, err := repo.RenewTransient5xxCooldown(context.Background(), 42, time.Now().Add(time.Minute))
+
+		require.NoError(t, err)
+		require.False(t, renewed)
+		require.Len(t, exec.execQueries, 1)
+		normalized := normalizeSQLWhitespace(exec.execQueries[0])
+		require.Contains(t, normalized, "temp_unschedulable_until < $1")
+		require.Contains(t, normalized, "status = $3")
+		require.Contains(t, normalized, "schedulable IS TRUE")
+		require.Contains(t, normalized, "LEFT(temp_unschedulable_reason, LENGTH($4)) = $4")
+		require.Contains(t, normalized, "LEFT(temp_unschedulable_reason, LENGTH($5)) = $5")
+		require.Equal(t, service.StatusActive, exec.execArgs[0][2])
+		require.Equal(t, service.Transient5xxCooldownReasonPrefix, exec.execArgs[0][3])
+		require.Equal(t, service.PoolTransient5xxCooldownReasonPrefix, exec.execArgs[0][4])
+	})
+}
+
 func TestAccountRepository_GrokCredentialConditionalMutationsAreEligibleAndAtomicallyPropagated(t *testing.T) {
 	proxyID := int64(77)
 	snapshot := service.GrokCredentialMutationSnapshot{

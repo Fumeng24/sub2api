@@ -49,8 +49,8 @@ func (h *AvailableChannelHandler) featureEnabled(c *gin.Context) bool {
 // userAvailableGroup 用户可见的分组概要（白名单字段）。
 //
 // 前端据此区分专属 vs 公开分组（IsExclusive）、订阅 vs 标准分组（SubscriptionType，
-// 订阅视觉加深），并展示默认倍率与高峰倍率规则；用户专属倍率前端走
-// /groups/rates，和 API 密钥页面保持一致。
+// 订阅视觉加深），并展示当前用户实际生效的倍率与高峰倍率规则。专属计费系数
+// 已在服务端合并，避免向用户泄露分组基础倍率。
 type userAvailableGroup struct {
 	ID                 int64   `json:"id"`
 	Name               string  `json:"name"`
@@ -121,6 +121,9 @@ func (h *AvailableChannelHandler) List(c *gin.Context) {
 	subject, ok := middleware.GetAuthSubjectFromContext(c)
 	if !ok {
 		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	if h.listAvailableChannelsCustom(c, subject.UserID) {
 		return
 	}
 

@@ -296,6 +296,29 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		}
 	}
 
+	// 同步用户专属分组折扣。固定倍率与相对折扣互斥，避免折扣被静默忽略。
+	if input.GroupDiscounts != nil && s.userGroupRateRepo != nil {
+		for groupID, discount := range input.GroupDiscounts {
+			if discount != nil && (*discount < 0 || *discount > 1) {
+				return nil, fmt.Errorf("discount_multiplier must be between 0 and 1 (group_id=%d)", groupID)
+			}
+			if discount != nil {
+				cfg, cfgErr := s.userGroupRateRepo.GetRateConfigByUserAndGroup(ctx, user.ID, groupID)
+				if cfgErr != nil {
+					return nil, cfgErr
+				}
+				if cfg != nil && cfg.RateMultiplier != nil {
+					return nil, fmt.Errorf("group %d has a fixed rate; remove it before setting a discount", groupID)
+				}
+			}
+		}
+		if err := s.userGroupRateRepo.SyncUserGroupDiscounts(ctx, user.ID, input.GroupDiscounts); err != nil {
+			logger.LegacyPrintf("service.admin", "failed to sync user group discounts: user_id=%d err=%v", user.ID, err)
+		} else if discounts, loadErr := s.userGroupRateRepo.GetDiscountsByUserID(ctx, user.ID); loadErr == nil {
+			user.GroupDiscounts = discounts
+		}
+	}
+
 	if s.authCacheInvalidator != nil {
 		// RPMLimit 直接参与 billing_cache_service.checkRPM 的三级级联，
 		// allowed_groups 参与 API Key 专属分组授权判断；不失效缓存会让修改在一个 L2 TTL 内失去效果。

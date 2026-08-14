@@ -375,7 +375,7 @@ func newOAuthEmailAffiliateRepoStub(codeOwners map[string]int64) *oauthEmailAffi
 
 func (r *oauthEmailAffiliateRepoStub) EnsureUserAffiliate(_ context.Context, userID int64) (*service.AffiliateSummary, error) {
 	r.ensureUserIDs = append(r.ensureUserIDs, userID)
-	return &service.AffiliateSummary{UserID: userID, AffCode: "SELF"}, nil
+	return &service.AffiliateSummary{UserID: userID, AffCode: "SELF", AffiliateSummaryCustom: service.AffiliateSummaryCustom{UserCreatedAt: time.Now()}}, nil
 }
 
 func (r *oauthEmailAffiliateRepoStub) GetAffiliateByCode(_ context.Context, code string) (*service.AffiliateSummary, error) {
@@ -389,6 +389,10 @@ func (r *oauthEmailAffiliateRepoStub) GetAffiliateByCode(_ context.Context, code
 func (r *oauthEmailAffiliateRepoStub) BindInviter(_ context.Context, userID, inviterID int64) (bool, error) {
 	r.bindCalls = append(r.bindCalls, oauthEmailAffiliateBindCall{userID: userID, inviterID: inviterID})
 	return true, nil
+}
+
+func (r *oauthEmailAffiliateRepoStub) ClaimBindBonus(context.Context, int64, float64) (bool, float64, error) {
+	panic("unexpected ClaimBindBonus call")
 }
 
 func (r *oauthEmailAffiliateRepoStub) AccrueQuota(context.Context, int64, int64, float64, int, *int64) (bool, error) {

@@ -72,6 +72,20 @@ func (_c *RedeemCodeCreate) SetNillableStatus(v *string) *RedeemCodeCreate {
 	return _c
 }
 
+// SetBusinessCategory sets the "business_category" field.
+func (_c *RedeemCodeCreate) SetBusinessCategory(v string) *RedeemCodeCreate {
+	_c.mutation.SetBusinessCategory(v)
+	return _c
+}
+
+// SetNillableBusinessCategory sets the "business_category" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableBusinessCategory(v *string) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetBusinessCategory(*v)
+	}
+	return _c
+}
+
 // SetUsedBy sets the "used_by" field.
 func (_c *RedeemCodeCreate) SetUsedBy(v int64) *RedeemCodeCreate {
 	_c.mutation.SetUsedBy(v)
@@ -241,6 +255,10 @@ func (_c *RedeemCodeCreate) defaults() {
 		v := redeemcode.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.BusinessCategory(); !ok {
+		v := redeemcode.DefaultBusinessCategory
+		_c.mutation.SetBusinessCategory(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := redeemcode.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -278,6 +296,14 @@ func (_c *RedeemCodeCreate) check() error {
 	if v, ok := _c.mutation.Status(); ok {
 		if err := redeemcode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.BusinessCategory(); !ok {
+		return &ValidationError{Name: "business_category", err: errors.New(`ent: missing required field "RedeemCode.business_category"`)}
+	}
+	if v, ok := _c.mutation.BusinessCategory(); ok {
+		if err := redeemcode.BusinessCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "business_category", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.business_category": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
@@ -328,6 +354,10 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(redeemcode.FieldStatus, field.TypeString, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.BusinessCategory(); ok {
+		_spec.SetField(redeemcode.FieldBusinessCategory, field.TypeString, value)
+		_node.BusinessCategory = value
 	}
 	if value, ok := _c.mutation.UsedAt(); ok {
 		_spec.SetField(redeemcode.FieldUsedAt, field.TypeTime, value)
@@ -486,6 +516,18 @@ func (u *RedeemCodeUpsert) SetStatus(v string) *RedeemCodeUpsert {
 // UpdateStatus sets the "status" field to the value that was provided on create.
 func (u *RedeemCodeUpsert) UpdateStatus() *RedeemCodeUpsert {
 	u.SetExcluded(redeemcode.FieldStatus)
+	return u
+}
+
+// SetBusinessCategory sets the "business_category" field.
+func (u *RedeemCodeUpsert) SetBusinessCategory(v string) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldBusinessCategory, v)
+	return u
+}
+
+// UpdateBusinessCategory sets the "business_category" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateBusinessCategory() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldBusinessCategory)
 	return u
 }
 
@@ -702,6 +744,20 @@ func (u *RedeemCodeUpsertOne) SetStatus(v string) *RedeemCodeUpsertOne {
 func (u *RedeemCodeUpsertOne) UpdateStatus() *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetBusinessCategory sets the "business_category" field.
+func (u *RedeemCodeUpsertOne) SetBusinessCategory(v string) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetBusinessCategory(v)
+	})
+}
+
+// UpdateBusinessCategory sets the "business_category" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateBusinessCategory() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateBusinessCategory()
 	})
 }
 
@@ -1102,6 +1158,20 @@ func (u *RedeemCodeUpsertBulk) SetStatus(v string) *RedeemCodeUpsertBulk {
 func (u *RedeemCodeUpsertBulk) UpdateStatus() *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetBusinessCategory sets the "business_category" field.
+func (u *RedeemCodeUpsertBulk) SetBusinessCategory(v string) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetBusinessCategory(v)
+	})
+}
+
+// UpdateBusinessCategory sets the "business_category" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateBusinessCategory() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateBusinessCategory()
 	})
 }
 

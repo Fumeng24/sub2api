@@ -6,10 +6,14 @@ import (
 	"context"
 	"errors"
 	"math"
+	"regexp"
 	"strconv"
 	"testing"
 	"time"
 
+	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/sql"
+	"github.com/DATA-DOG/go-sqlmock"
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
@@ -585,6 +589,26 @@ func TestPaymentAmountToleranceForThreeDecimalCurrency(t *testing.T) {
 	assert.Equal(t, amountToleranceCNY, paymentAmountToleranceForCurrency("CNY"))
 	assert.Equal(t, amountToleranceCNY, paymentAmountToleranceForCurrency("JPY"))
 	assert.InDelta(t, 0.0005, paymentAmountToleranceForCurrency("KWD"), 1e-12)
+}
+
+func TestTryClaimAffiliateRebateAuditClosesReturningRows(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	client := dbent.NewClient(dbent.Driver(sql.OpenDB(dialect.Postgres, db)))
+	t.Cleanup(func() { _ = client.Close() })
+	svc := &PaymentService{}
+
+	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO payment_audit_logs")).
+		WithArgs("123", sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(456))).
+		RowsWillBeClosed()
+
+	claimed, err := svc.tryClaimAffiliateRebateAudit(context.Background(), client, 123, 50)
+	require.NoError(t, err)
+	require.True(t, claimed)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestRetryFulfillmentRejectsFreshRechargingLease(t *testing.T) {

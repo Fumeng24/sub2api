@@ -24,7 +24,7 @@ type userGroupRateRepoHotpathStub struct {
 	calls atomic.Int64
 }
 
-func (s *userGroupRateRepoHotpathStub) GetByUserAndGroup(ctx context.Context, userID, groupID int64) (*float64, error) {
+func (s *userGroupRateRepoHotpathStub) GetRateConfigByUserAndGroup(ctx context.Context, userID, groupID int64) (*UserGroupRateConfig, error) {
 	s.calls.Add(1)
 	if s.wait != nil {
 		<-s.wait
@@ -32,7 +32,10 @@ func (s *userGroupRateRepoHotpathStub) GetByUserAndGroup(ctx context.Context, us
 	if s.err != nil {
 		return nil, s.err
 	}
-	return s.rate, nil
+	if s.rate == nil {
+		return nil, nil
+	}
+	return &UserGroupRateConfig{RateMultiplier: s.rate}, nil
 }
 
 type usageLogWindowBatchRepoStub struct {
@@ -141,20 +144,6 @@ func (s *stickyGatewayCacheHotpathStub) RefreshSessionTTL(ctx context.Context, g
 }
 
 func (s *stickyGatewayCacheHotpathStub) DeleteSessionAccountID(ctx context.Context, groupID int64, sessionHash string) error {
-	return nil
-}
-
-func (s *stickyGatewayCacheHotpathStub) SetGrokVideoPendingBilling(_ context.Context, _ string, _ []byte, _ time.Duration) error {
-	return nil
-}
-func (s *stickyGatewayCacheHotpathStub) GetGrokVideoPendingBilling(_ context.Context, _ string) ([]byte, error) {
-	return nil, nil
-}
-func (s *stickyGatewayCacheHotpathStub) ClaimGrokVideoBilled(_ context.Context, _ string, _ time.Duration) (bool, error) {
-	return true, nil
-}
-
-func (s *stickyGatewayCacheHotpathStub) ReleaseGrokVideoBilled(_ context.Context, _ string) error {
 	return nil
 }
 
@@ -297,7 +286,7 @@ func TestGetUserGroupRateMultiplier_CacheHitAndNilRepo(t *testing.T) {
 		userGroupRateRepo:  repo,
 		userGroupRateCache: gocache.New(time.Minute, time.Minute),
 	}
-	key := "101:202"
+	key := "101:202:1.1"
 	svc.userGroupRateCache.Set(key, 2.3, time.Minute)
 
 	got := svc.getUserGroupRateMultiplier(context.Background(), 101, 202, 1.1)
@@ -314,10 +303,10 @@ func TestGetUserGroupRateMultiplier_CacheHitAndNilRepo(t *testing.T) {
 	svc2 := &GatewayService{
 		userGroupRateCache: gocache.New(time.Minute, time.Minute),
 	}
-	svc2.userGroupRateCache.Set(key, 1.9, time.Minute)
+	svc2.userGroupRateCache.Set("101:202:1.4", 1.9, time.Minute)
 	require.Equal(t, 1.9, svc2.getUserGroupRateMultiplier(context.Background(), 101, 202, 1.4))
 	require.Equal(t, 1.4, svc2.getUserGroupRateMultiplier(context.Background(), 0, 202, 1.4))
-	svc2.userGroupRateCache.Delete(key)
+	svc2.userGroupRateCache.Delete("101:202:1.4")
 	require.Equal(t, 1.4, svc2.getUserGroupRateMultiplier(context.Background(), 101, 202, 1.4))
 }
 

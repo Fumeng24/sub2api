@@ -70,6 +70,10 @@ type UserListFilters struct {
 	Role      string // User role filter
 	Search    string // Search in email, username
 	GroupName string // Filter by allowed group name (fuzzy match)
+	// HasGroupRateConfig filters users whose effective group pricing differs from
+	// the group default. RPM-only overrides and no-op 1x/default-rate rows do
+	// not satisfy this filter.
+	HasGroupRateConfig bool
 	// APIKeyGroupID filters users who own at least one non-soft-deleted API key
 	// bound to this group (api_keys.group_id). 0 = no filter. Covers all three
 	// group types since it matches the key's group directly, not allowed_groups.
@@ -179,13 +183,6 @@ type UserRepository interface {
 	UpdateTotpSecret(ctx context.Context, userID int64, encryptedSecret *string) error
 	EnableTotp(ctx context.Context, userID int64) error
 	DisableTotp(ctx context.Context, userID int64) error
-}
-
-// RegistrationEmailDomainRepository 是生产用户仓储为非白名单域名单账户兜底策略提供的可选能力。
-// 它独立于 UserRepository，避免无关测试桩和服务消费者实现注册专用方法。
-type RegistrationEmailDomainRepository interface {
-	CountUsersByEmailDomain(ctx context.Context, domain string) (int, error)
-	CreateWithEmailAliasGuardAndDomainLimit(ctx context.Context, user *User, domain string) error
 }
 
 // RedeemUserAdjustmentRepository provides the atomic, floor-at-zero updates

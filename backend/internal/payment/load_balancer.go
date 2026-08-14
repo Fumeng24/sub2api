@@ -116,8 +116,10 @@ func (lb *DefaultLoadBalancer) SelectInstance(
 
 // queryEnabledInstances returns enabled instances that support paymentType.
 // When providerKey is non-empty, only instances with that provider key are considered.
-// When providerKey is empty, instances across all providers are considered,
-// enabling cross-provider load balancing (e.g. EasyPay + Alipay direct for "alipay").
+// When providerKey is empty, visible methods that can be served by multiple
+// providers are considered across providers. Standalone methods are scoped to
+// their own provider key so legacy empty supported_types values do not claim
+// unrelated payment methods.
 func (lb *DefaultLoadBalancer) queryEnabledInstances(
 	ctx context.Context,
 	providerKey string,
@@ -127,6 +129,8 @@ func (lb *DefaultLoadBalancer) queryEnabledInstances(
 		Where(paymentproviderinstance.Enabled(true))
 	if providerKey != "" {
 		query = query.Where(paymentproviderinstance.ProviderKey(providerKey))
+	} else if scopedProviderKey := standaloneProviderKeyForPaymentType(paymentType); scopedProviderKey != "" {
+		query = query.Where(paymentproviderinstance.ProviderKey(scopedProviderKey))
 	}
 	instances, err := query.
 		Order(dbent.Asc(paymentproviderinstance.FieldSortOrder)).

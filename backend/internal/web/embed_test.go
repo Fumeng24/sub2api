@@ -114,6 +114,16 @@ func TestInjectSiteTitle(t *testing.T) {
 	})
 }
 
+func TestInjectSiteTitleReplacesWegooFallback(t *testing.T) {
+	html := []byte(`<html><head><title>Wegoo's API - AI API Gateway</title></head><body></body></html>`)
+	settingsJSON := []byte(`{"site_name":"MyCustomSite"}`)
+
+	result := injectSiteTitle(html, settingsJSON)
+
+	assert.Contains(t, string(result), "<title>MyCustomSite - AI API Gateway</title>")
+	assert.NotContains(t, string(result), "Wegoo's API")
+}
+
 func TestInjectSiteFavicon(t *testing.T) {
 	t.Run("replaces_favicon_with_site_logo", func(t *testing.T) {
 		html := []byte(`<html><head><link rel="icon" type="image/png" href="/logo.png" /></head></html>`)
@@ -400,7 +410,7 @@ func TestFrontendServer_ServeIndexHTML(t *testing.T) {
 
 		server.serveIndexHTML(c)
 
-		assert.Equal(t, "no-cache", w.Header().Get("Cache-Control"))
+		assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 	})
 
 	t.Run("fallback_on_settings_error", func(t *testing.T) {
@@ -577,6 +587,36 @@ func TestFrontendServer_Middleware(t *testing.T) {
 		assert.JSONEq(t, `{"ok":true}`, w.Body.String())
 	})
 
+	t.Run("skips_versionless_post_api_routes", func(t *testing.T) {
+		provider := &mockSettingsProvider{
+			settings: map[string]string{"test": "value"},
+		}
+
+		server, err := NewFrontendServer(provider)
+		require.NoError(t, err)
+
+		for _, path := range []string{"/chat/completions", "/messages", "/embeddings"} {
+			t.Run(path, func(t *testing.T) {
+				router := gin.New()
+				router.Use(server.Middleware())
+				nextCalled := false
+				router.POST(path, func(c *gin.Context) {
+					nextCalled = true
+					c.JSON(http.StatusUnauthorized, gin.H{"error": "API key required"})
+				})
+
+				w := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"model":"route-probe"}`))
+				req.Header.Set("Content-Type", "application/json")
+				router.ServeHTTP(w, req)
+
+				assert.True(t, nextCalled, "next handler should be called for %s", path)
+				assert.Equal(t, http.StatusUnauthorized, w.Code)
+				assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
+			})
+		}
+	})
+
 	t.Run("skips_alpha_search_post_route", func(t *testing.T) {
 		provider := &mockSettingsProvider{
 			settings: map[string]string{"test": "value"},
@@ -623,6 +663,8 @@ func TestFrontendServer_Middleware(t *testing.T) {
 			"/dashboard",
 			"/users/123",
 			"/settings/profile",
+			"/messages",
+			"/usage",
 		}
 
 		for _, path := range spaPaths {
@@ -648,13 +690,13 @@ func TestFrontendServer_Middleware(t *testing.T) {
 		router := gin.New()
 		router.Use(server.Middleware())
 
-		// Request for existing static file
+		// Request for the source-controlled logo asset.
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/logo.png", nil)
+		req := httptest.NewRequest(http.MethodGet, "/logo.svg", nil)
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Contains(t, w.Header().Get("Content-Type"), "image/png")
+		assert.Contains(t, w.Header().Get("Content-Type"), "image/svg+xml")
 		assert.Empty(t, w.Header().Get("Cache-Control"))
 
 		entries, err := fs.ReadDir(server.distFS, "assets")
@@ -735,11 +777,11 @@ func TestServeEmbeddedFrontend(t *testing.T) {
 		router.Use(middleware)
 
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/logo.png", nil)
+		req := httptest.NewRequest(http.MethodGet, "/logo.svg", nil)
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Contains(t, w.Header().Get("Content-Type"), "image/png")
+		assert.Contains(t, w.Header().Get("Content-Type"), "image/svg+xml")
 	})
 
 	t.Run("serves_index_html_for_root", func(t *testing.T) {
@@ -763,7 +805,7 @@ func TestServeEmbeddedFrontend(t *testing.T) {
 		router := gin.New()
 		router.Use(middleware)
 
-		spaPaths := []string{"/dashboard", "/users/123", "/settings"}
+		spaPaths := []string{"/dashboard", "/users/123", "/settings", "/messages", "/usage"}
 
 		for _, path := range spaPaths {
 			t.Run(path, func(t *testing.T) {

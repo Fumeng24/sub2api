@@ -12,6 +12,7 @@ type UserGroupRateEntry struct {
 	UserStatus     string   `json:"user_status"`
 	RateMultiplier *float64 `json:"rate_multiplier,omitempty"`
 	RPMOverride    *int     `json:"rpm_override,omitempty"`
+	userGroupRateEntryCustom
 }
 
 // GroupRateMultiplierInput 批量设置分组倍率的输入条目
@@ -35,6 +36,8 @@ type UserGroupRateRepository interface {
 
 	// GetByUserAndGroup 获取用户在特定分组的专属 rate_multiplier（NULL 返回 nil）
 	GetByUserAndGroup(ctx context.Context, userID, groupID int64) (*float64, error)
+
+	userGroupRateRepositoryCustom
 
 	// GetRPMOverrideByUserAndGroup 获取用户在特定分组的 rpm_override（NULL 返回 nil）
 	GetRPMOverrideByUserAndGroup(ctx context.Context, userID, groupID int64) (*int, error)

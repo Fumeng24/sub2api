@@ -60,6 +60,7 @@ func (c *openAIImageOutputCounter) AddJSONResponse(body []byte) {
 	c.addDataArray(gjson.GetBytes(body, "data"))
 	c.addOutputArray(gjson.GetBytes(body, "output"))
 	c.addOutputArray(gjson.GetBytes(body, "response.output"))
+	c.addChatCompletionsChoices(gjson.GetBytes(body, "choices"))
 }
 
 func (c *openAIImageOutputCounter) AddSSEData(data []byte) {

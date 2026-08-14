@@ -33,10 +33,11 @@ type opsCleanupDeletedCounts struct {
 	systemMetrics  int64
 	hourlyPreagg   int64
 	dailyPreagg    int64
+	opsCleanupDeletedCountsCustom
 }
 
 func (c opsCleanupDeletedCounts) String() string {
-	return fmt.Sprintf(
+	base := fmt.Sprintf(
 		"error_logs=%d ingress_rejects=%d alert_events=%d system_logs=%d log_audits=%d system_metrics=%d hourly_preagg=%d daily_preagg=%d",
 		c.errorLogs,
 		c.ingressRejects,
@@ -47,6 +48,7 @@ func (c opsCleanupDeletedCounts) String() string {
 		c.hourlyPreagg,
 		c.dailyPreagg,
 	)
+	return base + c.customSuffix()
 }
 
 // opsCleanupPlan 把"保留天数"翻译成具体的清理动作。

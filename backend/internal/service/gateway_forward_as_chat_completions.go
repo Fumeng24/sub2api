@@ -138,11 +138,10 @@ func (s *GatewayService) ForwardAsChatCompletions(
 			AccountID:          account.ID,
 			AccountName:        account.Name,
 			UpstreamStatusCode: 0,
-			Kind:               "request_error",
+			Kind:               "failover",
 			Message:            safeErr,
 		})
-		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Upstream request failed")
-		return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+		return nil, newNetworkUpstreamFailoverError(safeErr)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -165,9 +164,7 @@ func (s *GatewayService) ForwardAsChatCompletions(
 				Kind:               "failover",
 				Message:            upstreamMsg,
 			})
-			if s.rateLimitService != nil {
-				s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody, mappedModel)
-			}
+			s.handleUpstreamErrorForScheduling(ctx, account, resp.StatusCode, resp.Header, respBody, mappedModel)
 			return nil, &UpstreamFailoverError{
 				StatusCode:   resp.StatusCode,
 				ResponseBody: respBody,
@@ -503,6 +500,7 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 // writeGatewayCCError writes an error in OpenAI Chat Completions format for
 // the Anthropic-upstream CC forwarding path.
 func writeGatewayCCError(c *gin.Context, statusCode int, errType, message string) {
+	message = ClientFacingErrorMessage(statusCode, errType, message)
 	MarkResponseCommitted(c)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{

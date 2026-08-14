@@ -80,18 +80,18 @@ func TestCountAccountsByCondition(t *testing.T) {
 		require.Equal(t, int64(2), got)
 	})
 
-	t.Run("测试错误账号统计（排除临时不可调度）: acc.HasError && acc.TempUnschedulableUntil == nil", func(t *testing.T) {
+	t.Run("测试错误账号统计: block_reason=inactive 且 has_error", func(t *testing.T) {
 		t.Parallel()
 
 		until := time.Now().UTC().Add(5 * time.Minute)
 		accounts := map[int64]*AccountAvailability{
-			1: {HasError: true},
-			2: {HasError: true, TempUnschedulableUntil: &until},
+			1: {HasError: true, BlockReason: AccountSchedulingBlockInactive.String()},
+			2: {HasError: true, BlockReason: AccountSchedulingBlockTempUnschedulable.String(), TempUnschedulableUntil: &until},
 			3: {HasError: false},
 		}
 
 		got := countAccountsByCondition(accounts, func(acc *AccountAvailability) bool {
-			return acc.HasError && acc.TempUnschedulableUntil == nil
+			return isAvailabilityStatusError(acc)
 		})
 		require.Equal(t, int64(1), got)
 	})
@@ -120,10 +120,10 @@ func TestComputeRuleMetric_AccountTempUnscheduledCount(t *testing.T) {
 	availability := &OpsAccountAvailability{
 		Accounts: map[int64]*AccountAvailability{
 			// currently temp-unscheduled (window active)
-			1: {TempUnschedulableUntil: &futureUntil},
-			2: {TempUnschedulableUntil: &futureUntil},
-			// temp-unsched window already expired → should NOT count
-			3: {TempUnschedulableUntil: &pastUntil},
+			1: {BlockReason: AccountSchedulingBlockTempUnschedulable.String(), TempUnschedulableUntil: &futureUntil},
+			2: {BlockReason: AccountSchedulingBlockTempUnschedulable.String(), TempUnschedulableUntil: &futureUntil},
+			// block_reason wins over the timestamp field and keeps expired legacy windows out.
+			3: {BlockReason: AccountSchedulingBlockNone.String(), TempUnschedulableUntil: &pastUntil},
 			// never temp-unscheduled
 			4: {HasError: true},
 			5: {IsRateLimited: true},
@@ -163,8 +163,8 @@ func TestComputeRuleMetricNewIndicators(t *testing.T) {
 		Accounts: map[int64]*AccountAvailability{
 			1: {IsRateLimited: true},
 			2: {IsRateLimited: true},
-			3: {HasError: true},
-			4: {HasError: true, TempUnschedulableUntil: timePtr(time.Now().UTC().Add(2 * time.Minute))},
+			3: {HasError: true, BlockReason: AccountSchedulingBlockInactive.String()},
+			4: {HasError: true, BlockReason: AccountSchedulingBlockTempUnschedulable.String(), TempUnschedulableUntil: timePtr(time.Now().UTC().Add(2 * time.Minute))},
 			5: {HasError: false, IsRateLimited: false},
 		},
 	}

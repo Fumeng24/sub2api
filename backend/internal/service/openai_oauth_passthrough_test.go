@@ -125,11 +125,14 @@ func TestOpenAIGatewayService_ResponsesUnknownModelDoesNotFallbackToGPT54(t *tes
 	result, err := svc.Forward(context.Background(), c, account, originalBody)
 	require.Error(t, err)
 	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusBadRequest, failoverErr.StatusCode)
 	require.NotNil(t, upstream.lastReq)
 	require.Equal(t, "https://chatgpt.com/backend-api/codex/responses", upstream.lastReq.URL.String())
 	require.Equal(t, "gpt6", gjson.GetBytes(upstream.lastBody, "model").String())
 	require.NotEqual(t, "gpt-5.4", gjson.GetBytes(upstream.lastBody, "model").String())
-	require.True(t, rec.Code >= http.StatusBadRequest)
+	require.False(t, c.Writer.Written())
 }
 
 func TestOpenAIGatewayService_NativeResponsesBodyModificationPreservesHTMLChars(t *testing.T) {
@@ -231,6 +234,13 @@ type openAIPassthroughFailoverRepo struct {
 	stubOpenAIAccountRepo
 	rateLimitCalls []time.Time
 	overloadCalls  []time.Time
+	setErrorCalls  []string
+	tempCalls      int
+}
+
+func (r *openAIPassthroughFailoverRepo) SetError(_ context.Context, _ int64, errorMsg string) error {
+	r.setErrorCalls = append(r.setErrorCalls, errorMsg)
+	return nil
 }
 
 func (r *openAIPassthroughFailoverRepo) SetRateLimited(_ context.Context, _ int64, resetAt time.Time) error {
@@ -240,6 +250,11 @@ func (r *openAIPassthroughFailoverRepo) SetRateLimited(_ context.Context, _ int6
 
 func (r *openAIPassthroughFailoverRepo) SetOverloaded(_ context.Context, _ int64, until time.Time) error {
 	r.overloadCalls = append(r.overloadCalls, until)
+	return nil
+}
+
+func (r *openAIPassthroughFailoverRepo) SetTempUnschedulable(_ context.Context, _ int64, _ time.Time, _ string) error {
+	r.tempCalls++
 	return nil
 }
 
@@ -364,7 +379,7 @@ func TestOpenAIGatewayService_OAuthPassthrough_StreamKeepsToolNameAndBodyNormali
 	originalBody := []byte(`{"model":"gpt-5.2","stream":true,"store":true,"instructions":"local-test-instructions","input":[{"type":"text","text":"hi"}]}`)
 
 	upstreamSSE := strings.Join([]string{
-		`data: {"type":"response.output_item.added","item":{"type":"tool_call","tool_calls":[{"function":{"name":"apply_patch"}}]}}`,
+		`data: {"type":"response.output_item.added","item":{"type":"function_call","call_id":"call_1","name":"apply_patch"},"output_index":0}`,
 		"",
 		"data: [DONE]",
 		"",
@@ -725,7 +740,7 @@ func TestOpenAIGatewayService_OAuthPassthrough_CompactUsesJSONAndKeepsNonStreami
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
 		Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"rid-compact"}},
-		Body:       io.NopCloser(strings.NewReader(`{"id":"cmp_123","usage":{"input_tokens":11,"output_tokens":22}}`)),
+		Body:       io.NopCloser(strings.NewReader(`{"id":"cmp_123","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"compact summary ready"}]}],"usage":{"input_tokens":11,"output_tokens":22}}`)),
 	}
 	upstream := &httpUpstreamRecorder{resp: resp}
 
@@ -1092,7 +1107,7 @@ func TestOpenAIGatewayService_OAuthPassthrough_UpstreamErrorIncludesPassthroughF
 
 	_, err := svc.Forward(context.Background(), c, account, originalBody)
 	require.Error(t, err)
-	require.True(t, c.Writer.Written(), "非 429/529 的 passthrough 错误应直接写回客户端")
+	require.True(t, c.Writer.Written(), "非 failover passthrough 错误应继续原样写回客户端")
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 
 	// should append an upstream error event with passthrough=true
@@ -1419,7 +1434,7 @@ func TestOpenAIGatewayService_OpenAIPassthrough_RetryableStatusesTriggerFailover
 			accountType:    AccountTypeOAuth,
 			statusCode:     http.StatusBadGateway,
 			body:           `{"error":{"message":"bad gateway","type":"server_error"}}`,
-			expectFailover: false,
+			expectFailover: true,
 			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
 				require.Empty(t, repo.rateLimitCalls)
 				require.Empty(t, repo.overloadCalls)
@@ -1430,7 +1445,7 @@ func TestOpenAIGatewayService_OpenAIPassthrough_RetryableStatusesTriggerFailover
 			accountType:    AccountTypeOAuth,
 			statusCode:     http.StatusServiceUnavailable,
 			body:           `{"error":{"message":"service unavailable","type":"server_error"}}`,
-			expectFailover: false,
+			expectFailover: true,
 			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
 				require.Empty(t, repo.rateLimitCalls)
 				require.Empty(t, repo.overloadCalls)
@@ -1441,7 +1456,7 @@ func TestOpenAIGatewayService_OpenAIPassthrough_RetryableStatusesTriggerFailover
 			accountType:    AccountTypeOAuth,
 			statusCode:     http.StatusGatewayTimeout,
 			body:           `{"error":{"message":"gateway timeout","type":"server_error"}}`,
-			expectFailover: false,
+			expectFailover: true,
 			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
 				require.Empty(t, repo.rateLimitCalls)
 				require.Empty(t, repo.overloadCalls)
@@ -1472,6 +1487,67 @@ func TestOpenAIGatewayService_OpenAIPassthrough_RetryableStatusesTriggerFailover
 				require.Empty(t, repo.rateLimitCalls)
 				require.Len(t, repo.overloadCalls, 1)
 				require.WithinDuration(t, start.Add(10*time.Minute), repo.overloadCalls[0], 5*time.Second)
+			},
+		},
+		{
+			name:           "apikey_502_bad_gateway",
+			accountType:    AccountTypeAPIKey,
+			statusCode:     http.StatusBadGateway,
+			body:           `{"error":{"message":"bad gateway","type":"server_error"}}`,
+			expectFailover: true,
+			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
+				require.Empty(t, repo.rateLimitCalls)
+				require.Empty(t, repo.overloadCalls)
+				require.Zero(t, repo.tempCalls, "transient API-key 5xx uses model-scoped cooldown")
+			},
+		},
+		{
+			name:           "apikey_503_service_unavailable",
+			accountType:    AccountTypeAPIKey,
+			statusCode:     http.StatusServiceUnavailable,
+			body:           `{"error":{"message":"service unavailable","type":"server_error"}}`,
+			expectFailover: true,
+			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
+				require.Empty(t, repo.rateLimitCalls)
+				require.Empty(t, repo.overloadCalls)
+				require.Zero(t, repo.tempCalls, "transient API-key 5xx uses model-scoped cooldown")
+			},
+		},
+		{
+			name:           "apikey_504_gateway_timeout",
+			accountType:    AccountTypeAPIKey,
+			statusCode:     http.StatusGatewayTimeout,
+			body:           `{"error":{"message":"gateway timeout","type":"server_error"}}`,
+			expectFailover: true,
+			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
+				require.Empty(t, repo.rateLimitCalls)
+				require.Empty(t, repo.overloadCalls)
+				require.Zero(t, repo.tempCalls, "transient API-key 5xx uses model-scoped cooldown")
+			},
+		},
+		{
+			name:           "apikey_402_billing",
+			accountType:    AccountTypeAPIKey,
+			statusCode:     http.StatusPaymentRequired,
+			body:           `{"error":{"message":"insufficient balance","type":"billing_error"}}`,
+			expectFailover: true,
+			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
+				require.Empty(t, repo.rateLimitCalls)
+				require.Empty(t, repo.overloadCalls)
+				require.Len(t, repo.setErrorCalls, 1)
+			},
+		},
+		{
+			name:           "apikey_403_group_disabled",
+			accountType:    AccountTypeAPIKey,
+			statusCode:     http.StatusForbidden,
+			body:           `{"code":"GROUP_DISABLED","message":"API Key 所属分组已停用"}`,
+			expectFailover: true,
+			assertRepo: func(t *testing.T, repo *openAIPassthroughFailoverRepo, _ time.Time) {
+				require.Empty(t, repo.rateLimitCalls)
+				require.Empty(t, repo.overloadCalls)
+				require.Len(t, repo.setErrorCalls, 1)
+				require.Contains(t, repo.setErrorCalls[0], "API Key 所属分组已停用")
 			},
 		},
 	}
@@ -1674,69 +1750,6 @@ func TestOpenAIGatewayService_APIKeyPassthrough_PoolModeConfigured5xxRetriesSame
 	require.ErrorAs(t, err, &failoverErr)
 	require.True(t, failoverErr.RetryableOnSameAccount)
 	require.False(t, c.Writer.Written())
-}
-
-func TestOpenAIGatewayService_APIKeyPassthrough_PoolModeAuthErrorsTriggerFailover(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	tests := []struct {
-		name        string
-		statusCode  int
-		credentials map[string]any
-	}{
-		{
-			name:       "configured_401",
-			statusCode: http.StatusUnauthorized,
-			credentials: map[string]any{
-				"pool_mode_retry_status_codes": []any{float64(http.StatusUnauthorized)},
-			},
-		},
-		{
-			name:        "default_403",
-			statusCode:  http.StatusForbidden,
-			credentials: map[string]any{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rec := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(rec)
-			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(nil))
-
-			upstreamBody := `{"error":{"message":"upstream credential rejected"}}`
-			svc := &OpenAIGatewayService{
-				cfg:              &config.Config{Gateway: config.GatewayConfig{ForceCodexCLI: false}},
-				rateLimitService: NewRateLimitService(transientCooldownAccountRepo{}, nil, &config.Config{}, nil, nil),
-				httpUpstream: &httpUpstreamRecorder{resp: &http.Response{
-					StatusCode: tt.statusCode,
-					Header:     http.Header{"Content-Type": []string{"application/json"}},
-					Body:       io.NopCloser(strings.NewReader(upstreamBody)),
-				}},
-			}
-			credentials := map[string]any{
-				"api_key":   "sk-test",
-				"base_url":  "https://api.example.test",
-				"pool_mode": true,
-			}
-			for key, value := range tt.credentials {
-				credentials[key] = value
-			}
-			account := &Account{
-				ID: 129, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Concurrency: 1,
-				Credentials: credentials,
-				Extra:       map[string]any{"openai_passthrough": true}, Status: StatusActive, Schedulable: true,
-			}
-
-			_, err := svc.Forward(context.Background(), c, account, []byte(`{"model":"gpt-5.2","input":"hello"}`))
-
-			var failoverErr *UpstreamFailoverError
-			require.ErrorAs(t, err, &failoverErr)
-			require.Equal(t, tt.statusCode, failoverErr.StatusCode)
-			require.True(t, failoverErr.RetryableOnSameAccount)
-			require.False(t, c.Writer.Written(), "pool-mode auth failure must fail over before committing a response")
-			require.False(t, IsResponseCommitted(c))
-		})
-	}
 }
 
 func TestOpenAIGatewayService_OpenAIPassthrough_CompactNetworkErrorsTriggerFailover(t *testing.T) {

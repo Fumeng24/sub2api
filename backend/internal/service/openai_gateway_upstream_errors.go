@@ -117,6 +117,9 @@ func isOpenAIInstructionsRequiredError(upstreamStatusCode int, upstreamMsg strin
 }
 
 func isOpenAITransientProcessingError(upstreamStatusCode int, upstreamMsg string, upstreamBody []byte) bool {
+	if isCustomOpenAITransientProcessingError(upstreamStatusCode, upstreamMsg, upstreamBody) {
+		return true
+	}
 	if upstreamStatusCode != http.StatusBadRequest && upstreamStatusCode != http.StatusServiceUnavailable {
 		return false
 	}
@@ -165,6 +168,9 @@ func isOpenAITransientProcessingError(upstreamStatusCode int, upstreamMsg string
 }
 
 func isOpenAIContextWindowError(upstreamMsg string, upstreamBody []byte) bool {
+	if isCustomOpenAIContextWindowError(upstreamMsg, upstreamBody) {
+		return true
+	}
 	match := func(text string) bool {
 		lower := strings.ToLower(strings.TrimSpace(text))
 		if lower == "" {
@@ -228,7 +234,10 @@ func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponse(statusCode i
 	if s.shouldFailoverUpstreamError(statusCode) {
 		return true
 	}
-	return isOpenAITransientProcessingError(statusCode, upstreamMsg, upstreamBody)
+	if isOpenAITransientProcessingError(statusCode, upstreamMsg, upstreamBody) {
+		return true
+	}
+	return s.shouldFailoverOpenAIUpstreamResponseCustom(statusCode, upstreamBody)
 }
 
 // OpenAIRequestBodyTooLargeClientMessage is the fixed downstream message used
@@ -382,6 +391,11 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			truncateForLog(body, s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes),
 		)
 	}
+	if result, err, handled := s.handleCustomOpenAIErrorPreflight(
+		openAIContextFromGin(ctx, c), resp, c, account, requestBody, body, upstreamMsg, upstreamDetail, requestedModel...,
+	); handled {
+		return result, err
+	}
 
 	if isOpenAIRequestBodyTooLargeError(resp.StatusCode, upstreamMsg, body) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -427,6 +441,9 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			return nil, fmt.Errorf("upstream error: %d (passthrough rule matched)", resp.StatusCode)
 		}
 		return nil, fmt.Errorf("upstream error: %d (passthrough rule matched) message=%s", resp.StatusCode, upstreamMsg)
+	}
+	if result, err, handled := s.handleUnhandledOpenAIStatusCustom(c, account, resp, upstreamMsg, upstreamDetail); handled {
+		return result, err
 	}
 
 	// Check custom error codes
@@ -488,18 +505,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 
 	MarkResponseCommitted(c)
 
-	// 上游 400 是确定性的请求错误：同一份请求体换账号、重试多少次都会失败。归一成
-	// 502 upstream_error 会让下游网关把它当成可重试的上游故障反复重放（#5479 实测
-	// 30 个失败请求被放大成 60 次上游调用），同时抹掉客户端定位问题所需的 code/param。
-	//
-	// 走到这里说明 shouldFailoverOpenAIUpstreamResponse 已判定该 400 不可 failover，
-	// 即 server_is_overloaded / at capacity 这类可重试的 400 不会到达此处。
-	//
-	// 兄弟路径早已这么做：handleCompatErrorResponse（ChatCompletions / Anthropic）
-	// 回真实状态码 + invalid_request_error + 真实 message；/v1/images 还额外透传
-	// code/param。原生 Responses 是唯一漏掉的一条。
-	if isOpenAIDeterministicClientError(resp.StatusCode) {
-		writeOpenAIUpstreamClientError(c, resp.StatusCode, body, upstreamMsg)
+	if s.writeCustomOpenAIClassifiedError(c, resp.StatusCode, upstreamMsg, body) {
 		if upstreamMsg == "" {
 			return nil, fmt.Errorf("upstream error: %d", resp.StatusCode)
 		}
@@ -613,6 +619,11 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		upstreamDetail = truncateString(string(body), maxBytes)
 	}
 	setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, upstreamDetail)
+	if result, err, handled := s.handleCustomOpenAICompatErrorPreflight(
+		resp, c, account, writeError, body, upstreamMsg, upstreamDetail, requestedModel...,
+	); handled {
+		return result, err
+	}
 
 	// Apply error passthrough rules
 	if status, errType, errMsg, matched := applyErrorPassthroughRule(
@@ -628,6 +639,9 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 			return nil, fmt.Errorf("upstream error: %d (passthrough rule matched)", resp.StatusCode)
 		}
 		return nil, fmt.Errorf("upstream error: %d (passthrough rule matched) message=%s", resp.StatusCode, upstreamMsg)
+	}
+	if result, err, handled := s.handleUnhandledOpenAICompatStatusCustom(c, account, resp, writeError, upstreamMsg, upstreamDetail); handled {
+		return result, err
 	}
 
 	// Check custom error codes — if the account does not handle this status,

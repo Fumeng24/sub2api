@@ -78,6 +78,19 @@ func TestMigration119DefersPaymentIndexRolloutToOnlineFollowup(t *testing.T) {
 	require.Contains(t, alignmentSQL, "RENAME TO paymentorder_out_trade_no")
 }
 
+func TestMigration136NormalizesFractionalAffiliateRebateRates(t *testing.T) {
+	content, err := FS.ReadFile("136_affiliate_rebate_hardening.sql")
+	require.NoError(t, err)
+
+	sql := string(content)
+	require.Contains(t, sql, "0.2 => 20%")
+	require.Contains(t, sql, "value ~ '^-?[0-9]+([.][0-9]+)?$'")
+	require.NotContains(t, sql, `value ~ '^-?[0-9]+(\\.[0-9]+)?$'`)
+	require.Contains(t, sql, "value::numeric * 100")
+	require.Contains(t, sql, "value::numeric > 0")
+	require.Contains(t, sql, "value::numeric <= 1")
+}
+
 func TestMigration110SeedsAuthSourceSignupGrantsDisabledByDefault(t *testing.T) {
 	content, err := FS.ReadFile("110_pending_auth_and_provider_default_grants.sql")
 	require.NoError(t, err)
@@ -128,8 +141,8 @@ func TestMigration124BackfillsLegacyOIDCSecurityFlagsSafely(t *testing.T) {
 	require.Contains(t, sql, "'false'")
 }
 
-func TestMigration134AddsAffiliateLedgerAuditFieldsWithoutJSONCast(t *testing.T) {
-	content, err := FS.ReadFile("134_affiliate_ledger_audit_snapshots.sql")
+func TestMigration139AddsAffiliateLedgerAuditFieldsWithoutJSONCast(t *testing.T) {
+	content, err := FS.ReadFile("139_affiliate_ledger_audit_snapshots.sql")
 	require.NoError(t, err)
 
 	sql := string(content)
@@ -141,6 +154,39 @@ func TestMigration134AddsAffiliateLedgerAuditFieldsWithoutJSONCast(t *testing.T)
 	require.Contains(t, sql, "COUNT(*) OVER (PARTITION BY ra.order_id) AS order_match_count")
 	require.Contains(t, sql, "COUNT(*) OVER (PARTITION BY ual.id) AS ledger_match_count")
 	require.NotContains(t, sql, "detail::jsonb")
+}
+
+func TestMigration174BackfillsGrokMediaGenerationGroups(t *testing.T) {
+	content, err := FS.ReadFile("174_enable_grok_media_generation_groups.sql")
+	require.NoError(t, err)
+
+	sql := string(content)
+	require.Contains(t, sql, "UPDATE groups")
+	require.Contains(t, sql, "SET allow_image_generation = true")
+	require.Contains(t, sql, "WHERE platform = 'grok'")
+	require.Contains(t, sql, "AND allow_image_generation = false")
+}
+
+func TestAffiliateLedgerAuditMigrationRunsAfterLedgerCreation(t *testing.T) {
+	entries, err := FS.ReadDir(".")
+	require.NoError(t, err)
+
+	var ledgerCreationIndex, auditSnapshotsIndex int
+	var foundLedgerCreation, foundAuditSnapshots bool
+	for index, entry := range entries {
+		switch entry.Name() {
+		case "136_affiliate_rebate_hardening.sql":
+			ledgerCreationIndex = index
+			foundLedgerCreation = true
+		case "139_affiliate_ledger_audit_snapshots.sql":
+			auditSnapshotsIndex = index
+			foundAuditSnapshots = true
+		}
+	}
+
+	require.True(t, foundLedgerCreation)
+	require.True(t, foundAuditSnapshots)
+	require.Greater(t, auditSnapshotsIndex, ledgerCreationIndex)
 }
 
 func TestMigration135AllowsGitHubAndGoogleAuthProviders(t *testing.T) {

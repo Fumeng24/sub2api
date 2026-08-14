@@ -20,10 +20,23 @@ func collectMapstructureKeys(t reflect.Type, prefix string, out map[string]strin
 			continue // unexported
 		}
 		tag := field.Tag.Get("mapstructure")
-		name, _, _ := strings.Cut(tag, ",")
+		name, options, _ := strings.Cut(tag, ",")
 		if name == "-" {
 			continue
 		}
+
+		ft := field.Type
+		for ft.Kind() == reflect.Ptr {
+			ft = ft.Elem()
+		}
+		if ft.Kind() == reflect.Struct && strings.Contains(","+options+",", ",squash,") {
+			// mapstructure flattens a squashed embedded struct into its parent.
+			// Following that behavior here prevents a false path such as
+			// gateway.scheduling.gateway...custom.slot_pool.enabled.
+			collectMapstructureKeys(ft, prefix, out)
+			continue
+		}
+
 		if name == "" {
 			name = strings.ToLower(field.Name)
 		}
@@ -32,10 +45,6 @@ func collectMapstructureKeys(t reflect.Type, prefix string, out map[string]strin
 			key = prefix + "." + name
 		}
 
-		ft := field.Type
-		for ft.Kind() == reflect.Ptr {
-			ft = ft.Elem()
-		}
 		if ft.Kind() == reflect.Struct {
 			collectMapstructureKeys(ft, key, out)
 			continue
@@ -46,6 +55,18 @@ func collectMapstructureKeys(t reflect.Type, prefix string, out map[string]strin
 			continue
 		}
 		out[strings.ToLower(key)] = ft.String()
+	}
+}
+
+func TestCollectMapstructureKeysFlattensSquashedEmbeddedConfig(t *testing.T) {
+	keys := map[string]string{}
+	collectMapstructureKeys(reflect.TypeOf(GatewayOpenAISchedulerConfig{}), "gateway.openai_scheduler", keys)
+
+	if _, ok := keys["gateway.openai_scheduler.runtime_cooldowns.probe_timeout_seconds"]; !ok {
+		t.Fatal("squashed runtime_cooldowns key was not collected")
+	}
+	if _, ok := keys["gateway.openai_scheduler.gatewayopenaischedulerconfigcustom.runtime_cooldowns.probe_timeout_seconds"]; ok {
+		t.Fatal("squashed embedded type name leaked into the collected key")
 	}
 }
 

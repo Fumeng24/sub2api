@@ -571,7 +571,7 @@ func (s *HTTPUpstreamSuite) newService() *httpUpstreamService {
 }
 
 // TestDefaultResponseHeaderTimeout 测试默认响应头超时配置
-// 验证显式 0 会禁用等待响应头超时
+// 验证零值配置会禁用等待响应头超时；完整默认值由 config.Load 注入。
 func (s *HTTPUpstreamSuite) TestDefaultResponseHeaderTimeout() {
 	svc := s.newService()
 	entry := mustGetOrCreateClient(s.T(), svc, "", 0, 0)
@@ -610,9 +610,10 @@ func (s *HTTPUpstreamSuite) TestGetOrCreateClient_InvalidURLReturnsError() {
 	require.Error(s.T(), err, "expected error for invalid proxy URL")
 }
 
-func (s *HTTPUpstreamSuite) TestOpenAIProfileDefaultsToHTTP2AndNoHeaderTimeout() {
+func (s *HTTPUpstreamSuite) TestOpenAIProfileDefaultsToHTTP2AndConfiguredHeaderTimeout() {
 	s.cfg.Gateway = config.GatewayConfig{
-		ResponseHeaderTimeout: 600,
+		OpenAIResponseHeaderTimeout: 15,
+		ResponseHeaderTimeout:       600,
 		OpenAIHTTP2: config.GatewayOpenAIHTTP2Config{
 			Enabled:                   true,
 			AllowProxyFallbackToHTTP1: true,
@@ -623,7 +624,7 @@ func (s *HTTPUpstreamSuite) TestOpenAIProfileDefaultsToHTTP2AndNoHeaderTimeout()
 	require.NoError(s.T(), err)
 	transport, ok := entry.client.Transport.(*http.Transport)
 	require.True(s.T(), ok, "expected *http.Transport")
-	require.Equal(s.T(), time.Duration(0), transport.ResponseHeaderTimeout, "OpenAI profile should not inherit generic header timeout")
+	require.Equal(s.T(), 15*time.Second, transport.ResponseHeaderTimeout, "OpenAI profile should use explicit OpenAI header timeout")
 	require.True(s.T(), transport.ForceAttemptHTTP2, "OpenAI profile should prefer HTTP/2")
 	require.Equal(s.T(), upstreamProtocolModeOpenAIH2, entry.protocolMode)
 }
@@ -646,7 +647,8 @@ func (s *HTTPUpstreamSuite) TestOpenAIProfileCustomHeaderTimeout() {
 
 func (s *HTTPUpstreamSuite) TestOpenAIProfileTLSFingerprintDoesNotInheritGenericHeaderTimeout() {
 	s.cfg.Gateway = config.GatewayConfig{
-		ResponseHeaderTimeout: 600,
+		OpenAIResponseHeaderTimeout: 15,
+		ResponseHeaderTimeout:       600,
 		OpenAIHTTP2: config.GatewayOpenAIHTTP2Config{
 			Enabled: true,
 		},
@@ -656,7 +658,43 @@ func (s *HTTPUpstreamSuite) TestOpenAIProfileTLSFingerprintDoesNotInheritGeneric
 	require.NoError(s.T(), err)
 	transport, ok := entry.client.Transport.(*http.Transport)
 	require.True(s.T(), ok, "expected *http.Transport")
-	require.Equal(s.T(), time.Duration(0), transport.ResponseHeaderTimeout, "OpenAI TLS path should not inherit generic header timeout")
+	require.Equal(s.T(), 15*time.Second, transport.ResponseHeaderTimeout, "OpenAI TLS path should use explicit OpenAI header timeout")
+}
+
+func (s *HTTPUpstreamSuite) TestOpenAIWeakFallbackProfileUsesOpenAIHeaderTimeout() {
+	s.cfg.Gateway = config.GatewayConfig{
+		ResponseHeaderTimeout:       600,
+		OpenAIResponseHeaderTimeout: 15,
+		OpenAIHTTP2: config.GatewayOpenAIHTTP2Config{
+			Enabled: true,
+		},
+	}
+	svc := s.newService()
+	entry, err := svc.getClientEntry("", 1, 1, service.HTTPUpstreamProfileOpenAIWeakFallback, false, false)
+	require.NoError(s.T(), err)
+	transport, ok := entry.client.Transport.(*http.Transport)
+	require.True(s.T(), ok, "expected *http.Transport")
+	require.Equal(s.T(), 15*time.Second, transport.ResponseHeaderTimeout)
+	require.True(s.T(), transport.ForceAttemptHTTP2, "weak fallback should keep OpenAI protocol policy")
+	require.Equal(s.T(), upstreamProtocolModeOpenAIH2, entry.protocolMode)
+}
+
+func (s *HTTPUpstreamSuite) TestOpenAINoHeaderTimeoutProfileDisablesHeaderTimeout() {
+	s.cfg.Gateway = config.GatewayConfig{
+		ResponseHeaderTimeout:       600,
+		OpenAIResponseHeaderTimeout: 15,
+		OpenAIHTTP2: config.GatewayOpenAIHTTP2Config{
+			Enabled: true,
+		},
+	}
+	svc := s.newService()
+	entry, err := svc.getClientEntry("", 1, 1, service.HTTPUpstreamProfileOpenAINoHeaderTimeout, false, false)
+	require.NoError(s.T(), err)
+	transport, ok := entry.client.Transport.(*http.Transport)
+	require.True(s.T(), ok, "expected *http.Transport")
+	require.Equal(s.T(), time.Duration(0), transport.ResponseHeaderTimeout)
+	require.True(s.T(), transport.ForceAttemptHTTP2, "no-header-timeout profile should keep OpenAI protocol policy")
+	require.Equal(s.T(), upstreamProtocolModeOpenAIH2, entry.protocolMode)
 }
 
 func (s *HTTPUpstreamSuite) TestOpenAIProfileHTTP2DisabledUsesHTTP1Transport() {
@@ -850,6 +888,23 @@ func (s *HTTPUpstreamSuite) TestAccountProxyIsolation_DifferentProxy() {
 	entry2 := mustGetOrCreateClient(s.T(), svc, "http://proxy-b:8080", 1, 3)
 	require.NotSame(s.T(), entry1, entry2, "账号+代理隔离应区分不同代理")
 	require.Equal(s.T(), 2, len(svc.clients), "账号+代理隔离应缓存两个客户端")
+}
+
+func (s *HTTPUpstreamSuite) TestCloseIdleConnectionsForAccount_ExactAccountMatch() {
+	s.cfg.Gateway = config.GatewayConfig{ConnectionPoolIsolation: config.ConnectionPoolIsolationAccountProxy}
+	svc := s.newService()
+	entry12 := mustGetOrCreateClient(s.T(), svc, "http://proxy-a:8080", 12, 3)
+	entry123 := mustGetOrCreateClient(s.T(), svc, "http://proxy-b:8080", 123, 3)
+	require.True(s.T(), cacheKeyMatchesAccount("account:12", 12))
+	require.True(s.T(), cacheKeyMatchesAccount("account:12|proxy:http://proxy-a:8080", 12))
+	require.True(s.T(), cacheKeyMatchesAccount("tls:account:12|proxy:http://proxy-a:8080", 12))
+	require.False(s.T(), cacheKeyMatchesAccount("account:123|proxy:http://proxy-b:8080", 12))
+	require.False(s.T(), cacheKeyMatchesAccount("tls:account:123|proxy:http://proxy-b:8080", 12))
+
+	svc.CloseIdleConnectionsForAccount(12)
+
+	require.False(s.T(), hasEntry(svc, entry12), "target account connection pool should be removed")
+	require.True(s.T(), hasEntry(svc, entry123), "similar account id must not be removed")
 }
 
 // TestAccountModeProxyChangeClearsPool 测试账户模式下代理变更

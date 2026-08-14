@@ -61,7 +61,7 @@ func IsImageGenerationIntent(endpoint string, requestedModel string, body []byte
 		case "tools":
 			if !toolsSeen {
 				toolsSeen = true
-				imageIntent = openAIJSONToolsContainImageGeneration(value)
+				imageIntent = openAIJSONToolsContainExplicitImageGeneration(value)
 			}
 		case "input":
 			if !inputSeen {
@@ -178,7 +178,10 @@ func IsImageGenerationIntentMap(endpoint string, requestedModel string, reqBody 
 	if isOpenAIImageGenerationModel(firstNonEmptyString(reqBody["model"])) {
 		return true
 	}
-	if hasOpenAIImageGenerationTool(reqBody) {
+	if hasOpenAIExplicitImageGenerationTool(reqBody) {
+		return true
+	}
+	if inputContainsImageGenerationTool(reqBody["input"]) {
 		return true
 	}
 	return openAIAnyToolChoiceSelectsImageGeneration(reqBody["tool_choice"])

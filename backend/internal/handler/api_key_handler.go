@@ -3,8 +3,6 @@ package handler
 
 import (
 	"context"
-	"errors"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +31,7 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
 	Name          string   `json:"name" binding:"required"`
+	Category      string   `json:"category"`
 	GroupID       *int64   `json:"group_id"`        // nullable
 	CustomKey     *string  `json:"custom_key"`      // 可选的自定义key
 	IPWhitelist   []string `json:"ip_whitelist"`    // IP 白名单
@@ -49,6 +48,7 @@ type CreateAPIKeyRequest struct {
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
 	Name        string    `json:"name"`
+	Category    *string   `json:"category"`
 	GroupID     *int64    `json:"group_id"`
 	Status      string    `json:"status" binding:"omitempty,oneof=active inactive"`
 	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
@@ -62,43 +62,6 @@ type UpdateAPIKeyRequest struct {
 	RateLimit1d         *float64 `json:"rate_limit_1d"`
 	RateLimit7d         *float64 `json:"rate_limit_7d"`
 	ResetRateLimitUsage *bool    `json:"reset_rate_limit_usage"` // 重置限速用量
-}
-
-func validAPIKeyLimit(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 }
-
-func validateAPIKeyCreateRequest(req CreateAPIKeyRequest) error {
-	if req.Quota != nil && !validAPIKeyLimit(*req.Quota) {
-		return errors.New("invalid quota")
-	}
-	if req.RateLimit5h != nil && !validAPIKeyLimit(*req.RateLimit5h) {
-		return errors.New("invalid rate_limit_5h")
-	}
-	if req.RateLimit1d != nil && !validAPIKeyLimit(*req.RateLimit1d) {
-		return errors.New("invalid rate_limit_1d")
-	}
-	if req.RateLimit7d != nil && !validAPIKeyLimit(*req.RateLimit7d) {
-		return errors.New("invalid rate_limit_7d")
-	}
-	if req.ExpiresInDays != nil && *req.ExpiresInDays <= 0 {
-		return errors.New("invalid expires_in_days")
-	}
-	return nil
-}
-
-func validateAPIKeyUpdateRequest(req UpdateAPIKeyRequest) error {
-	if req.Quota != nil && !validAPIKeyLimit(*req.Quota) {
-		return errors.New("invalid quota")
-	}
-	if req.RateLimit5h != nil && !validAPIKeyLimit(*req.RateLimit5h) {
-		return errors.New("invalid rate_limit_5h")
-	}
-	if req.RateLimit1d != nil && !validAPIKeyLimit(*req.RateLimit1d) {
-		return errors.New("invalid rate_limit_1d")
-	}
-	if req.RateLimit7d != nil && !validAPIKeyLimit(*req.RateLimit7d) {
-		return errors.New("invalid rate_limit_7d")
-	}
-	return nil
 }
 
 // List handles listing user's API keys with pagination
@@ -127,6 +90,9 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 		filters.Search = search
 	}
 	filters.Status = c.Query("status")
+	if category := strings.TrimSpace(c.Query("category")); category != "" {
+		filters.Category = category
+	}
 	if groupIDStr := c.Query("group_id"); groupIDStr != "" {
 		gid, err := strconv.ParseInt(groupIDStr, 10, 64)
 		if err == nil {
@@ -174,7 +140,12 @@ func (h *APIKeyHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.APIKeyFromService(key))
+	visibleKey, err := h.apiKeyService.ApplyUserVisibleRateToAPIKey(c.Request.Context(), subject.UserID, key)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, dto.APIKeyFromService(visibleKey))
 }
 
 // Create handles creating a new API key
@@ -191,13 +162,10 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if err := validateAPIKeyCreateRequest(req); err != nil {
-		response.BadRequest(c, "Invalid request: numeric limits must be finite and non-negative, and expires_in_days must be greater than zero")
-		return
-	}
 
 	svcReq := service.CreateAPIKeyRequest{
 		Name:          req.Name,
+		Category:      req.Category,
 		GroupID:       req.GroupID,
 		CustomKey:     req.CustomKey,
 		IPWhitelist:   req.IPWhitelist,
@@ -222,7 +190,11 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		if err != nil {
 			return nil, err
 		}
-		return dto.APIKeyFromService(key), nil
+		visibleKey, err := h.apiKeyService.ApplyUserVisibleRateToAPIKey(ctx, subject.UserID, key)
+		if err != nil {
+			return nil, err
+		}
+		return dto.APIKeyFromService(visibleKey), nil
 	})
 }
 
@@ -246,12 +218,9 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if err := validateAPIKeyUpdateRequest(req); err != nil {
-		response.BadRequest(c, "Invalid request: numeric limits must be finite and non-negative")
-		return
-	}
 
 	svcReq := service.UpdateAPIKeyRequest{
+		Category:            req.Category,
 		IPWhitelist:         req.IPWhitelist,
 		IPBlacklist:         req.IPBlacklist,
 		Quota:               req.Quota,
@@ -290,7 +259,12 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.APIKeyFromService(key))
+	visibleKey, err := h.apiKeyService.ApplyUserVisibleRateToAPIKey(c.Request.Context(), subject.UserID, key)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, dto.APIKeyFromService(visibleKey))
 }
 
 // Delete handles deleting an API key

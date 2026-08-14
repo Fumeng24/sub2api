@@ -66,3 +66,9 @@ func tryAcquireSingletonLeaderLock(ctx context.Context, cache LeaderLockCache, d
 	// No coordination backend available: run without gating.
 	return func() {}, true
 }
+
+// AcquireSingletonLeaderLock exposes the shared Redis-first, PostgreSQL-fallback
+// lock policy to process-wide background workers outside the service package.
+func AcquireSingletonLeaderLock(ctx context.Context, cache LeaderLockCache, db *sql.DB, key, owner string, ttl time.Duration) (func(), bool) {
+	return tryAcquireSingletonLeaderLock(ctx, cache, db, key, owner, ttl)
+}

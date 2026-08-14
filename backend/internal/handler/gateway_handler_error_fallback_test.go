@@ -33,7 +33,42 @@ func TestGatewayEnsureForwardErrorResponse_WritesFallbackWhenNotWritten(t *testi
 	errorObj, ok := parsed["error"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "upstream_error", errorObj["type"])
-	assert.Equal(t, "Upstream request failed", errorObj["message"])
+	assert.Equal(t, service.ClientFacingTemporaryUnavailableMessage(), errorObj["message"])
+}
+
+func TestGatewayDedicatedErrorResponsesSanitizeInternalMessages(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &GatewayHandler{}
+
+	t.Run("responses", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, EndpointResponses, nil)
+
+		h.responsesErrorResponse(c, http.StatusBadGateway, "upstream_error", `Upstream request failed: account 38850 via https://upstream.example`)
+
+		require.Equal(t, http.StatusBadGateway, w.Code)
+		var parsed map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &parsed))
+		errorObj, ok := parsed["error"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, service.ClientFacingTemporaryUnavailableMessage(), errorObj["message"])
+	})
+
+	t.Run("chat_completions", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, EndpointChatCompletions, nil)
+
+		h.chatCompletionsErrorResponse(c, http.StatusServiceUnavailable, "api_error", "No available accounts: excluded candidates by scheduler")
+
+		require.Equal(t, http.StatusServiceUnavailable, w.Code)
+		var parsed map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &parsed))
+		errorObj, ok := parsed["error"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, service.ClientFacingTemporaryUnavailableMessage(), errorObj["message"])
+	})
 }
 
 // Writer 已写后 ensureForwardErrorResponse 必须把错误以 SSE 形式追加，

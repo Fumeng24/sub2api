@@ -69,7 +69,12 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		// 如果Authorization header中没有，尝试从x-api-key header中提取
 		if apiKeyString == "" {
-			apiKeyString = c.GetHeader("x-api-key")
+			// Some OpenAI-compatible clients append a space/newline when they
+			// copy the credential from an environment variable. Authorization
+			// already trims its Bearer value; apply the same normalization to
+			// the header aliases so a valid key is not rejected only because of
+			// transport whitespace.
+			apiKeyString = strings.TrimSpace(c.GetHeader("x-api-key"))
 		}
 		if len(apiKeyString) > service.MaxAPIKeyCredentialBytes {
 			recordInvalidAuthFailure(c, apiKeyService)
@@ -80,7 +85,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		// 如果x-api-key header中没有，尝试从x-goog-api-key header中提取（Gemini CLI兼容）
 		if apiKeyString == "" {
-			apiKeyString = c.GetHeader("x-goog-api-key")
+			apiKeyString = strings.TrimSpace(c.GetHeader("x-goog-api-key"))
 		}
 
 		// 如果所有header都没有API key

@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 )
 
@@ -18,11 +17,7 @@ func concurrencyErrorResponse(err error, slotType string) (int, string, string) 
 
 	var concurrencyErr *ConcurrencyError
 	if errors.As(err, &concurrencyErr) {
-		if concurrencyErr.SlotType != "" {
-			slotType = concurrencyErr.SlotType
-		}
-		return http.StatusTooManyRequests, "rate_limit_error",
-			fmt.Sprintf("Concurrency limit exceeded for %s, please retry later", slotType)
+		return http.StatusTooManyRequests, "rate_limit_error", "Service rate limit reached, please retry later"
 	}
 
 	if errors.Is(err, context.Canceled) {

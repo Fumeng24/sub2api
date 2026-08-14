@@ -892,6 +892,13 @@ type GatewayConfig struct {
 	// OpenAIHighEffortFirstOutputTimeoutSeconds: high/xhigh/max 推理的首个语义输出超时（秒）。
 	// 0 表示回退到 OpenAIFirstOutputTimeoutSeconds。
 	OpenAIHighEffortFirstOutputTimeoutSeconds int `mapstructure:"openai_high_effort_first_output_timeout_seconds"`
+	// OpenAICompactFirstOutputTimeoutSeconds: Responses remote compaction 首个
+	// 语义输出超时（秒）。压缩请求通常携带数 MB 的上下文，不能复用普通请求的
+	// 短首拍预算；0 表示使用站点默认值（120 秒）。
+	OpenAICompactFirstOutputTimeoutSeconds int `mapstructure:"openai_compact_first_output_timeout_seconds"`
+	// OpenAICompactHighEffortFirstOutputTimeoutSeconds: high/xhigh/max 压缩请求的
+	// 首拍超时（秒）；0 表示回退到 OpenAICompactFirstOutputTimeoutSeconds。
+	OpenAICompactHighEffortFirstOutputTimeoutSeconds int `mapstructure:"openai_compact_high_effort_first_output_timeout_seconds"`
 	// 请求体最大字节数，用于网关请求体大小限制
 	MaxBodySize int64 `mapstructure:"max_body_size"`
 	// TextMaxBodySize limits endpoints that cannot carry inline image/video payloads.
@@ -1022,39 +1029,6 @@ type GatewayConfig struct {
 	// UserMessageQueue: 用户消息串行队列配置
 	// 对 role:"user" 的真实用户消息实施账号级串行化 + RPM 自适应延迟
 	UserMessageQueue UserMessageQueueConfig `mapstructure:"user_message_queue"`
-
-	// Grok: Grok/xAI gateway scheduling and free-tier soft-gate settings.
-	Grok GatewayGrokConfig `mapstructure:"grok"`
-}
-
-// GatewayGrokConfig holds Grok-specific gateway scheduling knobs.
-//
-// Free-quota soft gate keys (gateway.grok.*):
-//   - free_quota_soft_gate_enabled: enable local rolling-window scheduling guard for
-//     OAuth accounts whose subscription_tier/plan_type is explicitly "free".
-//     Default true is safe only because free-tier detection is strict (unknown/paid fail open).
-//   - free_quota_token_limit: nominal rolling-window token allowance.
-//   - free_quota_soft_gate_percent: stop new scheduling before the nominal limit (1-100).
-//   - free_quota_window_hours: local usage rolling window length in hours.
-//   - free_quota_stats_cache_seconds: cache TTL for free-tier usage stats
-//     (hot path never blocks on DB; misses fail open and refresh in background).
-type GatewayGrokConfig struct {
-	// PasswordAuthEnabled controls the optional password-to-SSO OAuth flow.
-	// It defaults to false and must be explicitly enabled by the operator.
-	// When true, POST /admin/grok/oauth/password is functional (not ignored).
-	PasswordAuthEnabled bool `mapstructure:"password_auth_enabled"`
-	// FreeQuotaSoftGateEnabled enables a local rolling-window scheduling guard
-	// for explicitly free Grok OAuth accounts only.
-	FreeQuotaSoftGateEnabled bool `mapstructure:"free_quota_soft_gate_enabled"`
-	// FreeQuotaTokenLimit is the nominal rolling-window allowance.
-	FreeQuotaTokenLimit int64 `mapstructure:"free_quota_token_limit"`
-	// FreeQuotaSoftGatePercent stops new scheduling before the nominal limit.
-	FreeQuotaSoftGatePercent int `mapstructure:"free_quota_soft_gate_percent"`
-	// FreeQuotaWindowHours controls the local rolling usage window.
-	FreeQuotaWindowHours int `mapstructure:"free_quota_window_hours"`
-	// FreeQuotaStatsCacheSeconds is the soft-gate stats cache TTL. Hot path never
-	// waits on usage_logs; misses fail open and refresh asynchronously.
-	FreeQuotaStatsCacheSeconds int `mapstructure:"free_quota_stats_cache_seconds"`
 }
 
 type GatewayLiveConfig struct {
@@ -1279,12 +1253,14 @@ func (w GatewayOpenAIWSSchedulerScoreWeights) IsValid() bool {
 
 // GatewayOpenAISchedulerConfig OpenAI 高级调度器配置。
 type GatewayOpenAISchedulerConfig struct {
-	// StickyEscapeEnabled: 是否允许 session_hash sticky 在账号健康度劣化时临时逃逸
+	// StickyEscapeEnabled: 是否允许 session_hash sticky 在账号进入模型级慢保留
+	// 或并发槽位已满时切换账号。
 	StickyEscapeEnabled bool `mapstructure:"sticky_escape_enabled"`
-	// StickyEscapeTTFTMs: TTFT EWMA 超过该阈值时跳过 sticky
+	// StickyEscapeTTFTMs: 模型级慢保留记录超过该实测 TTFT 时才拆除已有会话粘性。
 	StickyEscapeTTFTMs int `mapstructure:"sticky_escape_ttft_ms"`
-	// StickyEscapeErrorRate: 错误率 EWMA 超过该阈值时跳过 sticky
-	StickyEscapeErrorRate float64 `mapstructure:"sticky_escape_error_rate"`
+	// StickyEscapeErrorRate: 兼容旧配置保留；已有会话不再按该阈值逃逸。
+	StickyEscapeErrorRate              float64 `mapstructure:"sticky_escape_error_rate"`
+	GatewayOpenAISchedulerConfigCustom `mapstructure:",squash"`
 }
 
 // GatewayUsageRecordConfig 使用量记录异步队列配置
@@ -1410,7 +1386,8 @@ type GatewaySchedulingConfig struct {
 
 	// 全量重建周期配置
 	// 全量重建周期（秒），0 表示禁用
-	FullRebuildIntervalSeconds int `mapstructure:"full_rebuild_interval_seconds"`
+	FullRebuildIntervalSeconds    int `mapstructure:"full_rebuild_interval_seconds"`
+	GatewaySchedulingConfigCustom `mapstructure:",squash"`
 }
 
 func (s *ServerConfig) Address() string {
@@ -1733,7 +1710,7 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	}
 	cfg.Server.TrustedProxiesConfigured = trustedProxiesConfigured
 	if cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs == 0 {
-		cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs = 15000
+		cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs = 25000
 	}
 	if cfg.Gateway.OpenAIScheduler.StickyEscapeErrorRate == 0 {
 		cfg.Gateway.OpenAIScheduler.StickyEscapeErrorRate = 0.5
@@ -1835,6 +1812,9 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	// Auto-generate TOTP encryption key if not set (32 bytes = 64 hex chars for AES-256)
 	cfg.Totp.EncryptionKey = strings.TrimSpace(cfg.Totp.EncryptionKey)
 	if cfg.Totp.EncryptionKey == "" {
+		if err := validateCustomTOTPEnvironment(&cfg); err != nil {
+			return nil, err
+		}
 		key, err := generateJWTSecret(32) // Reuse the same random generation function
 		if err != nil {
 			return nil, fmt.Errorf("generate totp encryption key error: %w", err)
@@ -2262,6 +2242,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_response_header_timeout", 0)
 	viper.SetDefault("gateway.openai_first_output_timeout_seconds", 0)
 	viper.SetDefault("gateway.openai_high_effort_first_output_timeout_seconds", 0)
+	viper.SetDefault("gateway.openai_compact_first_output_timeout_seconds", 120)
+	viper.SetDefault("gateway.openai_compact_high_effort_first_output_timeout_seconds", 180)
 	viper.SetDefault("gateway.log_upstream_error_body", true)
 	viper.SetDefault("gateway.log_upstream_error_body_max_bytes", 2048)
 	viper.SetDefault("gateway.inject_beta_for_apikey", false)
@@ -2322,11 +2304,14 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_ws.metadata_bridge_enabled", true)
 	viper.SetDefault("gateway.openai_ws.sticky_response_id_ttl_seconds", 3600)
 	viper.SetDefault("gateway.openai_ws.sticky_previous_response_ttl_seconds", 3600)
-	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.priority", 1.0)
-	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.load", 1.0)
-	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.queue", 0.7)
-	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.error_rate", 0.8)
-	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.ttft", 0.5)
+	// Runtime health is the primary scheduling signal. Priority/load/queue are
+	// only secondary tie-breakers; hard cooldown and slow-reserve gates remain
+	// authoritative before this score is evaluated.
+	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.priority", 0.2)
+	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.load", 0.8)
+	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.queue", 0.4)
+	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.error_rate", 4.5)
+	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.ttft", 2.0)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.reset", 0.0)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.quota_headroom", 0.0)
 	viper.SetDefault("gateway.openai_ws.scheduler_score_weights.upstream_cost", 0.0)
@@ -2342,15 +2327,6 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_proxy_stream_circuit.failure_threshold", 2)
 	viper.SetDefault("gateway.openai_proxy_stream_circuit.window_seconds", 60)
 	viper.SetDefault("gateway.openai_proxy_stream_circuit.ttl_seconds", 600)
-	// Grok free-tier local soft gate (scheduler-only; admin QueryQuota does not use this).
-	// Enabled by default because free detection requires an explicit free tier marker.
-	viper.SetDefault("gateway.grok.free_quota_soft_gate_enabled", true)
-	viper.SetDefault("gateway.grok.password_auth_enabled", false)
-	// Free soft-gate nominal limit: 500k tokens / rolling 24h (operator policy).
-	viper.SetDefault("gateway.grok.free_quota_token_limit", int64(500_000))
-	viper.SetDefault("gateway.grok.free_quota_soft_gate_percent", 95)
-	viper.SetDefault("gateway.grok.free_quota_window_hours", 24)
-	viper.SetDefault("gateway.grok.free_quota_stats_cache_seconds", 60)
 	viper.SetDefault("gateway.image_concurrency.enabled", false)
 	viper.SetDefault("gateway.image_concurrency.max_concurrent_requests", 0)
 	viper.SetDefault("gateway.image_concurrency.overflow_mode", ImageConcurrencyOverflowModeReject)
@@ -2455,6 +2431,7 @@ func setDefaults() {
 	viper.SetDefault("subscription_maintenance.queue_size", 1024)
 
 	setEnvReachableDefaults()
+	setCustomDefaults()
 }
 
 // setEnvReachableDefaults registers zero-valued defaults for keys that are
@@ -3173,6 +3150,14 @@ func (c *Config) Validate() error {
 		(c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds > 0 && c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds < 30) {
 		return fmt.Errorf("gateway.openai_high_effort_first_output_timeout_seconds must be 0 or between 30-1800 seconds")
 	}
+	if c.Gateway.OpenAICompactFirstOutputTimeoutSeconds < 0 || c.Gateway.OpenAICompactFirstOutputTimeoutSeconds > 1800 ||
+		(c.Gateway.OpenAICompactFirstOutputTimeoutSeconds > 0 && c.Gateway.OpenAICompactFirstOutputTimeoutSeconds < 30) {
+		return fmt.Errorf("gateway.openai_compact_first_output_timeout_seconds must be 0 or between 30-1800 seconds")
+	}
+	if c.Gateway.OpenAICompactHighEffortFirstOutputTimeoutSeconds < 0 || c.Gateway.OpenAICompactHighEffortFirstOutputTimeoutSeconds > 1800 ||
+		(c.Gateway.OpenAICompactHighEffortFirstOutputTimeoutSeconds > 0 && c.Gateway.OpenAICompactHighEffortFirstOutputTimeoutSeconds < 30) {
+		return fmt.Errorf("gateway.openai_compact_high_effort_first_output_timeout_seconds must be 0 or between 30-1800 seconds")
+	}
 	if c.Gateway.Live.MaxSessionDurationSeconds <= 0 {
 		c.Gateway.Live.MaxSessionDurationSeconds = 3600
 	}
@@ -3403,14 +3388,15 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("gateway.openai_ws.scheduler_score_weights.* must be non-negative and finite")
 		}
 	}
-	weightSum := weights.BaseWeightSum()
+	baseWeightSum := weights.BaseWeightSum()
+	if math.IsNaN(baseWeightSum) || math.IsInf(baseWeightSum, 0) {
+		return fmt.Errorf("gateway.openai_ws.scheduler_score_weights base-weight sum must be finite")
+	}
+	weightSum := weights.TotalWeightSum()
 	if weightSum <= 0 {
 		return fmt.Errorf("gateway.openai_ws.scheduler_score_weights must not all be zero")
 	}
 	if math.IsNaN(weightSum) || math.IsInf(weightSum, 0) {
-		return fmt.Errorf("gateway.openai_ws.scheduler_score_weights base-weight sum must be finite")
-	}
-	if totalWeightSum := weights.TotalWeightSum(); math.IsNaN(totalWeightSum) || math.IsInf(totalWeightSum, 0) {
 		return fmt.Errorf("gateway.openai_ws.scheduler_score_weights total-weight sum must be finite")
 	}
 	if c.Gateway.OpenAIScheduler.StickyEscapeTTFTMs <= 0 {
@@ -3418,6 +3404,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Gateway.OpenAIScheduler.StickyEscapeErrorRate < 0 || c.Gateway.OpenAIScheduler.StickyEscapeErrorRate > 1 {
 		return fmt.Errorf("gateway.openai_scheduler.sticky_escape_error_rate must be between 0 and 1")
+	}
+	if err := validateCustomOpenAIRuntimeCooldowns(c); err != nil {
+		return err
+	}
+	if err := validateCustomOpenAISlowReserve(c); err != nil {
+		return err
 	}
 	if c.Gateway.MaxLineSize < 0 {
 		return fmt.Errorf("gateway.max_line_size must be non-negative")
@@ -3542,6 +3534,9 @@ func (c *Config) Validate() error {
 		c.Gateway.Scheduling.OutboxLagRebuildSeconds < c.Gateway.Scheduling.OutboxLagWarnSeconds {
 		return fmt.Errorf("gateway.scheduling.outbox_lag_rebuild_seconds must be >= outbox_lag_warn_seconds")
 	}
+	if err := validateCustomSlotPool(c); err != nil {
+		return err
+	}
 	if c.Ops.MetricsCollectorCache.TTL < 0 {
 		return fmt.Errorf("ops.metrics_collector_cache.ttl must be non-negative")
 	}
@@ -3559,20 +3554,6 @@ func (c *Config) Validate() error {
 	}
 	if c.Concurrency.PingInterval < 5 || c.Concurrency.PingInterval > 30 {
 		return fmt.Errorf("concurrency.ping_interval must be between 5-30 seconds")
-	}
-	if c.Gateway.Grok.FreeQuotaSoftGateEnabled {
-		if c.Gateway.Grok.FreeQuotaTokenLimit <= 0 {
-			return fmt.Errorf("gateway.grok.free_quota_token_limit must be positive")
-		}
-		if c.Gateway.Grok.FreeQuotaSoftGatePercent < 1 || c.Gateway.Grok.FreeQuotaSoftGatePercent > 100 {
-			return fmt.Errorf("gateway.grok.free_quota_soft_gate_percent must be between 1 and 100")
-		}
-		if c.Gateway.Grok.FreeQuotaWindowHours <= 0 {
-			return fmt.Errorf("gateway.grok.free_quota_window_hours must be positive")
-		}
-	}
-	if c.Gateway.Grok.FreeQuotaStatsCacheSeconds < 0 {
-		return fmt.Errorf("gateway.grok.free_quota_stats_cache_seconds must be non-negative")
 	}
 	if err := ValidateDingTalkConfig(c.DingTalk); err != nil {
 		return fmt.Errorf("dingtalk_connect: %w", err)

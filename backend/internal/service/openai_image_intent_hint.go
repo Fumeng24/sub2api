@@ -4,6 +4,7 @@ import "github.com/gin-gonic/gin"
 
 // 请求级 hint 仅限 HTTP：缺失表示 unknown，false/true 都表示已完成 canonical 判定。
 const openAIImageIntentHintContextKey = "openai_image_intent_hint"
+const openAIPassthroughAttemptImageIntentKey = "openai_passthrough_attempt_image_intent"
 
 type openAIImageIntentClassifier func(endpoint string, requestedModel string, body []byte) bool
 

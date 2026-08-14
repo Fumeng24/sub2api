@@ -144,8 +144,13 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		Methods:                       limitsResp.Methods,
 		GlobalMin:                     limitsResp.GlobalMin,
 		GlobalMax:                     limitsResp.GlobalMax,
+		MinAmount:                     cfg.MinAmount,
+		MaxAmount:                     cfg.MaxAmount,
 		Plans:                         planList,
 		BalanceDisabled:               cfg.BalanceDisabled,
+		BalanceRechargeAvailable:      !cfg.BalanceDisabled,
+		BalanceUnlockThreshold:        cfg.BalanceUnlockThreshold,
+		BalanceRechargeNetAmount:      0,
 		BalanceRechargeMultiplier:     cfg.BalanceRechargeMultiplier,
 		SubscriptionUSDToCNYRate:      cfg.SubscriptionUSDToCNYRate,
 		RechargeFeeRate:               cfg.RechargeFeeRate,
@@ -161,8 +166,13 @@ type checkoutInfoResponse struct {
 	Methods                       map[string]service.MethodLimits `json:"methods"`
 	GlobalMin                     float64                         `json:"global_min"`
 	GlobalMax                     float64                         `json:"global_max"`
+	MinAmount                     float64                         `json:"min_amount"`
+	MaxAmount                     float64                         `json:"max_amount"`
 	Plans                         []checkoutPlan                  `json:"plans"`
 	BalanceDisabled               bool                            `json:"balance_disabled"`
+	BalanceRechargeAvailable      bool                            `json:"balance_recharge_available"`
+	BalanceUnlockThreshold        float64                         `json:"balance_recharge_unlock_threshold"`
+	BalanceRechargeNetAmount      float64                         `json:"balance_recharge_net_amount"`
 	BalanceRechargeMultiplier     float64                         `json:"balance_recharge_multiplier"`
 	SubscriptionUSDToCNYRate      float64                         `json:"subscription_usd_to_cny_rate"`
 	RechargeFeeRate               float64                         `json:"recharge_fee_rate"`
@@ -341,18 +351,19 @@ func (h *PaymentHandler) GetMyOrders(c *gin.Context) {
 	}
 
 	page, pageSize := response.ParsePagination(c)
-	orders, total, err := h.paymentService.GetUserOrders(c.Request.Context(), subject.UserID, service.OrderListParams{
+	records, total, err := h.paymentService.UserListOrderRecords(c.Request.Context(), subject.UserID, service.OrderListParams{
 		Page:        page,
 		PageSize:    pageSize,
 		Status:      c.Query("status"),
 		OrderType:   c.Query("order_type"),
 		PaymentType: c.Query("payment_type"),
+		Invoiceable: parseOptionalBoolQuery(c.Query("invoiceable")),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Paginated(c, sanitizePaymentOrdersForResponse(orders), int64(total), page, pageSize)
+	response.Paginated(c, records, total, page, pageSize)
 }
 
 // GetOrder returns a single order for the authenticated user.

@@ -710,6 +710,12 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 
 		status := c.Writer.Status()
 		if status < 400 {
+			// A terminal in-band failure is not a recovered upstream attempt. Prefer
+			// its logical status even when upstream diagnostics are also attached.
+			if streamErr, ok := service.GetOpsStreamError(c); ok && streamErr.CountTowardsSLA {
+				logOpsStreamError(c, ops, status)
+				return
+			}
 			// Even when the client request succeeds, we still want to persist upstream error attempts
 			// (retries/failover) so ops can observe upstream instability that gets "covered" by retries.
 			var events []*service.OpsUpstreamErrorEvent

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -41,6 +42,12 @@ func (r codexModelsFailoverAccountRepo) ListSchedulableByPlatform(_ context.Cont
 		}
 	}
 	return accounts, nil
+}
+
+func (r codexModelsFailoverAccountRepo) ListModelAvailabilityCandidates(_ context.Context, _ *int64, _ []string, _ bool) ([]service.Account, error) {
+	// These tests exercise ordinary account failover. Group-reserve behavior has
+	// dedicated coverage in the service package and must not add another attempt.
+	return nil, nil
 }
 
 type codexModelsFailoverHTTPUpstream struct {
@@ -113,6 +120,54 @@ func TestCodexModelsCanceledRequestDoesNotWriteResponse(t *testing.T) {
 
 	if c.Writer.Written() {
 		t.Fatalf("canceled request wrote an HTTP response: status=%d body=%q", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestCodexModelsUsesConfiguredGroupModelsInsteadOfSelectedAccountManifest(t *testing.T) {
+	handler, upstream, groupID := newCodexModelsFailoverTestHandler(http.StatusServiceUnavailable)
+	upstream.firstBody = `{"models":[{"slug":"gpt-5.4","display_name":"GPT-5.4"},{"slug":"upstream-only"}],"rollout":"test"}`
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/models?client_version=0.144.0", nil)
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{
+		GroupID: &groupID,
+		Group: &service.Group{
+			ID:       groupID,
+			Platform: service.PlatformOpenAI,
+			ModelsListConfig: service.GroupModelsListConfig{
+				Enabled: true,
+				Models:  []string{"gpt-5.6-sol", "gpt-5.4", "gpt-5.6-sol"},
+			},
+		},
+	})
+
+	handler.CodexModels(c)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want %d; body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	var got struct {
+		Models []struct {
+			Slug        string `json:"slug"`
+			DisplayName string `json:"display_name"`
+		} `json:"models"`
+		Rollout string `json:"rollout"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+	if got.Rollout != "test" {
+		t.Fatalf("rollout: got %q, want test", got.Rollout)
+	}
+	if len(got.Models) != 2 {
+		t.Fatalf("model count: got %d, want 2; body=%s", len(got.Models), recorder.Body.String())
+	}
+	if got.Models[0].Slug != "gpt-5.6-sol" || got.Models[0].DisplayName != "" {
+		t.Fatalf("first model: got %#v, want synthetic gpt-5.6-sol", got.Models[0])
+	}
+	if got.Models[1].Slug != "gpt-5.4" || got.Models[1].DisplayName != "GPT-5.4" {
+		t.Fatalf("second model: got %#v, want preserved gpt-5.4 metadata", got.Models[1])
 	}
 }
 

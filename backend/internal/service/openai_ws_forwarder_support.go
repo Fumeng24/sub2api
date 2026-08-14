@@ -518,6 +518,16 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 	if vetoed, _ := openAIProfitControlVetoReason(ctx, account); vetoed {
 		return 0, nil, "", nil
 	}
+	// A short account+model cooldown must only move the current request. Keep the
+	// response chain bound to its original account so it can resume there after
+	// recovery. Account-wide runtime blocks retain the existing hard-clear path.
+	if s.isOpenAIAccountModelRuntimeBlocked(account, requestedModel) {
+		return 0, nil, "", nil
+	}
+	if s.isOpenAIAccountRuntimeBlocked(account) {
+		_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
+		return 0, nil, "", nil
+	}
 	if s.schedulerSnapshot != nil && s.accountRepo != nil {
 		latest, latestErr := s.accountRepo.GetByID(ctx, account.ID)
 		if latestErr != nil || latest == nil {
@@ -545,7 +555,10 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 		if vetoed, _ := openAIProfitControlVetoReason(ctx, latest); vetoed {
 			return 0, nil, "", nil
 		}
-		if s.isOpenAIAccountRequestRuntimeBlocked(latest, requestedModel) {
+		if s.isOpenAIAccountModelRuntimeBlocked(latest, requestedModel) {
+			return 0, nil, "", nil
+		}
+		if s.isOpenAIAccountRuntimeBlocked(latest) {
 			_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 			return 0, nil, "", nil
 		}
@@ -610,6 +623,9 @@ func isOpenAIWSRateLimitError(codeRaw, errTypeRaw, msgRaw string) bool {
 }
 
 func (s *OpenAIGatewayService) persistOpenAIWSRateLimitSignal(ctx context.Context, account *Account, headers http.Header, responseBody []byte, codeRaw, errTypeRaw, msgRaw string) {
+	if s != nil && s.persistOpenAIWSRateLimitSignalCustom(ctx, account, headers, responseBody, codeRaw, errTypeRaw, msgRaw) {
+		return
+	}
 	if s == nil || s.rateLimitService == nil || account == nil || account.Platform != PlatformOpenAI {
 		return
 	}

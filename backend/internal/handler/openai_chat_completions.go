@@ -146,11 +146,13 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 	failedAccountIDs := make(map[int64]struct{})
 	sameAccountRetryCount := make(map[int64]int)
 	var lastFailoverErr *service.UpstreamFailoverError
+	_, singleCandidateRetry := h.configureSingleAccountRetryCustom(c, c.Request.Context(), apiKey.GroupID, reqModel, false)
 	var oauth429FailoverState service.OpenAIOAuth429FailoverState
 
 	// 分组利润控制：chat completions 文本入口请求级装门并固定 pricingAt。
 	ccPricingCtx, pricingAt := h.gatewayService.WithOpenAIRequestPricingContext(c.Request.Context(), apiKey.GroupID)
 	c.Request = c.Request.WithContext(ccPricingCtx)
+	h.configureOpenAIStickyFailoverCustom(c, apiKey.GroupID, sessionHash, reqModel)
 
 	for {
 		if failoverClientGone(c) {
@@ -273,46 +275,67 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 						return
 					}
 					if c.Writer.Size() != writerSizeBeforeForward {
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+						h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(reqModel), failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, true)
 						return
 					}
 					if failoverErr.ShouldReportAccountScheduleFailure() {
-						h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(reqModel), false, nil)
+						h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
 					}
 					if !failoverErr.ShouldRetryNextAccount() {
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+						h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(reqModel), failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
 					// Pool mode: retry on the same account
-					if failoverErr.RetryableOnSameAccount {
+					if h.shouldRetryOpenAIPoolModeSameAccount(c.Request.Context(), reqLog, account, failoverErr, service.OpenAIAlternativeAccountRequest{
+						GroupID:            apiKey.GroupID,
+						Platform:           requestPlatform,
+						RequestedModel:     reqModel,
+						RequiredTransport:  service.OpenAIUpstreamTransportAny,
+						RequiredCapability: service.OpenAIEndpointCapabilityChatCompletions,
+						ExcludedIDs:        failedAccountIDs,
+					}) {
 						retryLimit := account.GetPoolModeRetryCount()
 						if sameAccountRetryCount[account.ID] < retryLimit {
 							sameAccountRetryCount[account.ID]++
-							retryDelay := sameAccountRetryDelayFor(failoverErr, sameAccountRetryCount[account.ID])
 							reqLog.Warn("openai_chat_completions.pool_mode_same_account_retry",
 								zap.Int64("account_id", account.ID),
 								zap.Int("upstream_status", failoverErr.StatusCode),
 								zap.Int("retry_limit", retryLimit),
 								zap.Int("retry_count", sameAccountRetryCount[account.ID]),
-								zap.Duration("retry_delay", retryDelay),
 							)
 							select {
 							case <-c.Request.Context().Done():
 								return
-							case <-time.After(retryDelay):
+							case <-time.After(sameAccountRetryDelay):
 							}
 							continue
 						}
 					}
 					h.gatewayService.RecordOpenAIAccountSwitch()
-					failedAccountIDs[account.ID] = struct{}{}
 					lastFailoverErr = failoverErr
+					retryAction := h.handleChatCompletionsSingleAccountRetryCustom(c, reqLog, account, failoverErr, singleCandidateRetry, &switchCount, maxAccountSwitches, streamStarted)
+					switch retryAction {
+					case singleAccountRetryActionRetry:
+						continue
+					case singleAccountRetryActionStop:
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+						h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(reqModel), failoverErr)
+						return
+					}
+					h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(reqModel), failoverErr)
+					failedAccountIDs[account.ID] = struct{}{}
 					if switchCount >= maxAccountSwitches {
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
 					switchCount++
 					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}

@@ -48,6 +48,7 @@ type AdminUser struct {
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]rateMultiplier
 	GroupRates map[int64]float64 `json:"group_rates,omitempty"`
+	adminUserCustomFields
 }
 
 type APIKey struct {
@@ -85,6 +86,7 @@ type APIKey struct {
 
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
+	apiKeyCustomFields
 }
 
 type Group struct {
@@ -122,14 +124,8 @@ type Group struct {
 	VideoPrice480P     *float64 `json:"video_price_480p"`
 	VideoPrice720P     *float64 `json:"video_price_720p"`
 	VideoPrice1080P    *float64 `json:"video_price_1080p"`
-	// VideoModelPrices 可选按模型族×分辨率覆盖视频每秒单价 (USD/s)。
-	VideoModelPrices map[string]map[string]float64 `json:"video_model_prices,omitempty"`
 	// Codex alpha/search 网页搜索单次价格（USD/次）；null 表示使用默认价 0.01
-	WebSearchPricePerCall        *float64 `json:"web_search_price_per_call"`
-	SearchPricePer1k             *float64 `json:"search_price_per_1k"`
-	AudioRealtimePricePerMin     *float64 `json:"audio_realtime_price_per_min"`
-	AudioTtsPricePerMillionChars *float64 `json:"audio_tts_price_per_million_chars"`
-	AudioSttPricePerHour         *float64 `json:"audio_stt_price_per_hour"`
+	WebSearchPricePerCall *float64 `json:"web_search_price_per_call"`
 
 	// Claude Code 客户端限制
 	ClaudeCodeOnly  bool   `json:"claude_code_only"`
@@ -155,6 +151,7 @@ type Group struct {
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	groupCustomFields
 }
 
 // AdminGroup 是管理员接口使用的 group DTO（包含敏感/内部字段）。
@@ -191,6 +188,7 @@ type AdminGroup struct {
 
 	// 分组排序
 	SortOrder int `json:"sort_order"`
+	adminGroupCustomFields
 }
 
 type Account struct {
@@ -311,6 +309,7 @@ type Account struct {
 
 	GroupIDs []int64  `json:"group_ids,omitempty"`
 	Groups   []*Group `json:"groups,omitempty"`
+	accountCustomFields
 }
 
 type AccountGroup struct {
@@ -321,6 +320,7 @@ type AccountGroup struct {
 
 	Account *Account `json:"account,omitempty"`
 	Group   *Group   `json:"group,omitempty"`
+	accountGroupCustomFields
 }
 
 type Proxy struct {
@@ -413,6 +413,7 @@ type RedeemCode struct {
 
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
+	redeemCodeCustomFields
 }
 
 // AdminRedeemCode 是管理员接口使用的 redeem code DTO（包含 notes 等字段）。
@@ -469,6 +470,7 @@ type BatchUpdateRedeemCodeFields struct {
 
 	Type  *string  `json:"type,omitempty"`
 	Value *float64 `json:"value,omitempty"`
+	batchUpdateRedeemCodeCustomFields
 }
 
 type BatchUpdateRedeemCodesRequest struct {
@@ -476,7 +478,7 @@ type BatchUpdateRedeemCodesRequest struct {
 	Fields BatchUpdateRedeemCodeFields `json:"fields" binding:"required"`
 }
 
-// UsageLog 是普通用户接口使用的 usage log DTO（不包含管理员字段）。
+// UsageLog 是普通用户接口使用的 usage log DTO。
 type UsageLog struct {
 	ID        int64  `json:"id"`
 	UserID    int64  `json:"user_id"`
@@ -484,6 +486,11 @@ type UsageLog struct {
 	AccountID int64  `json:"account_id"`
 	RequestID string `json:"request_id"`
 	Model     string `json:"model"`
+	// UpstreamModel is the model sent to the upstream provider after mapping.
+	// It is safe for the usage owner to see and omits account/channel internals.
+	UpstreamModel *string `json:"upstream_model,omitempty"`
+	// ModelMappingChain records the public model rewrite path, e.g. "a→b→c".
+	ModelMappingChain *string `json:"model_mapping_chain,omitempty"`
 	// ServiceTier records the OpenAI service tier used for billing, e.g. "priority" / "flex".
 	ServiceTier *string `json:"service_tier,omitempty"`
 	// ReasoningEffort is the request's reasoning effort level.
@@ -560,9 +567,6 @@ type UsageLog struct {
 type AdminUsageLog struct {
 	UsageLog
 
-	// UpstreamModel is the actual model sent to the upstream provider after mapping.
-	// Omitted when no mapping was applied (requested model was used as-is).
-	UpstreamModel *string `json:"upstream_model,omitempty"`
 	// UpstreamResponseModel is the raw model declared by the upstream response.
 	UpstreamResponseModel *string `json:"upstream_response_model,omitempty"`
 	// UpstreamModelMismatch is nil when the upstream did not declare a model.
@@ -570,8 +574,6 @@ type AdminUsageLog struct {
 
 	// ChannelID 渠道 ID
 	ChannelID *int64 `json:"channel_id,omitempty"`
-	// ModelMappingChain 模型映射链，如 "a→b→c"
-	ModelMappingChain *string `json:"model_mapping_chain,omitempty"`
 	// BillingTier 计费层级标签（per_request/image 模式）
 	BillingTier *string `json:"billing_tier,omitempty"`
 
@@ -652,6 +654,7 @@ type UserSubscription struct {
 
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
+	userSubscriptionCustomFields
 }
 
 // AdminUserSubscription 是管理员接口使用的订阅 DTO（包含分配信息/备注等字段）。

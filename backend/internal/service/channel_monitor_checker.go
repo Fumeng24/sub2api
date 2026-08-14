@@ -348,7 +348,11 @@ func extractOpenAIResponsesText(respBytes []byte) string {
 
 			content.ForEach(func(_, block gjson.Result) bool {
 				blockType := block.Get("type").String()
-				if blockType != "" && blockType != "output_text" {
+				// Some OpenAI-compatible Responses gateways return the assistant
+				// message content as type "text" instead of the native
+				// "output_text" block. It is still a completed message and must
+				// be accepted for capability probes.
+				if blockType != "" && blockType != "output_text" && blockType != "text" {
 					return true
 				}
 				if text := block.Get("text").String(); strings.TrimSpace(text) != "" {
@@ -394,6 +398,7 @@ func mergeHeaders(base map[string]string, opts *CheckOptions) map[string]string 
 //
 // 任何 mode 返回的 []byte 都已经是合法 JSON，可直接送入 postRawJSON。
 func buildRequestBody(adapter providerAdapter, provider, apiMode, model, prompt string, opts *CheckOptions) ([]byte, error) {
+	opts = checkOptionsWithRuntimePlaceholdersCustom(opts)
 	mode := bodyOverrideMode(opts)
 
 	if mode == MonitorBodyOverrideModeReplace {

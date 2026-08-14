@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -63,9 +62,9 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactPrefersSupported
 	require.Equal(t, int64(71002), selection.Account.ID, "compact-supported account should win over unknown")
 }
 
-// TestOpenAIGatewayService_SelectAccountWithScheduler_CompactRejectsExplicitlyUnsupported
-// 验证 force_off / 已探测不支持 (tier=0) 的账号不会被 compact 请求选中。
-func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactRejectsExplicitlyUnsupported(t *testing.T) {
+// TestOpenAIGatewayService_SelectAccountWithScheduler_CompactAllowsLegacyNegativeProbe
+// 历史探测为不支持的账号仍然可以参与 compact；探测结果只影响偏好层级。
+func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactAllowsLegacyNegativeProbe(t *testing.T) {
 	resetOpenAIAdvancedSchedulerSettingCacheForTest()
 
 	ctx := context.Background()
@@ -111,14 +110,15 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactRejectsExplicitl
 		OpenAIUpstreamTransportAny,
 		true,
 	)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrNoAvailableCompactAccounts), "compact-only accounts should rejected explicitly unsupported and return compact error")
-	require.Nil(t, selection)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Contains(t, []int64{71010, 71011}, selection.Account.ID)
 }
 
-// TestOpenAIGatewayService_SelectAccountWithScheduler_CompactFallsBackToUnknown
-// 验证当没有"已知支持"账号时，compact 请求会回退到"未探测"账号。
-func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactFallsBackToUnknown(t *testing.T) {
+// TestOpenAIGatewayService_SelectAccountWithScheduler_CompactAllowsLegacyNegativeProbe
+// 验证历史负探测账号不会被 compact 硬排除；它与未探测账号都可参与调度。
+func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactAllowsLegacyNegativeProbeFallback(t *testing.T) {
 	resetOpenAIAdvancedSchedulerSettingCacheForTest()
 
 	ctx := context.Background()
@@ -167,7 +167,7 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_CompactFallsBackToUnkno
 	require.NoError(t, err)
 	require.NotNil(t, selection)
 	require.NotNil(t, selection.Account)
-	require.Equal(t, int64(71021), selection.Account.ID, "unknown account should be picked when no supported account available")
+	require.Contains(t, []int64{71020, 71021}, selection.Account.ID)
 }
 
 // TestOpenAIGatewayService_SelectAccountWithScheduler_CompactAllowsGrok verifies
@@ -232,9 +232,9 @@ func TestOpenAICompactSupportTier(t *testing.T) {
 		{name: "grok", account: &Account{Platform: PlatformGrok}, want: 2},
 		{name: "openai unknown", account: &Account{Platform: PlatformOpenAI, Extra: map[string]any{}}, want: 1},
 		{name: "openai supported", account: &Account{Platform: PlatformOpenAI, Extra: map[string]any{"openai_compact_supported": true}}, want: 2},
-		{name: "openai unsupported", account: &Account{Platform: PlatformOpenAI, Extra: map[string]any{"openai_compact_supported": false}}, want: 0},
+		{name: "openai unsupported remains routable", account: &Account{Platform: PlatformOpenAI, Extra: map[string]any{"openai_compact_supported": false}}, want: 1},
 		{name: "force on", account: &Account{Platform: PlatformOpenAI, Extra: map[string]any{"openai_compact_mode": OpenAICompactModeForceOn}}, want: 2},
-		{name: "force off overrides probe true", account: &Account{Platform: PlatformOpenAI, Extra: map[string]any{"openai_compact_mode": OpenAICompactModeForceOff, "openai_compact_supported": true}}, want: 0},
+		{name: "force off remains routable", account: &Account{Platform: PlatformOpenAI, Extra: map[string]any{"openai_compact_mode": OpenAICompactModeForceOff, "openai_compact_supported": true}}, want: 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

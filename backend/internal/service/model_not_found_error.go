@@ -8,6 +8,9 @@ import (
 var upstreamModelNotFoundKeywords = []string{"model not found", "unknown model", "not found"}
 
 func isUpstreamModelNotFoundError(statusCode int, body []byte) bool {
+	if matched, handled := isUpstreamModelNotFoundErrorCustom(statusCode, body); handled {
+		return matched
+	}
 	if statusCode != http.StatusNotFound {
 		return false
 	}

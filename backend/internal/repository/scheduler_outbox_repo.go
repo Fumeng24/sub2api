@@ -206,8 +206,8 @@ func enqueueSchedulerOutbox(ctx context.Context, exec sqlExecutor, eventType str
 		`
 		args = append(args, dedupKey)
 	}
-	_, err := exec.ExecContext(ctx, query, args...)
-	return err
+	result, err := exec.ExecContext(ctx, query, args...)
+	return enqueueSchedulerOutboxCustom(ctx, exec, result, err, eventType, accountID, groupID, payloadArg)
 }
 
 func schedulerOutboxDedupKey(eventType string, accountID *int64, groupID *int64, payloadJSON []byte) string {

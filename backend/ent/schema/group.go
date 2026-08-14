@@ -276,6 +276,12 @@ func (Group) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
 			Comment("OpenAI reasoning effort 自定义精确映射；先映射再应用上限"),
 
+		// 分组级持续自动排序配置 (added by migration 161)
+		field.JSON("auto_sort_config", domain.GroupAutoSortConfig{}).
+			Default(domain.GroupAutoSortConfig{}).
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
+			Comment("分组级持续自动排序：后端定时任务按倍率、体验、可用率或延迟重排成员账号优先级"),
+
 		// 分组利润控制（migration 192/193）：openai/anthropic/gemini/grok/antigravity
 		// 的 token 分组可启用，composite 分组不能直接启用。
 		field.Bool("profit_control_enabled").

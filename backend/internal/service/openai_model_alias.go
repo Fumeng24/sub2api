@@ -79,6 +79,12 @@ func normalizeKnownOpenAICodexModel(model string) string {
 			return "gpt-5.6-sol"
 		}
 		return ""
+	}
+	if mapped, handled := normalizeKnownOpenAICodexModelCustom(normalized); handled {
+		return mapped
+	}
+
+	switch {
 	case strings.Contains(normalized, "gpt-5.5-pro"):
 		return "gpt-5.5-pro"
 	case strings.Contains(normalized, "gpt-5.5"):
@@ -146,7 +152,7 @@ func appendUsageBillingModelCandidate(candidates []string, seen map[string]struc
 	if canonical := canonicalizeOpenAIModelAliasSpelling(trimmed); canonical != "" {
 		add(canonical)
 	}
-	if normalized := normalizeKnownOpenAICodexModel(trimmed); normalized != "" {
+	if normalized := normalizeOpenAIBillingCodexModel(trimmed); normalized != "" {
 		add(normalized)
 	}
 	return candidates

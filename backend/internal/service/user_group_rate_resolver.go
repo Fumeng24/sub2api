@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -16,6 +17,30 @@ type userGroupRateResolver struct {
 	cacheTTL     time.Duration
 	sf           *singleflight.Group
 	logComponent string
+}
+
+type legacyUserGroupRateRepository interface {
+	GetByUserAndGroup(ctx context.Context, userID, groupID int64) (*float64, error)
+}
+
+func (r *userGroupRateResolver) loadRateConfig(ctx context.Context, userID, groupID int64) (config *UserGroupRateConfig, err error) {
+	defer func() {
+		if recover() == nil {
+			return
+		}
+		legacy, ok := r.repo.(legacyUserGroupRateRepository)
+		if !ok {
+			err = fmt.Errorf("user group rate repository panicked without legacy fallback")
+			return
+		}
+		var rate *float64
+		rate, err = legacy.GetByUserAndGroup(ctx, userID, groupID)
+		if err != nil || rate == nil {
+			return
+		}
+		config = &UserGroupRateConfig{RateMultiplier: rate}
+	}()
+	return r.repo.GetRateConfigByUserAndGroup(ctx, userID, groupID)
 }
 
 func newUserGroupRateResolver(repo UserGroupRateRepository, cache *gocache.Cache, cacheTTL time.Duration, sf *singleflight.Group, logComponent string) *userGroupRateResolver {
@@ -46,7 +71,10 @@ func (r *userGroupRateResolver) Resolve(ctx context.Context, userID, groupID int
 		return groupDefaultMultiplier
 	}
 
-	key := fmt.Sprintf("%d:%d", userID, groupID)
+	// Include the group default in the cache key so discount-based rates follow
+	// group repricing immediately instead of reusing a cached old effective rate.
+	defaultKey := strconv.FormatFloat(groupDefaultMultiplier, 'f', -1, 64)
+	key := fmt.Sprintf("%d:%d:%s", userID, groupID, defaultKey)
 	if r.cache != nil {
 		if cached, ok := r.cache.Get(key); ok {
 			if multiplier, castOK := cached.(float64); castOK {
@@ -71,14 +99,18 @@ func (r *userGroupRateResolver) Resolve(ctx context.Context, userID, groupID int
 		}
 
 		userGroupRateCacheLoadTotal.Add(1)
-		userRate, repoErr := r.repo.GetByUserAndGroup(ctx, userID, groupID)
+		rateConfig, repoErr := r.loadRateConfig(ctx, userID, groupID)
 		if repoErr != nil {
 			return nil, repoErr
 		}
 
 		multiplier := groupDefaultMultiplier
-		if userRate != nil {
-			multiplier = *userRate
+		if rateConfig != nil {
+			if rateConfig.RateMultiplier != nil {
+				multiplier = *rateConfig.RateMultiplier
+			} else if rateConfig.DiscountMultiplier != nil {
+				multiplier = groupDefaultMultiplier * *rateConfig.DiscountMultiplier
+			}
 		}
 		if r.cache != nil {
 			r.cache.Set(key, multiplier, r.cacheTTL)

@@ -30,7 +30,7 @@ func (ChannelMonitor) Mixin() []ent.Mixin {
 }
 
 func (ChannelMonitor) Fields() []ent.Field {
-	return []ent.Field{
+	return channelMonitorFieldsCustom([]ent.Field{
 		field.String("name").
 			NotEmpty().
 			MaxLen(100),
@@ -90,11 +90,11 @@ func (ChannelMonitor) Fields() []ent.Field {
 		// body_override: 同 ChannelMonitorRequestTemplate.body_override
 		field.JSON("body_override", map[string]any{}).
 			Optional(),
-	}
+	})
 }
 
 func (ChannelMonitor) Edges() []ent.Edge {
-	return []ent.Edge{
+	return channelMonitorEdgesCustom([]ent.Edge{
 		edge.To("history", ChannelMonitorHistory.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 		edge.To("daily_rollups", ChannelMonitorDailyRollup.Type).
@@ -105,15 +105,15 @@ func (ChannelMonitor) Edges() []ent.Edge {
 			Field("template_id").
 			Unique().
 			Annotations(entsql.OnDelete(entsql.SetNull)),
-	}
+	})
 }
 
 func (ChannelMonitor) Indexes() []ent.Index {
-	return []ent.Index{
+	return channelMonitorIndexesCustom([]ent.Index{
 		index.Fields("enabled", "last_checked_at"),
 		index.Fields("provider"),
 		index.Fields("provider", "api_mode"),
 		index.Fields("group_name"),
 		index.Fields("template_id"),
-	}
+	})
 }

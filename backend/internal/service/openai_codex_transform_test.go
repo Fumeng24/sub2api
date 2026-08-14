@@ -881,7 +881,7 @@ func TestApplyCodexImageGenerationBridgeInstructions_AppendsBridgeOnce(t *testin
 	require.True(t, ok)
 	require.Contains(t, instructions, "existing instructions")
 	require.Contains(t, instructions, codexImageGenerationBridgeMarker)
-	require.Contains(t, instructions, "Responses native `image_generation` tool")
+	require.Contains(t, instructions, codexImageGenerationBridgeTextCustom)
 
 	modified = applyCodexImageGenerationBridgeInstructions(reqBody)
 	require.False(t, modified)
@@ -1257,14 +1257,14 @@ func TestNormalizeCodexModel_Gpt53(t *testing.T) {
 		"codex-auto-review":         "codex-auto-review",
 		"gpt5.4":                    "gpt-5.4",
 		"gpt-5.4-high":              "gpt-5.4",
-		"gpt-5.4-chat-latest":       "gpt-5.4",
+		"gpt-5.4-chat-latest":       "gpt-5.4-chat-latest",
 		"gpt 5.4":                   "gpt-5.4",
 		"gpt-5.4-mini":              "gpt-5.4-mini",
 		"gpt5.4-mini":               "gpt-5.4-mini",
 		"gpt5.4mini":                "gpt-5.4-mini",
 		"gpt 5.4 mini":              "gpt-5.4-mini",
-		"gpt-5.3":                   "gpt-5.3-codex",
-		"gpt5.3":                    "gpt-5.3-codex",
+		"gpt-5.3":                   "gpt-5.3",
+		"gpt5.3":                    "gpt5.3",
 		"gpt-5.3-codex":             "gpt-5.3-codex",
 		"gpt5.3-codex":              "gpt-5.3-codex",
 		"gpt5.3codex":               "gpt-5.3-codex",
@@ -1283,19 +1283,19 @@ func TestNormalizeCodexModel_Gpt53(t *testing.T) {
 	}
 }
 
-func TestNormalizeCodexModel_RemovedModelsFallbackToSupportedTargets(t *testing.T) {
+func TestNormalizeCodexModel_RemovedModelsDoNotFallbackToSupportedTargets(t *testing.T) {
 	cases := map[string]string{
-		"":                   "gpt-5.4",
-		"gpt-5":              "gpt-5.4",
-		"gpt-5-mini":         "gpt-5.4",
-		"gpt-5-nano":         "gpt-5.4",
-		"gpt-5.1":            "gpt-5.4",
-		"gpt-5.1-codex":      "gpt-5.3-codex",
-		"gpt-5.1-codex-max":  "gpt-5.3-codex",
-		"gpt-5.1-codex-mini": "gpt-5.3-codex",
-		"gpt-5.2-codex":      "gpt-5.2",
-		"codex-mini-latest":  "gpt-5.3-codex",
-		"gpt-5-codex":        "gpt-5.3-codex",
+		"":                   "",
+		"gpt-5":              "gpt-5",
+		"gpt-5-mini":         "gpt-5-mini",
+		"gpt-5-nano":         "gpt-5-nano",
+		"gpt-5.1":            "gpt-5.1",
+		"gpt-5.1-codex":      "gpt-5.1-codex",
+		"gpt-5.1-codex-max":  "gpt-5.1-codex-max",
+		"gpt-5.1-codex-mini": "gpt-5.1-codex-mini",
+		"gpt-5.2-codex":      "gpt-5.2-codex",
+		"codex-mini-latest":  "codex-mini-latest",
+		"gpt-5-codex":        "gpt-5-codex",
 	}
 
 	for input, expected := range cases {

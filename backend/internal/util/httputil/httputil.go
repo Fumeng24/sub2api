@@ -25,6 +25,9 @@ func IsCloudflareChallengeResponse(statusCode int, headers http.Header, body []b
 	if statusCode != http.StatusForbidden && statusCode != http.StatusTooManyRequests {
 		return false
 	}
+	if isCloudflareChallengeResponseCustom(headers, body) {
+		return true
+	}
 
 	if headers != nil && strings.EqualFold(strings.TrimSpace(headers.Get("cf-mitigated")), "challenge") {
 		return true

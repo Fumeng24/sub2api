@@ -16,6 +16,11 @@ const (
 	OpsUpstreamErrorDetailKey  = "ops_upstream_error_detail"
 	OpsUpstreamErrorsKey       = "ops_upstream_errors"
 
+	// Best-effort capture of the current upstream request body so ops can
+	// retry the specific upstream attempt (not just the client request).
+	// This value is sanitized+trimmed before being persisted.
+	OpsUpstreamRequestBodyKey = "ops_upstream_request_body"
+
 	// Optional stage latencies (milliseconds) for troubleshooting and alerting.
 	OpsAuthLatencyMsKey      = "ops_auth_latency_ms"
 	OpsRoutingLatencyMsKey   = "ops_routing_latency_ms"
@@ -49,6 +54,7 @@ const (
 	OpsClientBusinessLimitedReasonIPRestriction          = "api_key_ip_restriction"
 	OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable = "api_key_group_unavailable"
 	OpsClientBusinessLimitedReasonAPIKeyGroupUnassigned  = "api_key_group_unassigned"
+	OpsClientBusinessLimitedReasonContextWindowExceeded  = "context_window_exceeded"
 	OpsClientBusinessLimitedReasonLocalFeatureGate       = "local_feature_gate"
 	OpsClientBusinessLimitedReasonLocalPolicyDenied      = "local_policy_denied"
 )
@@ -209,6 +215,10 @@ type OpsUpstreamErrorEvent struct {
 	// Helps debug 404/routing errors by showing which endpoint was targeted.
 	UpstreamURL string `json:"upstream_url,omitempty"`
 
+	// Best-effort upstream request capture (sanitized+trimmed).
+	// Required for retrying a specific upstream attempt.
+	UpstreamRequestBody string `json:"upstream_request_body,omitempty"`
+
 	// Best-effort upstream response capture (sanitized+trimmed).
 	UpstreamResponseBody string `json:"upstream_response_body,omitempty"`
 
@@ -220,6 +230,9 @@ type OpsUpstreamErrorEvent struct {
 	Scope  string `json:"scope,omitempty"`
 	Reason string `json:"reason,omitempty"`
 
+	CooldownApplied bool   `json:"cooldown_applied,omitempty"`
+	CooldownReason  string `json:"cooldown_reason,omitempty"`
+
 	Message string `json:"message,omitempty"`
 	Detail  string `json:"detail,omitempty"`
 }
@@ -228,6 +241,7 @@ func appendOpsUpstreamError(c *gin.Context, ev OpsUpstreamErrorEvent) {
 	if c == nil {
 		return
 	}
+	normalizeOpsUpstreamErrorEventCustom(c, &ev)
 	if ev.AtUnixMs <= 0 {
 		ev.AtUnixMs = time.Now().UnixMilli()
 	}

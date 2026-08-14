@@ -7,17 +7,7 @@ import (
 	"strconv"
 )
 
-// monitorChallengePromptTemplate 1:1 复刻 BingZi-233/check-cx 的 few-shot 模板。
-const monitorChallengePromptTemplate = `Calculate and respond with ONLY the number, nothing else.
-
-Q: 3 + 5 = ?
-A: 8
-
-Q: 12 - 7 = ?
-A: 5
-
-Q: %d %s %d = ?
-A:`
+const monitorChallengePromptTemplate = `Return only the integer result of %d %s %d.`
 
 // monitorChallengeNumberRegex 提取响应中的所有整数（含负号）。
 var monitorChallengeNumberRegex = regexp.MustCompile(`-?\d+`)

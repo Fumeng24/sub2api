@@ -79,14 +79,15 @@ const (
 // would erroneously match first.
 func NormalizeInboundEndpoint(path string) string {
 	path = strings.TrimSpace(path)
+	barePath := strings.TrimRight(path, "/")
 	switch {
-	case strings.Contains(path, EndpointEmbeddings):
+	case strings.Contains(path, EndpointEmbeddings) || barePath == "/embeddings":
 		return EndpointEmbeddings
 	case strings.Contains(path, EndpointAlphaSearch) || isBareOrSubpathOf(strings.TrimRight(path, "/"), "/alpha/search") || isBareOrSubpathOf(strings.TrimRight(path, "/"), "/backend-api/codex/alpha/search"):
 		return EndpointAlphaSearch
-	case strings.Contains(path, EndpointChatCompletions):
+	case strings.Contains(path, EndpointChatCompletions) || barePath == "/chat/completions":
 		return EndpointChatCompletions
-	case strings.Contains(path, EndpointMessages):
+	case strings.Contains(path, EndpointMessages) || barePath == "/messages" || barePath == "/messages/count_tokens":
 		return EndpointMessages
 	case strings.Contains(path, EndpointImagesGenerations) || strings.Contains(path, "/images/generations"):
 		return EndpointImagesGenerations

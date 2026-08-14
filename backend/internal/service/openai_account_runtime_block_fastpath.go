@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -16,6 +17,10 @@ const (
 	openAIOAuth429StormWindow             = 10 * time.Second
 	openAIOAuth429StormThreshold          = 20
 	openAIOAuth429StormMaxAccountSwitches = 1
+	// Endpoint migration/retirement is deterministic and requires operator
+	// repair. Keep the account out of every scheduler after the first hit;
+	// clearing the account error is the explicit recovery action.
+	openAIDeterministicAccountQuarantine = 365 * 24 * time.Hour
 )
 
 // OpenAIOAuth429FailoverState tracks the request-local follow-up budget after
@@ -72,6 +77,9 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	if s == nil || account == nil {
 		return false
 	}
+	if account.Platform == PlatformOpenAI && isOpenAIEndpointMigrationError(statusCode, extractUpstreamErrorMessage(responseBody), responseBody) {
+		return s.quarantineDeterministicOpenAIAccount(ctx, account, statusCode, responseBody)
+	}
 	stateCtx = withTempUnschedulableModel(stateCtx, canonicalModel)
 	if s.rateLimitService != nil && len(canonicalModel) > 0 && s.rateLimitService.HandleUpstreamModelNotFound(stateCtx, account, canonicalModel[0], statusCode, responseBody) {
 		return true
@@ -89,7 +97,10 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	if s.rateLimitService == nil {
 		return false
 	}
-	shouldDisable := s.rateLimitService.HandleUpstreamError(stateCtx, account, statusCode, headers, responseBody)
+	// Preserve the canonical request model through the unified policy. Without
+	// this argument, a known-model transient error would lose its scope here and
+	// fall back to account-level handling in the policy extension.
+	shouldDisable := s.rateLimitService.HandleUpstreamError(stateCtx, account, statusCode, headers, responseBody, canonicalModel...)
 	modelTempMatched := statusCode != http.StatusUnauthorized && tempUnschedulableModel(stateCtx, nil) != "" &&
 		len(matchTempUnschedulableRules(account, statusCode, responseBody)) > 0
 	if shouldDisable && !modelTempMatched {
@@ -99,24 +110,51 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	// same-account retry budget. Recording the generic account+model transient
 	// cooldown here would block the next approved retry before that budget is used.
 	poolModeRetryable := account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode)
-	if !shouldDisable && account.Platform == PlatformOpenAI && account.Type == AccountTypeAPIKey &&
-		shouldCooldownOpenAITransientUpstreamError(statusCode, responseBody) && !poolModeRetryable {
+	if !shouldDisable && account.Platform == PlatformOpenAI &&
+		shouldCooldownOpenAITransientUpstreamError(statusCode, responseBody) && !poolModeRetryable &&
+		!openAIStickyFailoverTracking(stateCtx) {
 		model := ""
 		if len(canonicalModel) > 0 {
 			model = canonicalModel[0]
 		}
 		decision := s.recordOpenAIAccountModelTransientFailure(account, model, time.Now())
-		if decision.FailureStreak > 0 {
-			slog.Warn("openai_model_transient_state",
-				"account_id", account.ID,
-				"model", openAIAccountModelTransientModel(model),
-				"failure_streak", decision.FailureStreak,
-				"cooldown_ms", decision.Cooldown.Milliseconds(),
-				"block_scope", "account_model",
-			)
-		}
+		logOpenAIAccountModelTransientDecision(account.ID, model, decision)
 	}
 	return shouldDisable
+}
+
+// quarantineDeterministicOpenAIAccount performs the account-wide hard gate
+// before the failover error is returned to the handler. This guarantees that
+// both the current request and subsequent requests avoid a broken sticky
+// binding, while SetError persists the decision and emits scheduler invalidation.
+func (s *OpenAIGatewayService) quarantineDeterministicOpenAIAccount(ctx context.Context, account *Account, statusCode int, responseBody []byte) bool {
+	if s == nil || account == nil || account.ID <= 0 {
+		return false
+	}
+	now := time.Now()
+	until := now.Add(openAIDeterministicAccountQuarantine)
+	message := sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(responseBody)))
+	if len(message) > 256 {
+		message = message[:256]
+	}
+	reason := fmt.Sprintf("deterministic_endpoint_failure:%d:%s", statusCode, message)
+	// Apply the in-memory block first so a concurrent request cannot select the
+	// stale scheduler snapshot while the durable write is in flight.
+	s.BlockAccountScheduling(account, until, "deterministic_endpoint_failure")
+	if s.accountRepo == nil {
+		slog.Error("openai.deterministic_account_quarantine_memory_only", "account_id", account.ID, "status_code", statusCode)
+		return true
+	}
+	stateCtx, cancel := openAIAccountStateContext(ctx)
+	defer cancel()
+	if err := s.accountRepo.SetError(stateCtx, account.ID, reason); err != nil {
+		slog.Error("openai.deterministic_account_quarantine_failed", "account_id", account.ID, "status_code", statusCode, "error", err)
+		// Keep the in-memory hard gate and still fail over this request even when
+		// persistence is temporarily unavailable.
+		return true
+	}
+	slog.Error("openai.deterministic_account_quarantined", "account_id", account.ID, "status_code", statusCode, "until", until, "reason", reason)
+	return true
 }
 
 func shouldCooldownOpenAITransientUpstreamError(statusCode int, responseBody []byte) bool {
@@ -222,6 +260,13 @@ func (s *OpenAIGatewayService) ClearAccountSchedulingBlock(accountID int64) {
 	s.openaiAccountRuntimeBlockGeneration.Store(accountID, s.openaiAccountRuntimeBlockSequence.Add(1))
 }
 
+func (s *OpenAIGatewayService) ClearAccountModelSchedulingBlock(accountID int64, model string) {
+	if s == nil || accountID <= 0 {
+		return
+	}
+	s.clearOpenAIAccountModelTransientState(accountID, normalizeOpenAIAccountModelTransientModel(model))
+}
+
 func (s *OpenAIGatewayService) isOpenAIAccountRuntimeBlocked(account *Account) bool {
 	if s == nil || !isOpenAIAccount(account) {
 		return false
@@ -283,6 +328,19 @@ func (s *OpenAIGatewayService) recordOpenAIAccountModelTransientFailure(account 
 		return openAIAccountModelTransientDecision{}
 	}
 	return state.recordFailure(account.ID, openAIAccountModelTransientModel(canonicalModel), now)
+}
+
+func logOpenAIAccountModelTransientDecision(accountID int64, model string, decision openAIAccountModelTransientDecision) {
+	if accountID <= 0 || decision.FailureStreak <= 0 {
+		return
+	}
+	slog.Warn("openai_model_transient_state",
+		"account_id", accountID,
+		"model", openAIAccountModelTransientModel(model),
+		"failure_streak", decision.FailureStreak,
+		"cooldown_ms", decision.Cooldown.Milliseconds(),
+		"block_scope", "account_model",
+	)
 }
 
 func (s *OpenAIGatewayService) clearOpenAIAccountModelTransientState(accountID int64, model string) {

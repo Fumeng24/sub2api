@@ -808,6 +808,20 @@ func (_c *GroupCreate) SetReasoningEffortMappings(v []domain.ReasoningEffortMapp
 	return _c
 }
 
+// SetAutoSortConfig sets the "auto_sort_config" field.
+func (_c *GroupCreate) SetAutoSortConfig(v domain.GroupAutoSortConfig) *GroupCreate {
+	_c.mutation.SetAutoSortConfig(v)
+	return _c
+}
+
+// SetNillableAutoSortConfig sets the "auto_sort_config" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableAutoSortConfig(v *domain.GroupAutoSortConfig) *GroupCreate {
+	if v != nil {
+		_c.SetAutoSortConfig(*v)
+	}
+	return _c
+}
+
 // SetProfitControlEnabled sets the "profit_control_enabled" field.
 func (_c *GroupCreate) SetProfitControlEnabled(v bool) *GroupCreate {
 	_c.mutation.SetProfitControlEnabled(v)
@@ -1127,6 +1141,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultReasoningEffortMappings
 		_c.mutation.SetReasoningEffortMappings(v)
 	}
+	if _, ok := _c.mutation.AutoSortConfig(); !ok {
+		v := group.DefaultAutoSortConfig
+		_c.mutation.SetAutoSortConfig(v)
+	}
 	if _, ok := _c.mutation.ProfitControlEnabled(); !ok {
 		v := group.DefaultProfitControlEnabled
 		_c.mutation.SetProfitControlEnabled(v)
@@ -1319,6 +1337,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.ReasoningEffortMappings(); !ok {
 		return &ValidationError{Name: "reasoning_effort_mappings", err: errors.New(`ent: missing required field "Group.reasoning_effort_mappings"`)}
+	}
+	if _, ok := _c.mutation.AutoSortConfig(); !ok {
+		return &ValidationError{Name: "auto_sort_config", err: errors.New(`ent: missing required field "Group.auto_sort_config"`)}
 	}
 	if _, ok := _c.mutation.ProfitControlEnabled(); !ok {
 		return &ValidationError{Name: "profit_control_enabled", err: errors.New(`ent: missing required field "Group.profit_control_enabled"`)}
@@ -1591,6 +1612,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ReasoningEffortMappings(); ok {
 		_spec.SetField(group.FieldReasoningEffortMappings, field.TypeJSON, value)
 		_node.ReasoningEffortMappings = value
+	}
+	if value, ok := _c.mutation.AutoSortConfig(); ok {
+		_spec.SetField(group.FieldAutoSortConfig, field.TypeJSON, value)
+		_node.AutoSortConfig = value
 	}
 	if value, ok := _c.mutation.ProfitControlEnabled(); ok {
 		_spec.SetField(group.FieldProfitControlEnabled, field.TypeBool, value)
@@ -2717,6 +2742,18 @@ func (u *GroupUpsert) SetReasoningEffortMappings(v []domain.ReasoningEffortMappi
 // UpdateReasoningEffortMappings sets the "reasoning_effort_mappings" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateReasoningEffortMappings() *GroupUpsert {
 	u.SetExcluded(group.FieldReasoningEffortMappings)
+	return u
+}
+
+// SetAutoSortConfig sets the "auto_sort_config" field.
+func (u *GroupUpsert) SetAutoSortConfig(v domain.GroupAutoSortConfig) *GroupUpsert {
+	u.Set(group.FieldAutoSortConfig, v)
+	return u
+}
+
+// UpdateAutoSortConfig sets the "auto_sort_config" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateAutoSortConfig() *GroupUpsert {
+	u.SetExcluded(group.FieldAutoSortConfig)
 	return u
 }
 
@@ -3933,6 +3970,20 @@ func (u *GroupUpsertOne) SetReasoningEffortMappings(v []domain.ReasoningEffortMa
 func (u *GroupUpsertOne) UpdateReasoningEffortMappings() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateReasoningEffortMappings()
+	})
+}
+
+// SetAutoSortConfig sets the "auto_sort_config" field.
+func (u *GroupUpsertOne) SetAutoSortConfig(v domain.GroupAutoSortConfig) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAutoSortConfig(v)
+	})
+}
+
+// UpdateAutoSortConfig sets the "auto_sort_config" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateAutoSortConfig() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAutoSortConfig()
 	})
 }
 
@@ -5323,6 +5374,20 @@ func (u *GroupUpsertBulk) SetReasoningEffortMappings(v []domain.ReasoningEffortM
 func (u *GroupUpsertBulk) UpdateReasoningEffortMappings() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateReasoningEffortMappings()
+	})
+}
+
+// SetAutoSortConfig sets the "auto_sort_config" field.
+func (u *GroupUpsertBulk) SetAutoSortConfig(v domain.GroupAutoSortConfig) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAutoSortConfig(v)
+	})
+}
+
+// UpdateAutoSortConfig sets the "auto_sort_config" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateAutoSortConfig() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAutoSortConfig()
 	})
 }
 

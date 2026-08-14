@@ -75,6 +75,11 @@ func Status(v string) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldStatus, v))
 }
 
+// BusinessCategory applies equality check predicate on the "business_category" field. It's identical to BusinessCategoryEQ.
+func BusinessCategory(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldBusinessCategory, v))
+}
+
 // UsedBy applies equality check predicate on the "used_by" field. It's identical to UsedByEQ.
 func UsedBy(v int64) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldUsedBy, v))
@@ -343,6 +348,71 @@ func StatusEqualFold(v string) predicate.RedeemCode {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldContainsFold(FieldStatus, v))
+}
+
+// BusinessCategoryEQ applies the EQ predicate on the "business_category" field.
+func BusinessCategoryEQ(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEQ(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryNEQ applies the NEQ predicate on the "business_category" field.
+func BusinessCategoryNEQ(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNEQ(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryIn applies the In predicate on the "business_category" field.
+func BusinessCategoryIn(vs ...string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIn(FieldBusinessCategory, vs...))
+}
+
+// BusinessCategoryNotIn applies the NotIn predicate on the "business_category" field.
+func BusinessCategoryNotIn(vs ...string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotIn(FieldBusinessCategory, vs...))
+}
+
+// BusinessCategoryGT applies the GT predicate on the "business_category" field.
+func BusinessCategoryGT(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGT(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryGTE applies the GTE predicate on the "business_category" field.
+func BusinessCategoryGTE(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldGTE(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryLT applies the LT predicate on the "business_category" field.
+func BusinessCategoryLT(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLT(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryLTE applies the LTE predicate on the "business_category" field.
+func BusinessCategoryLTE(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldLTE(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryContains applies the Contains predicate on the "business_category" field.
+func BusinessCategoryContains(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldContains(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryHasPrefix applies the HasPrefix predicate on the "business_category" field.
+func BusinessCategoryHasPrefix(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldHasPrefix(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryHasSuffix applies the HasSuffix predicate on the "business_category" field.
+func BusinessCategoryHasSuffix(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldHasSuffix(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryEqualFold applies the EqualFold predicate on the "business_category" field.
+func BusinessCategoryEqualFold(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldEqualFold(FieldBusinessCategory, v))
+}
+
+// BusinessCategoryContainsFold applies the ContainsFold predicate on the "business_category" field.
+func BusinessCategoryContainsFold(v string) predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldContainsFold(FieldBusinessCategory, v))
 }
 
 // UsedByEQ applies the EQ predicate on the "used_by" field.

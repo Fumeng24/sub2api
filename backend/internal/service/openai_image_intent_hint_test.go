@@ -35,7 +35,7 @@ func TestResolveOpenAIImageIntentHintCachesTrueAndFalse(t *testing.T) {
 		body []byte
 		want bool
 	}{
-		{name: "true", body: []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"}]}`), want: true},
+		{name: "true", body: []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation","size":"1024x1024"}]}`), want: true},
 		{name: "false is known", body: []byte(`{"model":"gpt-5.4","input":"write code"}`), want: false},
 	}
 
@@ -123,7 +123,7 @@ func TestResolveOpenAIPassthroughImageIntentKeepsCompactMappingAttemptLocal(t *t
 func TestResolveOpenAIPassthroughImageIntentInvalidationDoesNotPolluteCanonical(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c := newOpenAIImageIntentHintTestContext(OpenAIClientTransportHTTP)
-	canonicalBody := []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"}]}`)
+	canonicalBody := []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation","size":"1024x1024"}]}`)
 	strippedBody := []byte(`{"model":"gpt-5.4","tools":[]}`)
 	var calls atomic.Int64
 	classify := countingOpenAIImageIntentClassifier(&calls)
@@ -285,7 +285,7 @@ func TestResolveOpenAIImageIntentHintConcurrentRequestsAreIsolated(t *testing.T)
 			c := newOpenAIImageIntentHintTestContext(OpenAIClientTransportHTTP)
 			body := []byte(`{"model":"gpt-5.4","input":"write code"}`)
 			if image {
-				body = []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"}]}`)
+				body = []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation","size":"1024x1024"}]}`)
 			}
 			results[index][0] = resolveOpenAIImageIntentHint(c, "gpt-5.4", body, classify)
 			results[index][1] = resolveOpenAIImageIntentHint(c, "gpt-5.4", body, classify)

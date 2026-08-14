@@ -55,6 +55,7 @@ type RedeemCodeRepository interface {
 	GetByCode(ctx context.Context, code string) (*RedeemCode, error)
 	Update(ctx context.Context, code *RedeemCode) error
 	BatchUpdate(ctx context.Context, ids []int64, fields RedeemCodeBatchUpdateFields) (int64, error)
+	redeemCodeRepositoryCustom
 	Delete(ctx context.Context, id int64) error
 	Use(ctx context.Context, id, userID int64) error
 
@@ -98,6 +99,7 @@ type RedeemCodeBatchUpdateFields struct {
 	ExpiresAt NullableTimeUpdate
 	Notes     *string
 	GroupID   NullableInt64Update
+	RedeemCodeBatchUpdateFieldsCustom
 
 	// Core fields are intentionally modeled only so service validation can
 	// reject payloads that try to mutate redemption value semantics in bulk.
@@ -110,6 +112,7 @@ func (f RedeemCodeBatchUpdateFields) HasChanges() bool {
 		f.ExpiresAt.Set ||
 		f.Notes != nil ||
 		f.GroupID.Set ||
+		f.hasCustomChanges() ||
 		f.Type != nil ||
 		f.Value != nil
 }
@@ -230,6 +233,7 @@ func (s *RedeemService) GenerateCodes(ctx context.Context, req GenerateCodesRequ
 			Value:  value,
 			Status: StatusUnused,
 		})
+		applyGeneratedRedeemCodeCustom(&codes[len(codes)-1])
 	}
 
 	// 批量插入
@@ -259,6 +263,9 @@ func (s *RedeemService) CreateCode(ctx context.Context, code *RedeemCode) error 
 	}
 	if code.Status == "" {
 		code.Status = StatusUnused
+	}
+	if err := prepareRedeemCodeBusinessCategoryCustom(code); err != nil {
+		return err
 	}
 	if code.IsExpired() {
 		return ErrRedeemCodeExpired
@@ -316,6 +323,9 @@ func (s *RedeemService) BatchUpdate(ctx context.Context, input *RedeemCodeBatchU
 	}
 	if input.Fields.GroupID.Set && input.Fields.GroupID.Value != nil && *input.Fields.GroupID.Value <= 0 {
 		return nil, infraerrors.BadRequest("REDEEM_CODE_GROUP_ID_INVALID", "group_id must be positive")
+	}
+	if err := s.validateBatchBusinessCategoryCustom(ctx, ids, &input.Fields); err != nil {
+		return nil, err
 	}
 
 	updated, err := s.redeemRepo.BatchUpdate(ctx, ids, input.Fields)

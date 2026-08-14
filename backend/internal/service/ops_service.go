@@ -53,12 +53,13 @@ type OpsService struct {
 	// getAccountAvailability is a unit-test hook for overriding account availability lookup.
 	getAccountAvailability func(ctx context.Context, platformFilter string, groupIDFilter *int64) (*OpsAccountAvailability, error)
 
-	concurrencyService          *ConcurrencyService
-	gatewayService              *GatewayService
-	openAIGatewayService        *OpenAIGatewayService
-	geminiCompatService         *GeminiMessagesCompatService
-	antigravityGatewayService   *AntigravityGatewayService
-	systemLogSink               *OpsSystemLogSink
+	concurrencyService        *ConcurrencyService
+	gatewayService            *GatewayService
+	openAIGatewayService      *OpenAIGatewayService
+	geminiCompatService       *GeminiMessagesCompatService
+	antigravityGatewayService *AntigravityGatewayService
+	systemLogSink             *OpsSystemLogSink
+	opsServiceCustom
 	ingressRejectAggregator     *OpsIngressRejectAggregator
 	authCacheInvalidationWorker *AuthCacheInvalidationWorker
 	apiKeyService               *APIKeyService
@@ -122,6 +123,7 @@ func NewOpsService(
 	geminiCompatService *GeminiMessagesCompatService,
 	antigravityGatewayService *AntigravityGatewayService,
 	systemLogSink *OpsSystemLogSink,
+	runtimeAlertService ...*OpsRuntimeAlertService,
 ) *OpsService {
 	svc := &OpsService{
 		opsRepo:     opsRepo,
@@ -138,6 +140,7 @@ func NewOpsService(
 		antigravityGatewayService: antigravityGatewayService,
 		systemLogSink:             systemLogSink,
 	}
+	svc.initRuntimeAlertServiceCustom(runtimeAlertService...)
 	svc.initRuntimeSettings(context.Background())
 	svc.applyRuntimeLogConfigOnStartup(context.Background())
 	return svc
@@ -860,6 +863,9 @@ func isSensitiveKey(key string) bool {
 		"cache_read_input_tokens":
 		return false
 	}
+	if isSensitiveKeyCustom(k) {
+		return true
+	}
 
 	// Exact matches (common credential fields).
 	switch k {
@@ -1053,7 +1059,8 @@ func sanitizeErrorBodyForStorage(raw string, maxBytes int) (sanitized string, tr
 		return out, trunc
 	}
 
-	// Non-JSON: best-effort truncate.
+	// Non-JSON: redact first, then best-effort truncate.
+	raw = redactOpsNonJSONErrorBodyCustom(raw)
 	if maxBytes > 0 && len(raw) > maxBytes {
 		return truncateString(raw, maxBytes), true
 	}

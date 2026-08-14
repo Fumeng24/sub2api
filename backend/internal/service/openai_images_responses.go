@@ -61,6 +61,9 @@ func (e *OpenAIImagesUpstreamError) Error() string {
 }
 
 func (e *OpenAIImagesUpstreamError) clientStatusCode() int {
+	if statusCode, handled := openAIImagesClientStatusCodeCustom(e); handled {
+		return statusCode
+	}
 	if e == nil {
 		return http.StatusBadGateway
 	}
@@ -71,6 +74,9 @@ func (e *OpenAIImagesUpstreamError) clientStatusCode() int {
 }
 
 func (e *OpenAIImagesUpstreamError) clientErrorType() string {
+	if errType, handled := openAIImagesClientErrorTypeCustom(e); handled {
+		return errType
+	}
 	if e == nil {
 		return "upstream_error"
 	}
@@ -81,6 +87,9 @@ func (e *OpenAIImagesUpstreamError) clientErrorType() string {
 }
 
 func (e *OpenAIImagesUpstreamError) clientMessage() string {
+	if message, handled := openAIImagesClientMessageCustom(e); handled {
+		return message
+	}
 	if e == nil {
 		return "Upstream request failed"
 	}
@@ -93,9 +102,12 @@ func (e *OpenAIImagesUpstreamError) clientMessage() string {
 	return "Upstream request failed"
 }
 
-// IsOpenAIImagesRetryableUpstreamError reports whether an Images error is an
-// upstream server failure that may be retried on another account.
+// IsOpenAIImagesRetryableUpstreamError reports whether an Images error may be
+// retried on another account before any response has been written.
 func IsOpenAIImagesRetryableUpstreamError(err *OpenAIImagesUpstreamError) bool {
+	if isOpenAIImagesRetryableCustom(err) {
+		return true
+	}
 	return err != nil && err.StatusCode >= http.StatusInternalServerError
 }
 
@@ -921,6 +933,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesErrorResponse(
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           body,
 			RetryableOnSameAccount: false,
+			SchedulerCategory:      s.schedulerCategoryOverrideForOpenAIUpstreamError(ctx, account, resp.StatusCode, body),
 		}
 	}
 
@@ -1239,9 +1252,6 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthNonStreamingResponse(
 ) (OpenAIUsage, int, []string, error) {
 	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
 	if err != nil {
-		if shouldClassifyOpenAIUpstreamStreamReadError(err, c.Request.Context()) {
-			err = newOpenAIUpstreamStreamReadError(err)
-		}
 		return OpenAIUsage{}, 0, nil, err
 	}
 
@@ -1535,9 +1545,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 				} else if done {
 					return usage, imageCount, imageOutputSizes, firstTokenMs, nil
 				}
-				if shouldClassifyOpenAIUpstreamStreamReadError(err, c.Request.Context()) {
-					err = newOpenAIUpstreamStreamReadError(err)
-				}
+				s.tryWriteOpenAIImagesStreamEvent(c, flusher, &clientDisconnected, &lastDownstreamWriteAt, "error", buildOpenAIImagesStreamErrorBody(err.Error()))
 				return usage, imageCount, imageOutputSizes, firstTokenMs, err
 			}
 		}
@@ -1630,9 +1638,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 				} else if done {
 					return usage, imageCount, imageOutputSizes, firstTokenMs, nil
 				}
-				if shouldClassifyOpenAIUpstreamStreamReadError(ev.err, c.Request.Context()) {
-					ev.err = newOpenAIUpstreamStreamReadError(ev.err)
-				}
+				s.tryWriteOpenAIImagesStreamEvent(c, flusher, &clientDisconnected, &lastDownstreamWriteAt, "error", buildOpenAIImagesStreamErrorBody(ev.err.Error()))
 				return usage, imageCount, imageOutputSizes, firstTokenMs, ev.err
 			}
 			done, processErr := processLine(ev.line)
@@ -1721,6 +1727,9 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 	if err != nil {
+		if customErr, handled := s.handleOpenAIImagesRequestErrorCustom(ctx, c, account, err, safeUpstreamURL(upstreamReq.URL.String())); handled {
+			return nil, customErr
+		}
 		safeErr := sanitizeUpstreamErrorMessage(err.Error())
 		setOpsUpstreamError(c, 0, safeErr, "")
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -1748,7 +1757,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
 		upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
 		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
-		if s.shouldFailoverOpenAIUpstreamResponse(resp.StatusCode, upstreamMsg, respBody) {
+		if s.shouldFailoverOpenAIUpstreamResponseForAccount(ctx, account, resp.StatusCode, upstreamMsg, respBody) {
 			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 				Platform:           account.Platform,
 				AccountID:          account.ID,
@@ -1763,7 +1772,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 			return nil, &UpstreamFailoverError{
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
-				RetryableOnSameAccount: !shouldDisable && account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+				RetryableOnSameAccount: !shouldDisable && s.retryableOnSameOpenAIAccountStatus(ctx, account, resp.StatusCode),
 			}
 		}
 		return s.handleOpenAIImagesErrorResponse(upstreamCtx, resp, c, account, requestModel)
@@ -1853,41 +1862,13 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthResponseError(
 	writerSizeBeforeResponse int,
 	err error,
 ) error {
-	responseWritten := c != nil && c.Writer != nil && OpenAIImagesJSONKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeResponse
-	if code, message, ok := OpenAIUpstreamStreamReadErrorDetails(err); ok {
-		// A body transport failure after a successful HTTP status is retryable only
-		// until real image output has reached the client. Keep the upstream headers
-		// and request ID available to the failover/error passthrough path.
-		headers := http.Header(nil)
-		requestID := ""
-		statusCode := http.StatusBadGateway
-		if resp != nil {
-			headers = resp.Header.Clone()
-			requestID = strings.TrimSpace(resp.Header.Get("x-request-id"))
-		}
-		kind := "failover"
-		if responseWritten {
-			kind = "retry_exhausted_failover"
-		}
-		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-			Platform: account.Platform, AccountID: account.ID, AccountName: account.Name,
-			UpstreamStatusCode: statusCode, UpstreamRequestID: requestID, UpstreamURL: upstreamURL,
-			Kind: kind, Message: message,
-		})
-		if responseWritten {
-			return err
-		}
-		responseBody := []byte(fmt.Sprintf(`{"error":{"type":"upstream_error","code":%q,"message":%q}}`, code, message))
-		shouldDisable := s.handleOpenAIAccountUpstreamError(ctx, account, statusCode, headers, responseBody, requestedModel)
-		return &UpstreamFailoverError{StatusCode: statusCode, ResponseBody: responseBody, ResponseHeaders: headers,
-			RetryableOnSameAccount: !shouldDisable && account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode)}
-	}
 	var upstreamErr *OpenAIImagesUpstreamError
 	if !errors.As(err, &upstreamErr) {
 		return err
 	}
 
 	retryable := IsOpenAIImagesRetryableUpstreamError(upstreamErr)
+	responseWritten := c != nil && c.Writer != nil && OpenAIImagesJSONKeepaliveAdjustedWrittenSize(c) != writerSizeBeforeResponse
 	kind := "http_error"
 	if retryable {
 		kind = "failover"

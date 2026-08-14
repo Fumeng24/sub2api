@@ -29,10 +29,24 @@ func TestIsImageGenerationIntent(t *testing.T) {
 			want:     true,
 		},
 		{
-			name:     "image tool",
+			name:     "implicit image tool is text",
 			endpoint: "/v1/responses",
 			model:    "gpt-5.4",
 			body:     []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"}]}`),
+			want:     false,
+		},
+		{
+			name:     "image tool with model",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.4",
+			body:     []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation","model":"gpt-image-2"}]}`),
+			want:     true,
+		},
+		{
+			name:     "image tool with size",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.4",
+			body:     []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation","size":"1024x1024"}]}`),
 			want:     true,
 		},
 		{
@@ -368,6 +382,43 @@ func TestOpenAIImageOutputCounterCountsImagesAPIStreamShapes(t *testing.T) {
 	dataCounter.AddSSEData([]byte(`{"data":[{"b64_json":"a"},{"b64_json":"b"}]}`))
 	dataCounter.AddSSEData([]byte(`{"data":[{"b64_json":"a"},{"b64_json":"b"},{"b64_json":"c"}]}`))
 	require.Equal(t, 3, dataCounter.Count())
+}
+
+func TestOpenAIImageOutputCounterDoesNotCountTextOnlyResponses(t *testing.T) {
+	jsonBody := []byte(`{
+		"id": "resp_text",
+		"object": "response",
+		"output": [
+			{
+				"id": "msg_1",
+				"type": "message",
+				"role": "assistant",
+				"status": "completed",
+				"content": [{"type": "output_text", "text": "Hello"}]
+			}
+		],
+		"data": [{"id": "not_image", "status": "done"}],
+		"usage": {"input_tokens": 10, "output_tokens": 5}
+	}`)
+	require.Equal(t, 0, countOpenAIResponseImageOutputsFromJSONBytes(jsonBody))
+
+	sseBody := "data: {\"type\":\"response.output_item.done\",\"item\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello\"}]}}\n\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"output\":[{\"id\":\"msg_1\",\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello\"}]}]},\"data\":[{\"id\":\"not_image\",\"status\":\"done\"}]}\n\n" +
+		"data: [DONE]\n\n"
+	require.Equal(t, 0, countOpenAIImageOutputsFromSSEBody(sseBody))
+}
+
+func TestOpenAIImageOutputCounterCountsOnlyActualDataImages(t *testing.T) {
+	nonImageData := []byte(`{"data":[{"id":"task_1","status":"done"},{"object":"event"}]}`)
+	require.Equal(t, 0, countOpenAIResponseImageOutputsFromJSONBytes(nonImageData))
+
+	imageData := []byte(`{"data":[{"url":"https://example.com/a.png","size":"1024x1024"},{"b64_json":"final-b","size":"2048x1152"}]}`)
+	require.Equal(t, 2, countOpenAIResponseImageOutputsFromJSONBytes(imageData))
+	require.Equal(t, []string{"1024x1024", "2048x1152"}, collectOpenAIResponseImageOutputSizesFromJSONBytes(imageData))
+
+	emptyCompleted := newOpenAIImageOutputCounter()
+	emptyCompleted.AddSSEData([]byte(`{"type":"image_generation.completed","item":{"id":"ig_empty","type":"image_generation.completed"}}`))
+	require.Equal(t, 0, emptyCompleted.Count())
 }
 
 func TestOpenAIImageOutputCounterCountsMultilineSSEDataPayload(t *testing.T) {

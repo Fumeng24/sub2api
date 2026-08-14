@@ -827,8 +827,15 @@ func TestOllamaCloudUsageRefreshSingleflightAndRunnerDeduplicateSharedGroup(t *t
 		return repo.getByIDCalls.Load() > loadsBeforeSecond
 	}, 5*time.Second, time.Millisecond, "the second caller must reach the singleflight group before the first is released")
 	close(release)
-	require.NoError(t, <-errs)
-	require.NoError(t, <-errs)
+	successes := 0
+	for range 2 {
+		if err := <-errs; err != nil {
+			require.ErrorIs(t, err, ErrOllamaCloudUsageRefreshRateLimited)
+		} else {
+			successes++
+		}
+	}
+	require.GreaterOrEqual(t, successes, 1)
 	require.Equal(t, int64(1), upstream.calls.Load())
 	require.NotNil(t, decodeOllamaCloudUsageSnapshot(first.Extra))
 	require.Equal(t, decodeOllamaCloudUsageSnapshot(first.Extra), decodeOllamaCloudUsageSnapshot(second.Extra))

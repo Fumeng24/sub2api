@@ -22,6 +22,7 @@ type AvailableGroupRef struct {
 	PeakStart          string
 	PeakEnd            string
 	PeakRateMultiplier float64
+	ModelsListConfig   GroupModelsListConfig
 	IsExclusive        bool
 }
 
@@ -72,6 +73,7 @@ func (s *ChannelService) ListAvailable(ctx context.Context) ([]AvailableChannel,
 			PeakStart:          g.PeakStart,
 			PeakEnd:            g.PeakEnd,
 			PeakRateMultiplier: g.PeakRateMultiplier,
+			ModelsListConfig:   g.ModelsListConfig,
 			IsExclusive:        g.IsExclusive,
 		}
 	}
@@ -91,6 +93,7 @@ func (s *ChannelService) ListAvailable(ctx context.Context) ([]AvailableChannel,
 
 		supported := ch.SupportedModels()
 		s.fillGlobalPricingFallback(supported)
+		supported = s.appendGroupModelPricingFallback(supported, groups)
 
 		out = append(out, AvailableChannel{
 			ID:                 ch.ID,

@@ -71,6 +71,7 @@ type RelayOptions struct {
 	OnUsageParseFailure             func(eventType string, usageRaw string)
 	OnTurnComplete                  func(turn RelayTurnResult)
 	BeforeWriteClient               func(msgType coderws.MessageType, payload []byte, wroteDownstream bool) error
+	SanitizeClientPayload           func(msgType coderws.MessageType, payload []byte) []byte
 	BeforeClientWrite               func(msgType coderws.MessageType, payload []byte)
 	AfterClientWrite                func(msgType coderws.MessageType, payload []byte, writeErr error)
 	BeforeRelayCancel               func(exit RelayExit)
@@ -90,16 +91,17 @@ type RelayTraceEvent struct {
 }
 
 type relayState struct {
-	usage             Usage
-	requestModelMu    sync.RWMutex
-	requestModel      string
-	lastResponseID    string
-	lastResponseModel string
-	responseConflict  bool
-	terminalEventType string
-	firstTokenMs      *int
-	turnTimingByID    map[string]*relayTurnTiming
-	activeTurn        *relayTurnTiming
+	usage                 Usage
+	requestModelMu        sync.RWMutex
+	requestModel          string
+	lastResponseID        string
+	lastResponseModel     string
+	responseConflict      bool
+	terminalEventType     string
+	firstTokenMs          *int
+	turnTimingByID        map[string]*relayTurnTiming
+	activeTurn            *relayTurnTiming
+	sanitizeClientPayload func(msgType coderws.MessageType, payload []byte) []byte
 }
 
 type relayExitSignal struct {
@@ -160,7 +162,10 @@ func Relay(
 		firstMessageType = coderws.MessageText
 	}
 	startAt := nowFn()
-	state := &relayState{requestModel: result.RequestModel}
+	state := &relayState{
+		requestModel:          result.RequestModel,
+		sanitizeClientPayload: options.SanitizeClientPayload,
+	}
 	onTrace := options.OnTrace
 
 	relayCtx, relayCancel := context.WithCancel(ctx)
@@ -546,12 +551,18 @@ func runUpstreamToClient(
 			markActivity()
 			continue
 		}
-		if beforeClientWrite != nil {
-			beforeClientWrite(msgType, payload)
+		clientPayload := payload
+		if state.sanitizeClientPayload != nil {
+			if sanitized := state.sanitizeClientPayload(msgType, payload); len(sanitized) > 0 {
+				clientPayload = sanitized
+			}
 		}
-		writeErr := writeClient(msgType, payload)
+		if beforeClientWrite != nil {
+			beforeClientWrite(msgType, clientPayload)
+		}
+		writeErr := writeClient(msgType, clientPayload)
 		if afterClientWrite != nil {
-			afterClientWrite(msgType, payload, writeErr)
+			afterClientWrite(msgType, clientPayload, writeErr)
 		}
 		if writeErr != nil {
 			emitRelayTrace(onTrace, RelayTraceEvent{
@@ -1023,10 +1034,23 @@ func shouldParseUsage(eventType string) bool {
 }
 
 func isTokenEvent(eventType string) bool {
-	eventType = strings.TrimSpace(eventType)
-	return strings.HasSuffix(eventType, ".delta") ||
-		eventType == "response.output_text.done" ||
-		eventType == "response.function_call_arguments.done"
+	if eventType == "" {
+		return false
+	}
+	switch eventType {
+	case "response.created", "response.in_progress", "response.output_item.added", "response.output_item.done":
+		return false
+	}
+	if strings.Contains(eventType, ".delta") {
+		return true
+	}
+	if strings.HasPrefix(eventType, "response.output_text") {
+		return true
+	}
+	if strings.HasPrefix(eventType, "response.output") {
+		return true
+	}
+	return eventType == "response.completed" || eventType == "response.done"
 }
 
 func minDuration(a, b time.Duration) time.Duration {

@@ -712,10 +712,26 @@ func (s *UsageLogRepoSuite) TestDashboardStats_TodayTotalsAndPerformance() {
 	mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: userOld.ID, Key: "sk-ul-2", Name: "ul2", Status: service.StatusDisabled})
 
 	resetAt := now.Add(10 * time.Minute)
+	expiredAt := now.Add(-10 * time.Minute)
+	tempUntil := now.Add(15 * time.Minute)
 	accNormal := mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-normal", Schedulable: true})
 	mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-error", Status: service.StatusError, Schedulable: true})
 	mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-rl", RateLimitedAt: &now, RateLimitResetAt: &resetAt, Schedulable: true})
 	mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-ov", OverloadUntil: &resetAt, Schedulable: true})
+	accTemp := mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-temp", Schedulable: true})
+	s.Require().NoError(s.client.Account.UpdateOneID(accTemp.ID).SetTempUnschedulableUntil(tempUntil).Exec(s.ctx))
+	accExpired := mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-expired", Schedulable: true})
+	s.Require().NoError(s.client.Account.UpdateOneID(accExpired.ID).SetAutoPauseOnExpired(true).SetExpiresAt(expiredAt).Exec(s.ctx))
+	mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:        "a-quota",
+		Type:        service.AccountTypeAPIKey,
+		Platform:    service.PlatformOpenAI,
+		Schedulable: true,
+		Extra: map[string]any{
+			"quota_limit": 10.0,
+			"quota_used":  10.0,
+		},
+	})
 
 	d1, d2, d3 := 100, 200, 300
 	logToday := &service.UsageLog{
@@ -779,7 +795,8 @@ func (s *UsageLogRepoSuite) TestDashboardStats_TodayTotalsAndPerformance() {
 	s.Require().Equal(baseStats.ActiveUsers+1, stats.ActiveUsers, "ActiveUsers mismatch")
 	s.Require().Equal(baseStats.TotalAPIKeys+2, stats.TotalAPIKeys, "TotalAPIKeys mismatch")
 	s.Require().Equal(baseStats.ActiveAPIKeys+1, stats.ActiveAPIKeys, "ActiveAPIKeys mismatch")
-	s.Require().Equal(baseStats.TotalAccounts+4, stats.TotalAccounts, "TotalAccounts mismatch")
+	s.Require().Equal(baseStats.TotalAccounts+7, stats.TotalAccounts, "TotalAccounts mismatch")
+	s.Require().Equal(baseStats.NormalAccounts+1, stats.NormalAccounts, "NormalAccounts mismatch")
 	s.Require().Equal(baseStats.ErrorAccounts+1, stats.ErrorAccounts, "ErrorAccounts mismatch")
 	s.Require().Equal(baseStats.RateLimitAccounts+1, stats.RateLimitAccounts, "RateLimitAccounts mismatch")
 	s.Require().Equal(baseStats.OverloadAccounts+1, stats.OverloadAccounts, "OverloadAccounts mismatch")

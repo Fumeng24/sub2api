@@ -17,6 +17,9 @@ import (
 // --- Dashboard & Analytics ---
 
 func (s *PaymentService) GetDashboardStats(ctx context.Context, days int) (*DashboardStats, error) {
+	if stats, handled, err := s.getDashboardStatsCustom(ctx, days); handled {
+		return stats, err
+	}
 	if days <= 0 {
 		days = 30
 	}

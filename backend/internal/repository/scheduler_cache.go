@@ -589,6 +589,9 @@ func (c *schedulerCache) SetAccount(ctx context.Context, account *service.Accoun
 	if account == nil || account.ID <= 0 {
 		return nil
 	}
+	if handled, err := c.setAccountCustom(ctx, account); handled {
+		return err
+	}
 	accountIDs, err := c.writeAccountIDs(ctx, []service.Account{*account})
 	if err != nil {
 		return err
@@ -697,7 +700,7 @@ func (c *schedulerCache) GetOutboxWatermark(ctx context.Context) (int64, error) 
 }
 
 func (c *schedulerCache) SetOutboxWatermark(ctx context.Context, id int64) error {
-	return c.rdb.Set(ctx, schedulerOutboxWatermarkKey, strconv.FormatInt(id, 10), 0).Err()
+	return c.setOutboxWatermarkCustom(ctx, id)
 }
 
 func schedulerBucketKey(prefix string, bucket service.SchedulerBucket) string {
@@ -910,6 +913,7 @@ func filterSchedulerAccountGroups(accountGroups []service.AccountGroup) []servic
 			Priority:  ag.Priority,
 			CreatedAt: ag.CreatedAt,
 		})
+		applySchedulerAccountGroupCustom(&filtered[len(filtered)-1], ag)
 	}
 	if len(filtered) == 0 {
 		return nil
@@ -1016,6 +1020,7 @@ func filterSchedulerExtra(extra map[string]any) map[string]any {
 		service.GrokMediaEligibleExtraKey,
 		"grok_billing_snapshot",
 	}
+	keys = appendSchedulerExtraKeysCustom(keys)
 	filtered := make(map[string]any)
 	for _, key := range keys {
 		if value, ok := extra[key]; ok && value != nil {

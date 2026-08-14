@@ -67,12 +67,12 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 	if base == nil {
 		return nil
 	}
-	return &AdminUser{
+	return withAdminUserCustomFields(&AdminUser{
 		User:       *base,
 		Notes:      u.Notes,
 		LastUsedAt: u.LastUsedAt,
 		GroupRates: u.GroupRates,
-	}
+	}, u)
 }
 
 func APIKeyFromService(k *service.APIKey) *APIKey {
@@ -108,6 +108,7 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 		User:               UserFromServiceShallow(k.User),
 		Group:              GroupFromServiceShallow(k.Group),
 	}
+	applyAPIKeyCustomFields(out, k)
 	if k.Window5hStart != nil && !service.IsWindowExpired(k.Window5hStart, service.RateLimitWindow5h) {
 		t := k.Window5hStart.Add(service.RateLimitWindow5h)
 		out.Reset5hAt = &t
@@ -162,6 +163,7 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 		RateLimitedAccountCount:     g.RateLimitedAccountCount,
 		SortOrder:                   g.SortOrder,
 	}
+	applyAdminGroupCustomFields(out, g)
 	if len(g.AccountGroups) > 0 {
 		out.AccountGroups = make([]AccountGroup, 0, len(g.AccountGroups))
 		for i := range g.AccountGroups {
@@ -173,7 +175,7 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 }
 
 func groupFromServiceBase(g *service.Group) Group {
-	return Group{
+	return withGroupCustomFields(Group{
 		ID:                              g.ID,
 		Name:                            g.Name,
 		Description:                     g.Description,
@@ -204,12 +206,7 @@ func groupFromServiceBase(g *service.Group) Group {
 		VideoPrice480P:                  g.VideoPrice480P,
 		VideoPrice720P:                  g.VideoPrice720P,
 		VideoPrice1080P:                 g.VideoPrice1080P,
-		VideoModelPrices:                g.VideoModelPrices,
 		WebSearchPricePerCall:           g.WebSearchPricePerCall,
-		SearchPricePer1k:                g.SearchPricePer1k,
-		AudioRealtimePricePerMin:        g.AudioRealtimePricePerMin,
-		AudioTtsPricePerMillionChars:    g.AudioTTSPricePerMillionChars,
-		AudioSttPricePerHour:            g.AudioSTTPricePerHour,
 		ClaudeCodeOnly:                  g.ClaudeCodeOnly,
 		FallbackGroupID:                 g.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: g.FallbackGroupIDOnInvalidRequest,
@@ -222,7 +219,7 @@ func groupFromServiceBase(g *service.Group) Group {
 		ReasoningEffortMappings:         g.ReasoningEffortMappings,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
-	}
+	}, g)
 }
 
 func AccountFromServiceShallow(a *service.Account) *Account {
@@ -272,6 +269,7 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		ParentAccountID:         a.ParentAccountID,
 		QuotaDimension:          a.QuotaDimension,
 	}
+	applyAccountCustomFields(out, a)
 
 	// 提取 5h 窗口费用控制和会话数量控制配置（仅 Anthropic OAuth/SetupToken 账号有效）
 	if a.IsAnthropicOAuthOrSetupToken() {
@@ -406,16 +404,13 @@ func redactAccountManagedExtra(extra map[string]any) map[string]any {
 	if extra == nil {
 		return nil
 	}
-	redacted := make(map[string]any, len(extra))
-	for key, value := range extra {
-		switch key {
-		case service.OllamaCloudUsageSessionExtraKey,
-			service.OllamaCloudUsageAutoRefreshExtraKey,
-			service.OllamaCloudUsageSnapshotExtraKey:
-			continue
-		default:
-			redacted[key] = value
-		}
+	redacted := RedactSensitiveMap(extra)
+	for _, key := range []string{
+		service.OllamaCloudUsageSessionExtraKey,
+		service.OllamaCloudUsageAutoRefreshExtraKey,
+		service.OllamaCloudUsageSnapshotExtraKey,
+	} {
+		delete(redacted, key)
 	}
 	return redacted
 }
@@ -454,14 +449,14 @@ func AccountGroupFromService(ag *service.AccountGroup) *AccountGroup {
 	if ag == nil {
 		return nil
 	}
-	return &AccountGroup{
+	return withAccountGroupCustomFields(&AccountGroup{
 		AccountID: ag.AccountID,
 		GroupID:   ag.GroupID,
 		Priority:  ag.Priority,
 		CreatedAt: ag.CreatedAt,
 		Account:   AccountFromServiceShallow(ag.Account),
 		Group:     GroupFromServiceShallow(ag.Group),
-	}
+	}, ag)
 }
 
 func ProxyFromService(p *service.Proxy) *Proxy {
@@ -602,6 +597,7 @@ func redeemCodeFromServiceBase(rc *service.RedeemCode) RedeemCode {
 		User:         UserFromServiceShallow(rc.User),
 		Group:        GroupFromServiceShallow(rc.Group),
 	}
+	applyRedeemCodeCustomFields(&out, rc)
 	if rc.IsExpired() {
 		out.Status = service.StatusExpired
 	}
@@ -628,7 +624,7 @@ func AccountSummaryFromService(a *service.Account) *AccountSummary {
 }
 
 func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
-	// 普通用户 DTO：严禁包含管理员字段（例如 account_rate_multiplier、account、upstream_model）。
+	// 普通用户 DTO：仅公开请求路由结果，严禁包含账号、渠道和内部成本字段。
 	requestType := l.EffectiveRequestType()
 	stream, openAIWSMode := service.ApplyLegacyRequestFields(requestType, l.Stream, l.OpenAIWSMode)
 	requestedModel := l.RequestedModel
@@ -642,6 +638,8 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		AccountID:                 l.AccountID,
 		RequestID:                 l.RequestID,
 		Model:                     requestedModel,
+		UpstreamModel:             l.UpstreamModel,
+		ModelMappingChain:         l.ModelMappingChain,
 		ServiceTier:               l.ServiceTier,
 		ReasoningEffort:           l.ReasoningEffort,
 		InboundEndpoint:           l.InboundEndpoint,
@@ -692,7 +690,8 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 }
 
 // UsageLogFromService converts a service UsageLog to DTO for regular users.
-// It excludes admin-only account/upstream internals while keeping user billing and request metadata.
+// It excludes admin-only account/upstream-response internals while keeping the
+// model sent upstream, user billing, and request metadata visible to the owner.
 func UsageLogFromService(l *service.UsageLog) *UsageLog {
 	if l == nil {
 		return nil
@@ -711,11 +710,9 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 	usageLog.UpstreamEndpoint = l.UpstreamEndpoint
 	return &AdminUsageLog{
 		UsageLog:              usageLog,
-		UpstreamModel:         l.UpstreamModel,
 		UpstreamResponseModel: l.UpstreamResponseModel,
 		UpstreamModelMismatch: l.UpstreamModelMismatch,
 		ChannelID:             l.ChannelID,
-		ModelMappingChain:     l.ModelMappingChain,
 		BillingTier:           l.BillingTier,
 		AccountRateMultiplier: l.AccountRateMultiplier,
 		AccountStatsCost:      l.AccountStatsCost,
@@ -799,7 +796,7 @@ func UserSubscriptionFromServiceAdmin(sub *service.UserSubscription) *AdminUserS
 }
 
 func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscription {
-	return UserSubscription{
+	return withUserSubscriptionCustomFields(UserSubscription{
 		ID:                 sub.ID,
 		UserID:             sub.UserID,
 		GroupID:            sub.GroupID,
@@ -817,7 +814,7 @@ func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscrip
 		RevokedAt:          sub.DeletedAt,
 		User:               UserFromServiceShallow(sub.User),
 		Group:              GroupFromServiceShallow(sub.Group),
-	}
+	}, sub)
 }
 
 func BulkAssignResultFromService(r *service.BulkAssignResult) *BulkAssignResult {

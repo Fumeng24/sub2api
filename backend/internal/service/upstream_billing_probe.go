@@ -742,14 +742,6 @@ func (s *UpstreamBillingProbeService) persistProbeFailure(
 		HTTPStatus:    statusCode,
 		LastError:     reason,
 	}
-	if previous != nil {
-		snapshot.Data = previous.Data
-		snapshot.ReceivedAt = previous.ReceivedAt
-		snapshot.FreshUntil = previous.FreshUntil
-		if snapshot.FreshUntil == nil && previous.Status == UpstreamBillingProbeStatusOK && previous.ReceivedAt != nil {
-			snapshot.FreshUntil = probeTimePtr(previous.ReceivedAt.Add(2 * time.Duration(intervalMinutes) * time.Minute))
-		}
-	}
 	if err := s.updateSnapshot(ctx, account, snapshot, nil); err != nil {
 		return nil, err
 	}

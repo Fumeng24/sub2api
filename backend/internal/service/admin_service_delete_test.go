@@ -13,45 +13,22 @@ import (
 )
 
 type userRepoStub struct {
-	user                 *User
-	usersByID            map[int64]*User
-	getErr               error
-	createErr            error
-	deleteErr            error
-	exists               bool
-	existsErr            error
-	aliasExists          bool
-	aliasErr             error
-	guardedCreates       int
-	nextID               int64
-	created              []*User
-	updated              []*User
-	deletedIDs           []int64
-	usersByEmail         map[string]*User
-	getByEmailErr        error
-	getByEmailMisses     int
-	domainCounts         map[string]int
-	domainCountErr       error
-	domainLimitErr       error
-	domainLimitedCreates int
-}
-
-func (s *userRepoStub) CountUsersByEmailDomain(_ context.Context, domain string) (int, error) {
-	if s.domainCountErr != nil {
-		return 0, s.domainCountErr
-	}
-	return s.domainCounts[domain], nil
-}
-
-func (s *userRepoStub) CreateWithEmailAliasGuardAndDomainLimit(ctx context.Context, user *User, domain string) error {
-	s.domainLimitedCreates++
-	if s.domainLimitErr != nil {
-		return s.domainLimitErr
-	}
-	if s.domainCounts[domain] > 0 {
-		return ErrEmailDomainRegistrationLimit
-	}
-	return s.CreateWithEmailAliasGuard(ctx, user)
+	user           *User
+	getErr         error
+	createErr      error
+	deleteErr      error
+	exists         bool
+	existsErr      error
+	aliasExists    bool
+	aliasErr       error
+	guardedCreates int
+	nextID         int64
+	created        []*User
+	updated        []*User
+	deletedIDs     []int64
+	usersByEmail   map[string]*User
+	usersByID      map[int64]*User
+	getByEmailErr  error
 }
 
 func (s *userRepoStub) Create(ctx context.Context, user *User) error {
@@ -85,11 +62,8 @@ func (s *userRepoStub) GetByID(ctx context.Context, id int64) (*User, error) {
 	if s.getErr != nil {
 		return nil, s.getErr
 	}
-	if s.usersByID != nil {
-		if user, ok := s.usersByID[id]; ok {
-			return user, nil
-		}
-		return nil, ErrUserNotFound
+	if user, ok := s.usersByID[id]; ok {
+		return user, nil
 	}
 	if s.user == nil {
 		return nil, ErrUserNotFound
@@ -100,10 +74,6 @@ func (s *userRepoStub) GetByID(ctx context.Context, id int64) (*User, error) {
 func (s *userRepoStub) GetByEmail(ctx context.Context, email string) (*User, error) {
 	if s.getByEmailErr != nil {
 		return nil, s.getByEmailErr
-	}
-	if s.getByEmailMisses > 0 {
-		s.getByEmailMisses--
-		return nil, ErrUserNotFound
 	}
 	if s.usersByEmail != nil {
 		if user, ok := s.usersByEmail[email]; ok {
@@ -407,6 +377,10 @@ func (s *proxyRepoStub) CountExpiringSoon(_ context.Context, _ time.Time) (int64
 type redeemRepoStub struct {
 	deleteErrByID map[int64]error
 	deletedIDs    []int64
+	created       []*RedeemCode
+
+	listByIDsResult []RedeemCode
+	listByIDsErr    error
 
 	batchUpdateIDs    []int64
 	batchUpdateFields RedeemCodeBatchUpdateFields
@@ -416,7 +390,9 @@ type redeemRepoStub struct {
 }
 
 func (s *redeemRepoStub) Create(ctx context.Context, code *RedeemCode) error {
-	panic("unexpected Create call")
+	clone := *code
+	s.created = append(s.created, &clone)
+	return nil
 }
 
 func (s *redeemRepoStub) CreateBatch(ctx context.Context, codes []RedeemCode) error {
@@ -429,6 +405,10 @@ func (s *redeemRepoStub) GetByID(ctx context.Context, id int64) (*RedeemCode, er
 
 func (s *redeemRepoStub) GetByCode(ctx context.Context, code string) (*RedeemCode, error) {
 	panic("unexpected GetByCode call")
+}
+
+func (s *redeemRepoStub) ListByIDs(ctx context.Context, ids []int64) ([]RedeemCode, error) {
+	return append([]RedeemCode(nil), s.listByIDsResult...), s.listByIDsErr
 }
 
 func (s *redeemRepoStub) Update(ctx context.Context, code *RedeemCode) error {

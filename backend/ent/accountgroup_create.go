@@ -50,6 +50,62 @@ func (_c *AccountGroupCreate) SetNillablePriority(v *int) *AccountGroupCreate {
 	return _c
 }
 
+// SetRole sets the "role" field.
+func (_c *AccountGroupCreate) SetRole(v string) *AccountGroupCreate {
+	_c.mutation.SetRole(v)
+	return _c
+}
+
+// SetNillableRole sets the "role" field if the given value is not nil.
+func (_c *AccountGroupCreate) SetNillableRole(v *string) *AccountGroupCreate {
+	if v != nil {
+		_c.SetRole(*v)
+	}
+	return _c
+}
+
+// SetWeight sets the "weight" field.
+func (_c *AccountGroupCreate) SetWeight(v int) *AccountGroupCreate {
+	_c.mutation.SetWeight(v)
+	return _c
+}
+
+// SetNillableWeight sets the "weight" field if the given value is not nil.
+func (_c *AccountGroupCreate) SetNillableWeight(v *int) *AccountGroupCreate {
+	if v != nil {
+		_c.SetWeight(*v)
+	}
+	return _c
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (_c *AccountGroupCreate) SetSortOrder(v int) *AccountGroupCreate {
+	_c.mutation.SetSortOrder(v)
+	return _c
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_c *AccountGroupCreate) SetNillableSortOrder(v *int) *AccountGroupCreate {
+	if v != nil {
+		_c.SetSortOrder(*v)
+	}
+	return _c
+}
+
+// SetSchedulingConfigured sets the "scheduling_configured" field.
+func (_c *AccountGroupCreate) SetSchedulingConfigured(v bool) *AccountGroupCreate {
+	_c.mutation.SetSchedulingConfigured(v)
+	return _c
+}
+
+// SetNillableSchedulingConfigured sets the "scheduling_configured" field if the given value is not nil.
+func (_c *AccountGroupCreate) SetNillableSchedulingConfigured(v *bool) *AccountGroupCreate {
+	if v != nil {
+		_c.SetSchedulingConfigured(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *AccountGroupCreate) SetCreatedAt(v time.Time) *AccountGroupCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -113,6 +169,22 @@ func (_c *AccountGroupCreate) defaults() {
 		v := accountgroup.DefaultPriority
 		_c.mutation.SetPriority(v)
 	}
+	if _, ok := _c.mutation.Role(); !ok {
+		v := accountgroup.DefaultRole
+		_c.mutation.SetRole(v)
+	}
+	if _, ok := _c.mutation.Weight(); !ok {
+		v := accountgroup.DefaultWeight
+		_c.mutation.SetWeight(v)
+	}
+	if _, ok := _c.mutation.SortOrder(); !ok {
+		v := accountgroup.DefaultSortOrder
+		_c.mutation.SetSortOrder(v)
+	}
+	if _, ok := _c.mutation.SchedulingConfigured(); !ok {
+		v := accountgroup.DefaultSchedulingConfigured
+		_c.mutation.SetSchedulingConfigured(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := accountgroup.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -129,6 +201,28 @@ func (_c *AccountGroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.Priority(); !ok {
 		return &ValidationError{Name: "priority", err: errors.New(`ent: missing required field "AccountGroup.priority"`)}
+	}
+	if _, ok := _c.mutation.Role(); !ok {
+		return &ValidationError{Name: "role", err: errors.New(`ent: missing required field "AccountGroup.role"`)}
+	}
+	if v, ok := _c.mutation.Role(); ok {
+		if err := accountgroup.RoleValidator(v); err != nil {
+			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "AccountGroup.role": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Weight(); !ok {
+		return &ValidationError{Name: "weight", err: errors.New(`ent: missing required field "AccountGroup.weight"`)}
+	}
+	if v, ok := _c.mutation.Weight(); ok {
+		if err := accountgroup.WeightValidator(v); err != nil {
+			return &ValidationError{Name: "weight", err: fmt.Errorf(`ent: validator failed for field "AccountGroup.weight": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.SortOrder(); !ok {
+		return &ValidationError{Name: "sort_order", err: errors.New(`ent: missing required field "AccountGroup.sort_order"`)}
+	}
+	if _, ok := _c.mutation.SchedulingConfigured(); !ok {
+		return &ValidationError{Name: "scheduling_configured", err: errors.New(`ent: missing required field "AccountGroup.scheduling_configured"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "AccountGroup.created_at"`)}
@@ -165,6 +259,22 @@ func (_c *AccountGroupCreate) createSpec() (*AccountGroup, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.Priority(); ok {
 		_spec.SetField(accountgroup.FieldPriority, field.TypeInt, value)
 		_node.Priority = value
+	}
+	if value, ok := _c.mutation.Role(); ok {
+		_spec.SetField(accountgroup.FieldRole, field.TypeString, value)
+		_node.Role = value
+	}
+	if value, ok := _c.mutation.Weight(); ok {
+		_spec.SetField(accountgroup.FieldWeight, field.TypeInt, value)
+		_node.Weight = value
+	}
+	if value, ok := _c.mutation.SortOrder(); ok {
+		_spec.SetField(accountgroup.FieldSortOrder, field.TypeInt, value)
+		_node.SortOrder = value
+	}
+	if value, ok := _c.mutation.SchedulingConfigured(); ok {
+		_spec.SetField(accountgroup.FieldSchedulingConfigured, field.TypeBool, value)
+		_node.SchedulingConfigured = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(accountgroup.FieldCreatedAt, field.TypeTime, value)
@@ -298,6 +408,66 @@ func (u *AccountGroupUpsert) AddPriority(v int) *AccountGroupUpsert {
 	return u
 }
 
+// SetRole sets the "role" field.
+func (u *AccountGroupUpsert) SetRole(v string) *AccountGroupUpsert {
+	u.Set(accountgroup.FieldRole, v)
+	return u
+}
+
+// UpdateRole sets the "role" field to the value that was provided on create.
+func (u *AccountGroupUpsert) UpdateRole() *AccountGroupUpsert {
+	u.SetExcluded(accountgroup.FieldRole)
+	return u
+}
+
+// SetWeight sets the "weight" field.
+func (u *AccountGroupUpsert) SetWeight(v int) *AccountGroupUpsert {
+	u.Set(accountgroup.FieldWeight, v)
+	return u
+}
+
+// UpdateWeight sets the "weight" field to the value that was provided on create.
+func (u *AccountGroupUpsert) UpdateWeight() *AccountGroupUpsert {
+	u.SetExcluded(accountgroup.FieldWeight)
+	return u
+}
+
+// AddWeight adds v to the "weight" field.
+func (u *AccountGroupUpsert) AddWeight(v int) *AccountGroupUpsert {
+	u.Add(accountgroup.FieldWeight, v)
+	return u
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *AccountGroupUpsert) SetSortOrder(v int) *AccountGroupUpsert {
+	u.Set(accountgroup.FieldSortOrder, v)
+	return u
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *AccountGroupUpsert) UpdateSortOrder() *AccountGroupUpsert {
+	u.SetExcluded(accountgroup.FieldSortOrder)
+	return u
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *AccountGroupUpsert) AddSortOrder(v int) *AccountGroupUpsert {
+	u.Add(accountgroup.FieldSortOrder, v)
+	return u
+}
+
+// SetSchedulingConfigured sets the "scheduling_configured" field.
+func (u *AccountGroupUpsert) SetSchedulingConfigured(v bool) *AccountGroupUpsert {
+	u.Set(accountgroup.FieldSchedulingConfigured, v)
+	return u
+}
+
+// UpdateSchedulingConfigured sets the "scheduling_configured" field to the value that was provided on create.
+func (u *AccountGroupUpsert) UpdateSchedulingConfigured() *AccountGroupUpsert {
+	u.SetExcluded(accountgroup.FieldSchedulingConfigured)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -389,6 +559,76 @@ func (u *AccountGroupUpsertOne) AddPriority(v int) *AccountGroupUpsertOne {
 func (u *AccountGroupUpsertOne) UpdatePriority() *AccountGroupUpsertOne {
 	return u.Update(func(s *AccountGroupUpsert) {
 		s.UpdatePriority()
+	})
+}
+
+// SetRole sets the "role" field.
+func (u *AccountGroupUpsertOne) SetRole(v string) *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetRole(v)
+	})
+}
+
+// UpdateRole sets the "role" field to the value that was provided on create.
+func (u *AccountGroupUpsertOne) UpdateRole() *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateRole()
+	})
+}
+
+// SetWeight sets the "weight" field.
+func (u *AccountGroupUpsertOne) SetWeight(v int) *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetWeight(v)
+	})
+}
+
+// AddWeight adds v to the "weight" field.
+func (u *AccountGroupUpsertOne) AddWeight(v int) *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.AddWeight(v)
+	})
+}
+
+// UpdateWeight sets the "weight" field to the value that was provided on create.
+func (u *AccountGroupUpsertOne) UpdateWeight() *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateWeight()
+	})
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *AccountGroupUpsertOne) SetSortOrder(v int) *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetSortOrder(v)
+	})
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *AccountGroupUpsertOne) AddSortOrder(v int) *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.AddSortOrder(v)
+	})
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *AccountGroupUpsertOne) UpdateSortOrder() *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateSortOrder()
+	})
+}
+
+// SetSchedulingConfigured sets the "scheduling_configured" field.
+func (u *AccountGroupUpsertOne) SetSchedulingConfigured(v bool) *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetSchedulingConfigured(v)
+	})
+}
+
+// UpdateSchedulingConfigured sets the "scheduling_configured" field to the value that was provided on create.
+func (u *AccountGroupUpsertOne) UpdateSchedulingConfigured() *AccountGroupUpsertOne {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateSchedulingConfigured()
 	})
 }
 
@@ -626,6 +866,76 @@ func (u *AccountGroupUpsertBulk) AddPriority(v int) *AccountGroupUpsertBulk {
 func (u *AccountGroupUpsertBulk) UpdatePriority() *AccountGroupUpsertBulk {
 	return u.Update(func(s *AccountGroupUpsert) {
 		s.UpdatePriority()
+	})
+}
+
+// SetRole sets the "role" field.
+func (u *AccountGroupUpsertBulk) SetRole(v string) *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetRole(v)
+	})
+}
+
+// UpdateRole sets the "role" field to the value that was provided on create.
+func (u *AccountGroupUpsertBulk) UpdateRole() *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateRole()
+	})
+}
+
+// SetWeight sets the "weight" field.
+func (u *AccountGroupUpsertBulk) SetWeight(v int) *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetWeight(v)
+	})
+}
+
+// AddWeight adds v to the "weight" field.
+func (u *AccountGroupUpsertBulk) AddWeight(v int) *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.AddWeight(v)
+	})
+}
+
+// UpdateWeight sets the "weight" field to the value that was provided on create.
+func (u *AccountGroupUpsertBulk) UpdateWeight() *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateWeight()
+	})
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *AccountGroupUpsertBulk) SetSortOrder(v int) *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetSortOrder(v)
+	})
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *AccountGroupUpsertBulk) AddSortOrder(v int) *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.AddSortOrder(v)
+	})
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *AccountGroupUpsertBulk) UpdateSortOrder() *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateSortOrder()
+	})
+}
+
+// SetSchedulingConfigured sets the "scheduling_configured" field.
+func (u *AccountGroupUpsertBulk) SetSchedulingConfigured(v bool) *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.SetSchedulingConfigured(v)
+	})
+}
+
+// UpdateSchedulingConfigured sets the "scheduling_configured" field to the value that was provided on create.
+func (u *AccountGroupUpsertBulk) UpdateSchedulingConfigured() *AccountGroupUpsertBulk {
+	return u.Update(func(s *AccountGroupUpsert) {
+		s.UpdateSchedulingConfigured()
 	})
 }
 

@@ -3,11 +3,14 @@ package handler
 import (
 	"context"
 	"errors"
-	"strings"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 type grokMediaEligibilityProberStub struct {
@@ -42,13 +45,13 @@ func TestShouldRecordGrokMediaUsage(t *testing.T) {
 			want:     true,
 		},
 		{
-			name:     "video generation defers usage until status",
+			name:     "video generation records usage",
 			endpoint: service.GrokMediaEndpointVideosGenerations,
 			model:    "grok-imagine-video-1.5",
-			want:     false,
+			want:     true,
 		},
 		{
-			name:     "video status skips immediate helper (status path claims separately)",
+			name:     "video status skips empty model usage",
 			endpoint: service.GrokMediaEndpointVideoStatus,
 			model:    "",
 			want:     false,
@@ -69,18 +72,7 @@ func TestShouldRecordGrokMediaUsage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Nil result must never bill.
-			require.False(t, shouldRecordGrokMediaUsage(tt.endpoint, tt.model, nil))
-			// Immediate helper only bills image generation (async video bills on status).
-			result := &service.OpenAIForwardResult{ImageCount: 1, VideoCount: 0}
-			if tt.endpoint.IsGenerationRequest() && !isGrokVideoCreateEndpoint(tt.endpoint) && strings.TrimSpace(tt.model) != "" {
-				require.Equal(t, tt.want, shouldRecordGrokMediaUsage(tt.endpoint, tt.model, result))
-			} else {
-				require.False(t, shouldRecordGrokMediaUsage(tt.endpoint, tt.model, result))
-			}
-			// Zero billable units never bill even for generation + model.
-			empty := &service.OpenAIForwardResult{}
-			require.False(t, shouldRecordGrokMediaUsage(tt.endpoint, tt.model, empty))
+			require.Equal(t, tt.want, shouldRecordGrokMediaUsage(tt.endpoint, tt.model))
 		})
 	}
 }
@@ -105,6 +97,84 @@ func TestGrokMediaRequiredCapability(t *testing.T) {
 			require.Equal(t, tt.want, grokMediaRequiredCapability(tt.endpoint))
 		})
 	}
+}
+
+func TestGrokImageRequestRequiresUnsupportedEditing(t *testing.T) {
+	tests := []struct {
+		name         string
+		endpoint     service.GrokMediaEndpoint
+		model        string
+		request      service.GrokMediaRequestInfo
+		wantRejected bool
+	}{
+		{
+			name:     "text-to-image generation remains available",
+			endpoint: service.GrokMediaEndpointImagesGenerations,
+			model:    "grok-imagine-image",
+		},
+		{
+			name:         "reference image is rejected for the generation model",
+			endpoint:     service.GrokMediaEndpointImagesGenerations,
+			model:        "grok-imagine-image",
+			request:      service.GrokMediaRequestInfo{InputImageURLs: []string{"data:image/png;base64,AA=="}},
+			wantRejected: true,
+		},
+		{
+			name:         "edits endpoint rejects the generation model",
+			endpoint:     service.GrokMediaEndpointImagesEdits,
+			model:        "grok-imagine-image",
+			wantRejected: true,
+		},
+		{
+			name:     "explicit edit model remains routable",
+			endpoint: service.GrokMediaEndpointImagesEdits,
+			model:    "grok-imagine-edit",
+		},
+		{
+			name:     "video routes are unaffected",
+			endpoint: service.GrokMediaEndpointVideosGenerations,
+			model:    "grok-imagine-image",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.wantRejected, grokImageRequestRequiresUnsupportedEditing(tt.endpoint, tt.model, tt.request))
+		})
+	}
+}
+
+func TestHandleGrokImageFailoverExhausted503ReturnsSafeRetryableResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+
+	(&OpenAIGatewayHandler{}).handleGrokMediaFailoverExhausted(c, service.GrokMediaEndpointImagesGenerations, &service.UpstreamFailoverError{
+		StatusCode:      http.StatusServiceUnavailable,
+		ResponseHeaders: http.Header{"Retry-After": []string{"60"}},
+		ResponseBody:    []byte(`{"error":{"message":"upstream_unavailable at https://private-upstream.example"}}`),
+	}, false)
+
+	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+	require.Equal(t, "60", recorder.Header().Get("Retry-After"))
+	require.Equal(t, "upstream_error", gjson.GetBytes(recorder.Body.Bytes(), "error.type").String())
+	require.Equal(t, service.ClientFacingTemporaryUnavailableMessage(), gjson.GetBytes(recorder.Body.Bytes(), "error.message").String())
+	require.NotContains(t, recorder.Body.String(), "private-upstream.example")
+	require.NotContains(t, recorder.Body.String(), "upstream_unavailable")
+}
+
+func TestHandleGrokVideoFailoverExhausted503KeepsExistingMapping(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos/generations", nil)
+
+	(&OpenAIGatewayHandler{}).handleGrokMediaFailoverExhausted(c, service.GrokMediaEndpointVideosGenerations, &service.UpstreamFailoverError{
+		StatusCode: http.StatusServiceUnavailable,
+	}, false)
+
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
 }
 
 func TestGrokMediaScheduleModelUsesNormalizedMappedUpstream(t *testing.T) {

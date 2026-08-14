@@ -1460,7 +1460,7 @@ func TestCreateOIDCOAuthAccountExistingEmailNormalizesLegacySpacingAndCase(t *te
 	require.Equal(t, "owner@example.com", storedSession.ResolvedEmail)
 }
 
-func TestCreateOIDCOAuthAccountRejectsSecondEmailOutsideRegistrationSuffixWhitelist(t *testing.T) {
+func TestCreateOIDCOAuthAccountRejectsEmailOutsideRegistrationSuffixWhitelist(t *testing.T) {
 	handler, client := newOAuthPendingFlowTestHandlerWithDependencies(t, oauthPendingFlowTestHandlerOptions{
 		emailVerifyEnabled: true,
 		emailCache: &oauthPendingFlowEmailCacheStub{
@@ -1473,19 +1473,10 @@ func TestCreateOIDCOAuthAccountRejectsSecondEmailOutsideRegistrationSuffixWhitel
 			},
 		},
 		settingValues: map[string]string{
-			service.SettingKeyRegistrationEmailSuffixWhitelist:    `["@qq.com"]`,
-			service.SettingKeyRegistrationEmailDomainQuotaEnabled: "true",
+			service.SettingKeyRegistrationEmailSuffixWhitelist: `["@qq.com"]`,
 		},
 	})
 	ctx := context.Background()
-	_, err := client.User.Create().
-		SetEmail("existing@gmail.com").
-		SetUsername("existing-gmail-user").
-		SetPasswordHash("hash").
-		SetRole(service.RoleUser).
-		SetStatus(service.StatusActive).
-		Save(ctx)
-	require.NoError(t, err)
 
 	session, err := client.PendingAuthSession.Create().
 		SetSessionToken("suffix-whitelist-session-token").
@@ -1508,60 +1499,6 @@ func TestCreateOIDCOAuthAccountRejectsSecondEmailOutsideRegistrationSuffixWhitel
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: oauthPendingSessionCookieName, Value: encodeCookieValue(session.SessionToken)})
 	req.AddCookie(&http.Cookie{Name: oauthPendingBrowserCookieName, Value: encodeCookieValue("suffix-whitelist-browser-session-key")})
-	ginCtx.Request = req
-
-	handler.CreateOIDCOAuthAccount(ginCtx)
-
-	require.Equal(t, http.StatusBadRequest, recorder.Code)
-	payload := decodeJSONBody(t, recorder)
-	require.Equal(t, "EMAIL_DOMAIN_REGISTRATION_LIMIT", payload["reason"])
-
-	count, err := client.User.Query().Where(dbuser.EmailEQ("foo@gmail.com")).Count(ctx)
-	require.NoError(t, err)
-	require.Zero(t, count)
-}
-
-// 域名限量注册开关默认关闭：白名单外域名保持 PR5423 之前的严格拒绝语义，
-// 即使该域名下还没有任何账户也不放行。
-func TestCreateOIDCOAuthAccountRejectsEmailOutsideWhitelistWhenQuotaDisabled(t *testing.T) {
-	handler, client := newOAuthPendingFlowTestHandlerWithDependencies(t, oauthPendingFlowTestHandlerOptions{
-		emailVerifyEnabled: true,
-		emailCache: &oauthPendingFlowEmailCacheStub{
-			verificationCodes: map[string]*service.VerificationCodeData{
-				"foo@gmail.com": {
-					Code:      "135790",
-					CreatedAt: time.Now().UTC(),
-					ExpiresAt: time.Now().UTC().Add(15 * time.Minute),
-				},
-			},
-		},
-		settingValues: map[string]string{
-			service.SettingKeyRegistrationEmailSuffixWhitelist: `["@qq.com"]`,
-		},
-	})
-	ctx := context.Background()
-
-	session, err := client.PendingAuthSession.Create().
-		SetSessionToken("suffix-strict-session-token").
-		SetIntent("login").
-		SetProviderType("oidc").
-		SetProviderKey("https://issuer.example").
-		SetProviderSubject("oidc-suffix-strict-123").
-		SetBrowserSessionKey("suffix-strict-browser-session-key").
-		SetUpstreamIdentityClaims(map[string]any{
-			"username": "oidc_user",
-		}).
-		SetExpiresAt(time.Now().UTC().Add(10 * time.Minute)).
-		Save(ctx)
-	require.NoError(t, err)
-
-	body := bytes.NewBufferString(`{"email":"foo@gmail.com","verify_code":"135790","password":"secret-123"}`)
-	recorder := httptest.NewRecorder()
-	ginCtx, _ := gin.CreateTestContext(recorder)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/oauth/oidc/create-account", body)
-	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: oauthPendingSessionCookieName, Value: encodeCookieValue(session.SessionToken)})
-	req.AddCookie(&http.Cookie{Name: oauthPendingBrowserCookieName, Value: encodeCookieValue("suffix-strict-browser-session-key")})
 	ginCtx.Request = req
 
 	handler.CreateOIDCOAuthAccount(ginCtx)
@@ -2571,6 +2508,7 @@ CREATE TABLE IF NOT EXISTS user_affiliates (
 	aff_quota REAL NOT NULL DEFAULT 0,
 	aff_frozen_quota REAL NOT NULL DEFAULT 0,
 	aff_history_quota REAL NOT NULL DEFAULT 0,
+	bind_bonus_claimed_at TIMESTAMP NULL,
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )`)
@@ -2978,6 +2916,10 @@ func (r *oauthPendingFlowRedeemCodeRepo) BatchUpdate(context.Context, []int64, s
 	panic("unexpected BatchUpdate call")
 }
 
+func (r *oauthPendingFlowRedeemCodeRepo) ListByIDs(context.Context, []int64) ([]service.RedeemCode, error) {
+	panic("unexpected ListByIDs call")
+}
+
 func (r *oauthPendingFlowRedeemCodeRepo) Delete(context.Context, int64) error {
 	panic("unexpected Delete call")
 }
@@ -3096,8 +3038,6 @@ type oauthPendingFlowUserRepo struct {
 	options oauthPendingFlowUserRepoOptions
 }
 
-var _ service.RegistrationEmailDomainRepository = (*oauthPendingFlowUserRepo)(nil)
-
 type oauthPendingFlowUserRepoOptions struct {
 	rejectDeleteWhileAuthIdentityExists bool
 }
@@ -3138,35 +3078,6 @@ func (r *oauthPendingFlowUserRepo) CreateWithEmailAliasGuard(ctx context.Context
 		return service.ErrEmailExists
 	}
 	return r.Create(ctx, user)
-}
-
-func (r *oauthPendingFlowUserRepo) CountUsersByEmailDomain(ctx context.Context, domain string) (int, error) {
-	domain = service.NormalizeRegistrationEmailDomain(domain)
-	if domain == "" {
-		return 0, nil
-	}
-	emails, err := r.client.User.Query().Select(dbuser.FieldEmail).Strings(ctx)
-	if err != nil {
-		return 0, err
-	}
-	count := 0
-	for _, email := range emails {
-		if service.RegistrationEmailDomain(email) == domain {
-			count++
-		}
-	}
-	return count, nil
-}
-
-func (r *oauthPendingFlowUserRepo) CreateWithEmailAliasGuardAndDomainLimit(ctx context.Context, user *service.User, domain string) error {
-	count, err := r.CountUsersByEmailDomain(ctx, domain)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return service.ErrEmailDomainRegistrationLimit
-	}
-	return r.CreateWithEmailAliasGuard(ctx, user)
 }
 
 func (r *oauthPendingFlowUserRepo) GetByID(ctx context.Context, id int64) (*service.User, error) {

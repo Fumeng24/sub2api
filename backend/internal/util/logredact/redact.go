@@ -99,9 +99,11 @@ func RedactText(input string, extraKeys ...string) string {
 	out := input
 	out = reGOCSPX.ReplaceAllString(out, "GOCSPX-***")
 	out = reAIza.ReplaceAllString(out, "AIza***")
+	out = redactTextTokensCustom(out)
 	out = patterns.reJSONLike.ReplaceAllString(out, `$1***$3`)
 	out = patterns.reQueryLike.ReplaceAllString(out, `$1=***`)
 	out = patterns.rePlain.ReplaceAllString(out, `$1$2***`)
+	out = redactTextHeadersCustom(out)
 	return out
 }
 
@@ -160,6 +162,7 @@ func normalizeAndSortExtraKeys(extraKeys []string) []string {
 }
 
 func buildKeyAlternation(extraKeys []string) string {
+	extraKeys = appendLogRedactCustomKeys(extraKeys)
 	seen := make(map[string]struct{}, len(defaultSensitiveKeyList)+len(extraKeys))
 	keys := make([]string, 0, len(defaultSensitiveKeyList)+len(extraKeys))
 	for _, k := range defaultSensitiveKeyList {
@@ -181,6 +184,7 @@ func buildKeyAlternation(extraKeys []string) string {
 }
 
 func buildKeySet(extraKeys []string) map[string]struct{} {
+	extraKeys = appendLogRedactCustomKeys(extraKeys)
 	keys := make(map[string]struct{}, len(defaultSensitiveKeys)+len(extraKeys))
 	for k := range defaultSensitiveKeys {
 		keys[k] = struct{}{}

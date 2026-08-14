@@ -102,6 +102,13 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 
 	// 解析渠道级模型映射
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(requestCtx, apiKey.GroupID, reqModel)
+	if !service.IsImageGenerationIntent("/v1/responses", reqModel, body) {
+		if err := h.gatewayService.ValidateUsagePricingAvailable(requestCtx, apiKey, reqModel, channelMapping); err != nil {
+			reqLog.Warn("gateway.responses.pricing_unavailable", zap.Error(err))
+			h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", usagePricingUnavailableMessage(reqModel))
+			return
+		}
+	}
 
 	// Claude Code only restriction:
 	// /v1/responses is never a Claude Code endpoint.
@@ -182,6 +189,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 				if !cls.ModelNotFound {
 					message = "No available accounts: " + err.Error()
 				}
+				message = gatewayAccountSelectionMessageCustom(cls, message)
 				h.responsesErrorResponse(c, cls.Status, cls.ErrType, message)
 				return
 			}
@@ -351,6 +359,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 
 // responsesErrorResponse writes an error in OpenAI Responses API format.
 func (h *GatewayHandler) responsesErrorResponse(c *gin.Context, status int, code, message string) {
+	message = service.ClientFacingErrorMessage(status, code, message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    code,

@@ -507,7 +507,7 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 			return 0, false
 		}
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
-			return acc.HasError && acc.TempUnschedulableUntil == nil
+			return isAvailabilityStatusError(acc)
 		})), true
 	case "account_temp_unscheduled_count":
 		if s == nil || s.opsService == nil {
@@ -519,7 +519,7 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 		}
 		now := time.Now().UTC()
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
-			return acc.TempUnschedulableUntil != nil && now.Before(*acc.TempUnschedulableUntil)
+			return isAvailabilityTempUnschedulableAt(acc, now)
 		})), true
 	case "group_rate_limit_ratio":
 		if groupID == nil || *groupID <= 0 {
@@ -549,7 +549,7 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 			return 0, true
 		}
 		errorCount := countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
-			return acc.HasError && acc.TempUnschedulableUntil == nil
+			return isAvailabilityStatusError(acc)
 		})
 		return (float64(errorCount) / float64(total)) * 100, true
 	case "overload_account_count":

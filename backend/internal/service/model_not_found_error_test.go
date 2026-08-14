@@ -43,9 +43,33 @@ func TestIsUpstreamModelNotFoundError(t *testing.T) {
 			want:       false,
 		},
 		{
-			name:       "non 404 does not match",
+			name:       "400 model not found message",
 			statusCode: http.StatusBadRequest,
 			body:       []byte(`{"error":{"message":"model not found"}}`),
+			want:       true,
+		},
+		{
+			name:       "503 wrapped model_not_found code",
+			statusCode: http.StatusServiceUnavailable,
+			body:       []byte(`{"error":{"code":"model_not_found","message":"No available channel for model gpt-5.5 under group gptplus"}}`),
+			want:       true,
+		},
+		{
+			name:       "503 generic service unavailable does not match",
+			statusCode: http.StatusServiceUnavailable,
+			body:       []byte(`{"error":{"message":"Service temporarily unavailable","type":"api_error"}}`),
+			want:       false,
+		},
+		{
+			name:       "503 no available accounts does not match model cooldown",
+			statusCode: http.StatusServiceUnavailable,
+			body:       []byte(`{"error":{"message":"No available accounts: no available accounts","type":"api_error"},"type":"error"}`),
+			want:       false,
+		},
+		{
+			name:       "502 cloudflare page mentioning origin is not model specific",
+			statusCode: http.StatusBadGateway,
+			body:       []byte(`{"title":"Error 502: Bad gateway","detail":"The origin web server returned an invalid or incomplete response to Cloudflare."}`),
 			want:       false,
 		},
 	}

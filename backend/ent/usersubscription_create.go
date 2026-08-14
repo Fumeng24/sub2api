@@ -189,6 +189,20 @@ func (_c *UserSubscriptionCreate) SetNillableMonthlyUsageUsd(v *float64) *UserSu
 	return _c
 }
 
+// SetAutoResetDaily sets the "auto_reset_daily" field.
+func (_c *UserSubscriptionCreate) SetAutoResetDaily(v bool) *UserSubscriptionCreate {
+	_c.mutation.SetAutoResetDaily(v)
+	return _c
+}
+
+// SetNillableAutoResetDaily sets the "auto_reset_daily" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableAutoResetDaily(v *bool) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetAutoResetDaily(*v)
+	}
+	return _c
+}
+
 // SetAssignedBy sets the "assigned_by" field.
 func (_c *UserSubscriptionCreate) SetAssignedBy(v int64) *UserSubscriptionCreate {
 	_c.mutation.SetAssignedBy(v)
@@ -342,6 +356,10 @@ func (_c *UserSubscriptionCreate) defaults() error {
 		v := usersubscription.DefaultMonthlyUsageUsd
 		_c.mutation.SetMonthlyUsageUsd(v)
 	}
+	if _, ok := _c.mutation.AutoResetDaily(); !ok {
+		v := usersubscription.DefaultAutoResetDaily
+		_c.mutation.SetAutoResetDaily(v)
+	}
 	if _, ok := _c.mutation.AssignedAt(); !ok {
 		if usersubscription.DefaultAssignedAt == nil {
 			return fmt.Errorf("ent: uninitialized usersubscription.DefaultAssignedAt (forgotten import ent/runtime?)")
@@ -388,6 +406,9 @@ func (_c *UserSubscriptionCreate) check() error {
 	}
 	if _, ok := _c.mutation.MonthlyUsageUsd(); !ok {
 		return &ValidationError{Name: "monthly_usage_usd", err: errors.New(`ent: missing required field "UserSubscription.monthly_usage_usd"`)}
+	}
+	if _, ok := _c.mutation.AutoResetDaily(); !ok {
+		return &ValidationError{Name: "auto_reset_daily", err: errors.New(`ent: missing required field "UserSubscription.auto_reset_daily"`)}
 	}
 	if _, ok := _c.mutation.AssignedAt(); !ok {
 		return &ValidationError{Name: "assigned_at", err: errors.New(`ent: missing required field "UserSubscription.assigned_at"`)}
@@ -472,6 +493,10 @@ func (_c *UserSubscriptionCreate) createSpec() (*UserSubscription, *sqlgraph.Cre
 	if value, ok := _c.mutation.MonthlyUsageUsd(); ok {
 		_spec.SetField(usersubscription.FieldMonthlyUsageUsd, field.TypeFloat64, value)
 		_node.MonthlyUsageUsd = value
+	}
+	if value, ok := _c.mutation.AutoResetDaily(); ok {
+		_spec.SetField(usersubscription.FieldAutoResetDaily, field.TypeBool, value)
+		_node.AutoResetDaily = value
 	}
 	if value, ok := _c.mutation.AssignedAt(); ok {
 		_spec.SetField(usersubscription.FieldAssignedAt, field.TypeTime, value)
@@ -798,6 +823,18 @@ func (u *UserSubscriptionUpsert) AddMonthlyUsageUsd(v float64) *UserSubscription
 	return u
 }
 
+// SetAutoResetDaily sets the "auto_reset_daily" field.
+func (u *UserSubscriptionUpsert) SetAutoResetDaily(v bool) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldAutoResetDaily, v)
+	return u
+}
+
+// UpdateAutoResetDaily sets the "auto_reset_daily" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateAutoResetDaily() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldAutoResetDaily)
+	return u
+}
+
 // SetAssignedBy sets the "assigned_by" field.
 func (u *UserSubscriptionUpsert) SetAssignedBy(v int64) *UserSubscriptionUpsert {
 	u.Set(usersubscription.FieldAssignedBy, v)
@@ -1119,6 +1156,20 @@ func (u *UserSubscriptionUpsertOne) AddMonthlyUsageUsd(v float64) *UserSubscript
 func (u *UserSubscriptionUpsertOne) UpdateMonthlyUsageUsd() *UserSubscriptionUpsertOne {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.UpdateMonthlyUsageUsd()
+	})
+}
+
+// SetAutoResetDaily sets the "auto_reset_daily" field.
+func (u *UserSubscriptionUpsertOne) SetAutoResetDaily(v bool) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetAutoResetDaily(v)
+	})
+}
+
+// UpdateAutoResetDaily sets the "auto_reset_daily" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateAutoResetDaily() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateAutoResetDaily()
 	})
 }
 
@@ -1617,6 +1668,20 @@ func (u *UserSubscriptionUpsertBulk) AddMonthlyUsageUsd(v float64) *UserSubscrip
 func (u *UserSubscriptionUpsertBulk) UpdateMonthlyUsageUsd() *UserSubscriptionUpsertBulk {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.UpdateMonthlyUsageUsd()
+	})
+}
+
+// SetAutoResetDaily sets the "auto_reset_daily" field.
+func (u *UserSubscriptionUpsertBulk) SetAutoResetDaily(v bool) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetAutoResetDaily(v)
+	})
+}
+
+// UpdateAutoResetDaily sets the "auto_reset_daily" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateAutoResetDaily() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateAutoResetDaily()
 	})
 }
 

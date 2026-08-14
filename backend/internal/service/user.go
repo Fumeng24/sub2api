@@ -39,6 +39,10 @@ type User struct {
 	// map[groupID]rateMultiplier
 	GroupRates map[int64]float64
 
+	// GroupDiscounts 用户专属分组折扣配置
+	// map[groupID]discountMultiplier，0.8 表示当前分组倍率的 8 折
+	GroupDiscounts map[int64]float64
+
 	// TOTP 双因素认证字段
 	TotpSecretEncrypted *string    // AES-256-GCM 加密的 TOTP 密钥
 	TotpEnabled         bool       // 是否启用 TOTP
@@ -66,6 +70,14 @@ type User struct {
 
 func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
+}
+
+func (u *User) IsSupport() bool {
+	return u.Role == RoleSupport
+}
+
+func (u *User) CanHandleTickets() bool {
+	return u.IsAdmin() || u.IsSupport()
 }
 
 func (u *User) IsActive() bool {

@@ -99,13 +99,19 @@ func (m *mockAccountRepoForPlatform) ListAllWithFilters(ctx context.Context, pla
 	return nil, nil
 }
 func (m *mockAccountRepoForPlatform) ListByGroup(ctx context.Context, groupID int64) ([]Account, error) {
-	return nil, nil
+	return m.accounts, nil
 }
 func (m *mockAccountRepoForPlatform) ListActive(ctx context.Context) ([]Account, error) {
 	return nil, nil
 }
 func (m *mockAccountRepoForPlatform) ListByPlatform(ctx context.Context, platform string) ([]Account, error) {
-	return nil, nil
+	var result []Account
+	for _, acc := range m.accounts {
+		if acc.Platform == platform {
+			result = append(result, acc)
+		}
+	}
+	return result, nil
 }
 func (m *mockAccountRepoForPlatform) UpdateLastUsed(ctx context.Context, id int64) error {
 	return nil
@@ -274,20 +280,6 @@ func (m *mockGatewayCacheForPlatform) DeleteSessionAccountID(ctx context.Context
 	}
 	m.deletedSessions[sessionHash]++
 	delete(m.sessionBindings, sessionHash)
-	return nil
-}
-
-func (m *mockGatewayCacheForPlatform) SetGrokVideoPendingBilling(_ context.Context, _ string, _ []byte, _ time.Duration) error {
-	return nil
-}
-func (m *mockGatewayCacheForPlatform) GetGrokVideoPendingBilling(_ context.Context, _ string) ([]byte, error) {
-	return nil, nil
-}
-func (m *mockGatewayCacheForPlatform) ClaimGrokVideoBilled(_ context.Context, _ string, _ time.Duration) (bool, error) {
-	return true, nil
-}
-
-func (m *mockGatewayCacheForPlatform) ReleaseGrokVideoBilled(_ context.Context, _ string) error {
 	return nil
 }
 
@@ -2819,7 +2811,7 @@ func TestGatewayService_SelectAccountWithLoadAwareness(t *testing.T) {
 		require.Equal(t, int64(2), cache.sessionBindings["route"])
 	})
 
-	t.Run("模型路由-路由账号全满返回等待计划", func(t *testing.T) {
+	t.Run("模型路由-非粘性路由账号全满进入普通等待计划", func(t *testing.T) {
 		groupID := int64(23)
 
 		repo := &mockAccountRepoForPlatform{
@@ -2872,8 +2864,9 @@ func TestGatewayService_SelectAccountWithLoadAwareness(t *testing.T) {
 		result, err := svc.SelectAccountWithLoadAwareness(ctx, &groupID, "route-full", "claude-3-5-sonnet-20241022", nil, "", int64(0))
 		require.NoError(t, err)
 		require.NotNil(t, result)
+		require.NotNil(t, result.Account)
 		require.NotNil(t, result.WaitPlan)
-		require.Equal(t, int64(1), result.Account.ID)
+		require.Contains(t, []int64{1, 2}, result.Account.ID)
 	})
 
 	t.Run("模型路由-路由账号全满-回退普通选择", func(t *testing.T) {
@@ -3263,6 +3256,7 @@ func TestGatewayService_SelectAccountWithLoadAwareness(t *testing.T) {
 		require.NotNil(t, result.Account)
 		require.Equal(t, int64(2), result.Account.ID)
 	})
+
 }
 
 func TestGatewayService_GroupResolution_ReusesContextGroup(t *testing.T) {

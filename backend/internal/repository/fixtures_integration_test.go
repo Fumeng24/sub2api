@@ -425,6 +425,10 @@ func mustCreateSubscription(t *testing.T, client *dbent.Client, s *service.UserS
 }
 
 func mustBindAccountToGroup(t *testing.T, client *dbent.Client, accountID, groupID int64, priority int) {
+	mustBindAccountToGroupWithSchedulingConfigured(t, client, accountID, groupID, priority, true)
+}
+
+func mustBindAccountToGroupWithSchedulingConfigured(t *testing.T, client *dbent.Client, accountID, groupID int64, priority int, schedulingConfigured bool) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -432,6 +436,7 @@ func mustBindAccountToGroup(t *testing.T, client *dbent.Client, accountID, group
 		SetAccountID(accountID).
 		SetGroupID(groupID).
 		SetPriority(priority).
+		SetSchedulingConfigured(schedulingConfigured).
 		Save(ctx)
 	require.NoError(t, err, "create account_group")
 }

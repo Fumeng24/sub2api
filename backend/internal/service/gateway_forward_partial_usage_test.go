@@ -183,7 +183,7 @@ func TestGatewayService_Forward_FailoverErrorKeepsNilResult(t *testing.T) {
 	require.Nil(t, result, "failover 错误必须保持 result=nil，防止重试成功后双重计费")
 }
 
-func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardStreamMissingTerminalPreservesPartialUsage(t *testing.T) {
+func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardStreamMissingTerminalPreservesUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	rec := httptest.NewRecorder()
@@ -215,9 +215,8 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardStreamMissingTerminalP
 	account := newAnthropicAPIKeyAccountForTest()
 
 	result, err := svc.Forward(context.Background(), c, account, parsed)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "missing terminal event")
-	require.NotNil(t, result, "透传流中断但已观测到 usage 时必须返回部分结果用于计费")
+	require.NoError(t, err)
+	require.NotNil(t, result, "API-key 透传流缺少终止事件时仍须保留已观测 usage")
 	require.True(t, result.Stream)
 	require.Equal(t, 9, result.Usage.InputTokens)
 	require.Equal(t, 2, result.Usage.CacheReadInputTokens)

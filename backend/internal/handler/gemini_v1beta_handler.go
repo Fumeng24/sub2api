@@ -215,6 +215,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	// 解析渠道级模型映射
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, modelName)
 	reqModel := modelName // 保存映射前的原始模型名
+	if err := h.gatewayService.ValidateUsagePricingAvailable(c.Request.Context(), apiKey, reqModel, channelMapping); err != nil {
+		reqLog.Warn("gemini.pricing_unavailable", zap.Error(err))
+		googleError(c, http.StatusBadRequest, usagePricingUnavailableMessage(reqModel))
+		return
+	}
 	if channelMapping.Mapped {
 		modelName = channelMapping.MappedModel
 	}
@@ -361,7 +366,8 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 
 	// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 	// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-	if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), apiKey.GroupID) {
+	// 本地策略将“单账号”收紧为当前请求只有一个可调度候选。
+	if h.gatewayService.IsSingleSchedulableAccountForRequest(c.Request.Context(), apiKey.GroupID, modelName) {
 		ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
 		c.Request = c.Request.WithContext(ctx)
 	}
@@ -670,6 +676,9 @@ func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverE
 }
 
 func mapGeminiUpstreamError(statusCode int) (int, string) {
+	if status, message, handled := mapGeminiUpstreamErrorCustom(statusCode); handled {
+		return status, message
+	}
 	switch statusCode {
 	case 401:
 		return http.StatusBadGateway, "Upstream authentication failed, please contact administrator"
@@ -691,6 +700,9 @@ type pathParseError struct{ msg string }
 func (e *pathParseError) Error() string { return e.msg }
 
 func googleError(c *gin.Context, status int, message string) {
+	if writeGoogleErrorCustom(c, status, message) {
+		return
+	}
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,
@@ -703,6 +715,9 @@ func googleError(c *gin.Context, status int, message string) {
 func writeUpstreamResponse(c *gin.Context, res *service.UpstreamHTTPResult) {
 	if res == nil {
 		googleError(c, http.StatusBadGateway, "Empty upstream response")
+		return
+	}
+	if writeGeminiUpstreamErrorCustom(c, res) {
 		return
 	}
 	for k, vv := range res.Headers {

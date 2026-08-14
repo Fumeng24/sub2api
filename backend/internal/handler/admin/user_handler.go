@@ -63,7 +63,7 @@ type CreateUserRequest struct {
 	Password      string   `json:"password" binding:"required,min=6"`
 	Username      string   `json:"username"`
 	Notes         string   `json:"notes"`
-	Role          string   `json:"role" binding:"omitempty,oneof=admin user"`
+	Role          string   `json:"role" binding:"omitempty,oneof=admin support user"`
 	Balance       *float64 `json:"balance"`
 	Concurrency   int      `json:"concurrency"`
 	RPMLimit      int      `json:"rpm_limit"`
@@ -77,22 +77,26 @@ type UpdateUserRequest struct {
 	Password      string   `json:"password" binding:"omitempty,min=6"`
 	Username      *string  `json:"username"`
 	Notes         *string  `json:"notes"`
-	Role          string   `json:"role" binding:"omitempty,oneof=admin user"`
 	Balance       *float64 `json:"balance"`
 	Concurrency   *int     `json:"concurrency"`
 	RPMLimit      *int     `json:"rpm_limit"`
+	Role          string   `json:"role" binding:"omitempty,oneof=admin support user"`
 	Status        string   `json:"status" binding:"omitempty,oneof=active disabled"`
 	AllowedGroups *[]int64 `json:"allowed_groups"`
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
 	GroupRates map[int64]*float64 `json:"group_rates"`
+	// GroupDiscounts 用户专属分组折扣配置
+	// map[groupID]*discount，nil 表示删除该分组的专属折扣
+	GroupDiscounts map[int64]*float64 `json:"group_discounts"`
 }
 
 // UpdateBalanceRequest represents balance update request
 type UpdateBalanceRequest struct {
-	Balance   float64 `json:"balance" binding:"required,gt=0"`
-	Operation string  `json:"operation" binding:"required,oneof=set add subtract"`
-	Notes     string  `json:"notes"`
+	Balance          float64 `json:"balance" binding:"required,gt=0"`
+	Operation        string  `json:"operation" binding:"required,oneof=set add subtract"`
+	Notes            string  `json:"notes"`
+	BusinessCategory string  `json:"business_category"`
 }
 
 type BindUserAuthIdentityRequest struct {
@@ -120,6 +124,7 @@ type BindUserAuthIdentityChannelRequest struct {
 //   - attr[{id}]: filter by custom attribute value, e.g. attr[1]=company
 //   - group_name: fuzzy filter by allowed group name
 //   - api_key_group_id: filter by the exact group bound to the user's API keys
+//   - has_group_rate_config: only users whose effective group pricing differs from the default
 func (h *UserHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 
@@ -131,11 +136,12 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	filters := service.UserListFilters{
-		Status:     c.Query("status"),
-		Role:       c.Query("role"),
-		Search:     search,
-		GroupName:  strings.TrimSpace(c.Query("group_name")),
-		Attributes: parseAttributeFilters(c),
+		Status:             c.Query("status"),
+		Role:               c.Query("role"),
+		Search:             search,
+		GroupName:          strings.TrimSpace(c.Query("group_name")),
+		HasGroupRateConfig: parseBoolQueryWithDefault(c.Query("has_group_rate_config"), false),
+		Attributes:         parseAttributeFilters(c),
 	}
 	if raw := strings.TrimSpace(c.Query("api_key_group_id")); raw != "" {
 		if id, parseErr := strconv.ParseInt(raw, 10, 64); parseErr == nil && id > 0 {
@@ -342,18 +348,19 @@ func (h *UserHandler) Update(c *gin.Context) {
 
 	// 使用指针类型直接传递，nil 表示未提供该字段
 	user, err := h.adminService.UpdateUser(c.Request.Context(), userID, &service.UpdateUserInput{
-		Email:         req.Email,
-		Password:      req.Password,
-		Username:      req.Username,
-		Notes:         req.Notes,
-		Role:          req.Role,
-		Balance:       req.Balance,
-		Concurrency:   req.Concurrency,
-		RPMLimit:      req.RPMLimit,
-		Status:        req.Status,
-		AllowedGroups: req.AllowedGroups,
-		GroupRates:    req.GroupRates,
-		ActorAdminID:  getAdminIDFromContext(c),
+		Email:          req.Email,
+		Password:       req.Password,
+		Username:       req.Username,
+		Notes:          req.Notes,
+		Role:           req.Role,
+		Balance:        req.Balance,
+		Concurrency:    req.Concurrency,
+		RPMLimit:       req.RPMLimit,
+		Status:         req.Status,
+		AllowedGroups:  req.AllowedGroups,
+		GroupRates:     req.GroupRates,
+		GroupDiscounts: req.GroupDiscounts,
+		ActorAdminID:   getAdminIDFromContext(c),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -404,7 +411,7 @@ func (h *UserHandler) UpdateBalance(c *gin.Context) {
 		Body:   req,
 	}
 	executeAdminIdempotentJSON(c, "admin.users.balance.update", idempotencyPayload, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
-		user, execErr := h.adminService.UpdateUserBalance(ctx, userID, req.Balance, req.Operation, req.Notes)
+		user, execErr := service.UpdateAdminUserBalance(ctx, h.adminService, userID, req.Balance, req.Operation, req.Notes, req.BusinessCategory)
 		if execErr != nil {
 			return nil, execErr
 		}

@@ -145,6 +145,45 @@ func TestOpenAIStreamingPassthroughKeepsPreamblePendingUntilFirstOutputBoundary(
 	}, writer.flushBodyLengths)
 }
 
+func TestOpenAIRemoteCompactPassthroughDoesNotExposePartialOutputWithoutCompaction(t *testing.T) {
+	message := `data: {"type":"response.output_item.done","output_index":0,"item":{"type":"message","content":[{"type":"output_text","text":"partial"}]}}` + "\n\n"
+	terminal := `data: {"type":"response.completed","response":{"id":"resp_missing_compact","output":[{"type":"message"}],"usage":{"input_tokens":3,"output_tokens":1,"total_tokens":4}}}` + "\n\n"
+
+	result, recorder, _, err := runPassthroughFlushTest(
+		t,
+		io.NopCloser(strings.NewReader(message+terminal)),
+		-1,
+		func(c *gin.Context) { MarkOpenAIRemoteCompactionV2(c) },
+	)
+
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.NotNil(t, result)
+	require.Empty(t, recorder.Body.String(), "partial normal output must remain private so failover can retry")
+}
+
+func TestOpenAIRemoteCompactPassthroughReleasesOnlyAfterCompactionItem(t *testing.T) {
+	upstream := strings.Join([]string{
+		`data: {"type":"response.output_item.done","output_index":0,"item":{"type":"message","content":[{"type":"output_text","text":"preamble"}]}}`,
+		`data: {"type":"response.output_item.done","output_index":1,"item":{"type":"compaction","encrypted_content":"compact-payload"}}`,
+		`data: {"type":"response.completed","response":{"id":"resp_compact","output":[],"usage":{"input_tokens":3,"output_tokens":1,"total_tokens":4}}}`,
+		`data: [DONE]`,
+		``,
+	}, "\n\n")
+
+	result, recorder, _, err := runPassthroughFlushTest(
+		t,
+		io.NopCloser(strings.NewReader(upstream)),
+		-1,
+		func(c *gin.Context) { MarkOpenAIRemoteCompactionV2(c) },
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, upstream, recorder.Body.String())
+	require.Contains(t, recorder.Body.String(), `"type":"compaction"`)
+}
+
 func TestOpenAIStreamingPassthroughFlushesTerminalEventAtEOFWithoutBlankLine(t *testing.T) {
 	upstream := "event: response.completed\n" +
 		`data: {"type":"response.completed","response":{"id":"resp_eof","usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}}`

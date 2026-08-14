@@ -29,7 +29,7 @@ func TestOpenAIGatewayServiceForward_RejectsDisabledImageGenerationIntents(t *te
 		},
 		{
 			name: "image tool",
-			body: []byte(`{"model":"gpt-5.4","input":"draw","tools":[{"type":"image_generation"}]}`),
+			body: []byte(`{"model":"gpt-5.4","input":"draw","tools":[{"type":"image_generation","size":"1024x1024"}]}`),
 		},
 		{
 			name: "image tool choice",
@@ -53,6 +53,32 @@ func TestOpenAIGatewayServiceForward_RejectsDisabledImageGenerationIntents(t *te
 			require.Nil(t, upstream.lastReq, "disabled image request must not reach upstream")
 		})
 	}
+}
+
+func TestOpenAIGatewayServiceForward_DisabledGroupStripsImplicitImageTool(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"id":"resp_text_tool","model":"gpt-5.4","usage":{"input_tokens":4,"output_tokens":2}}`)),
+		},
+	}
+	svc := newOpenAIImageGenerationControlTestService(upstream)
+	c, recorder := newOpenAIImageGenerationControlTestContext(false, "unit-test-agent/1.0")
+	account := newOpenAIImageGenerationControlTestAccount()
+	body := []byte(`{"model":"gpt-5.4","input":"write text","stream":false,"tools":[{"type":"image_generation"},{"type":"web_search"}]}`)
+
+	result, err := svc.Forward(context.Background(), c, account, body)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.NotNil(t, upstream.lastReq)
+	require.False(t, gjson.GetBytes(upstream.lastBody, `tools.#(type=="image_generation")`).Exists())
+	require.True(t, gjson.GetBytes(upstream.lastBody, `tools.#(type=="web_search")`).Exists())
+	require.Equal(t, 0, result.ImageCount)
 }
 
 func TestOpenAIGatewayServiceForward_DisabledGroupAllowsTextOnlyResponses(t *testing.T) {
@@ -80,7 +106,7 @@ func TestOpenAIGatewayServiceForward_DisabledGroupAllowsTextOnlyResponses(t *tes
 	require.NotNil(t, upstream.lastReq)
 }
 
-func TestOpenAIGatewayServiceForward_CodexImageInjectionRespectsGroupCapability(t *testing.T) {
+func TestOpenAIGatewayServiceForward_CodexImageBridgeInjectsImageToolWhenEnabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
@@ -431,7 +457,7 @@ func TestOpenAIGatewayServiceForward_CodexBridgeSkipsCompactRequests(t *testing.
 		resp: &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": []string{"application/json"}},
-			Body:       io.NopCloser(strings.NewReader(`{"id":"resp_codex_compact","model":"gpt-5.4","usage":{"input_tokens":1,"output_tokens":1}}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"id":"resp_codex_compact","status":"completed","model":"gpt-5.4","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"compact summary ready"}]}],"usage":{"input_tokens":1,"output_tokens":20}}`)),
 		},
 	}
 	svc := newOpenAIImageGenerationControlTestService(upstream)
@@ -665,6 +691,34 @@ func TestNormalizeCompletedImageGenerationStatus(t *testing.T) {
 			require.JSONEq(t, tt.want, string(got))
 		})
 	}
+}
+
+func TestOpenAIGatewayServiceForward_StreamingImagePartialErrorReturnsResult(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body: io.NopCloser(strings.NewReader(
+				"data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_image_partial\"}}\n\n" +
+					"data: {\"type\":\"response.output_item.done\",\"item\":{\"id\":\"ig_stream_partial\",\"type\":\"image_generation_call\",\"result\":\"final-image\"}}\n\n",
+			)),
+		},
+	}
+	svc := newOpenAIImageGenerationControlTestService(upstream)
+	c, _ := newOpenAIImageGenerationControlTestContext(true, "codex_cli_rs/0.98.0")
+	account := newOpenAIImageGenerationControlTestAccount()
+	body := []byte(`{"model":"gpt-5.5","stream":true,"input":"draw","tools":[{"type":"image_generation","size":"1024x1024"}]}`)
+
+	result, err := svc.Forward(context.Background(), c, account, body)
+
+	require.Error(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 1, result.ImageCount)
+	require.Equal(t, "resp_image_partial", result.ResponseID)
+	require.Equal(t, "gpt-5.5", result.Model)
+	require.True(t, result.Stream)
 }
 
 // TestHandleStreamingResponse_CyberPolicyCapturesRealUpstreamTokens 锁定流式

@@ -143,11 +143,10 @@ func (s *GatewayService) ForwardAsResponses(
 			AccountID:          account.ID,
 			AccountName:        account.Name,
 			UpstreamStatusCode: 0,
-			Kind:               "request_error",
+			Kind:               "failover",
 			Message:            safeErr,
 		})
-		writeResponsesError(c, http.StatusBadGateway, "server_error", "Upstream request failed")
-		return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+		return nil, newNetworkUpstreamFailoverError(safeErr)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -170,9 +169,7 @@ func (s *GatewayService) ForwardAsResponses(
 				Kind:               "failover",
 				Message:            upstreamMsg,
 			})
-			if s.rateLimitService != nil {
-				s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody, mappedModel)
-			}
+			s.handleUpstreamErrorForScheduling(ctx, account, resp.StatusCode, resp.Header, respBody, mappedModel)
 			return nil, &UpstreamFailoverError{
 				StatusCode:   resp.StatusCode,
 				ResponseBody: respBody,
@@ -614,6 +611,7 @@ func appendRawJSON(existing json.RawMessage, fragment string) json.RawMessage {
 
 // writeResponsesError writes an error response in OpenAI Responses API format.
 func writeResponsesError(c *gin.Context, statusCode int, code, message string) {
+	message = ClientFacingErrorMessage(statusCode, code, message)
 	MarkResponseCommitted(c)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
@@ -625,8 +623,5 @@ func writeResponsesError(c *gin.Context, statusCode int, code, message string) {
 
 // mapUpstreamStatusCode maps upstream HTTP status codes to appropriate client-facing codes.
 func mapUpstreamStatusCode(code int) int {
-	if code >= 500 {
-		return http.StatusBadGateway
-	}
-	return code
+	return NormalizeUpstreamClientError(code, "upstream_error", "").Status
 }

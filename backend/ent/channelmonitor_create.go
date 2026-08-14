@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -91,6 +92,20 @@ func (_c *ChannelMonitorCreate) SetAPIKeyEncrypted(v string) *ChannelMonitorCrea
 	return _c
 }
 
+// SetAPIKeyID sets the "api_key_id" field.
+func (_c *ChannelMonitorCreate) SetAPIKeyID(v int64) *ChannelMonitorCreate {
+	_c.mutation.SetAPIKeyID(v)
+	return _c
+}
+
+// SetNillableAPIKeyID sets the "api_key_id" field if the given value is not nil.
+func (_c *ChannelMonitorCreate) SetNillableAPIKeyID(v *int64) *ChannelMonitorCreate {
+	if v != nil {
+		_c.SetAPIKeyID(*v)
+	}
+	return _c
+}
+
 // SetPrimaryModel sets the "primary_model" field.
 func (_c *ChannelMonitorCreate) SetPrimaryModel(v string) *ChannelMonitorCreate {
 	_c.mutation.SetPrimaryModel(v)
@@ -113,6 +128,20 @@ func (_c *ChannelMonitorCreate) SetGroupName(v string) *ChannelMonitorCreate {
 func (_c *ChannelMonitorCreate) SetNillableGroupName(v *string) *ChannelMonitorCreate {
 	if v != nil {
 		_c.SetGroupName(*v)
+	}
+	return _c
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (_c *ChannelMonitorCreate) SetSortOrder(v int) *ChannelMonitorCreate {
+	_c.mutation.SetSortOrder(v)
+	return _c
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_c *ChannelMonitorCreate) SetNillableSortOrder(v *int) *ChannelMonitorCreate {
+	if v != nil {
+		_c.SetSortOrder(*v)
 	}
 	return _c
 }
@@ -241,6 +270,11 @@ func (_c *ChannelMonitorCreate) AddDailyRollups(v ...*ChannelMonitorDailyRollup)
 	return _c.AddDailyRollupIDs(ids...)
 }
 
+// SetAPIKey sets the "api_key" edge to the APIKey entity.
+func (_c *ChannelMonitorCreate) SetAPIKey(v *APIKey) *ChannelMonitorCreate {
+	return _c.SetAPIKeyID(v.ID)
+}
+
 // SetRequestTemplateID sets the "request_template" edge to the ChannelMonitorRequestTemplate entity by ID.
 func (_c *ChannelMonitorCreate) SetRequestTemplateID(id int64) *ChannelMonitorCreate {
 	_c.mutation.SetRequestTemplateID(id)
@@ -314,6 +348,10 @@ func (_c *ChannelMonitorCreate) defaults() {
 	if _, ok := _c.mutation.GroupName(); !ok {
 		v := channelmonitor.DefaultGroupName
 		_c.mutation.SetGroupName(v)
+	}
+	if _, ok := _c.mutation.SortOrder(); !ok {
+		v := channelmonitor.DefaultSortOrder
+		_c.mutation.SetSortOrder(v)
 	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		v := channelmonitor.DefaultEnabled
@@ -396,6 +434,9 @@ func (_c *ChannelMonitorCreate) check() error {
 		if err := channelmonitor.GroupNameValidator(v); err != nil {
 			return &ValidationError{Name: "group_name", err: fmt.Errorf(`ent: validator failed for field "ChannelMonitor.group_name": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.SortOrder(); !ok {
+		return &ValidationError{Name: "sort_order", err: errors.New(`ent: missing required field "ChannelMonitor.sort_order"`)}
 	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "ChannelMonitor.enabled"`)}
@@ -497,6 +538,10 @@ func (_c *ChannelMonitorCreate) createSpec() (*ChannelMonitor, *sqlgraph.CreateS
 		_spec.SetField(channelmonitor.FieldGroupName, field.TypeString, value)
 		_node.GroupName = value
 	}
+	if value, ok := _c.mutation.SortOrder(); ok {
+		_spec.SetField(channelmonitor.FieldSortOrder, field.TypeInt, value)
+		_node.SortOrder = value
+	}
 	if value, ok := _c.mutation.Enabled(); ok {
 		_spec.SetField(channelmonitor.FieldEnabled, field.TypeBool, value)
 		_node.Enabled = value
@@ -559,6 +604,23 @@ func (_c *ChannelMonitorCreate) createSpec() (*ChannelMonitor, *sqlgraph.CreateS
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.APIKeyIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   channelmonitor.APIKeyTable,
+			Columns: []string{channelmonitor.APIKeyColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.APIKeyID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.RequestTemplateIDs(); len(nodes) > 0 {
@@ -702,6 +764,24 @@ func (u *ChannelMonitorUpsert) UpdateAPIKeyEncrypted() *ChannelMonitorUpsert {
 	return u
 }
 
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *ChannelMonitorUpsert) SetAPIKeyID(v int64) *ChannelMonitorUpsert {
+	u.Set(channelmonitor.FieldAPIKeyID, v)
+	return u
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsert) UpdateAPIKeyID() *ChannelMonitorUpsert {
+	u.SetExcluded(channelmonitor.FieldAPIKeyID)
+	return u
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (u *ChannelMonitorUpsert) ClearAPIKeyID() *ChannelMonitorUpsert {
+	u.SetNull(channelmonitor.FieldAPIKeyID)
+	return u
+}
+
 // SetPrimaryModel sets the "primary_model" field.
 func (u *ChannelMonitorUpsert) SetPrimaryModel(v string) *ChannelMonitorUpsert {
 	u.Set(channelmonitor.FieldPrimaryModel, v)
@@ -741,6 +821,24 @@ func (u *ChannelMonitorUpsert) UpdateGroupName() *ChannelMonitorUpsert {
 // ClearGroupName clears the value of the "group_name" field.
 func (u *ChannelMonitorUpsert) ClearGroupName() *ChannelMonitorUpsert {
 	u.SetNull(channelmonitor.FieldGroupName)
+	return u
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *ChannelMonitorUpsert) SetSortOrder(v int) *ChannelMonitorUpsert {
+	u.Set(channelmonitor.FieldSortOrder, v)
+	return u
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *ChannelMonitorUpsert) UpdateSortOrder() *ChannelMonitorUpsert {
+	u.SetExcluded(channelmonitor.FieldSortOrder)
+	return u
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *ChannelMonitorUpsert) AddSortOrder(v int) *ChannelMonitorUpsert {
+	u.Add(channelmonitor.FieldSortOrder, v)
 	return u
 }
 
@@ -1017,6 +1115,27 @@ func (u *ChannelMonitorUpsertOne) UpdateAPIKeyEncrypted() *ChannelMonitorUpsertO
 	})
 }
 
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *ChannelMonitorUpsertOne) SetAPIKeyID(v int64) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetAPIKeyID(v)
+	})
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertOne) UpdateAPIKeyID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateAPIKeyID()
+	})
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (u *ChannelMonitorUpsertOne) ClearAPIKeyID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearAPIKeyID()
+	})
+}
+
 // SetPrimaryModel sets the "primary_model" field.
 func (u *ChannelMonitorUpsertOne) SetPrimaryModel(v string) *ChannelMonitorUpsertOne {
 	return u.Update(func(s *ChannelMonitorUpsert) {
@@ -1063,6 +1182,27 @@ func (u *ChannelMonitorUpsertOne) UpdateGroupName() *ChannelMonitorUpsertOne {
 func (u *ChannelMonitorUpsertOne) ClearGroupName() *ChannelMonitorUpsertOne {
 	return u.Update(func(s *ChannelMonitorUpsert) {
 		s.ClearGroupName()
+	})
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *ChannelMonitorUpsertOne) SetSortOrder(v int) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetSortOrder(v)
+	})
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *ChannelMonitorUpsertOne) AddSortOrder(v int) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.AddSortOrder(v)
+	})
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertOne) UpdateSortOrder() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateSortOrder()
 	})
 }
 
@@ -1529,6 +1669,27 @@ func (u *ChannelMonitorUpsertBulk) UpdateAPIKeyEncrypted() *ChannelMonitorUpsert
 	})
 }
 
+// SetAPIKeyID sets the "api_key_id" field.
+func (u *ChannelMonitorUpsertBulk) SetAPIKeyID(v int64) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetAPIKeyID(v)
+	})
+}
+
+// UpdateAPIKeyID sets the "api_key_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertBulk) UpdateAPIKeyID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateAPIKeyID()
+	})
+}
+
+// ClearAPIKeyID clears the value of the "api_key_id" field.
+func (u *ChannelMonitorUpsertBulk) ClearAPIKeyID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearAPIKeyID()
+	})
+}
+
 // SetPrimaryModel sets the "primary_model" field.
 func (u *ChannelMonitorUpsertBulk) SetPrimaryModel(v string) *ChannelMonitorUpsertBulk {
 	return u.Update(func(s *ChannelMonitorUpsert) {
@@ -1575,6 +1736,27 @@ func (u *ChannelMonitorUpsertBulk) UpdateGroupName() *ChannelMonitorUpsertBulk {
 func (u *ChannelMonitorUpsertBulk) ClearGroupName() *ChannelMonitorUpsertBulk {
 	return u.Update(func(s *ChannelMonitorUpsert) {
 		s.ClearGroupName()
+	})
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *ChannelMonitorUpsertBulk) SetSortOrder(v int) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetSortOrder(v)
+	})
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *ChannelMonitorUpsertBulk) AddSortOrder(v int) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.AddSortOrder(v)
+	})
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertBulk) UpdateSortOrder() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateSortOrder()
 	})
 }
 

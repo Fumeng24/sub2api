@@ -25,6 +25,9 @@ type stubAdminService struct {
 	boundAuthIdentityFor                int64
 	createdAccounts                     []*service.CreateAccountInput
 	createdProxies                      []*service.CreateProxyInput
+	updatedAccounts                     []*service.UpdateAccountInput
+	updatedExtra                        []map[string]any
+	deletedAccountIDs                   []int64
 	updatedProxyIDs                     []int64
 	updatedProxies                      []*service.UpdateProxyInput
 	testedProxyIDs                      []int64
@@ -371,6 +374,21 @@ func (s *stubAdminService) UpdateGroup(ctx context.Context, id int64, input *ser
 	return &group, nil
 }
 
+func (s *stubAdminService) PreviewGroupRateChangeNotification(ctx context.Context, groupID int64, input service.GroupRateChangeNotificationInput) (*service.GroupRateChangeNotificationPreview, error) {
+	return &service.GroupRateChangeNotificationPreview{
+		GroupID:           groupID,
+		GroupName:         "group",
+		OldRateMultiplier: 1,
+		NewRateMultiplier: input.NewRateMultiplier,
+		WindowMinutes:     input.WindowMinutes,
+		Users:             []service.GroupRateChangeNotificationUser{},
+	}, nil
+}
+
+func (s *stubAdminService) SendGroupRateChangeNotification(ctx context.Context, groupID int64, input service.GroupRateChangeNotificationInput) (*service.GroupRateChangeNotificationSendResult, error) {
+	return &service.GroupRateChangeNotificationSendResult{GroupID: groupID}, nil
+}
+
 func (s *stubAdminService) DeleteGroup(ctx context.Context, id int64) error {
 	return nil
 }
@@ -464,6 +482,11 @@ func (s *stubAdminService) ListOpenAISchedulableAccountsForSchedulerScore(_ cont
 }
 
 func (s *stubAdminService) GetAccount(ctx context.Context, id int64) (*service.Account, error) {
+	for i := range s.accounts {
+		if s.accounts[i].ID == id {
+			return &s.accounts[i], nil
+		}
+	}
 	if s.getAccountResult != nil {
 		return s.getAccountResult, nil
 	}
@@ -501,6 +524,9 @@ func (s *stubAdminService) RecoverDuplicateAccount(ctx context.Context, id int64
 }
 
 func (s *stubAdminService) UpdateAccount(ctx context.Context, id int64, input *service.UpdateAccountInput) (*service.Account, error) {
+	s.mu.Lock()
+	s.updatedAccounts = append(s.updatedAccounts, input)
+	s.mu.Unlock()
 	s.updateAccountCalls++
 	s.lastUpdateAccountInput = input
 	if s.updateAccountErr != nil {
@@ -511,11 +537,17 @@ func (s *stubAdminService) UpdateAccount(ctx context.Context, id int64, input *s
 }
 
 func (s *stubAdminService) UpdateAccountExtra(ctx context.Context, id int64, updates map[string]any) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.updatedExtra = append(s.updatedExtra, updates)
 	s.updateAccountExtraCalls++
 	return nil
 }
 
 func (s *stubAdminService) DeleteAccount(ctx context.Context, id int64) error {
+	s.mu.Lock()
+	s.deletedAccountIDs = append(s.deletedAccountIDs, id)
+	s.mu.Unlock()
 	return nil
 }
 
@@ -720,6 +752,10 @@ func (s *stubAdminService) GetUserBalanceHistory(ctx context.Context, userID int
 
 func (s *stubAdminService) UpdateGroupSortOrders(ctx context.Context, updates []service.GroupSortOrderUpdate) error {
 	return nil
+}
+
+func (s *stubAdminService) GetGroupSchedulerHistory(ctx context.Context, groupID int64, limit int) ([]service.SchedulerOutboxEvent, error) {
+	return []service.SchedulerOutboxEvent{}, nil
 }
 
 func (s *stubAdminService) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*service.AdminUpdateAPIKeyGroupIDResult, error) {
