@@ -122,6 +122,30 @@ func openAIModelMappedBody(body []byte, mapped bool, mappedModel string, replace
 	return replace(body, mappedModel)
 }
 
+func openAICompatUsageMapping(mapping service.ChannelMappingResult, requestedModel, routingModel string) service.ChannelMappingResult {
+	requestedModel = strings.TrimSpace(requestedModel)
+	routingModel = strings.TrimSpace(routingModel)
+	if routingModel == "" {
+		routingModel = requestedModel
+	}
+	if !mapping.Mapped && routingModel != requestedModel {
+		mapping.Mapped = true
+		mapping.MappedModel = routingModel
+	}
+	return mapping
+}
+
+func openAICompatForwardBody(body []byte, mapping service.ChannelMappingResult, requestedModel, routingModel string, replace openAIModelBodyReplaceFunc) []byte {
+	targetModel := strings.TrimSpace(routingModel)
+	if mapping.Mapped {
+		targetModel = strings.TrimSpace(mapping.MappedModel)
+	}
+	if targetModel == "" || targetModel == strings.TrimSpace(requestedModel) {
+		return body
+	}
+	return openAIModelMappedBody(body, true, targetModel, replace)
+}
+
 func seedOpenAIForwardImageIntentHint(c *gin.Context, channelMapped bool, imageIntent bool) {
 	if channelMapped {
 		// 渠道映射改变了规范请求，保持 unknown，由 Forward 按映射后的 model/body 初始化。
@@ -316,8 +340,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 	reqModel := modelResult.String()
-	ensureCompositeTargetPlatform(c, apiKey, reqModel)
-	if !compositeTargetPlatformAllowed(c, apiKey, reqModel, service.PlatformOpenAI, service.PlatformGrok) {
+	routingModel := service.NormalizeOpenAICompatRequestedModel(reqModel)
+	ensureCompositeTargetPlatform(c, apiKey, routingModel)
+	if !compositeTargetPlatformAllowed(c, apiKey, routingModel, service.PlatformOpenAI, service.PlatformGrok) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint for composite groups")
 		return
 	}
@@ -382,9 +407,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
-	forwardBody := openAIModelMappedBody(body, channelMapping.Mapped, channelMapping.MappedModel, h.gatewayService.ReplaceModelInBody)
-	seedOpenAIForwardImageIntentHint(c, channelMapping.Mapped, imageIntent)
+	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, routingModel)
+	usageMapping := openAICompatUsageMapping(channelMapping, reqModel, routingModel)
+	forwardBody := openAICompatForwardBody(body, channelMapping, reqModel, routingModel, h.gatewayService.ReplaceModelInBody)
+	seedOpenAIForwardImageIntentHint(c, usageMapping.Mapped, imageIntent)
 
 	// 提前校验 function_call_output 是否具备可关联上下文，避免上游 400。
 	if !h.validateFunctionCallOutputRequest(c, body, reqLog) {
@@ -455,7 +481,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// token 计费部分仍受利润门保护，独立图片/视频端点才在门外。
 	pricingCtx, pricingAt := h.gatewayService.WithOpenAIRequestPricingContext(c.Request.Context(), apiKey.GroupID)
 	c.Request = c.Request.WithContext(pricingCtx)
-	h.configureOpenAIStickyFailoverCustom(c, apiKey.GroupID, sessionHash, reqModel)
+	h.configureOpenAIStickyFailoverCustom(c, apiKey.GroupID, sessionHash, routingModel)
 
 	for {
 		// Streaming Forward intentionally detaches the upstream request so usage can
@@ -471,7 +497,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			apiKey.GroupID,
 			previousResponseID,
 			sessionHash,
-			reqModel,
+			routingModel,
 			failedAccountIDs,
 			service.OpenAIUpstreamTransportAny,
 			requiredCapability,
@@ -495,11 +521,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "compact_not_supported", "No available accounts support /responses/compact", streamStarted)
 					return
 				}
-				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, requestPlatform)
+				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, routingModel, requestPlatform)
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 				}
-				h.handleStreamingAwareError(c, cls.Status, cls.ErrType, cls.Message, streamStarted)
+				h.handleStreamingAwareErrorWithCode(c, cls.Status, cls.ErrType, cls.Code, cls.Message, streamStarted, false)
 				return
 			}
 			if lastFailoverErr != nil {
@@ -516,11 +542,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				h.handleFailoverExhausted(c, lastFailoverErr, streamStarted)
 				return
 			}
-			cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, requestPlatform)
+			cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, routingModel, requestPlatform)
 			if !cls.ModelNotFound {
 				markOpsRoutingCapacityLimited(c)
 			}
-			h.handleStreamingAwareError(c, cls.Status, cls.ErrType, cls.Message, streamStarted)
+			h.handleStreamingAwareErrorWithCode(c, cls.Status, cls.ErrType, cls.Code, cls.Message, streamStarted, false)
 			return
 		}
 		if previousResponseID != "" && selection != nil && selection.Account != nil {
@@ -576,7 +602,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		if service.GetOpsCyberPolicy(c) != nil {
 			cyberBlockKeyHTTP = service.CyberSessionBlockKey(apiKey.ID, c, sessionHashBody)
 		}
-		h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, reqModel, err != nil, cyberBlockKeyHTTP, clientRequestedUsageFields(c, channelMapping, reqModel, ""), service.HashUsageRequestPayload(body))
+		h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, reqModel, err != nil, cyberBlockKeyHTTP, clientRequestedUsageFields(c, usageMapping, reqModel, ""), service.HashUsageRequestPayload(body))
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
 		responseLatencyMs := forwardDurationMs
@@ -605,8 +631,8 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						return
 					}
 					if !openAIForwardMayFailover(c, writerSizeBeforeForward, failoverErr) {
-						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
-						h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(reqModel), failoverErr)
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
+						h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(routingModel), failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, true)
 						return
 					}
@@ -614,11 +640,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						streamStarted = true
 					}
 					if failoverErr.ShouldReportAccountScheduleFailure() {
-						h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+						h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
 					}
 					if !failoverErr.ShouldRetryNextAccount() {
-						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
-						h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(reqModel), failoverErr)
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
+						h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(routingModel), failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
@@ -631,8 +657,8 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						timeoutSwitchLimit = maxOpenAICompactFirstOutputTimeoutSwitches
 					}
 					if openAIFirstOutputFailoverExhaustedWithLimit(failoverErr, &firstOutputTimeoutSwitchCount, timeoutSwitchLimit) {
-						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
-						h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(reqModel), failoverErr)
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
+						h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(routingModel), failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
@@ -640,7 +666,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					if h.shouldRetryOpenAIPoolModeSameAccount(c.Request.Context(), reqLog, account, failoverErr, service.OpenAIAlternativeAccountRequest{
 						GroupID:            apiKey.GroupID,
 						Platform:           requestPlatform,
-						RequestedModel:     reqModel,
+						RequestedModel:     routingModel,
 						RequiredTransport:  service.OpenAIUpstreamTransportAny,
 						RequiredCapability: requiredCapability,
 						RequireCompact:     requireCompact,
@@ -663,20 +689,20 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 							continue
 						}
 					}
-					h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(reqModel), failoverErr)
+					h.applyOpenAIStickyFailoverFailureCustom(c, reqLog, account, account.GetMappedModel(routingModel), failoverErr)
 					h.gatewayService.RecordOpenAIAccountSwitch()
 					failedAccountIDs[account.ID] = struct{}{}
 					lastFailoverErr = failoverErr
 					lastFailoverAccountID = account.ID
-					lastFailoverModel = account.GetMappedModel(reqModel)
+					lastFailoverModel = account.GetMappedModel(routingModel)
 					if switchCount >= maxAccountSwitches {
-						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
 					switchCount++
 					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
-						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+						h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
@@ -699,7 +725,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					reqLog.Warn("openai.upstream_failover_switching", failoverSwitchFields...)
 					continue
 				}
-				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(reqModel), false, nil)
+				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(routingModel), false, nil)
 				upstreamErrorAlreadyCommunicated := openAIForwardErrorAlreadyCommunicated(c, writerSizeBeforeForward, err)
 				wroteFallback := false
 				if !upstreamErrorAlreadyCommunicated {
@@ -724,9 +750,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			if account.Type == service.AccountTypeOAuth && !account.IsShadow() {
 				h.gatewayService.UpdateCodexUsageSnapshotFromHeaders(c.Request.Context(), account.ID, result.ResponseHeaders)
 			}
-			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(reqModel), openAIForwardSucceededForScheduling(result), result.FirstTokenMs)
+			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(routingModel), openAIForwardSucceededForScheduling(result), result.FirstTokenMs)
 		} else {
-			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(reqModel), openAIForwardSucceededForScheduling(result), nil)
+			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(routingModel), openAIForwardSucceededForScheduling(result), nil)
 		}
 
 		// 捕获请求信息（用于异步记录，避免在 goroutine 中访问 gin.Context）
@@ -755,7 +781,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				APIKeyService:      h.apiKeyService,
 				QuotaPlatform:      quotaPlatform,
 				SessionID:          sessionID,
-				ChannelUsageFields: clientRequestedUsageFields(c, channelMapping, reqModel, result.UpstreamModel),
+				ChannelUsageFields: clientRequestedUsageFields(c, usageMapping, reqModel, result.UpstreamModel),
 				PricingAt:          pricingAt,
 				CyberBlocked:       cyberBlocked,
 			}); err != nil {
@@ -1013,8 +1039,8 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	}
 
 	// 解析渠道级模型映射
-	channelMappingMsg, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
-	mappedBodyForMessages := newOpenAIModelMappedBodyCache(body, h.gatewayService.ReplaceModelInBody)
+	channelMappingMsg, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, routingModel)
+	usageMappingMsg := openAICompatUsageMapping(channelMappingMsg, reqModel, routingModel)
 
 	// 绑定错误透传服务，允许 service 层在非 failover 错误场景复用规则。
 	if h.errorPassthroughService != nil {
@@ -1157,7 +1183,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 		defaultMappedModel := strings.TrimSpace(effectiveMappedModel)
 		// 应用渠道模型映射到请求体
-		forwardBody := mappedBodyForMessages(channelMappingMsg.Mapped, channelMappingMsg.MappedModel)
+		forwardBody := openAICompatForwardBody(body, channelMappingMsg, reqModel, routingModel, h.gatewayService.ReplaceModelInBody)
 		writerSizeBeforeForward := c.Writer.Size()
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
@@ -1171,7 +1197,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		if service.GetOpsCyberPolicy(c) != nil {
 			cyberBlockKeyMsg = service.CyberSessionBlockKey(apiKey.ID, c, body)
 		}
-		h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, reqModel, err != nil, cyberBlockKeyMsg, clientRequestedUsageFields(c, channelMappingMsg, reqModel, ""), service.HashUsageRequestPayload(body))
+		h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, reqModel, err != nil, cyberBlockKeyMsg, clientRequestedUsageFields(c, usageMappingMsg, reqModel, ""), service.HashUsageRequestPayload(body))
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
 		responseLatencyMs := forwardDurationMs
@@ -1310,7 +1336,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 				APIKeyService:      h.apiKeyService,
 				QuotaPlatform:      quotaPlatform,
 				SessionID:          sessionID,
-				ChannelUsageFields: clientRequestedUsageFields(c, channelMappingMsg, reqModel, result.UpstreamModel),
+				ChannelUsageFields: clientRequestedUsageFields(c, usageMappingMsg, reqModel, result.UpstreamModel),
 				PricingAt:          pricingAt,
 				CyberBlocked:       cyberBlocked,
 			}); err != nil {
@@ -1769,7 +1795,8 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model is required in first response.create payload")
 		return
 	}
-	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	routingModel := service.NormalizeOpenAICompatRequestedModel(reqModel)
+	ensureCompositeTargetPlatform(c, apiKey, routingModel)
 	ctx = c.Request.Context()
 	if apiKey.Group != nil && apiKey.Group.Platform == service.PlatformComposite {
 		platform, ok := service.ResolvedTargetPlatformFromContext(ctx)
@@ -1819,7 +1846,8 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	cyberBlockedThisConn := false
 
 	// 解析渠道级模型映射
-	channelMappingWS, _ := h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.GroupID, reqModel)
+	channelMappingWS, _ := h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.GroupID, routingModel)
+	usageMappingWS := openAICompatUsageMapping(channelMappingWS, reqModel, routingModel)
 
 	var currentUserRelease func()
 	var currentAccountRelease func()
@@ -1885,7 +1913,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		firstMessage,
 		openAIWSIngressFallbackSessionSeed(subject.UserID, apiKey.ID, apiKey.GroupID),
 	)
-	ctx = h.gatewayService.PrepareOpenAIStickyFailoverContext(ctx, apiKey.GroupID, sessionHash, reqModel)
+	ctx = h.gatewayService.PrepareOpenAIStickyFailoverContext(ctx, apiKey.GroupID, sessionHash, routingModel)
 	c.Request = c.Request.WithContext(ctx)
 	maxAccountSwitches := h.maxAccountSwitches
 	switchCount := 0
@@ -1898,13 +1926,13 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			return false
 		}
 		if failoverErr.ShouldReportAccountScheduleFailure() {
-			h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+			h.gatewayService.ReportOpenAIAccountScheduleFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
 		}
 		releaseAccountSlot()
-		ctx = h.applyOpenAIStickyFailoverFailureContextCustom(ctx, reqLog, account, account.GetMappedModel(reqModel), failoverErr)
+		ctx = h.applyOpenAIStickyFailoverFailureContextCustom(ctx, reqLog, account, account.GetMappedModel(routingModel), failoverErr)
 		c.Request = c.Request.WithContext(ctx)
 		if !failoverErr.ShouldRetryNextAccount() {
-			h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+			h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
 			closeOpenAIWSFailoverExhausted(wsConn, failoverErr)
 			return false
 		}
@@ -1915,13 +1943,13 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		failedAccountIDs[account.ID] = struct{}{}
 		lastFailoverErr = failoverErr
 		if switchCount >= maxAccountSwitches {
-			h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+			h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
 			closeOpenAIWSFailoverExhausted(wsConn, failoverErr)
 			return false
 		}
 		switchCount++
 		if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
-			h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(reqModel), failoverErr)
+			h.gatewayService.MarkOpenAIAccountModelTerminalFailure(account.ID, account.GetMappedModel(routingModel), failoverErr)
 			closeOpenAIWSFailoverExhausted(wsConn, failoverErr)
 			return false
 		}
@@ -1963,7 +1991,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			apiKey.GroupID,
 			previousResponseID,
 			sessionHash,
-			reqModel,
+			routingModel,
 			failedAccountIDs,
 			requiredTransport,
 			requiredCapability,
@@ -2094,7 +2122,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		// Passthrough rejects overlapping response.create frames, so one immutable
 		// turn-tagged slot preserves the exact mapping used for the in-flight request.
 		var turnChannelMapping atomic.Pointer[openAIWSTurnChannelMappingSnapshot]
-		turnChannelMapping.Store(&openAIWSTurnChannelMappingSnapshot{turn: 1, mapping: channelMappingWS})
+		turnChannelMapping.Store(&openAIWSTurnChannelMappingSnapshot{turn: 1, mapping: usageMappingWS})
 		// turn 级定价：BeforeTurn 重新冻结 pricingAt 并按最新门复核当前账号，
 		// AfterTurn 的计费读取所属 turn 的时刻。零值起步的语义见
 		// openAIWSTurnPricing 的注释——绝不能用建连时刻初始化。
@@ -2129,15 +2157,17 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				if model == "" {
 					model = reqModel
 				}
-				mapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.GroupID, model)
+				turnRoutingModel := service.NormalizeOpenAICompatRequestedModel(model)
+				mapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.GroupID, turnRoutingModel)
+				usageMapping := openAICompatUsageMapping(mapping, model, turnRoutingModel)
 				mappedModelUnchanged := false
 				if previous := turnChannelMapping.Load(); previous != nil && previous.turn < turn {
-					mappedModelUnchanged = strings.TrimSpace(previous.mapping.MappedModel) == strings.TrimSpace(mapping.MappedModel)
+					mappedModelUnchanged = strings.TrimSpace(previous.mapping.MappedModel) == strings.TrimSpace(usageMapping.MappedModel)
 				}
-				if turn > 1 && !mappedModelUnchanged && !account.IsModelSupported(model) && !account.IsModelSupported(mapping.MappedModel) {
+				if turn > 1 && !mappedModelUnchanged && !account.IsModelSupported(turnRoutingModel) && !account.IsModelSupported(mapping.MappedModel) {
 					return "", newOpenAIWSUnsupportedModelSwitchError(mapping.MappedModel)
 				}
-				turnChannelMapping.Store(&openAIWSTurnChannelMappingSnapshot{turn: turn, mapping: mapping})
+				turnChannelMapping.Store(&openAIWSTurnChannelMappingSnapshot{turn: turn, mapping: usageMapping})
 				return mapping.MappedModel, nil
 			},
 			BeforeTurn: func(turn int) error {
@@ -2207,7 +2237,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				if snapshot := turnChannelMapping.Load(); snapshot != nil && snapshot.turn == turn {
 					turnMapping = snapshot.mapping
 				} else {
-					turnMapping, _ = h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.GroupID, turnRequestedModel)
+					turnRoutingModel := service.NormalizeOpenAICompatRequestedModel(turnRequestedModel)
+					turnMapping, _ = h.gatewayService.ResolveChannelMappingAndRestrict(ctx, apiKey.GroupID, turnRoutingModel)
+					turnMapping = openAICompatUsageMapping(turnMapping, turnRequestedModel, turnRoutingModel)
 				}
 				if turnUpstreamModel == "" {
 					turnUpstreamModel = turnRequestedModel
@@ -2331,7 +2363,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			}
 
 			if shouldReportOpenAIWSProxyAccountFailure(err) {
-				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(reqModel), false, nil)
+				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, account.GetMappedModel(routingModel), false, nil)
 			}
 			closeStatus, closeReason := summarizeWSCloseErrorForLog(err)
 			proxyFailedFields := []zap.Field{
@@ -2740,7 +2772,7 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithCode(
 		return
 	}
 	c.JSON(status, gin.H{"error": gin.H{
-		"type": errType, "code": code, "message": message,
+		"type": errType, "code": code, "message": message, "param": nil,
 	}})
 }
 

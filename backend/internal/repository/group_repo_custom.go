@@ -144,13 +144,8 @@ func (r *groupRepository) ListAccountSchedulingConfigs(ctx context.Context, grou
 		if a.SortOrder != b.SortOrder {
 			return a.SortOrder < b.SortOrder
 		}
-		// Role is reserve metadata, not an ordering key.  The persisted
-		// sort_order is the canonical per-group order and must be returned
-		// unchanged; putting primary rows first here made the API/UI order
-		// "snap back" after the scheduler had written a valid order.
-		if schedulerRoleRankForRepository(a.Role) != schedulerRoleRankForRepository(b.Role) {
-			return schedulerRoleRankForRepository(a.Role) < schedulerRoleRankForRepository(b.Role)
-		}
+		// Role is metadata only.  The persisted sort_order is the canonical
+		// per-group order; use the stable account ID only for malformed ties.
 		return a.AccountID < b.AccountID
 	})
 
@@ -257,11 +252,4 @@ func (r *groupRepository) UpdateAccountSchedulingConfigs(ctx context.Context, gr
 		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue account scheduling config update failed: group=%d err=%v", groupID, err)
 	}
 	return nil
-}
-
-func schedulerRoleRankForRepository(role string) int {
-	if role == service.AccountGroupRoleBackup {
-		return 1
-	}
-	return 0
 }

@@ -74,6 +74,12 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 		if c.Request.Context().Err() != nil {
 			return
 		}
+		filteredBody, filterErr := stripLunaFromCodexModelsManifest(manifest.Body)
+		if filterErr != nil {
+			h.errorResponse(c, http.StatusBadGateway, "upstream_error", "Codex models manifest is unavailable")
+			return
+		}
+		manifest.Body = filteredBody
 		if h.writeConfiguredCodexModelsManifestCustom(c, apiKey.Group, manifest.Body) {
 			return
 		}

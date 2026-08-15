@@ -17,6 +17,7 @@ import (
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
 )
 
 type codexModelsFailoverAccountRepo struct {
@@ -121,6 +122,22 @@ func TestCodexModelsCanceledRequestDoesNotWriteResponse(t *testing.T) {
 	if c.Writer.Written() {
 		t.Fatalf("canceled request wrote an HTTP response: status=%d body=%q", recorder.Code, recorder.Body.String())
 	}
+}
+
+func TestStripLunaFromCodexModelsManifest(t *testing.T) {
+	body := []byte(`{"models":[{"slug":"gpt-5.6-sol","display_name":"Sol"},{"slug":"gpt-5.6-luna","display_name":"Luna"},{"slug":"gpt-5.6-luna-2026-07-09"}],"rollout":"test"}`)
+
+	filtered, err := stripLunaFromCodexModelsManifest(body)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"models":[{"slug":"gpt-5.6-sol","display_name":"Sol"}],"rollout":"test"}`, string(filtered))
+}
+
+func TestRestrictCodexModelsManifestNeverSynthesizesLuna(t *testing.T) {
+	body := []byte(`{"models":[{"slug":"gpt-5.6-sol"},{"slug":"gpt-5.6-luna"}]}`)
+
+	filtered, err := restrictCodexModelsManifest(body, []string{"gpt-5.6-luna", "gpt-5.6-sol"})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"models":[{"slug":"gpt-5.6-sol"}]}`, string(filtered))
 }
 
 func TestCodexModelsUsesConfiguredGroupModelsInsteadOfSelectedAccountManifest(t *testing.T) {

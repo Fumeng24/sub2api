@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -88,118 +87,12 @@ type groupAutoSortExperienceProvider interface {
 	) (map[int64]*groupAutoSortExperienceStats, error)
 }
 
-// groupAutoSortWeightedExperienceProvider is optional so lightweight test and
-// third-party providers can keep implementing the original interface. The SQL
-// provider uses a 30-minute recent window blended with a 24-hour decayed
-// baseline.
-type groupAutoSortWeightedExperienceProvider interface {
-	StatsByAccountIDWeighted(
-		ctx context.Context,
-		groupID int64,
-		accountIDs []int64,
-		recentSince time.Time,
-		longSince time.Time,
-	) (map[int64]*groupAutoSortExperienceStats, error)
-}
-
 type groupAutoSortRateProvider interface {
 	RatesByAccountID(ctx context.Context, accountIDs []int64, now time.Time) (map[int64]float64, error)
 }
 
 type sqlGroupAutoSortExperienceProvider struct {
 	db *sql.DB
-}
-
-func (p *sqlGroupAutoSortExperienceProvider) StatsByAccountIDWeighted(
-	ctx context.Context,
-	groupID int64,
-	accountIDs []int64,
-	recentSince time.Time,
-	longSince time.Time,
-) (map[int64]*groupAutoSortExperienceStats, error) {
-	if p == nil || p.db == nil {
-		return map[int64]*groupAutoSortExperienceStats{}, nil
-	}
-	recent, err := p.StatsByAccountID(ctx, groupID, accountIDs, recentSince)
-	if err != nil {
-		return nil, err
-	}
-	long, err := p.StatsByAccountID(ctx, groupID, accountIDs, longSince)
-	if err != nil {
-		return nil, err
-	}
-	return blendGroupAutoSortExperienceStats(recent, long), nil
-}
-
-// blendGroupAutoSortExperienceStats gives recent traffic 70% influence and
-// the 24-hour baseline 30%. Counts are intentionally blended rather than
-// concatenated because the long window includes the recent window.
-func blendGroupAutoSortExperienceStats(recent, long map[int64]*groupAutoSortExperienceStats) map[int64]*groupAutoSortExperienceStats {
-	out := make(map[int64]*groupAutoSortExperienceStats, len(recent)+len(long))
-	ids := make(map[int64]struct{}, len(recent)+len(long))
-	for id := range recent {
-		ids[id] = struct{}{}
-	}
-	for id := range long {
-		ids[id] = struct{}{}
-	}
-	for id := range ids {
-		r := recent[id]
-		l := long[id]
-		if r == nil {
-			r = &groupAutoSortExperienceStats{}
-		}
-		if l == nil {
-			l = &groupAutoSortExperienceStats{}
-		}
-		v := &groupAutoSortExperienceStats{Models: make(map[string]*groupAutoSortModelExperienceStats)}
-		v.SuccessCount = weightedCount(r.SuccessCount, l.SuccessCount)
-		v.FailureCount = weightedCount(r.FailureCount, l.FailureCount)
-		v.FailoverCount = weightedCount(r.FailoverCount, l.FailoverCount)
-		v.FirstTokenSamples = weightedCount(r.FirstTokenSamples, l.FirstTokenSamples)
-		v.DurationSamples = weightedCount(r.DurationSamples, l.DurationSamples)
-		v.P95FirstTokenMs = weightedFloat(r.P95FirstTokenMs, l.P95FirstTokenMs, r.FirstTokenSamples, l.FirstTokenSamples)
-		v.P95DurationMs = weightedFloat(r.P95DurationMs, l.P95DurationMs, r.DurationSamples, l.DurationSamples)
-		v.CacheReadTokens = weightedCount(r.CacheReadTokens, l.CacheReadTokens)
-		v.CacheEligibleTokens = weightedCount(r.CacheEligibleTokens, l.CacheEligibleTokens)
-		modelNames := make(map[string]struct{}, len(r.Models)+len(l.Models))
-		for name := range r.Models {
-			modelNames[name] = struct{}{}
-		}
-		for name := range l.Models {
-			modelNames[name] = struct{}{}
-		}
-		for name := range modelNames {
-			rm, lm := r.Models[name], l.Models[name]
-			if rm == nil {
-				rm = &groupAutoSortModelExperienceStats{}
-			}
-			if lm == nil {
-				lm = &groupAutoSortModelExperienceStats{}
-			}
-			v.Models[name] = &groupAutoSortModelExperienceStats{
-				SuccessCount:  weightedCount(rm.SuccessCount, lm.SuccessCount),
-				FailureCount:  weightedCount(rm.FailureCount, lm.FailureCount),
-				FailoverCount: weightedCount(rm.FailoverCount, lm.FailoverCount),
-			}
-		}
-		out[id] = v
-	}
-	return out
-}
-
-func weightedCount(recent, long int64) int64 {
-	return int64(math.Round(float64(recent)*0.70 + float64(long)*0.30))
-}
-
-func weightedFloat(recent, long float64, recentSamples, longSamples int64) float64 {
-	if recentSamples <= 0 {
-		return long
-	}
-	if longSamples <= 0 {
-		return recent
-	}
-	return recent*0.70 + long*0.30
 }
 
 func newSQLGroupAutoSortExperienceProvider(db *sql.DB) *sqlGroupAutoSortExperienceProvider {

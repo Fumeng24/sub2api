@@ -418,16 +418,19 @@ func normalizeChannelMonitorMode(raw string) string {
 }
 
 // ActiveProbesAllowed reports whether the legacy V1 active probe runner may
-// issue upstream requests. V2 is an exclusive mode in the official monitor
-// implementation, so enabling it does not double the probe traffic.
+// issue upstream requests. The persisted mode controls which status contract
+// is exposed to ordinary viewers; V1 remains the live probe source when the
+// site is configured for V1.
 func (r ChannelMonitorRuntime) ActiveProbesAllowed() bool {
 	return r.Enabled && normalizeChannelMonitorMode(r.Mode) == ChannelMonitorModeV1
 }
 
 // PassiveAggregationAllowed reports whether V2's real-traffic aggregator may
-// run. It is separately guarded by the persisted V2 config and leader lock.
+// run. V2 is a passive administrator observer and does not issue upstream
+// requests, so it may aggregate alongside V1. The separate V2 config and
+// leader lock still control whether aggregation actually runs.
 func (r ChannelMonitorRuntime) PassiveAggregationAllowed() bool {
-	return r.Enabled && normalizeChannelMonitorMode(r.Mode) == ChannelMonitorModeV2
+	return r.Enabled
 }
 
 // GetChannelMonitorRuntime reads the channel monitor feature flags directly from

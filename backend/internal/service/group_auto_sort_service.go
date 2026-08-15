@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log"
 	"math"
+	"sort"
 	"sync"
 	"time"
 
@@ -20,23 +21,22 @@ const (
 	groupAutoSortDefaultInterval = time.Minute
 	// groupAutoSortRunTimeout 单轮全量重排的超时。
 	groupAutoSortRunTimeout = 2 * time.Minute
-	// groupAutoSortExperienceWindow 使用足够短的真实请求窗口保持实时性，同时避免被单次抖动支配。
-	groupAutoSortExperienceWindow = 30 * time.Minute
-	// groupAutoSortExperienceLongWindow supplies a decayed baseline so a quiet
-	// account is not promoted (or quarantined) from a handful of recent calls.
-	groupAutoSortExperienceLongWindow = 24 * time.Hour
+	// groupAutoSortProbeWindow is the primary health window. Account probes run
+	// every 60 seconds in production, so this gives roughly fifteen fresh
+	// observations without retaining stale upstream behavior for half an hour.
+	groupAutoSortProbeWindow = 15 * time.Minute
+	// A few successful probe samples are enough to leave probation, but a
+	// missing/stale probe never masquerades as a healthy account.
+	groupAutoSortProbeMinSamples = 3
+	// Real user traffic is a model-specific overlay. Keep it on the same short
+	// window so an unstable upstream is not hidden by old traffic history.
+	groupAutoSortExperienceWindow = groupAutoSortProbeWindow
 	// groupAutoSortExperienceMinAttempts 达到该样本量后才使用完整失败率分层。
 	groupAutoSortExperienceMinAttempts int64 = 20
 	// groupAutoSortExperienceMinModelAttempts 模型级异常的最小判定样本。
 	// Model-level rates are noisier than account-level rates, so require ten
 	// requests before a model can move an account into a degraded tier.
 	groupAutoSortExperienceMinModelAttempts int64 = 10
-	// groupAutoSortRateMaxFailureRate 是低价分组进入已验证主力层的最大上游尝试失败率。
-	groupAutoSortRateMaxFailureRate = 0.10
-	// groupAutoSortRateSevereFailureRate 将持续失败账号直接降到故障层。
-	groupAutoSortRateSevereFailureRate = 0.20
-	// groupAutoSortRateMaxP95FirstTokenMs 是低价分组已验证主力层的首字上限。
-	groupAutoSortRateMaxP95FirstTokenMs = 30000.0
 	// groupAutoSortRateMinFirstTokenSamples 避免少量慢样本触发长期降级。
 	groupAutoSortRateMinFirstTokenSamples int64 = 8
 	// groupAutoSortExperienceMaxP95FirstTokenMs 是体验分组健康主力层的首字上限。
@@ -65,14 +65,16 @@ type groupAutoSortAdmin interface {
 	UpdateGroupAccountScheduling(ctx context.Context, groupID int64, configs []AccountSchedulingConfig) error
 }
 
-// groupAutoSortAvailabilityProvider 提供按 account_id 索引的近 1 小时可用率，用于 availability 依据排序。
+// groupAutoSortAvailabilityProvider 提供按 account_id 索引的探针状态和时间线。
+// 自动排序从时间线计算最近 15 分钟窗口，旧的 1 小时聚合只用于兼容没有时间线的状态提供者。
 type groupAutoSortAvailabilityProvider interface {
 	StatusByAccountID(ctx context.Context) (map[int64]*AccountMonitorStatus, error)
 }
 
 // GroupAutoSortService periodically reorders enabled groups with one canonical
 // comparator: hard scheduling gates, real-request/model stability, latency and
-// cache signals, then reserve role and (only for a near-tie) upstream rate.
+// cache signals, then (only for a near-tie) upstream rate.  The legacy
+// primary/backup role is metadata only and never changes the order.
 // The legacy auto_sort_config basis is accepted for API compatibility but does
 // not select a different ranking policy.
 //
@@ -285,13 +287,8 @@ func (s *GroupAutoSortService) sortGroup(ctx context.Context, g Group, _ string,
 	experienceByAccount := map[int64]*groupAutoSortExperienceStats{}
 	if s.experience != nil {
 		now := time.Now()
-		recentSince := now.Add(-groupAutoSortExperienceWindow)
-		longSince := now.Add(-groupAutoSortExperienceLongWindow)
-		if weighted, ok := s.experience.(groupAutoSortWeightedExperienceProvider); ok {
-			experienceByAccount, err = weighted.StatsByAccountIDWeighted(ctx, g.ID, accountIDs, recentSince, longSince)
-		} else {
-			experienceByAccount, err = s.experience.StatsByAccountID(ctx, g.ID, accountIDs, recentSince)
-		}
+		experienceSince := now.Add(-groupAutoSortExperienceWindow)
+		experienceByAccount, err = s.experience.StatsByAccountID(ctx, g.ID, accountIDs, experienceSince)
 		if err != nil {
 			log.Printf("[GroupAutoSort] load experience stats group=%d failed: %v", g.ID, err)
 			experienceByAccount = map[int64]*groupAutoSortExperienceStats{}
@@ -364,14 +361,15 @@ func (s *GroupAutoSortService) sortGroup(ctx context.Context, g Group, _ string,
 	if !changed {
 		return
 	}
-	if !s.canReorderGroup(g.ID, time.Now()) {
+	reorderNow := time.Now()
+	if !s.canReorderGroup(g.ID, reorderNow) && !groupAutoSortHasUrgentTierMove(items) {
 		return
 	}
 	if err := s.admin.UpdateGroupAccountScheduling(ctx, g.ID, configs); err != nil {
 		log.Printf("[GroupAutoSort] update group order group=%d failed: %v", g.ID, err)
 		return
 	}
-	s.markReorderedGroup(g.ID, time.Now())
+	s.markReorderedGroup(g.ID, reorderNow)
 }
 
 func (s *GroupAutoSortService) canReorderGroup(groupID int64, now time.Time) bool {
@@ -393,6 +391,19 @@ func (s *GroupAutoSortService) markReorderedGroup(groupID int64, now time.Time) 
 	s.orderMu.Lock()
 	defer s.orderMu.Unlock()
 	s.lastReorderAt[groupID] = now
+}
+
+// groupAutoSortHasUrgentTierMove bypasses the minimum-residence window only
+// when a hard scheduling failure changed an account's position. This keeps
+// normal score jitter sticky while allowing a fresh probe failure or an
+// account-level scheduling block to leave the serving path immediately.
+func groupAutoSortHasUrgentTierMove(items []groupAutoSortRanked) bool {
+	for desiredPosition, item := range items {
+		if item.tier >= 3 && item.currentOrder != desiredPosition {
+			return true
+		}
+	}
+	return false
 }
 
 func groupAutoSortWithHysteresis(items []groupAutoSortRanked) {
@@ -427,8 +438,9 @@ func groupAutoSortExperienceShouldPromote(candidate, incumbent groupAutoSortRank
 	if !candidate.hasKey {
 		return false
 	}
-	// A role is only a tie-breaker. A backup may promote over a primary when it
-	// has a materially better health score, but not for a small fluctuation.
+	// A material health improvement is required to move an account within the
+	// same tier.  Role is intentionally not considered: primary/backup is a
+	// legacy label, not a quality signal.
 	threshold := math.Max(groupAutoSortExperienceScoreDeadband, math.Abs(incumbent.key)*groupAutoSortScoreImprovement)
 	if candidate.key+threshold < incumbent.key {
 		return true
@@ -438,12 +450,10 @@ func groupAutoSortExperienceShouldPromote(candidate, incumbent groupAutoSortRank
 	if math.Abs(candidate.key-incumbent.key) <= threshold && candidate.hasRate && incumbent.hasRate && candidate.rate < incumbent.rate {
 		return true
 	}
-	return schedulerRoleRankForAutoSort(candidate.entry.Role) < schedulerRoleRankForAutoSort(incumbent.entry.Role)
+	return false
 }
 
 func groupAutoSortStrictlyBefore(a, b groupAutoSortRanked) bool {
-	aRole := schedulerRoleRankForAutoSort(a.entry.Role)
-	bRole := schedulerRoleRankForAutoSort(b.entry.Role)
 	if a.tier != b.tier {
 		return a.tier < b.tier
 	}
@@ -452,9 +462,6 @@ func groupAutoSortStrictlyBefore(a, b groupAutoSortRanked) bool {
 	}
 	if a.hasKey && a.key != b.key {
 		return a.key < b.key
-	}
-	if aRole != bRole {
-		return aRole < bRole
 	}
 	if a.hasRate != b.hasRate {
 		return a.hasRate
@@ -465,25 +472,113 @@ func groupAutoSortStrictlyBefore(a, b groupAutoSortRanked) bool {
 	return a.currentOrder < b.currentOrder
 }
 
-func schedulerRoleRankForAutoSort(role string) int {
-	if role == AccountGroupRoleBackup {
-		return 1
+// groupAutoSortProbeStats is the short-lived account-level health baseline
+// derived from the configured account probe. It deliberately describes the
+// upstream account as a whole; model-specific user traffic is layered on top
+// only when enough samples exist.
+type groupAutoSortProbeStats struct {
+	known           bool
+	samples         int
+	failures        int
+	degraded        int
+	availability    float64
+	p95LatencyMs    float64
+	latestStatus    string
+	latestIsFailure bool
+}
+
+func (p groupAutoSortProbeStats) failureRate() float64 {
+	if p.samples <= 0 {
+		return 0
 	}
-	return 0
+	return float64(p.failures) / float64(p.samples)
+}
+
+// groupAutoSortProbeWindowStats converts the account monitor timeline into a
+// fresh 15-minute window. The status aggregate's one-hour fields are retained
+// only as a compatibility fallback for synthetic/legacy callers that do not
+// supply a timeline.
+func groupAutoSortProbeWindowStats(status *AccountMonitorStatus, now time.Time) groupAutoSortProbeStats {
+	if status == nil || !groupAutoSortMonitorKnown(status, now) {
+		return groupAutoSortProbeStats{}
+	}
+	windowStart := now.Add(-groupAutoSortProbeWindow)
+	latencies := make([]float64, 0, len(status.Timeline))
+	stats := groupAutoSortProbeStats{latestStatus: status.LatestStatus}
+	for _, check := range status.Timeline {
+		if check == nil || check.CheckedAt.IsZero() || check.CheckedAt.Before(windowStart) || check.CheckedAt.After(now.Add(groupAutoSortMonitorMinFreshness)) {
+			continue
+		}
+		if stats.latestStatus == "" {
+			stats.latestStatus = check.Status
+		}
+		switch check.Status {
+		case MonitorStatusOperational:
+			stats.samples++
+		case MonitorStatusDegraded:
+			stats.samples++
+			stats.degraded++
+		case MonitorStatusFailed, MonitorStatusError:
+			stats.samples++
+			stats.failures++
+		default:
+			continue
+		}
+		if check.LatencyMs != nil && *check.LatencyMs > 0 {
+			latencies = append(latencies, float64(*check.LatencyMs))
+		} else if check.PingLatencyMs != nil && *check.PingLatencyMs > 0 {
+			latencies = append(latencies, float64(*check.PingLatencyMs))
+		}
+	}
+	if stats.samples == 0 {
+		// Unit tests and older status providers may only expose the aggregate.
+		// Use one fresh synthetic sample rather than treating a known-good probe
+		// as absent, while production timelines always take the path above.
+		if status.LatestStatus == MonitorStatusOperational || status.LatestStatus == MonitorStatusDegraded ||
+			status.LatestStatus == MonitorStatusFailed || status.LatestStatus == MonitorStatusError {
+			stats.samples = 1
+			stats.availability = status.Availability1h
+			if status.LatestStatus == MonitorStatusFailed || status.LatestStatus == MonitorStatusError {
+				stats.failures = 1
+			} else if status.LatestStatus == MonitorStatusDegraded {
+				stats.degraded = 1
+			}
+			if status.AvgLatency1h != nil && *status.AvgLatency1h > 0 {
+				latencies = append(latencies, *status.AvgLatency1h)
+			}
+		}
+	}
+	if stats.samples == 0 {
+		return groupAutoSortProbeStats{}
+	}
+	if stats.availability == 0 || len(status.Timeline) > 0 {
+		stats.availability = float64(stats.samples-stats.failures) * 100 / float64(stats.samples)
+	}
+	stats.known = true
+	stats.latestIsFailure = stats.latestStatus == MonitorStatusFailed || stats.latestStatus == MonitorStatusError
+	if len(latencies) > 0 {
+		sort.Float64s(latencies)
+		index := int(math.Ceil(float64(len(latencies))*0.95)) - 1
+		if index < 0 {
+			index = 0
+		}
+		if index >= len(latencies) {
+			index = len(latencies) - 1
+		}
+		stats.p95LatencyMs = latencies[index]
+	}
+	return stats
 }
 
 func groupAutoSortHealthTier(acc *Account, monitor *AccountMonitorStatus, experience *groupAutoSortExperienceStats) int {
 	if acc == nil || acc.SchedulingBlockReasonAt(time.Now()) != AccountSchedulingBlockNone {
 		return 4
 	}
-	monitorKnown := groupAutoSortMonitorKnown(monitor, time.Now()) && (monitor.LatestStatus == MonitorStatusOperational ||
-		monitor.LatestStatus == MonitorStatusDegraded ||
-		monitor.LatestStatus == MonitorStatusFailed ||
-		monitor.LatestStatus == MonitorStatusError)
-	if monitorKnown {
-		if monitor.LatestStatus == MonitorStatusFailed || monitor.LatestStatus == MonitorStatusError || monitor.Availability1h < 80 {
-			return 3
-		}
+	probe := groupAutoSortProbeWindowStats(monitor, time.Now())
+	// A current probe failure is an immediate account-level demotion. It is not
+	// diluted by a good model-specific traffic sample.
+	if probe.known && (probe.latestIsFailure || probe.availability < 80) {
+		return 3
 	}
 	if experience != nil {
 		failureRate := experience.failureRate()
@@ -497,93 +592,73 @@ func groupAutoSortHealthTier(acc *Account, monitor *AccountMonitorStatus, experi
 			return 2
 		}
 	}
-	if monitorKnown && (monitor.LatestStatus == MonitorStatusDegraded || monitor.Availability1h < 95) {
-		return 2
-	}
-	// Tier 0 is proven only after enough real traffic. Probe-only or low-sample
-	// accounts stay in the fresh/probation tier until user traffic validates
-	// their model success rate.
-	if experience == nil || experience.attempts() < groupAutoSortExperienceMinAttempts {
-		return 1
-	}
-	return 0
-}
-
-// groupAutoSortRateHealthTier keeps cost-oriented groups cheap without letting
-// an inexpensive but failing account become their primary. A proven account
-// must have enough real attempts, at least 90% upstream-attempt success, and a
-// bounded P95 first-token latency. New accounts remain usable as probationary
-// overflow so they can collect samples without displacing a proven primary.
-func groupAutoSortRateHealthTier(acc *Account, monitor *AccountMonitorStatus, experience *groupAutoSortExperienceStats) int {
-	if acc == nil || acc.SchedulingBlockReasonAt(time.Now()) != AccountSchedulingBlockNone {
-		return 4
-	}
-	monitorKnown := groupAutoSortMonitorKnown(monitor, time.Now()) && (monitor.LatestStatus == MonitorStatusOperational ||
-		monitor.LatestStatus == MonitorStatusDegraded ||
-		monitor.LatestStatus == MonitorStatusFailed ||
-		monitor.LatestStatus == MonitorStatusError)
-	if monitorKnown && (monitor.LatestStatus == MonitorStatusFailed ||
-		monitor.LatestStatus == MonitorStatusError || monitor.Availability1h < 80) {
-		return 3
-	}
-
-	if experience != nil && experience.attempts() >= groupAutoSortExperienceMinAttempts {
-		failureRate := experience.failureRate()
-		if failureRate >= groupAutoSortRateSevereFailureRate {
-			return 3
-		}
-		if failureRate > groupAutoSortRateMaxFailureRate ||
-			(experience.FirstTokenSamples >= groupAutoSortRateMinFirstTokenSamples && experience.P95FirstTokenMs > groupAutoSortRateMaxP95FirstTokenMs) {
+	if probe.known {
+		if probe.latestStatus == MonitorStatusDegraded || probe.degraded > 0 || probe.availability < 95 ||
+			probe.p95LatencyMs > groupAutoSortExperienceMaxP95FirstTokenMs {
 			return 2
 		}
-		if monitorKnown && (monitor.LatestStatus == MonitorStatusDegraded || monitor.Availability1h < 95) {
+		if probe.samples < groupAutoSortProbeMinSamples || experience == nil || experience.attempts() < groupAutoSortExperienceMinAttempts {
 			return 1
 		}
 		return 0
 	}
+	// No fresh probe means the account is probationary, even when it has old
+	// traffic data. This keeps stopped probes from leaving a stale green rank.
+	return 1
+}
 
-	if monitorKnown {
-		if monitor.LatestStatus == MonitorStatusOperational && monitor.Availability1h >= 95 {
-			return 1
-		}
-		return 2
-	}
-	return 2
+// groupAutoSortRateHealthTier is retained for compatibility with older tests
+// and callers; all group bases now use the same probe-first policy.
+func groupAutoSortRateHealthTier(acc *Account, monitor *AccountMonitorStatus, experience *groupAutoSortExperienceStats) int {
+	return groupAutoSortHealthTier(acc, monitor, experience)
 }
 
 func groupAutoSortExperienceScore(monitor *AccountMonitorStatus, experience *groupAutoSortExperienceStats) float64 {
 	score := 0.0
-	if experience == nil || experience.attempts() == 0 {
-		score += 50
+	probe := groupAutoSortProbeWindowStats(monitor, time.Now())
+	if !probe.known {
+		score += 40
 	} else {
-		score += 700 * experience.failureRate()
-		score += 300 * experience.failoverRate()
-		score += 500 * experience.worstModelFailureRate(groupAutoSortExperienceMinModelAttempts)
-		if experience.attempts() < groupAutoSortExperienceMinAttempts {
-			score += 25
+		// Probe health is the dominant account/site baseline.
+		score += 1200 * probe.failureRate()
+		score += math.Max(0, 100-probe.availability) * 2
+		if probe.latestIsFailure {
+			score += 100
 		}
-		if experience.FirstTokenSamples > 0 {
-			score += math.Min(experience.P95FirstTokenMs, 120000) / 1000
-		} else {
-			score += 30
+		if probe.latestStatus == MonitorStatusDegraded || probe.degraded > 0 {
+			score += 8
 		}
-		if experience.DurationSamples > 0 {
-			score += math.Min(experience.P95DurationMs, 600000) / 10000
+		if probe.p95LatencyMs > 0 {
+			score += math.Min(probe.p95LatencyMs, 120000) / 1000
 		}
-		if experience.SuccessCount >= 4 {
-			score += 5 * (1 - experience.cacheHitRate())
-		} else {
-			score += 2.5
+		if probe.samples < groupAutoSortProbeMinSamples {
+			score += 20
 		}
 	}
-	monitorKnown := groupAutoSortMonitorKnown(monitor, time.Now()) && (monitor.LatestStatus == MonitorStatusOperational || monitor.LatestStatus == MonitorStatusDegraded)
-	if monitorKnown {
-		score += math.Max(0, 100-monitor.Availability1h) * 0.5
-		if (experience == nil || experience.FirstTokenSamples == 0) && monitor.AvgLatency1h != nil {
-			score += math.Min(*monitor.AvgLatency1h, 120000) / 1000
-		}
+	if experience == nil || experience.attempts() == 0 {
+		score += 25
 	} else {
-		score += 20
+		// Real traffic is a model-specific overlay, deliberately weaker than the
+		// account-level probe so it cannot hide a failing upstream endpoint.
+		score += 350 * experience.failureRate()
+		score += 150 * experience.failoverRate()
+		score += 200 * experience.worstModelFailureRate(groupAutoSortExperienceMinModelAttempts)
+		if experience.attempts() < groupAutoSortExperienceMinAttempts {
+			score += 15
+		}
+		if experience.FirstTokenSamples > 0 {
+			score += math.Min(experience.P95FirstTokenMs, 120000) / 2000
+		} else {
+			score += 15
+		}
+		if experience.DurationSamples > 0 {
+			score += math.Min(experience.P95DurationMs, 600000) / 20000
+		}
+		if experience.SuccessCount >= 4 {
+			score += 2 * (1 - experience.cacheHitRate())
+		} else {
+			score += 1
+		}
 	}
 	return score
 }

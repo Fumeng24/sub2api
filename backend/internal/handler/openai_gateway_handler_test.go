@@ -126,6 +126,30 @@ func TestOpenAIHandleStreamingAwareErrorWithCode_EmitsStableClassification(t *te
 	require.Equal(t, http.StatusBadGateway, streamErr.IntendedStatus)
 }
 
+func TestOpenAIHandleStreamingAwareErrorWithCode_UsesOfficialModelNotFoundShape(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	h := &OpenAIGatewayHandler{}
+	h.handleStreamingAwareErrorWithCode(
+		c,
+		http.StatusNotFound,
+		"invalid_request_error",
+		"model_not_found",
+		"The requested model is not supported",
+		false,
+		false,
+	)
+
+	require.Equal(t, http.StatusNotFound, w.Code)
+	require.Equal(t, "invalid_request_error", gjson.Get(w.Body.String(), "error.type").String())
+	require.Equal(t, "model_not_found", gjson.Get(w.Body.String(), "error.code").String())
+	require.True(t, gjson.Get(w.Body.String(), "error.param").Exists())
+	require.Equal(t, "The requested model is not supported", gjson.Get(w.Body.String(), "error.message").String())
+}
+
 func TestOpenAIForwardSucceededForScheduling(t *testing.T) {
 	require.True(t, openAIForwardSucceededForScheduling(nil))
 	require.True(t, openAIForwardSucceededForScheduling(&service.OpenAIForwardResult{}))
@@ -729,6 +753,32 @@ func TestOpenAIModelMappedBody(t *testing.T) {
 	require.Equal(t, 1, calls)
 	require.Equal(t, "gpt-5.4", gjson.GetBytes(forwardBody, "model").String())
 	require.Equal(t, "alias", gjson.GetBytes(body, "model").String())
+}
+
+func TestOpenAICompatForwardBodyMapsLunaToSolWithoutChannelMapping(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.6-luna","input":"hello"}`)
+	mapping := service.ChannelMappingResult{MappedModel: "gpt-5.6-sol"}
+
+	forwardBody := openAICompatForwardBody(body, mapping, "gpt-5.6-luna", "gpt-5.6-sol", service.ReplaceModelInBody)
+	usageMapping := openAICompatUsageMapping(mapping, "gpt-5.6-luna", "gpt-5.6-sol")
+	usageFields := usageMapping.ToUsageFields("gpt-5.6-luna", "gpt-5.6-sol")
+
+	require.Equal(t, "gpt-5.6-sol", gjson.GetBytes(forwardBody, "model").String())
+	require.Equal(t, "gpt-5.6-luna", gjson.GetBytes(body, "model").String())
+	require.True(t, usageMapping.Mapped)
+	require.Equal(t, "gpt-5.6-sol", usageMapping.MappedModel)
+	require.Equal(t, "gpt-5.6-luna→gpt-5.6-sol", usageFields.ModelMappingChain)
+}
+
+func TestOpenAICompatForwardBodyKeepsChannelMapping(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.6-luna","input":"hello"}`)
+	mapping := service.ChannelMappingResult{Mapped: true, MappedModel: "gpt-5.6-terra"}
+
+	forwardBody := openAICompatForwardBody(body, mapping, "gpt-5.6-luna", "gpt-5.6-sol", service.ReplaceModelInBody)
+	usageMapping := openAICompatUsageMapping(mapping, "gpt-5.6-luna", "gpt-5.6-sol")
+
+	require.Equal(t, "gpt-5.6-terra", gjson.GetBytes(forwardBody, "model").String())
+	require.Equal(t, "gpt-5.6-luna→gpt-5.6-terra", usageMapping.BuildModelMappingChain("gpt-5.6-luna", "gpt-5.6-terra"))
 }
 
 func TestOpenAIModelMappedBodyCache(t *testing.T) {
@@ -1358,6 +1408,20 @@ func TestOpenAIResponsesWebSocket_PassthroughUsageLogInfersReasoningFromInitialR
 	require.NotNil(t, got.log.ReasoningEffort)
 	require.Equal(t, "xhigh", *got.log.ReasoningEffort,
 		"usage log reasoning effort 必须使用渠道映射前首帧模型后缀推导")
+}
+
+func TestOpenAIResponsesWebSocket_LunaRoutesToSolAndPreservesRequestedModel(t *testing.T) {
+	got := runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+		firstPayload: `{"type":"response.create","model":"gpt-5.6-luna","stream":false}`,
+	})
+
+	require.Equal(t, "gpt-5.6-sol", gjson.GetBytes(got.upstreamFirstPayload, "model").String())
+	require.Equal(t, "gpt-5.6-luna", gjson.GetBytes(got.clientEvents[0], "response.model").String())
+	require.Equal(t, "gpt-5.6-luna", got.log.RequestedModel)
+	require.NotNil(t, got.log.UpstreamModel)
+	require.Equal(t, "gpt-5.6-sol", *got.log.UpstreamModel)
+	require.NotNil(t, got.log.ModelMappingChain)
+	require.Equal(t, "gpt-5.6-luna→gpt-5.6-sol", *got.log.ModelMappingChain)
 }
 
 func TestOpenAIResponsesWebSocket_PassthroughUsageLogLeavesUserAgentNilWhenMissing(t *testing.T) {

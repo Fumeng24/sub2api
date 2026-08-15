@@ -104,6 +104,14 @@ func TestCustomRoutesRegisterAlongsideUpstreamRoutes(t *testing.T) {
 		"PUT /api/v1/admin/upstreams/:id/accounts/:account_id/upstream-group",
 		"POST /api/v1/admin/subscriptions/:id/reset-with-cost",
 		"PUT /api/v1/admin/channel-monitors/sort-order",
+		"GET /api/v1/admin/channel-monitor-v2/config",
+		"PUT /api/v1/admin/channel-monitor-v2/config",
+		"GET /api/v1/admin/channel-monitor-v2/dimensions",
+		"GET /api/v1/admin/channel-monitor-v2/snapshot",
+		"GET /api/v1/admin/channel-monitor-v2/models",
+		"GET /api/v1/admin/channel-monitor-v2/matrix",
+		"GET /api/v1/admin/channel-monitor-v2/errors",
+		"GET /api/v1/admin/channel-monitor-v2/users",
 		"GET /api/v1/admin/account-monitors",
 		"GET /api/v1/admin/account-monitors/status",
 		"POST /api/v1/admin/account-monitors",
@@ -115,6 +123,18 @@ func TestCustomRoutesRegisterAlongsideUpstreamRoutes(t *testing.T) {
 	for _, route := range expected {
 		_, ok := registered[route]
 		require.Truef(t, ok, "custom route is not registered: %s", route)
+	}
+
+	for _, path := range []string{
+		"/api/v1/channel-monitor-v2/dimensions",
+		"/api/v1/channel-monitor-v2/snapshot",
+		"/api/v1/channel-monitor-v2/models",
+		"/api/v1/channel-monitor-v2/matrix",
+		"/api/v1/channel-monitor-v2/errors",
+		"/api/v1/channel-monitor-v2/users",
+	} {
+		_, ok := registered[http.MethodGet+" "+path]
+		require.Falsef(t, ok, "user-facing V2 route must not be registered: %s", path)
 	}
 }
 

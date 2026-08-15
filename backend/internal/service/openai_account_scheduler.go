@@ -36,6 +36,10 @@ const (
 	// Top-K controls the preferred set, while ordered same-group overflow stays
 	// available for request-local failover. Cap those extra probes defensively.
 	openAIAccountSelectionProbeLimit = 64
+	// A failed first-output attempt consumes most of the normal failover budget.
+	// Use that cost when comparing a fast-but-unreliable account with a slightly
+	// slower stable one instead of sorting by successful TTFT alone.
+	openAIStableLowTTFTFailurePenaltyMs = 20_000.0
 )
 
 const (
@@ -924,6 +928,7 @@ type openAIAccountCandidateScore struct {
 	errorRate float64
 	ttft      float64
 	hasTTFT   bool
+	tailRisk  bool
 }
 
 type openAIAccountCandidateHeap []openAIAccountCandidateScore
@@ -958,6 +963,9 @@ func (h *openAIAccountCandidateHeap) Pop() any {
 }
 
 func isOpenAIAccountCandidateBetter(left openAIAccountCandidateScore, right openAIAccountCandidateScore) bool {
+	if left.tailRisk != right.tailRisk {
+		return !left.tailRisk
+	}
 	if left.score != right.score {
 		return left.score > right.score
 	}
@@ -971,6 +979,15 @@ func isOpenAIAccountCandidateBetter(left openAIAccountCandidateScore, right open
 		return left.loadInfo.WaitingCount < right.loadInfo.WaitingCount
 	}
 	return left.account.ID < right.account.ID
+}
+
+func openAIExpectedSuccessfulTTFT(candidate openAIAccountCandidateScore) float64 {
+	if !candidate.hasTTFT || candidate.ttft <= 0 {
+		return math.Inf(1)
+	}
+	errorRate := clamp01(candidate.errorRate)
+	successProbability := math.Max(1-errorRate, 0.05)
+	return (candidate.ttft + errorRate*openAIStableLowTTFTFailurePenaltyMs) / successProbability
 }
 
 func selectTopKOpenAICandidates(candidates []openAIAccountCandidateScore, topK int) []openAIAccountCandidateScore {
@@ -1029,12 +1046,23 @@ func selectTopKOpenAIStableLowTTFTCandidates(candidates []openAIAccountCandidate
 		unknown = append(unknown, candidate)
 	}
 	sort.SliceStable(known, func(i, j int) bool {
-		if known[i].ttft != known[j].ttft {
-			return known[i].ttft < known[j].ttft
+		if known[i].tailRisk != known[j].tailRisk {
+			return !known[i].tailRisk
+		}
+		leftExpected := openAIExpectedSuccessfulTTFT(known[i])
+		rightExpected := openAIExpectedSuccessfulTTFT(known[j])
+		if leftExpected != rightExpected {
+			return leftExpected < rightExpected
+		}
+		if known[i].errorRate != known[j].errorRate {
+			return known[i].errorRate < known[j].errorRate
 		}
 		return isOpenAIAccountCandidateBetter(known[i], known[j])
 	})
 	sort.SliceStable(unknown, func(i, j int) bool {
+		if unknown[i].tailRisk != unknown[j].tailRisk {
+			return !unknown[i].tailRisk
+		}
 		return isOpenAIAccountCandidateBetter(unknown[i], unknown[j])
 	})
 
@@ -1197,6 +1225,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 			errorRate: errorRate,
 			ttft:      ttft,
 			hasTTFT:   hasTTFT,
+			tailRisk:  s.service.isOpenAIAccountSlowReserveForRequest(account, req.RequestedModel, req.RequireCompact),
 		})
 	}
 

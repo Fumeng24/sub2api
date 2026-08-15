@@ -631,8 +631,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Channel Monitor V2',
       titleKey: 'channelMonitorV2.title',
-      featureFlag: 'channelMonitor',
-      channelMonitorMode: 'v2'
+      featureFlag: 'channelMonitor'
     }
   },
   {
@@ -652,11 +651,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/user/ChannelStatusV2View.vue'),
     meta: {
       requiresAuth: true,
-      requiresAdmin: false,
+      requiresAdmin: true,
       title: 'Channel Status V2',
       titleKey: 'channelMonitorV2.title',
       featureFlag: 'channelMonitor',
-      channelMonitorMode: 'v2'
     }
   },
   {

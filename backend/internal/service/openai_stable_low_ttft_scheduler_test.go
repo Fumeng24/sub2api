@@ -6,13 +6,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func stableLowTTFTCandidate(id int64, score, ttft float64, measured bool) openAIAccountCandidateScore {
+func stableLowTTFTCandidate(id int64, score, ttft float64, measured bool, errorRate ...float64) openAIAccountCandidateScore {
+	rate := 0.0
+	if len(errorRate) > 0 {
+		rate = errorRate[0]
+	}
 	return openAIAccountCandidateScore{
-		account:  &Account{ID: id, Priority: int(id)},
-		loadInfo: &AccountLoadInfo{AccountID: id},
-		score:    score,
-		ttft:     ttft,
-		hasTTFT:  measured,
+		account:   &Account{ID: id, Priority: int(id)},
+		loadInfo:  &AccountLoadInfo{AccountID: id},
+		score:     score,
+		ttft:      ttft,
+		hasTTFT:   measured,
+		errorRate: rate,
 	}
 }
 
@@ -37,6 +42,30 @@ func TestSelectTopKOpenAIStableLowTTFTCandidatesPrefersMeasuredLatency(t *testin
 		stableLowTTFTCandidate(2, 1, 350, true),
 		stableLowTTFTCandidate(3, 50, 900, true),
 		stableLowTTFTCandidate(4, 200, 0, false),
+	}
+
+	selected := selectTopKOpenAIStableLowTTFTCandidates(candidates, 2, 1)
+	require.Equal(t, []int64{2, 3}, stableLowTTFTCandidateIDs(selected))
+}
+
+func TestSelectTopKOpenAIStableLowTTFTCandidatesPenalizesFastUnreliableAccounts(t *testing.T) {
+	candidates := []openAIAccountCandidateScore{
+		stableLowTTFTCandidate(1, 100, 5700, true, 0.49),
+		stableLowTTFTCandidate(2, 90, 9000, true, 0.03),
+		stableLowTTFTCandidate(3, 80, 11000, true, 0.05),
+	}
+
+	selected := selectTopKOpenAIStableLowTTFTCandidates(candidates, 2, 1)
+	require.Equal(t, []int64{2, 3}, stableLowTTFTCandidateIDs(selected))
+}
+
+func TestSelectTopKOpenAIStableLowTTFTCandidatesMovesTailRiskOutOfTopK(t *testing.T) {
+	risky := stableLowTTFTCandidate(1, 100, 4000, true, 0.01)
+	risky.tailRisk = true
+	candidates := []openAIAccountCandidateScore{
+		risky,
+		stableLowTTFTCandidate(2, 90, 9000, true, 0.03),
+		stableLowTTFTCandidate(3, 80, 11000, true, 0.05),
 	}
 
 	selected := selectTopKOpenAIStableLowTTFTCandidates(candidates, 2, 1)

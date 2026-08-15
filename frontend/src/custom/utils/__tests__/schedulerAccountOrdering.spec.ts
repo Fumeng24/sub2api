@@ -124,23 +124,25 @@ describe('scheduler account ordering', () => {
     expect(sorted).toEqual([2, 1])
   })
 
-  it('keeps backup entries after primary entries when group order ties', () => {
-    const backup = entry(1)
+  it('uses account id as the tie-breaker regardless of role', () => {
+    const primary = entry(1)
+    primary.role = 'primary'
+    primary.sort_order = 10
+    const backup = entry(2)
     backup.role = 'backup'
     backup.sort_order = 10
-    const primary = entry(2)
-    primary.sort_order = 10
 
     expect([backup, primary].sort(comparePersistedSchedulerEntries).map((item) => item.account_id))
       .toEqual([1, 2])
   })
 
-  it('preserves an explicit group order across primary and backup roles', () => {
-    const backup = entry(1)
+  it('preserves explicit group order without consulting role', () => {
+    const primary = entry(1)
+    primary.role = 'primary'
+    primary.sort_order = 10
+    const backup = entry(2)
     backup.role = 'backup'
-    backup.sort_order = 10
-    const primary = entry(2)
-    primary.sort_order = 20
+    backup.sort_order = 20
 
     expect([primary, backup].sort(comparePersistedSchedulerEntries).map((item) => item.account_id))
       .toEqual([1, 2])

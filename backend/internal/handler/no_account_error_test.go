@@ -105,6 +105,7 @@ func TestClassifyNoAccountError_ModelNotSupported_Returns404(t *testing.T) {
 
 	require.Equal(t, http.StatusNotFound, cls.Status)
 	require.Equal(t, "model_not_found", cls.ErrType)
+	require.Empty(t, cls.Code)
 	require.True(t, cls.ModelNotFound)
 	require.Equal(t, service.ClientFacingModelUnsupportedMessage(), cls.Message)
 
@@ -113,6 +114,21 @@ func TestClassifyNoAccountError_ModelNotSupported_Returns404(t *testing.T) {
 	require.Equal(t, service.PlatformOpenAI, fd.calls[0].Platform)
 	require.NotNil(t, fd.calls[0].GroupID)
 	require.Equal(t, int64(42), *fd.calls[0].GroupID)
+}
+
+func TestClassifyNoAccountError_LunaDisplayUsesSolRoutingDiagnosis(t *testing.T) {
+	c := newTestGinContextWithRequest()
+	fd := &fakeDiagnoser{resp: service.ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}}
+	apiKey := &service.APIKey{GroupID: ptrInt64(42)}
+
+	cls := classifyNoAccountErrorFromGin(c, fd, apiKey, "gpt-5.6-sol", "gpt-5.6-luna", service.PlatformOpenAI)
+
+	require.Equal(t, http.StatusServiceUnavailable, cls.Status)
+	require.Equal(t, "api_error", cls.ErrType)
+	require.False(t, cls.ModelNotFound)
+	require.Equal(t, service.ClientFacingModelGroupUnavailableMessage(), cls.Message)
+	require.Len(t, fd.calls, 1)
+	require.Equal(t, "gpt-5.6-sol", fd.calls[0].Model)
 }
 
 func TestClassifyOpenAICompatibleNoAccountError_GrokUsesGrokPlatform(t *testing.T) {

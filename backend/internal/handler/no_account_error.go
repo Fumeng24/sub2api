@@ -28,6 +28,7 @@ import (
 type noAccountErrorClassification struct {
 	Status        int
 	ErrType       string
+	Code          string
 	Message       string
 	ModelNotFound bool // true when this is a 404 model_not_found classification
 }
@@ -95,6 +96,15 @@ func classifyNoAccountError(
 		}
 	}
 	return fallback
+}
+
+func isOpenAILunaModel(model string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	if index := strings.LastIndex(normalized, "/"); index >= 0 {
+		normalized = normalized[index+1:]
+	}
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	return normalized == "gpt-5.6-luna" || strings.HasPrefix(normalized, "gpt-5.6-luna-")
 }
 
 // classifyNoAccountErrorFromGin is a thin wrapper that forwards the gin

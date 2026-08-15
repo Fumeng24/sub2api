@@ -758,7 +758,6 @@ func registerChannelMonitorRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerChannelMonitorV2Routes(admin *gin.RouterGroup, h *handler.Handlers, settingService *service.SettingService) {
 	featureGuard := channelMonitorAdminFeatureGuard(settingService)
-	modeV2Guard := channelMonitorModeV2Guard(settingService)
 	monitor := admin.Group("/channel-monitor-v2")
 	{
 		config := monitor.Group("")
@@ -766,7 +765,7 @@ func registerChannelMonitorV2Routes(admin *gin.RouterGroup, h *handler.Handlers,
 		config.GET("/config", h.ChannelMonitorV2.GetConfig)
 		config.PUT("/config", h.ChannelMonitorV2.UpdateConfig)
 		reads := monitor.Group("")
-		reads.Use(modeV2Guard)
+		reads.Use(featureGuard)
 		reads.GET("/dimensions", h.ChannelMonitorV2.Dimensions)
 		reads.GET("/snapshot", h.ChannelMonitorV2.AdminSnapshot)
 		reads.GET("/models", h.ChannelMonitorV2.AdminModels)
@@ -784,28 +783,6 @@ func channelMonitorAdminFeatureGuard(settingService *service.SettingService) gin
 		}
 		response.ErrorFrom(c, service.ErrChannelMonitorDisabled)
 		c.Abort()
-	}
-}
-
-func channelMonitorModeV2Guard(settingService *service.SettingService) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if settingService == nil {
-			response.ErrorFrom(c, service.ErrChannelMonitorDisabled)
-			c.Abort()
-			return
-		}
-		rt := settingService.GetChannelMonitorRuntime(c.Request.Context())
-		if !rt.Enabled {
-			response.ErrorFrom(c, service.ErrChannelMonitorDisabled)
-			c.Abort()
-			return
-		}
-		if !rt.PassiveAggregationAllowed() {
-			response.ErrorFrom(c, service.ErrChannelMonitorModeMismatch)
-			c.Abort()
-			return
-		}
-		c.Next()
 	}
 }
 

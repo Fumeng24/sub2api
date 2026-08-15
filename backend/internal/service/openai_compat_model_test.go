@@ -79,6 +79,10 @@ func TestNormalizeOpenAICompatRequestedModel(t *testing.T) {
 	}{
 		{name: "gpt reasoning alias strips xhigh", input: "gpt-5.4-xhigh", want: "gpt-5.4"},
 		{name: "gpt reasoning alias strips none", input: "gpt-5.4-none", want: "gpt-5.4"},
+		{name: "luna maps to sol", input: "gpt-5.6-luna", want: "gpt-5.6-sol"},
+		{name: "namespaced luna maps to sol", input: "openai/gpt-5.6-luna", want: "gpt-5.6-sol"},
+		{name: "luna reasoning suffix maps to sol", input: "gpt-5.6-luna-xhigh", want: "gpt-5.6-sol"},
+		{name: "luna underscore variant maps to sol", input: "GPT_5.6_LUNA", want: "gpt-5.6-sol"},
 		{name: "codex max model stays intact", input: "gpt-5.1-codex-max", want: "gpt-5.1-codex-max"},
 		{name: "non openai model unchanged", input: "claude-opus-4-6", want: "claude-opus-4-6"},
 	}

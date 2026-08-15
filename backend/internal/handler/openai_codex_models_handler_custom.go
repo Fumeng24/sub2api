@@ -10,11 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func codexModelsIfNoneMatchCustom(group *service.Group, ifNoneMatch string) string {
-	if group != nil && group.CustomModelsListEnabled() {
-		return ""
-	}
-	return ifNoneMatch
+func codexModelsIfNoneMatchCustom(_ *service.Group, _ string) string {
+	// Force one complete manifest response so clients replace any cached catalog
+	// that still contains Luna. The response can still carry a fresh ETag.
+	return ""
 }
 
 func (h *OpenAIGatewayHandler) writeConfiguredCodexModelsManifestCustom(c *gin.Context, group *service.Group, body []byte) bool {
@@ -28,6 +27,44 @@ func (h *OpenAIGatewayHandler) writeConfiguredCodexModelsManifestCustom(c *gin.C
 	}
 	c.Data(http.StatusOK, "application/json", rewritten)
 	return true
+}
+
+// stripLunaFromCodexModelsManifest prevents Codex clients from discovering a
+// model that this site deliberately rejects. This also covers groups without a
+// custom models list when the upstream manifest still advertises Luna.
+func stripLunaFromCodexModelsManifest(body []byte) ([]byte, error) {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, err
+	}
+	if envelope == nil {
+		return nil, errors.New("invalid manifest object")
+	}
+	rawModels, ok := envelope["models"]
+	if !ok {
+		return nil, errors.New("missing models array")
+	}
+	var models []json.RawMessage
+	if err := json.Unmarshal(rawModels, &models); err != nil {
+		return nil, err
+	}
+
+	filtered := make([]json.RawMessage, 0, len(models))
+	for _, rawModel := range models {
+		var model struct {
+			Slug string `json:"slug"`
+		}
+		if err := json.Unmarshal(rawModel, &model); err == nil && isOpenAILunaModel(model.Slug) {
+			continue
+		}
+		filtered = append(filtered, rawModel)
+	}
+	rawFiltered, err := json.Marshal(filtered)
+	if err != nil {
+		return nil, err
+	}
+	envelope["models"] = rawFiltered
+	return json.Marshal(envelope)
 }
 
 // restrictCodexModelsManifest preserves upstream metadata for configured
@@ -96,7 +133,7 @@ func uniqueCodexManifestModelIDs(models []string) []string {
 	result := make([]string, 0, len(models))
 	for _, model := range models {
 		model = strings.TrimSpace(model)
-		if model == "" {
+		if model == "" || isOpenAILunaModel(model) {
 			continue
 		}
 		if _, ok := seen[model]; ok {

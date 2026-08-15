@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -13,6 +14,8 @@ const (
 	openAIStickyFailoverTrackingKey openAIStickyFailoverContextKey = iota + 1
 	openAIPreserveStickyBindingKey
 	openAIStickyOriginalAccountIDKey
+	openAIStickyGroupIDKey
+	openAIStickySessionHashKey
 )
 
 // WithOpenAIStickyFailoverTracking makes the HTTP handler the owner of
@@ -65,6 +68,28 @@ func openAIStickyOriginalAccountID(ctx context.Context) int64 {
 	return accountID
 }
 
+func withOpenAIStickyRoute(ctx context.Context, groupID *int64, sessionHash string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if groupID != nil {
+		ctx = context.WithValue(ctx, openAIStickyGroupIDKey, *groupID)
+	}
+	if sessionHash = strings.TrimSpace(sessionHash); sessionHash != "" {
+		ctx = context.WithValue(ctx, openAIStickySessionHashKey, sessionHash)
+	}
+	return ctx
+}
+
+func openAIStickyRoute(ctx context.Context) (int64, string) {
+	if ctx == nil {
+		return 0, ""
+	}
+	groupID, _ := ctx.Value(openAIStickyGroupIDKey).(int64)
+	sessionHash, _ := ctx.Value(openAIStickySessionHashKey).(string)
+	return groupID, strings.TrimSpace(sessionHash)
+}
+
 // PrepareOpenAIStickyFailoverContext captures the binding that existed before
 // this logical request started. A fallback that has not completed successfully
 // must not accidentally become the binding protected by a later transient
@@ -76,6 +101,7 @@ func (s *OpenAIGatewayService) PrepareOpenAIStickyFailoverContext(
 	requestedModel string,
 ) context.Context {
 	ctx = WithOpenAIStickyFailoverTracking(ctx)
+	ctx = withOpenAIStickyRoute(ctx, groupID, sessionHash)
 	if s == nil || s.cache == nil || strings.TrimSpace(sessionHash) == "" {
 		return ctx
 	}
@@ -88,6 +114,36 @@ func (s *OpenAIGatewayService) PrepareOpenAIStickyFailoverContext(
 	// healthy fallback must be allowed to replace it.
 	ctx = withOpenAIStickyOriginalAccountID(ctx, accountID)
 	return ctx
+}
+
+func (s *OpenAIGatewayService) invalidateOpenAIStickyBindingAfterTimeout(
+	ctx context.Context,
+	accountID int64,
+	failure *UpstreamFailoverError,
+) {
+	if s == nil || s.cache == nil || accountID <= 0 {
+		return
+	}
+	if _, timeoutLike := openAISlowReserveFailureReason(failure); !timeoutLike {
+		return
+	}
+	groupID, sessionHash := openAIStickyRoute(ctx)
+	if groupID <= 0 || sessionHash == "" {
+		return
+	}
+	stateCtx, cancel := openAIAccountStateContext(ctx)
+	defer cancel()
+	boundAccountID, err := s.getStickySessionAccountID(stateCtx, &groupID, sessionHash)
+	if err != nil || boundAccountID != accountID {
+		return
+	}
+	if err := s.deleteStickySessionAccountID(stateCtx, &groupID, sessionHash); err != nil {
+		return
+	}
+	slog.Info("openai_sticky_timeout_binding_invalidated",
+		"account_id", accountID,
+		"group_id", groupID,
+	)
 }
 
 // ShouldPreserveOpenAIStickyBindingAfterFailure records one logical transient
@@ -103,6 +159,7 @@ func (s *OpenAIGatewayService) ShouldPreserveOpenAIStickyBindingAfterFailure(
 	if s == nil || account == nil || account.Platform != PlatformOpenAI || failure == nil {
 		return false
 	}
+	s.invalidateOpenAIStickyBindingAfterTimeout(ctx, account.ID, failure)
 	if !failure.ShouldReportAccountScheduleFailure() {
 		return shouldPreserveOpenAIStickyRequestOriginal(ctx, account.ID)
 	}

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
@@ -10,6 +11,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// slowRequestLogThreshold is deliberately shorter than the gateway's upstream
+// timeout so an in-flight request remains diagnosable before it eventually
+// becomes an error (or a usage log).
+const slowRequestLogThreshold = 30 * time.Second
+
 // Logger 请求日志中间件
 func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -18,6 +24,28 @@ func Logger() gin.HandlerFunc {
 
 		// 请求路径
 		path := c.Request.URL.Path
+		if path != "/health" && path != "/setup/status" {
+			requestLogger := logger.FromContext(c.Request.Context())
+			requestLogger.Info("http request started", zap.Time("started_at", startTime))
+
+			// usage_logs and ops_error_logs are written after the handler returns.
+			// Keep a lifecycle breadcrumb for requests that are still waiting on
+			// auth, scheduling, an upstream response, or response-body draining.
+			var completed atomic.Bool
+			slowTimer := time.AfterFunc(slowRequestLogThreshold, func() {
+				if completed.Load() {
+					return
+				}
+				requestLogger.Warn("http request still in progress",
+					zap.Int64("elapsed_ms", time.Since(startTime).Milliseconds()),
+					zap.Time("started_at", startTime),
+				)
+			})
+			defer func() {
+				completed.Store(true)
+				slowTimer.Stop()
+			}()
+		}
 
 		// 处理请求
 		c.Next()

@@ -43,6 +43,10 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		return
 	}
 	model := strings.TrimSpace(gjson.GetBytes(request.Session, "model").String())
+	routingModel := service.NormalizeOpenAICompatRequestedModel(model)
+	if routingModel != model {
+		request.Session = service.ReplaceModelInBody(request.Session, routingModel)
+	}
 	reqLog := requestLogger(
 		c,
 		"handler.openai_gateway.live",

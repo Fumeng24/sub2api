@@ -22,6 +22,44 @@ func TestOpenAIStickyFailoverTransientFailureMigratesImmediately(t *testing.T) {
 	require.Equal(t, 3, svc.openaiModelTransient.activeFailureStreak(account.ID, "gpt-5.6-sol", time.Now()))
 }
 
+func TestOpenAIStickyFirstOutputTimeoutDeletesCurrentBindingImmediately(t *testing.T) {
+	groupID := int64(10)
+	account := &Account{ID: 7111, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	cache := &schedulerTestGatewayCache{sessionBindings: map[string]int64{"openai:session-timeout": account.ID}}
+	svc := &OpenAIGatewayService{
+		cache:                cache,
+		openaiModelTransient: newOpenAIAccountModelTransientState(128),
+	}
+	ctx := svc.PrepareOpenAIStickyFailoverContext(context.Background(), &groupID, "session-timeout", "gpt-5.6-sol")
+	failure := &UpstreamFailoverError{
+		StatusCode:   http.StatusGatewayTimeout,
+		ResponseBody: []byte(`{"error":{"type":"first_output_timeout"}}`),
+	}
+
+	require.False(t, svc.ShouldPreserveOpenAIStickyBindingAfterFailure(ctx, account, "gpt-5.6-sol", failure))
+	require.NotContains(t, cache.sessionBindings, "openai:session-timeout")
+	require.Contains(t, cache.deletedSessions, "openai:session-timeout")
+}
+
+func TestOpenAIStickyTimeoutDoesNotDeleteReplacementBinding(t *testing.T) {
+	groupID := int64(10)
+	failed := &Account{ID: 7121, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	cache := &schedulerTestGatewayCache{sessionBindings: map[string]int64{"openai:session-timeout": 7122}}
+	svc := &OpenAIGatewayService{
+		cache:                cache,
+		openaiModelTransient: newOpenAIAccountModelTransientState(128),
+	}
+	ctx := withOpenAIStickyRoute(context.Background(), &groupID, "session-timeout")
+	failure := &UpstreamFailoverError{
+		StatusCode:   http.StatusGatewayTimeout,
+		ResponseBody: []byte(`{"error":{"type":"first_output_timeout"}}`),
+	}
+
+	require.False(t, svc.ShouldPreserveOpenAIStickyBindingAfterFailure(ctx, failed, "gpt-5.6-sol", failure))
+	require.Equal(t, int64(7122), cache.sessionBindings["openai:session-timeout"])
+	require.Empty(t, cache.deletedSessions)
+}
+
 func TestOpenAIStickyFailoverHardFailuresMigrateImmediately(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -376,7 +376,7 @@ func TestGroupAutoSortExperience_BestChallengerIsNotBlockedByDeadbandNeighbor(t 
 	require.Equal(t, int64(2), items[2].entry.AccountID)
 }
 
-func TestGroupAutoSortExperience_DoesNotPromoteBackupOverPrimary(t *testing.T) {
+func TestGroupAutoSortExperience_IgnoresPrimaryBackupRole(t *testing.T) {
 	items := []groupAutoSortRanked{
 		{
 			entry:        AccountSchedulingEntry{AccountSchedulingConfig: AccountSchedulingConfig{AccountID: 1, Role: AccountGroupRolePrimary}},
@@ -396,11 +396,34 @@ func TestGroupAutoSortExperience_DoesNotPromoteBackupOverPrimary(t *testing.T) {
 
 	groupAutoSortExperienceWithHysteresis(items)
 
-	// Reserve role is only a tie-breaker. A materially healthier backup is
-	// allowed to outrank a degraded primary so users do not see avoidable
-	// provider errors.
+	// A materially healthier account outranks a degraded account regardless of
+	// the legacy primary/backup label.
 	require.Equal(t, int64(2), items[0].entry.AccountID)
 	require.Equal(t, int64(1), items[1].entry.AccountID)
+}
+
+func TestGroupAutoSortExperience_DoesNotUseRoleForEqualHealth(t *testing.T) {
+	items := []groupAutoSortRanked{
+		{
+			entry:        AccountSchedulingEntry{AccountSchedulingConfig: AccountSchedulingConfig{AccountID: 1, Role: AccountGroupRoleBackup}},
+			tier:         0,
+			key:          10,
+			hasKey:       true,
+			currentOrder: 0,
+		},
+		{
+			entry:        AccountSchedulingEntry{AccountSchedulingConfig: AccountSchedulingConfig{AccountID: 2, Role: AccountGroupRolePrimary}},
+			tier:         0,
+			key:          10,
+			hasKey:       true,
+			currentOrder: 1,
+		},
+	}
+
+	groupAutoSortWithHysteresis(items)
+
+	require.Equal(t, int64(1), items[0].entry.AccountID)
+	require.Equal(t, int64(2), items[1].entry.AccountID)
 }
 
 func TestGroupAutoSortStrategiesRemainIndependentPerGroup(t *testing.T) {
@@ -524,6 +547,87 @@ func TestGroupAutoSortMonitorKnownRejectsDisabledAndStaleEvidence(t *testing.T) 
 	fresh.Enabled = true
 	fresh.LastCheckedAt = groupAutoSortTimePtr(now.Add(-time.Minute))
 	require.True(t, groupAutoSortMonitorKnown(&fresh, now))
+}
+
+func TestGroupAutoSortProbeWindowStatsUsesFresh15MinuteTimeline(t *testing.T) {
+	now := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
+	status := &AccountMonitorStatus{
+		MonitorID:       1,
+		AccountID:       1001,
+		Enabled:         true,
+		IntervalSeconds: 60,
+		LatestStatus:    MonitorStatusOperational,
+		LastCheckedAt:   groupAutoSortTimePtr(now),
+		Timeline: []*AccountMonitorCheck{
+			{Status: MonitorStatusOperational, LatencyMs: groupAutoSortIntPtr(100), CheckedAt: now.Add(-time.Minute)},
+			{Status: MonitorStatusDegraded, LatencyMs: groupAutoSortIntPtr(200), CheckedAt: now.Add(-2 * time.Minute)},
+			{Status: MonitorStatusFailed, LatencyMs: groupAutoSortIntPtr(300), CheckedAt: now.Add(-3 * time.Minute)},
+			// Older probe evidence must not dilute the current 15-minute result.
+			{Status: MonitorStatusOperational, LatencyMs: groupAutoSortIntPtr(1), CheckedAt: now.Add(-16 * time.Minute)},
+		},
+	}
+
+	stats := groupAutoSortProbeWindowStats(status, now)
+	require.True(t, stats.known)
+	require.Equal(t, 3, stats.samples)
+	require.Equal(t, 1, stats.failures)
+	require.Equal(t, 1, stats.degraded)
+	require.InDelta(t, 66.666, stats.availability, 0.01)
+	require.InDelta(t, 300, stats.p95LatencyMs, 0.01)
+}
+
+func TestGroupAutoSortHealthTierLatestProbeFailureOverridesGoodTraffic(t *testing.T) {
+	now := time.Now()
+	account := groupAutoSortAccount(1002, "probe-failed")
+	monitor := &AccountMonitorStatus{
+		MonitorID:       2,
+		AccountID:       account.ID,
+		Enabled:         true,
+		IntervalSeconds: 60,
+		LatestStatus:    MonitorStatusError,
+		LastCheckedAt:   groupAutoSortTimePtr(now),
+		Timeline:        []*AccountMonitorCheck{{Status: MonitorStatusError, CheckedAt: now}},
+	}
+	traffic := &groupAutoSortExperienceStats{SuccessCount: 200, FirstTokenSamples: 200, P95FirstTokenMs: 500}
+
+	require.Equal(t, 3, groupAutoSortHealthTier(account, monitor, traffic))
+}
+
+func TestGroupAutoSortLatestProbeFailureBypassesMinimumResidence(t *testing.T) {
+	now := time.Now()
+	healthy := groupAutoSortAccount(1003, "healthy")
+	failed := groupAutoSortAccount(1004, "probe-failed")
+	admin := &groupAutoSortAdminStub{
+		groups: []Group{{ID: 100, AutoSortConfig: GroupAutoSortConfig{Enabled: true, Basis: domain.GroupAutoSortBasisExperience}}},
+		entries: map[int64][]AccountSchedulingEntry{
+			100: {
+				{AccountSchedulingConfig: AccountSchedulingConfig{AccountID: failed.ID, Priority: 1, SortOrder: 1}, Account: failed},
+				{AccountSchedulingConfig: AccountSchedulingConfig{AccountID: healthy.ID, Priority: 2, SortOrder: 2}, Account: healthy},
+			},
+		},
+	}
+	availability := &groupAutoSortAvailabilityStub{status: map[int64]*AccountMonitorStatus{
+		healthy.ID: {
+			AccountID: healthy.ID, Enabled: true, IntervalSeconds: 60,
+			LatestStatus: MonitorStatusOperational, LastCheckedAt: groupAutoSortTimePtr(now),
+			Timeline: []*AccountMonitorCheck{{Status: MonitorStatusOperational, CheckedAt: now}},
+		},
+		failed.ID: {
+			AccountID: failed.ID, Enabled: true, IntervalSeconds: 60,
+			LatestStatus: MonitorStatusError, LastCheckedAt: groupAutoSortTimePtr(now),
+			Timeline: []*AccountMonitorCheck{{Status: MonitorStatusError, CheckedAt: now}},
+		},
+	}}
+
+	svc := NewGroupAutoSortService(admin, availability, 0)
+	svc.lastReorderAt[100] = now.Add(-time.Minute)
+	svc.runOnce()
+
+	require.Equal(t, []int64{healthy.ID, failed.ID}, admin.updated)
+}
+
+func groupAutoSortIntPtr(v int) *int {
+	return &v
 }
 
 func TestFinalRateForAccount_UsesOnlyFreshProbeAndAppliesScale(t *testing.T) {

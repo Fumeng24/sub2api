@@ -218,13 +218,20 @@ func TestLogger_IngressRejectRemainsInStandardAccessLog(t *testing.T) {
 		t.Fatalf("status=%d", w.Code)
 	}
 	events := sink.list()
-	if len(events) != 1 {
-		t.Fatalf("events=%d, want 1", len(events))
+	var completed *logger.LogEvent
+	for _, event := range events {
+		if event != nil && event.Message == "http request completed" {
+			completed = event
+			break
+		}
 	}
-	if got := events[0].Fields["ingress_reject_reason"]; got != string(IngressRejectInvalidAPIKey) {
+	if completed == nil {
+		t.Fatalf("completed access event not found in %d events", len(events))
+	}
+	if got := completed.Fields["ingress_reject_reason"]; got != string(IngressRejectInvalidAPIKey) {
 		t.Fatalf("ingress_reject_reason=%v", got)
 	}
-	if got, _ := events[0].Fields[logger.OpsSystemLogSkipField].(bool); !got {
+	if got, _ := completed.Fields[logger.OpsSystemLogSkipField].(bool); !got {
 		t.Fatalf("%s must be true", logger.OpsSystemLogSkipField)
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 )
 
+const OpenAILunaCompatTargetModel = "gpt-5.6-sol"
+
 func NormalizeOpenAICompatRequestedModel(model string) string {
 	trimmed := strings.TrimSpace(model)
 	if trimmed == "" {
@@ -13,10 +15,22 @@ func NormalizeOpenAICompatRequestedModel(model string) string {
 	}
 
 	normalized, _, ok := splitOpenAICompatReasoningModel(trimmed)
-	if !ok || normalized == "" {
-		return trimmed
+	if ok && normalized != "" {
+		trimmed = normalized
 	}
-	return normalized
+	if isOpenAILunaCompatModel(trimmed) {
+		return OpenAILunaCompatTargetModel
+	}
+	return trimmed
+}
+
+func isOpenAILunaCompatModel(model string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	if index := strings.LastIndex(normalized, "/"); index >= 0 {
+		normalized = normalized[index+1:]
+	}
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	return normalized == "gpt-5.6-luna" || strings.HasPrefix(normalized, "gpt-5.6-luna-")
 }
 
 func applyOpenAICompatModelNormalization(req *apicompat.AnthropicRequest) {
