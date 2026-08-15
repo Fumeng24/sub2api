@@ -17,7 +17,7 @@ type openAISSEJSONContext struct {
 func (s *OpenAIGatewayService) handleSSEToJSONWithContext(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, body []byte, originalModel, mappedModel string) (*openaiNonStreamingResult, error) {
 	restore := bindOpenAISSEJSONContextCustom(ctx, c, account)
 	defer restore()
-	return s.handleSSEToJSON(resp, c, body, originalModel, mappedModel)
+	return s.handleSSEToJSON(resp, c, account, body, originalModel, mappedModel)
 }
 
 func bindOpenAISSEJSONContextCustom(ctx context.Context, c *gin.Context, account *Account) func() {
